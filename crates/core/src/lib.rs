@@ -4,6 +4,7 @@
 //! config files, file names). Validation lives here, never in the UI. No
 //! `cmd`/`powershell`/`reg`/`net` spawning anywhere in this crate.
 
+pub mod disk;
 pub mod network;
 pub mod safety;
 pub mod system;

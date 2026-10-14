@@ -30,6 +30,7 @@ export default function App() {
         setVersion(i.version);
         if (i.start_tab) boot.startTab = i.start_tab;
         boot.autorun = i.autorun;
+        if (i.scan_path) boot.scanPath = i.scan_path;
         if (isRoute(i.start_route)) setRoute(i.start_route);
       }
       setReady(true);

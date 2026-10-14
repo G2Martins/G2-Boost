@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
 /** True inside the Tauri webview; false in a plain browser (`bun run dev`). */
@@ -12,6 +13,7 @@ export type AppInfo = {
   start_route: string | null;
   start_tab: string | null;
   autorun: boolean;
+  scan_path: string | null;
 };
 
 export type DriveInfo = {
@@ -46,6 +48,35 @@ export type LatencyStats = {
 export type PingReport = { host: string; ip: string; probes: Probe[]; stats: LatencyStats };
 export type Hop = { ttl: number; addr: string | null; rtts_ms: (number | null)[] };
 
+export type NodeView = {
+  name: string;
+  size: number;
+  is_dir: boolean;
+  files: number;
+  mtime: number;
+  ids: number[];
+  children: NodeView[];
+  others_size: number;
+  others_count: number;
+};
+export type BigFile = { size: number; path: string; mtime: number };
+export type ScanSummary = {
+  root: string;
+  files: number;
+  dirs: number;
+  bytes: number;
+  errors: number;
+  elapsed_ms: number;
+  cancelled: boolean;
+};
+export type ScanProgressEvent = {
+  files: number;
+  dirs: number;
+  bytes: number;
+  errors: number;
+  current: string;
+};
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -71,10 +102,25 @@ export const backend = {
   appInfo: () => call<AppInfo>("app_info"),
   listDrives: () => call<DriveInfo[]>("list_drives"),
   memoryStatus: () => call<MemoryStatus>("memory_status"),
+
+  diskScanStart: (root: string) => callOrThrow<void>("disk_scan_start", { root }),
+  diskScanCancel: () => call<void>("disk_scan_cancel"),
+  diskSummary: () => call<ScanSummary | null>("disk_summary"),
+  diskTree: (ids: number[], depth = 2, maxChildren = 80) =>
+    call<NodeView | null>("disk_tree", { ids, depth, maxChildren }),
+  diskTopFiles: (n = 50) => call<BigFile[]>("disk_top_files", { n }),
+
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),
   traceHost: (host: string, maxHops: number, probes: number, timeoutMs: number) =>
     callOrThrow<Hop[]>("trace_host", { host, maxHops, probes, timeoutMs }),
+
+  /** Subscribe to a Rust-emitted event; no-op outside Tauri. */
+  on: async <T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> => {
+    if (!inTauri) return () => undefined;
+    return listen<T>(event, (e) => cb(e.payload));
+  },
+
   /** JSON over the Rust HTTP client (scoped in capabilities); plain fetch in the browser. */
   fetchJson: async <T>(url: string): Promise<T> => {
     const res = inTauri ? await tauriFetch(url) : await fetch(url);
