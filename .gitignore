@@ -1,0 +1,55 @@
+# planejamento GSD é local
+.planning/
+
+# dependências / builds
+node_modules/
+target/
+dist/
+out/
+.turbo/
+*.log
+
+# segredos / ambiente
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+
+# referências baixadas (binários de terceiros; os .bat e docs ficam)
+Referencias/Downloads/
+Referencias/*.tmp
+
+# SO / editores
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# --- from create-tauri-app ---
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
