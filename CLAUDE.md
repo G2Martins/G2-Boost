@@ -4,7 +4,7 @@
 >
 > **Última revisão:** 2026-10-14 (noite — fase 0 executada)
 > **Fonte única de regras:** [Docs/core/global-rules.md](Docs/core/global-rules.md) · **Roadmap:** [Docs/core/next-steps.md](Docs/core/next-steps.md) · **Estado/sprints:** `.planning/STATE.md` (local, gitignored — criar com `/gsd-new-project`) · **Índice de docs:** [Docs/README.md](Docs/README.md)
-> **Pasta:** o dono pediu renomear `Otimização PC` → `G2 Boost` (fazer com o VS Code fechado; a memória do Claude já foi copiada para a chave nova `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
+> **Pasta:** renomeada para `G2 Boost` em 2026-10-14 (memória do Claude na chave `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
 > **Projeto-irmão de referência (organização de pastas, Docs, design):** `G:\1. Projetos\6. Grovic Data\Valerium-Portal` (`CLAUDE.md`, `Docs/core/design-system.md`, `Docs/core/global-rules.md`). Mesmas convenções, outro domínio.
 
 ---
