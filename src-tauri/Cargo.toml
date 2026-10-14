@@ -1,16 +1,15 @@
 [package]
 name = "g2-boost"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-edition = "2024"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "G2 Boost — disk analyzer, Windows cleaner, network tools and game performance tweaks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+# The `_lib` suffix keeps the lib name unique vs the bin name on Windows
+# (https://github.com/rust-lang/cargo/issues/8519).
 name = "g2_boost_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -18,16 +17,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+g2boost-core = { path = "../crates/core" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-panic = "abort"
-strip = true
+serde = { workspace = true }
+serde_json = { workspace = true }

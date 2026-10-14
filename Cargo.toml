@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = ["src-tauri", "crates/core"]
+exclude = ["tools/vswhom-sys-stub"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Grovic Data"]
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+# No-admin toolchain (Docs/core/architecture.md §8): vswhom-sys would compile C++ with cl.exe.
+# The stub reports "no Visual Studio", which embed-resource treats as a normal miss (rc.exe comes
+# from the RC env var or the Windows Kits registry). Harmless on machines that do have VS.
+[patch.crates-io]
+vswhom-sys = { path = "tools/vswhom-sys-stub" }
+
+# https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

@@ -1,0 +1,11 @@
+[package]
+name = "vswhom-sys"
+version = "0.1.3"
+edition = "2021"
+description = "Stub of vswhom-sys: no C++ build, always reports 'no Visual Studio found' (G2 Boost no-admin toolchain)"
+license = "MIT"
+publish = false
+
+[lib]
+name = "vswhom_sys"
+path = "src/lib.rs"
