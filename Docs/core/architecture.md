@@ -1,6 +1,6 @@
 # Arquitetura — proposta e decisão de stack
 
-**Última revisão:** 2026-10-14 · **Status: DECIDIDO 2026-10-14 — opção A (Tauri 2)**, com a restrição do dono: toolchain, caches e downloads em **D:/G:**, não no C:.
+**Última revisão:** 2026-10-14 · **Status: DECIDIDO E EXECUTADO 2026-10-14 — opção A (Tauri 2)**, com a restrição do dono: toolchain, caches e downloads em **D:/G:**, não no C:.
 
 ## 1. Requisitos que puxam a decisão
 - Windows 10/11 x64, interface no estilo ExitLag (escuro, cards, gauges, gráficos em tempo real).
@@ -86,4 +86,4 @@ winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--quiet -
 ```
 `target/` do Cargo e `node_modules` ficam dentro do projeto (G:). `--no-modify-path`: o PATH do usuário ganha `D:\dev\cargo\bin` manualmente (feito no setup).
 
-**Plano B sem admin** (se o UAC do Build Tools não for aprovado): `xwin splat` baixa CRT + Windows SDK (headers/libs) da CDN da Microsoft para `D:\dev\xwin`, linker `rust-lld` via `.cargo/config.toml`, e LLVM portátil (`clang-cl`, `llvm-rc`, `llvm-lib`) para os crates com C (`libsqlite3-sys`) e para o recurso `.rc` do Tauri. Mais frágil; documentar se for usado.
+**Plano B sem admin — EM USO desde 2026-10-14** (UAC do Build Tools foi cancelado, exit 1602): `xwin splat --copy` baixou CRT + Windows SDK (libs completas; o alias de headers falhou por symlink sem privilégio, irrelevante) para `D:\dev\xwin`; linker `rust-lld` + `RC`/`INCLUDE`/`LIB` em `D:\dev\cargo\config.toml` (nível máquina, fora do repo); `rc.exe` + `rcdll.dll` oficiais do NuGet `Microsoft.Windows.SDK.BuildTools` em `D:\dev\winsdk-tools`; e `[patch.crates-io] vswhom-sys` → `tools/vswhom-sys-stub` (o único crate da árvore do Tauri que compila C++). Limite: nada com código C (`rusqlite bundled`, `ring`) compila sem `clang-cl`; persistência = JSON. Verificado: `cargo test --workspace` e `cargo build -p g2-boost` passam.

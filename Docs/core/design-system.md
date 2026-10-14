@@ -1,6 +1,6 @@
 # Design system — "cara de ExitLag", convenções do Valerium
 
-**Última revisão:** 2026-10-14 · **Fonte de tokens (quando existir):** `src/styles/globals.css` · **Referência de convenção:** `Valerium-Portal/Docs/core/design-system.md` e `packages/ui/src/globals.css` (mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente).
+**Última revisão:** 2026-10-14 (noite) · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/Docs/core/design-system.md` e `packages/ui/src/globals.css` (mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente).
 
 Referência visual: prints do ExitLag 5.23 em 2026-10-14 — escuro, cards de cantos suaves, abas sublinhadas, gauges em arco, toggles verdes, botão primário vermelho, `?` de ajuda ao lado de cada título. Aplicar com a skill `frontend-design`; evitar cara genérica de IA.
 
@@ -36,13 +36,13 @@ Gráficos (grayscale no Valerium; aqui com 2 acentos porque as séries têm iden
 | `--gauge-upload-start/end` | `330 75% 55%` → `350 70% 45%` | gauge de upload |
 
 ## 2. Tipografia
-ExitLag usa Ubuntu. Aqui: **Inter** empacotada (`font-sans`), `Geist Mono` para valores tabulares (ms, MB — `tabular-nums`), fallback `Segoe UI Variable`, `system-ui`. Escala: título de página 22px/600 · título de card 15px/600 · corpo 13px · rótulo 12px · valor de métrica 13px/600.
+ExitLag usa Ubuntu. Aqui (skill `frontend-design`: nada de Inter/Roboto): **Chakra Petch** (`font-display` — títulos, abas, botões, valores grandes; quadrada, cara de console), **Manrope** variável (`font-sans` — corpo), **JetBrains Mono** (`font-mono` + classe `.num` com `tabular-nums` — ms, MB, IPs). Tudo empacotado via `@fontsource` (offline; CSP não libera Google Fonts). Escala: título de página 22px/600 · título de card 15px/600 · corpo 13px · rótulo 12px · valor de métrica 13px/600.
 
 ## 3. Gráficos — convenção obrigatória
 Recharts envolto em `<ChartContainer>` + `ChartConfig` (portar `chart.tsx` do `packages/ui` do Valerium — Recharts v3, mesmos hurdles de tipos). Cores só por `--chart-*`. Gauge e treemap são canvas/SVG próprios (não existem no Recharts), mas também lêem tokens via `getComputedStyle`.
 
 ## 4. Estrutura — onde a UI vive
-- `src/components/ui/` — shadcn (reusar antes de criar).
+- `src/components/ui/primitives.tsx` — Button, Card/CardTitle, HelpHint (Radix Tooltip), Tabs (Radix, sublinhadas), Switch (Radix), StatusPill, Badge, MetricRow, EmptyState; `gauge.tsx` — arco 270° SVG com gradiente por token. Reusar antes de criar.
 - `src/components/<dominio>/` — `disk/`, `cleanup/`, `network/`, `boost/`, `shell/` (como `apps/dashboard/src/components/<dominio>` no Valerium).
 - Toda rota com **skeleton de loading** (padrão Valerium).
 - Biblioteca de apoio: `G:. Projetos. Grovic Data\Grovic-Components` — `directory.md` (blueprint), `design-ref/` (40+ marcas: linear, raycast, nvidia, cursor, posthog… inspiração de layout/microinteração, não copiar pixel), `ValeriumDesktop/` (Tauri 2 de referência), `ValeriumPro/`. Consultar antes de inventar componente.
@@ -58,6 +58,7 @@ Recharts envolto em `<ChartContainer>` + `ChartConfig` (portar `chart.tsx` do `p
 - `LatencyChart` (linha + marcadores de disponibilidade/perda na base) · `RamBar` (usado/livre) · `DnsRankRow` (posição, provedor, IPs, badge Atual/Mais rápido, resposta média, botão).
 
 ## 6. Regras
+- Texturas: `.carbon` (grade 28 px a 2,5 %) no fundo, `.grain` (SVG feTurbulence a 3,5 %) no banner, `.banner` (radial vermelho a 18 % no canto). Animações: `animate-rise` + `rise(i)` para revelação escalonada; `animate-pulse-dot` no status ON.
 - Estado perigoso = confirmação inline no card (sem `alert`); botão destrutivo `destructive` só depois da prévia.
 - Toda string via i18n; ícones Lucide; `prefers-reduced-motion` respeitado nas animações de gauge/treemap.
 - Antes de criar UI: (1) shadcn? (2) `Grovic-Components`? (3) inspiração `design-ref`/web — e re-amarrar nos tokens §1.

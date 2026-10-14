@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "g2-boost",
+  "productName": "G2 Boost",
   "version": "0.1.0",
   "identifier": "com.grovicdata.g2boost",
   "build": {
@@ -12,24 +12,39 @@
   "app": {
     "windows": [
       {
-        "title": "g2-boost",
-        "width": 800,
-        "height": 600
+        "title": "G2 Boost",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "center": true,
+        "theme": "Dark"
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://speed.cloudflare.com https://api.steampowered.com",
+      "devCsp": null
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "publisher": "Grovic Data",
+    "shortDescription": "G2 Boost",
+    "longDescription": "Disk analyzer, Windows cleaner, network tools and game performance tweaks.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "languages": ["PortugueseBR", "English"],
+        "displayLanguageSelector": true,
+        "installMode": "currentUser"
+      }
+    }
   }
 }

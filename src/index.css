@@ -1,0 +1,157 @@
+@import "tailwindcss";
+@import "@fontsource/chakra-petch/500.css";
+@import "@fontsource/chakra-petch/600.css";
+@import "@fontsource/chakra-petch/700.css";
+@import "@fontsource-variable/manrope/index.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/* Tokens canônicos (HSL triplets) — Docs/core/design-system.md. Zero hex nos componentes. */
+:root {
+  --background: 228 14% 7%;
+  --surface: 223 14% 10%;
+  --card: 225 13% 12%;
+  --card-hover: 222 14% 15%;
+  --border: 225 13% 18%;
+  --foreground: 220 15% 92%;
+  --muted-foreground: 222 8% 58%;
+  --primary: 356 78% 55%;
+  --primary-foreground: 0 0% 100%;
+  --success: 165 73% 46%;
+  --warning: 39 87% 62%;
+  --destructive: 358 100% 68%;
+  --ring: 165 73% 46%;
+  --chart-1: 258 90% 66%;
+  --chart-2: 37 92% 55%;
+  --chart-3: 142 71% 45%;
+  --gauge-download-start: 262 83% 58%;
+  --gauge-download-end: 280 70% 45%;
+  --gauge-upload-start: 330 75% 55%;
+  --gauge-upload-end: 350 70% 45%;
+  --radius: 0.5rem;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-surface: hsl(var(--surface));
+  --color-card: hsl(var(--card));
+  --color-card-hover: hsl(var(--card-hover));
+  --color-border: hsl(var(--border));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
+  --color-destructive: hsl(var(--destructive));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --radius-card: var(--radius);
+  --font-display: "Chakra Petch", "Segoe UI Variable", system-ui, sans-serif;
+  --font-sans: "Manrope Variable", "Segoe UI Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, monospace;
+  --animate-rise: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+  --animate-sweep: sweep 2.4s linear infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--success) / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px hsl(var(--success) / 0);
+  }
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans text-[13px] antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+  }
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.8);
+    outline-offset: 2px;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 3px solid hsl(var(--background));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer components {
+  /* grão de carbono: textura sutil, sem imagem externa */
+  .carbon {
+    background-color: hsl(var(--background));
+    background-image:
+      linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .panel {
+    @apply rounded-card border border-border bg-card;
+    box-shadow:
+      inset 0 1px 0 hsl(var(--foreground) / 0.04),
+      0 1px 2px hsl(0 0% 0% / 0.4);
+  }
+  .panel-hover {
+    @apply transition-colors duration-200 hover:bg-card-hover;
+  }
+  .banner {
+    background:
+      radial-gradient(60% 120% at 85% 0%, hsl(var(--primary) / 0.18), transparent 60%),
+      linear-gradient(180deg, hsl(var(--surface)), hsl(var(--background)));
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+}

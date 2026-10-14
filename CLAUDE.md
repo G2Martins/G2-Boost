@@ -2,7 +2,7 @@
 
 > **Spec viva.** Porta-de-entrada lida pelo agente toda sessão. Não duplica os docs profundos — **aponta** pra eles. Atualize quando uma regra, comando, módulo ou hurdle mudar.
 >
-> **Última revisão:** 2026-10-14
+> **Última revisão:** 2026-10-14 (noite — fase 0 executada)
 > **Fonte única de regras:** [Docs/core/global-rules.md](Docs/core/global-rules.md) · **Roadmap:** [Docs/core/next-steps.md](Docs/core/next-steps.md) · **Estado/sprints:** `.planning/STATE.md` (local, gitignored — criar com `/gsd-new-project`) · **Índice de docs:** [Docs/README.md](Docs/README.md)
 > **Pasta:** o dono pediu renomear `Otimização PC` → `G2 Boost` (fazer com o VS Code fechado; a memória do Claude já foi copiada para a chave nova `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
 > **Projeto-irmão de referência (organização de pastas, Docs, design):** `G:\1. Projetos\6. Grovic Data\Valerium-Portal` (`CLAUDE.md`, `Docs/core/design-system.md`, `Docs/core/global-rules.md`). Mesmas convenções, outro domínio.
@@ -29,21 +29,24 @@ App desktop **Windows 10/11** (x64) que junta, numa interface no estilo ExitLag 
 - Alternativas avaliadas: Electron + FFI (zero toolchain nova, binário ~200 MB, spawn de shell tentador) · .NET 8 WinUI 3 (nativo, UI custom cara, skills de web não transferem).
 - **Precedente interno:** `Grovic-Components/ValeriumDesktop` já é Tauri 2 (wrapper web com tray/deep-link/updater assinado) — referência de config, não base de produto.
 
-Comandos (preencher quando o scaffold existir):
+Comandos (toolchain: `D:\dev\cargo\bin` no PATH do usuário; nova shell depois da instalação):
 
 ```bash
-# bun run dev        # Tauri dev (UI + core)
-# bun run test       # Vitest (UI) + cargo test (core)
-# bun run lint       # Biome + cargo clippy
-# bun run typecheck  # tsc --noEmit
-# bun run build      # bundle NSIS assinado
+bun install            # deps JS (cache em D:\dev\bun-cache; bunfig: exact + minimumReleaseAge 7d)
+bun run tauri:dev      # app de verdade (Vite + Rust, hot reload) — PRIMEIRA vez compila ~5-10 min
+bun run dev            # só a UI no browser (comandos Rust voltam null; speedtest funciona)
+bun run typecheck      # tsc (também garante simetria pt-BR/en via `satisfies`)
+bun run lint           # Biome + cargo clippy -D warnings
+bun run test           # cargo test --workspace (core: SafePath, Win32 system)
+bun run check          # typecheck + lint + test — DEVE estar verde antes de fechar fase
+bun run tauri:build    # NSIS em target/release/bundle/nsis (sem assinatura ainda)
 ```
 
 Máquina de dev hoje (2026-10-14): Windows 11 Pro 26200, 32 GB RAM, **C: 40 GB livres** (o app vai nascer resolvendo o próprio problema). Node 22 ✓ · Bun 1.3.11 ✓ · WebView2 ✓ · git/gh ✓ · Python 3.11 ✓ · **faltam** rustup (MSVC) + VS Build Tools 2022 "Desktop development with C++" (~4 GB) · sem .NET SDK · Kaspersky 21.26 instalado (o AV que flagrou os scripts — vira ambiente de teste).
 
 ## 3. Mapa de módulos (planejado)
 
-Layout proposto (espelha o espírito apps/packages do Valerium, adaptado a Cargo workspace): `src/` (UI React por domínio) · `src-tauri/` (shell Tauri) · `crates/core` (lib Rust: disk, cleanup, network, boost, safety) · `crates/mcp` (binário stdio) · `Docs/` · `scripts/` · `tests/` (fixtures de FS sandbox) · `.planning/` (local).
+Layout real (Cargo workspace + Vite): `src/` (UI React: `components/shell`, `components/ui/primitives.tsx`, `pages/<módulo>.tsx`, `lib/` (i18n, backend, speedtest), `locales/`, `data/catalogs.ts`) · `src-tauri/` (shell Tauri: comandos IPC finos em `src/lib.rs`) · `crates/core` (lib Rust: `safety.rs` SafePath, `system.rs` Win32 read-only; futuros `disk`, `cleanup`, `network`, `boost`) · `crates/mcp` (a criar) · `Docs/` · `.planning/` (local). Toolchain fora do repo em `D:\dev` (ver [architecture.md §8](Docs/core/architecture.md)).
 
 | Módulo | O que faz | Doc |
 |---|---|---|
@@ -89,16 +92,20 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Cloudflare speedtest:** `https://speed.cloudflare.com/__down?bytes=N` e `__up`, CORS `*`; ISP/IP/cidade vêm nos headers `cf-meta-*` (o `/meta` via curl voltou `{}`). Ookla CLI é proprietário — não usar.
 - **Steam SDR:** `https://api.steampowered.com/ISteamApps/GetSDRConfig/v1/?appid=730` → 53 POPs com IPs de relay (`gru` = São Paulo). Serve CS2/Dota 2/Deadlock sem chave.
 - **WMIC removido no 24H2** (o script v2.0 já quebrou por isso) → WMI/CIM via API.
-- **Comando Bash > ~8 KB falha no Windows** (`unexpected EOF while looking for matching`) — heredoc grande é truncado. Arquivo grande = tool `Write`.
+- **Comando Bash > ~8 KB falha no Windows** (`unexpected EOF while looking for matching`) — heredoc grande é truncado. **E heredoc colapsa `\\` em `\`** (Python com `D:\\dev` vira `D:\dev` → `unicodeescape`). Arquivo grande ou com barra invertida = tool `Write` (script no scratchpad) e rodar com `python -I`.
 - **`python -I` ignora user-site** → libs no scratchpad via venv.
 - **GSD global 1.16.0** (atualizado 2026-10-14); instalador avisa `node >= 24` (temos 22) mas funcionou. Hooks novos valem na próxima sessão.
+- **VS Build Tools NÃO instalado (UAC cancelado, exit 1602).** O projeto compila mesmo assim pelo plano B sem admin: `D:\dev\cargo\config.toml` aponta linker `rust-lld` + libs CRT/SDK do `xwin` (`D:\dev\xwin`) + `rc.exe` oficial do NuGet (`D:\dev\winsdk-tools`). `xwin splat` falhou só no alias de headers (symlink sem privilégio) — libs completas (481 `.lib`). `vswhom-sys` (C++ dentro do `embed-resource`) é substituído por `tools/vswhom-sys-stub` via `[patch.crates-io]` — não remover sem Build Tools. Crates com código C (ex.: `rusqlite bundled`) precisariam de `clang-cl` (LLVM portátil, 900 MB) — evitar; persistência em JSON por enquanto. Para o caminho oficial, rodar o `winget` do architecture §8 aprovando o UAC.
+- **Kaspersky intercepta TLS** (`pip install` falhou com erro de certificado no subagente). Downloads via `curl`/`Invoke-WebRequest` passaram; se `pip`/`cargo` reclamarem de certificado, é o AV, não a rede.
+- **`tsc` é o gate de i18n**: `en.ts` usa `satisfies Record<keyof typeof ptBR, string>` — chave faltando ou sobrando quebra o typecheck. Não precisa de script separado.
+- **Comandos Tauri fora do Tauri** (`bun run dev` no browser) voltam `null` via `backend.ts` (`inTauri` guard) — a UI mostra "—", não quebra.
 
 ## 7. Antes de fechar qualquer fase
 
 - [ ] Doc da feature atualizada (data) · catálogo de limpeza revisado por risco
 - [ ] Testes: unit + integração em FS sandbox + segurança (traversal, junction, symlink, MCP sem token)
 - [ ] Nenhum spawn de shell novo · nenhuma deleção fora do catálogo/seleção
-- [ ] `cargo clippy` · `bun run lint` · `bun run typecheck` verdes
+- [ ] `bun run check` verde (typecheck + Biome + clippy + cargo test)
 - [ ] i18n pt-BR + en simétrico · tokens de design (zero hex)
 - [ ] `.planning/STATE.md` atualizado
 
