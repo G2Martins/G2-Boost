@@ -77,6 +77,25 @@ export type ScanProgressEvent = {
   current: string;
 };
 
+export type TweakStatus = "on" | "off" | "partial" | "unavailable";
+export type FxLevel = "appearance" | "minimal" | "balanced" | "performance";
+export type ServiceState = {
+  name: string;
+  start: "auto" | "manual" | "disabled" | "other";
+  running: boolean;
+};
+export type TweakState = {
+  id: string;
+  admin: boolean;
+  beta: boolean;
+  status: TweakStatus;
+  has_backup: boolean;
+  level: FxLevel | null;
+  detail: string | null;
+  services: ServiceState[];
+};
+export type PurgeResult = { before_avail: number; after_avail: number; freed_bytes: number };
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -109,6 +128,14 @@ export const backend = {
   diskTree: (ids: number[], depth = 2, maxChildren = 80) =>
     call<NodeView | null>("disk_tree", { ids, depth, maxChildren }),
   diskTopFiles: (n = 50) => call<BigFile[]>("disk_top_files", { n }),
+
+  boostState: () => call<TweakState[]>("boost_state"),
+  boostApply: (id: string, on: boolean) => callOrThrow<TweakState>("boost_apply", { id, on }),
+  boostVisualFx: (level: FxLevel) => callOrThrow<TweakState>("boost_visual_fx", { level }),
+  boostVisualFxRevert: () => callOrThrow<TweakState>("boost_visual_fx_revert"),
+  ramPurge: () => callOrThrow<PurgeResult>("ram_purge"),
+  /** Relaunches the app elevated (UAC prompt) on `route`; this instance exits on success. */
+  relaunchElevated: (route: string) => callOrThrow<void>("relaunch_elevated", { route }),
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),

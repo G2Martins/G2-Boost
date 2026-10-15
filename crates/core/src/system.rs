@@ -1,6 +1,7 @@
 //! Read-only system facts: elevation, OS version, memory, drives.
 //! All via Win32; nothing here spawns a process.
 
+use std::collections::HashSet;
 use std::mem::size_of;
 
 use serde::Serialize;
@@ -9,9 +10,56 @@ use windows::Win32::Security::{
     GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation,
 };
 use windows::Win32::Storage::FileSystem::{GetDiskFreeSpaceExW, GetDriveTypeW};
+use windows::Win32::System::ProcessStatus::EnumProcesses;
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX, OSVERSIONINFOW};
-use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
-use windows::core::PCWSTR;
+use windows::Win32::System::Threading::{
+    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    QueryFullProcessImageNameW,
+};
+use windows::core::{PCWSTR, PWSTR};
+
+/// Lowercase exe names of running processes (best effort: protected processes are skipped).
+/// Used to warn "close X first" and to detect games.
+pub fn running_processes() -> HashSet<String> {
+    running_process_paths().into_iter().filter_map(|p| p.rsplit('\\').next().map(|n| n.to_ascii_lowercase())).collect()
+}
+
+/// Full image paths of running processes we are allowed to query.
+pub fn running_process_paths() -> Vec<String> {
+    let mut pids = vec![0u32; 1024];
+    let mut needed = 0u32;
+    loop {
+        let cb = (pids.len() * 4) as u32;
+        // SAFETY: buffer of `cb` bytes; `needed` receives the bytes written.
+        if unsafe { EnumProcesses(pids.as_mut_ptr(), cb, &mut needed) }.is_err() {
+            return Vec::new();
+        }
+        if needed < cb {
+            break;
+        }
+        pids.resize(pids.len() * 2, 0);
+    }
+    let mut out = Vec::new();
+    for &pid in &pids[..(needed / 4) as usize] {
+        if pid == 0 {
+            continue;
+        }
+        // SAFETY: limited-information handle; closed below; buffer sized for the call.
+        unsafe {
+            let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+                continue;
+            };
+            let mut buf = [0u16; 1024];
+            let mut len = buf.len() as u32;
+            let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+            let _ = CloseHandle(h);
+            if ok {
+                out.push(String::from_utf16_lossy(&buf[..len as usize]));
+            }
+        }
+    }
+    out
+}
 
 /// Is the current process running with an elevated (admin) token?
 pub fn is_elevated() -> bool {
@@ -124,6 +172,13 @@ mod tests {
         assert!(drives.iter().any(|d| d.letter.eq_ignore_ascii_case("C:")));
         let c = drives.iter().find(|d| d.letter.eq_ignore_ascii_case("C:")).unwrap();
         assert!(c.total_bytes > 0 && c.free_bytes <= c.total_bytes);
+    }
+
+    #[test]
+    fn running_processes_include_this_test_binary() {
+        let me = std::env::current_exe().unwrap();
+        let name = me.file_name().unwrap().to_string_lossy().to_ascii_lowercase();
+        assert!(running_processes().contains(&name));
     }
 
     #[test]

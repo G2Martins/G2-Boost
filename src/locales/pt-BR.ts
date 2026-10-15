@@ -218,43 +218,107 @@ export const ptBR = {
   "boost.preset.custom": "Personalizado",
   "boost.tweaks.help":
     "Cada ajuste salva o valor anterior antes de mudar e volta ao original ao desligar — nunca um 'padrão' chutado.",
-  "boost.tweak.game_mode": "Desempenho máximo para jogos",
+  "boost.tweak.visual_fx": "Efeitos visuais do Windows",
+  "boost.tweak.visual_fx.desc":
+    "Os 17 itens de 'Opções de Desempenho' em níveis. Mínima tira só o pesado; Média é a configuração equilibrada; Máxima deixa só as fontes suavizadas. Aplica na hora, sem logoff.",
+  "boost.tweak.visual_fx.warn":
+    "você gosta das animações — isso muda a sensação do desktop, não o FPS em tela cheia.",
+  "boost.tweak.game_mode": "Modo de jogo e Game DVR",
   "boost.tweak.game_mode.desc":
-    "Game Mode ligado, Game DVR/captura em segundo plano desligados, prioridade de GPU e CPU para a categoria Jogos (MMCSS).",
+    "Game Mode ligado; gravação em segundo plano (Game DVR) e captura da Xbox Game Bar desligadas.",
   "boost.tweak.game_mode.warn": "você usa a Xbox Game Bar para gravar clipes.",
+  "boost.tweak.input_lag": "Reduzir input lag",
+  "boost.tweak.input_lag.desc":
+    "Desliga as otimizações de tela cheia do Windows para todos os jogos (FSE), que atrasam a exibição do quadro.",
+  "boost.tweak.input_lag.warn": "você depende de overlays que exigem o modo janela otimizado.",
+  "boost.tweak.keyboard": "Reduzir tempo de entrada do teclado",
+  "boost.tweak.keyboard.desc":
+    "Menor atraso e maior taxa de repetição de teclas (SystemParametersInfo).",
+  "boost.tweak.keyboard.warn": "você tem dificuldade motora e usa as teclas de filtro.",
+  "boost.tweak.tips": "Sem dicas e sugestões",
+  "boost.tweak.tips.desc":
+    "Desliga dicas, sugestões no Iniciar e conteúdo promovido (ContentDeliveryManager).",
+  "boost.tweak.tips.warn": "você quer as sugestões de apps da Microsoft.",
+  "boost.tweak.mouse": "Mouse sem aceleração",
+  "boost.tweak.mouse.desc":
+    "Precisão do ponteiro desligada: o movimento no mousepad vira movimento 1:1 na tela.",
+  "boost.tweak.mouse.warn": "você se acostumou com a aceleração.",
+  "boost.tweak.svc_sysmain": "Desligar SysMain (Superfetch)",
+  "boost.tweak.svc_sysmain.desc":
+    "Para o serviço que pré-carrega apps na RAM e alimenta o Prefetch. Em SSD o ganho dele é ~0; parar tira leitura de disco em segundo plano.",
+  "boost.tweak.svc_sysmain.warn":
+    "o Windows está num HD mecânico — aí o SysMain ajuda a abrir programas.",
+  "boost.tweak.svc_telemetry": "Desligar telemetria",
+  "boost.tweak.svc_telemetry.desc":
+    "Para os serviços DiagTrack e dmwappushservice (Experiências do Usuário Conectado e Telemetria).",
+  "boost.tweak.svc_telemetry.warn": "você participa do Programa Windows Insider.",
+  "boost.tweak.power_plan": "Plano de energia Desempenho máximo",
+  "boost.tweak.power_plan.desc":
+    "Ativa o esquema Desempenho máximo (Ultimate Performance): sem estacionamento de núcleos nem economia agressiva. Ao desligar, volta ao plano anterior.",
+  "boost.tweak.power_plan.warn": "é um notebook na bateria.",
   "boost.tweak.hags": "Agendamento de GPU acelerado por hardware",
   "boost.tweak.hags.desc":
     "Deixa a GPU gerenciar a própria memória de vídeo (HAGS). Reduz latência em placas recentes.",
   "boost.tweak.hags.warn": "a GPU é anterior a 2018 ou o driver apresenta travamentos.",
-  "boost.tweak.input_lag": "Reduzir input lag",
-  "boost.tweak.input_lag.desc":
-    "Desliga otimizações de tela cheia e a captura automática que atrasam a exibição do quadro.",
-  "boost.tweak.input_lag.warn": "você depende de overlays que exigem o modo janela otimizado.",
-  "boost.tweak.keyboard": "Reduzir tempo de entrada do teclado",
-  "boost.tweak.keyboard.desc":
-    "Menor atraso e maior taxa de repetição de teclas nas configurações do sistema.",
-  "boost.tweak.keyboard.warn": "você tem dificuldade motora e usa as teclas de filtro.",
+  "boost.tweak.mmcss": "Prioridade multimídia para jogos",
+  "boost.tweak.mmcss.desc":
+    "Categoria Jogos do MMCSS com prioridade alta de CPU/GPU/E/S e SystemResponsiveness em 10 % (padrão 20 %).",
+  "boost.tweak.mmcss.warn": "você grava ou faz streaming enquanto joga e o encoder perde quadros.",
+  "boost.tweak.network_latency": "Latência de rede para jogos",
+  "boost.tweak.network_latency.desc":
+    "ACK imediato e sem algoritmo de Nagle em todas as interfaces (TcpAckFrequency/TCPNoDelay/TcpDelAckTicks).",
+  "boost.tweak.network_latency.warn": "a conexão é por satélite ou com muita perda de pacotes.",
+  "boost.tweak.svc_search": "Desligar indexação da Pesquisa",
+  "boost.tweak.svc_search.desc":
+    "Para o Windows Search (WSearch). Sem ele, a busca de arquivos no Iniciar e no Outlook fica lenta ou vazia.",
+  "boost.tweak.svc_search.warn": "você usa a busca do Windows ou do Outlook todo dia.",
+  "boost.tweak.svc_xbox": "Desligar serviços Xbox",
+  "boost.tweak.svc_xbox.desc": "Para XblAuthManager, XblGameSave, XboxNetApiSvc e XboxGipSvc.",
+  "boost.tweak.svc_xbox.warn": "você usa Game Pass, o app Xbox ou jogos da Microsoft Store.",
+  "boost.tweak.priority_sep": "Prioridade de primeiro plano",
+  "boost.tweak.priority_sep.desc":
+    "Win32PrioritySeparation = 0x26: fatias curtas e fixas, 3:1 para a janela em primeiro plano. Ganho não comprovado.",
+  "boost.tweak.priority_sep.warn":
+    "você roda encoder, compilação ou servidor em segundo plano enquanto joga.",
   "boost.tweak.perf_counters": "Desligar contadores de desempenho do Windows",
   "boost.tweak.perf_counters.desc":
     "Desativa a coleta de contadores (Perflib) que consome CPU em segundo plano.",
   "boost.tweak.perf_counters.warn":
     "você usa Monitor de Desempenho, Gerenciador de Tarefas detalhado ou ferramentas de telemetria.",
-  "boost.tweak.power_plan": "Plano de energia Desempenho máximo",
-  "boost.tweak.power_plan.desc":
-    "Ativa o esquema Ultimate Performance (cópia própria) e desliga o estacionamento de núcleos.",
-  "boost.tweak.power_plan.warn": "é um notebook na bateria.",
-  "boost.tweak.network_latency": "Latência de rede para jogos",
-  "boost.tweak.network_latency.desc":
-    "ACK imediato e sem Nagle nas interfaces (TcpAckFrequency/TCPNoDelay) e reserva de banda do QoS em 0 %.",
-  "boost.tweak.network_latency.warn": "a conexão é por satélite ou com muita perda de pacotes.",
-  "boost.tweak.mouse": "Mouse sem aceleração",
-  "boost.tweak.mouse.desc":
-    "Precisão do ponteiro desligada: o movimento no mousepad vira movimento 1:1 na tela.",
-  "boost.tweak.mouse.warn": "você se acostumou com a aceleração.",
-  "boost.tweak.background_services": "Serviços em segundo plano",
-  "boost.tweak.background_services.desc":
-    "SysMain (Superfetch) e indexação da Pesquisa em início atrasado enquanto você joga.",
-  "boost.tweak.background_services.warn": "você usa muito a busca do Windows ou tem HD mecânico.",
+  "boost.fx.level.appearance": "Aparência",
+  "boost.fx.level.minimal": "Mínima",
+  "boost.fx.level.balanced": "Média",
+  "boost.fx.level.performance": "Máxima",
+  "boost.fx.custom": "Mistura própria",
+  "boost.fx.revert": "Restaurar como estava",
+  "boost.state.on": "Ativo",
+  "boost.state.off": "Inativo",
+  "boost.state.partial": "Parcial",
+  "boost.state.unavailable": "Indisponível neste PC",
+  "boost.state.backup": "Backup salvo",
+  "boost.state.no_backup": "Sem backup",
+  "boost.state.backup.hint": "Desligar restaura exatamente o valor original.",
+  "boost.state.no_backup.hint": "Sem backup: desligar grava o padrão do Windows.",
+  "boost.state.reboot": "Vale após reiniciar",
+  "boost.svc.auto": "automático",
+  "boost.svc.manual": "manual",
+  "boost.svc.disabled": "desativado",
+  "boost.svc.other": "outro",
+  "boost.svc.running": "em execução",
+  "boost.svc.stopped": "parado",
+  "boost.elevate": "Elevar (administrador)",
+  "boost.elevate.hint":
+    "Serviços, plano de energia, HAGS, rede e limpeza de RAM mexem em HKLM: precisam de administrador. O app reabre elevado nesta aba.",
+  "boost.elevated": "Executando como administrador",
+  "boost.preset.applying": "Aplicando preset: {done}/{total}…",
+  "boost.preset.skipped_admin":
+    "{count} ajuste(s) precisam de administrador e ficaram de fora. Eleve o app e aplique de novo.",
+  "boost.error.needs_admin": "Precisa de administrador.",
+  "boost.error.cancelled": "Elevação cancelada.",
+  "boost.error.generic": "Falhou: {error}",
+  "boost.ram.freed": "{freed} liberados",
+  "boost.ram.freed_none": "Nada a liberar agora",
+  "boost.ram.soon_routine": "A rotina automática chega na fase Rotinas.",
   "boost.ram.title": "Limpeza de RAM",
   "boost.ram.help":
     "Libera a lista de espera (standby) e páginas modificadas, o que corta engasgos em jogos. Não encolhe o working set dos apps: isso comprovadamente piora.",

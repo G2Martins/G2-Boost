@@ -6,10 +6,30 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use g2boost_core::boost::{self, PurgeResult, TweakState};
 use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::network::{self, Hop, LatencyStats, Probe};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
+use g2boost_core::visualfx::Level;
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
+const ROUTES: &[&str] = &["disk", "cleanup", "network", "boost", "settings"];
+
+/// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
+/// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
+fn start_route() -> Option<String> {
+    let mut args = std::env::args().skip(1);
+    let mut from_cli = None;
+    while let Some(a) = args.next() {
+        if a == "--route" {
+            from_cli = args.next();
+        }
+    }
+    from_cli
+        .or_else(|| std::env::var("G2BOOST_START_ROUTE").ok())
+        .filter(|r| ROUTES.contains(&r.as_str()))
+}
 
 #[derive(serde::Serialize)]
 struct AppInfo {
@@ -34,7 +54,7 @@ fn app_info() -> AppInfo {
         core_version: g2boost_core::VERSION,
         os: system::os_version(),
         elevated: system::is_elevated(),
-        start_route: std::env::var("G2BOOST_START_ROUTE").ok(),
+        start_route: start_route(),
         start_tab: std::env::var("G2BOOST_START_TAB").ok(),
         autorun: std::env::var("G2BOOST_AUTORUN").is_ok_and(|v| v == "1"),
         scan_path: std::env::var("G2BOOST_SCAN_PATH").ok(),
@@ -49,6 +69,59 @@ fn list_drives() -> Vec<DriveInfo> {
 #[tauri::command]
 fn memory_status() -> Option<MemoryStatus> {
     system::memory_status()
+}
+
+/* ---------------- boost ---------------- */
+
+#[tauri::command]
+async fn boost_state() -> Vec<TweakState> {
+    tauri::async_runtime::spawn_blocking(boost::detect_all).await.unwrap_or_default()
+}
+
+#[tauri::command]
+async fn boost_apply(id: String, on: bool) -> Result<TweakState, String> {
+    tauri::async_runtime::spawn_blocking(move || boost::apply(&id, on).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn boost_visual_fx(level: String) -> Result<TweakState, String> {
+    let level = match level.as_str() {
+        "appearance" => Level::Appearance,
+        "minimal" => Level::Minimal,
+        "balanced" => Level::Balanced,
+        "performance" => Level::Performance,
+        _ => return Err("unknown_level".into()),
+    };
+    tauri::async_runtime::spawn_blocking(move || boost::apply_visual_fx(level).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn boost_visual_fx_revert() -> Result<TweakState, String> {
+    tauri::async_runtime::spawn_blocking(|| boost::revert_visual_fx().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn ram_purge() -> Result<PurgeResult, String> {
+    tauri::async_runtime::spawn_blocking(|| boost::purge_standby_list().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Relaunch this exe elevated (UAC) on `route`, then quit this instance.
+#[tauri::command]
+fn relaunch_elevated(app: AppHandle, route: String) -> Result<(), String> {
+    if !ROUTES.contains(&route.as_str()) {
+        return Err("unknown_route".into());
+    }
+    boost::relaunch_elevated(&["--route", &route]).map_err(|e| e.to_string())?;
+    app.exit(0);
+    Ok(())
 }
 
 /* ---------------- disk scan ---------------- */
@@ -218,6 +291,12 @@ pub fn run() {
             app_info,
             list_drives,
             memory_status,
+            boost_state,
+            boost_apply,
+            boost_visual_fx,
+            boost_visual_fx_revert,
+            ram_purge,
+            relaunch_elevated,
             disk_scan_start,
             disk_scan_cancel,
             disk_summary,

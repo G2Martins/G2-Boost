@@ -220,42 +220,106 @@ export const en = {
   "boost.preset.custom": "Custom",
   "boost.tweaks.help":
     "Every tweak saves the previous value before changing it and restores the original when turned off — never a guessed 'default'.",
-  "boost.tweak.game_mode": "Maximum performance for games",
+  "boost.tweak.visual_fx": "Windows visual effects",
+  "boost.tweak.visual_fx.desc":
+    "The 17 items of 'Performance Options' as levels. Minimal removes only the heavy ones; Balanced is the middle ground; Maximum keeps only smooth fonts. Applies instantly, no logoff.",
+  "boost.tweak.visual_fx.warn":
+    "you like the animations — this changes how the desktop feels, not fullscreen FPS.",
+  "boost.tweak.game_mode": "Game Mode and Game DVR",
   "boost.tweak.game_mode.desc":
-    "Game Mode on, Game DVR/background capture off, GPU and CPU priority for the Games category (MMCSS).",
+    "Game Mode on; background recording (Game DVR) and Xbox Game Bar capture off.",
   "boost.tweak.game_mode.warn": "you use the Xbox Game Bar to record clips.",
+  "boost.tweak.input_lag": "Reduce input lag",
+  "boost.tweak.input_lag.desc":
+    "Turns off Windows fullscreen optimizations for every game (FSE), which delay frame presentation.",
+  "boost.tweak.input_lag.warn": "you rely on overlays that need optimized windowed mode.",
+  "boost.tweak.keyboard": "Reduce keyboard input delay",
+  "boost.tweak.keyboard.desc":
+    "Shorter repeat delay and faster repeat rate (SystemParametersInfo).",
+  "boost.tweak.keyboard.warn": "you have motor difficulties and use Filter Keys.",
+  "boost.tweak.tips": "No tips and suggestions",
+  "boost.tweak.tips.desc":
+    "Turns off tips, Start menu suggestions and promoted content (ContentDeliveryManager).",
+  "boost.tweak.tips.warn": "you want Microsoft's app suggestions.",
+  "boost.tweak.mouse": "Mouse without acceleration",
+  "boost.tweak.mouse.desc": "Pointer precision off: mousepad movement becomes 1:1 screen movement.",
+  "boost.tweak.mouse.warn": "you got used to acceleration.",
+  "boost.tweak.svc_sysmain": "Disable SysMain (Superfetch)",
+  "boost.tweak.svc_sysmain.desc":
+    "Stops the service that preloads apps into RAM and feeds Prefetch. On an SSD its gain is ~0; stopping it removes background disk reads.",
+  "boost.tweak.svc_sysmain.warn":
+    "Windows runs on a mechanical HDD — there SysMain helps launch programs.",
+  "boost.tweak.svc_telemetry": "Disable telemetry",
+  "boost.tweak.svc_telemetry.desc":
+    "Stops the DiagTrack and dmwappushservice services (Connected User Experiences and Telemetry).",
+  "boost.tweak.svc_telemetry.warn": "you are in the Windows Insider Program.",
+  "boost.tweak.power_plan": "Ultimate Performance power plan",
+  "boost.tweak.power_plan.desc":
+    "Activates the Ultimate Performance scheme: no core parking or aggressive power saving. Turning it off returns to the previous plan.",
+  "boost.tweak.power_plan.warn": "it is a laptop on battery.",
   "boost.tweak.hags": "Hardware-accelerated GPU scheduling",
   "boost.tweak.hags.desc":
     "Lets the GPU manage its own video memory (HAGS). Lowers latency on recent cards.",
   "boost.tweak.hags.warn": "the GPU is older than 2018 or the driver crashes.",
-  "boost.tweak.input_lag": "Reduce input lag",
-  "boost.tweak.input_lag.desc":
-    "Turns off fullscreen optimizations and the automatic capture that delay frame presentation.",
-  "boost.tweak.input_lag.warn": "you rely on overlays that need optimized windowed mode.",
-  "boost.tweak.keyboard": "Reduce keyboard input delay",
-  "boost.tweak.keyboard.desc":
-    "Shorter repeat delay and faster repeat rate in the system settings.",
-  "boost.tweak.keyboard.warn": "you have motor difficulties and use Filter Keys.",
+  "boost.tweak.mmcss": "Multimedia priority for games",
+  "boost.tweak.mmcss.desc":
+    "MMCSS Games category with high CPU/GPU/IO priority and SystemResponsiveness at 10% (default 20%).",
+  "boost.tweak.mmcss.warn": "you record or stream while playing and the encoder drops frames.",
+  "boost.tweak.network_latency": "Network latency for games",
+  "boost.tweak.network_latency.desc":
+    "Immediate ACK and no Nagle on every interface (TcpAckFrequency/TCPNoDelay/TcpDelAckTicks).",
+  "boost.tweak.network_latency.warn": "the connection is satellite or very lossy.",
+  "boost.tweak.svc_search": "Disable Search indexing",
+  "boost.tweak.svc_search.desc":
+    "Stops Windows Search (WSearch). Without it, file search in Start and Outlook gets slow or empty.",
+  "boost.tweak.svc_search.warn": "you use Windows or Outlook search every day.",
+  "boost.tweak.svc_xbox": "Disable Xbox services",
+  "boost.tweak.svc_xbox.desc": "Stops XblAuthManager, XblGameSave, XboxNetApiSvc and XboxGipSvc.",
+  "boost.tweak.svc_xbox.warn": "you use Game Pass, the Xbox app or Microsoft Store games.",
+  "boost.tweak.priority_sep": "Foreground priority",
+  "boost.tweak.priority_sep.desc":
+    "Win32PrioritySeparation = 0x26: short fixed quanta, 3:1 for the foreground window. Unproven gain.",
+  "boost.tweak.priority_sep.warn":
+    "you run an encoder, a build or a server in the background while playing.",
   "boost.tweak.perf_counters": "Disable Windows performance counters",
   "boost.tweak.perf_counters.desc":
     "Turns off the counter collection (Perflib) that burns CPU in the background.",
   "boost.tweak.perf_counters.warn":
     "you use Performance Monitor, the detailed Task Manager or telemetry tools.",
-  "boost.tweak.power_plan": "Ultimate Performance power plan",
-  "boost.tweak.power_plan.desc":
-    "Enables the Ultimate Performance scheme (own copy) and disables core parking.",
-  "boost.tweak.power_plan.warn": "it is a laptop on battery.",
-  "boost.tweak.network_latency": "Network latency for games",
-  "boost.tweak.network_latency.desc":
-    "Immediate ACK and no Nagle on interfaces (TcpAckFrequency/TCPNoDelay) and QoS bandwidth reservation at 0%.",
-  "boost.tweak.network_latency.warn": "the connection is satellite or very lossy.",
-  "boost.tweak.mouse": "Mouse without acceleration",
-  "boost.tweak.mouse.desc": "Pointer precision off: mousepad movement becomes 1:1 screen movement.",
-  "boost.tweak.mouse.warn": "you got used to acceleration.",
-  "boost.tweak.background_services": "Background services",
-  "boost.tweak.background_services.desc":
-    "SysMain (Superfetch) and Search indexing set to delayed start while you play.",
-  "boost.tweak.background_services.warn": "you use Windows Search a lot or have a mechanical HDD.",
+  "boost.fx.level.appearance": "Appearance",
+  "boost.fx.level.minimal": "Minimal",
+  "boost.fx.level.balanced": "Balanced",
+  "boost.fx.level.performance": "Maximum",
+  "boost.fx.custom": "Custom mix",
+  "boost.fx.revert": "Restore as it was",
+  "boost.state.on": "On",
+  "boost.state.off": "Off",
+  "boost.state.partial": "Partial",
+  "boost.state.unavailable": "Not available on this PC",
+  "boost.state.backup": "Backup saved",
+  "boost.state.no_backup": "No backup",
+  "boost.state.backup.hint": "Turning off restores the exact original value.",
+  "boost.state.no_backup.hint": "No backup: turning off writes the Windows default.",
+  "boost.state.reboot": "Takes effect after reboot",
+  "boost.svc.auto": "automatic",
+  "boost.svc.manual": "manual",
+  "boost.svc.disabled": "disabled",
+  "boost.svc.other": "other",
+  "boost.svc.running": "running",
+  "boost.svc.stopped": "stopped",
+  "boost.elevate": "Elevate (administrator)",
+  "boost.elevate.hint":
+    "Services, power plan, HAGS, network and RAM cleanup touch HKLM: they need administrator. The app reopens elevated on this tab.",
+  "boost.elevated": "Running as administrator",
+  "boost.preset.applying": "Applying preset: {done}/{total}…",
+  "boost.preset.skipped_admin":
+    "{count} tweak(s) need administrator and were skipped. Elevate the app and apply again.",
+  "boost.error.needs_admin": "Needs administrator.",
+  "boost.error.cancelled": "Elevation cancelled.",
+  "boost.error.generic": "Failed: {error}",
+  "boost.ram.freed": "{freed} freed",
+  "boost.ram.freed_none": "Nothing to free right now",
+  "boost.ram.soon_routine": "The automatic routine lands in the Routines phase.",
   "boost.ram.title": "RAM cleaner",
   "boost.ram.help":
     "Frees the standby list and modified pages, which cuts stutter in games. It does not trim app working sets: that provably makes things worse.",

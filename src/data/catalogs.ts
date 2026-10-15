@@ -55,24 +55,40 @@ export const CLEANUP_CATALOG: CleanupCategory[] = [
 export const cleanupName = (id: string) => `cleanup.cat.${id}` as I18nKey;
 export const cleanupHint = (id: string) => `cleanup.cat.${id}.hint` as I18nKey;
 
-/* ---------- Boost tweaks (ExitLag analysis + legacy scripts). ---------- */
+/* ---------- Boost tweaks. Mechanics (registry keys, services, SPI) live in the Rust core
+   (crates/core/src/boost.rs); this list only decides presentation and preset membership.
+   Presets (owner's decision 2026-10-14): "default" = safe set + SysMain/telemetry off;
+   "high" = everything non-beta; "custom" = the user toggles each card. ---------- */
+export type Preset = "default" | "high" | "custom";
 export type Tweak = {
   id: string;
   beta?: boolean;
   admin?: boolean;
-  presets: ("high" | "default")[];
+  /** Needs a reboot to take effect. */
+  reboot?: boolean;
+  presets: Exclude<Preset, "custom">[];
 };
 export const TWEAKS: Tweak[] = [
-  { id: "game_mode", presets: ["high"] },
-  { id: "hags", admin: true, presets: ["high"] },
-  { id: "input_lag", presets: ["high"] },
-  { id: "keyboard", presets: ["high"] },
-  { id: "perf_counters", admin: true, beta: true, presets: [] },
+  { id: "visual_fx", presets: ["default", "high"] },
+  { id: "game_mode", presets: ["default", "high"] },
+  { id: "input_lag", presets: ["default", "high"] },
+  { id: "keyboard", presets: ["default", "high"] },
+  { id: "tips", presets: ["default", "high"] },
+  { id: "mouse", presets: ["high"] },
+  { id: "svc_sysmain", admin: true, presets: ["default", "high"] },
+  { id: "svc_telemetry", admin: true, presets: ["default", "high"] },
   { id: "power_plan", admin: true, presets: ["high"] },
-  { id: "network_latency", admin: true, presets: ["high"] },
-  { id: "mouse", presets: [] },
-  { id: "background_services", admin: true, beta: true, presets: [] },
+  { id: "hags", admin: true, reboot: true, presets: ["high"] },
+  { id: "mmcss", admin: true, presets: ["high"] },
+  { id: "network_latency", admin: true, reboot: true, presets: ["high"] },
+  { id: "svc_search", admin: true, presets: ["high"] },
+  { id: "svc_xbox", admin: true, presets: ["high"] },
+  { id: "priority_sep", admin: true, beta: true, presets: [] },
+  { id: "perf_counters", admin: true, beta: true, presets: [] },
 ];
+/** Visual-effects level each preset applies. */
+export const PRESET_FX_LEVEL = { default: "balanced", high: "performance" } as const;
+export const FX_LEVELS = ["appearance", "minimal", "balanced", "performance"] as const;
 export const tweakName = (id: string) => `boost.tweak.${id}` as I18nKey;
 export const tweakDesc = (id: string) => `boost.tweak.${id}.desc` as I18nKey;
 export const tweakWarn = (id: string) => `boost.tweak.${id}.warn` as I18nKey;

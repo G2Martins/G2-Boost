@@ -1,0 +1,325 @@
+//! Registry access (HKCU/HKLM) and the per-tweak backup store.
+//! No `reg.exe`: `RegOpenKeyExW` / `RegQueryValueExW` / `RegSetValueExW` only.
+//! A backup records the exact original values a tweak touched, so `revert`
+//! restores what was there — never a guessed "Windows default".
+
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, WIN32_ERROR};
+use windows::Win32::System::Registry::{
+    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_DWORD, REG_EXPAND_SZ,
+    REG_OPTION_NON_VOLATILE, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegCreateKeyExW, RegDeleteValueW,
+    RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+};
+use windows::core::{PCWSTR, PWSTR};
+
+const ERROR_ACCESS_DENIED: u32 = 5;
+const ERROR_NO_MORE_ITEMS: u32 = 259;
+
+/// Null-terminated UTF-16 for Win32 calls.
+pub fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Decode a little-endian UTF-16 byte buffer up to its first NUL.
+pub(crate) fn utf16z(bytes: &[u8]) -> String {
+    let (chunks, _) = bytes.as_chunks::<2>();
+    let units: Vec<u16> = chunks.iter().map(|c| u16::from_le_bytes(*c)).collect();
+    let end = units.iter().position(|&u| u == 0).unwrap_or(units.len());
+    String::from_utf16_lossy(&units[..end])
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Root {
+    Hkcu,
+    Hklm,
+}
+
+impl Root {
+    fn hkey(self) -> HKEY {
+        match self {
+            Root::Hkcu => HKEY_CURRENT_USER,
+            Root::Hklm => HKEY_LOCAL_MACHINE,
+        }
+    }
+}
+
+/// The value kinds tweaks use. `Absent` = value does not exist (deleting restores that).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "t", content = "v", rename_all = "snake_case")]
+pub enum Value {
+    Dword(u32),
+    Str(String),
+    Absent,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RegError {
+    #[error("access_denied")]
+    AccessDenied,
+    #[error("registry error {0}")]
+    Win32(u32),
+    #[error("unsupported registry value type {0}")]
+    Unsupported(u32),
+}
+
+fn check(e: WIN32_ERROR) -> Result<(), RegError> {
+    match e {
+        ERROR_SUCCESS => Ok(()),
+        WIN32_ERROR(ERROR_ACCESS_DENIED) => Err(RegError::AccessDenied),
+        WIN32_ERROR(code) => Err(RegError::Win32(code)),
+    }
+}
+
+struct Key(HKEY);
+
+impl Drop for Key {
+    fn drop(&mut self) {
+        // SAFETY: handle came from RegOpenKeyExW/RegCreateKeyExW and is closed once.
+        unsafe {
+            let _ = RegCloseKey(self.0);
+        }
+    }
+}
+
+/// `Ok(None)` when the key does not exist.
+fn open(root: Root, path: &str, sam: windows::Win32::System::Registry::REG_SAM_FLAGS) -> Result<Option<Key>, RegError> {
+    let p = wide(path);
+    let mut h = HKEY::default();
+    // SAFETY: valid null-terminated path; out param is a plain handle.
+    let e = unsafe { RegOpenKeyExW(root.hkey(), PCWSTR(p.as_ptr()), None, sam, &mut h) };
+    if e == ERROR_FILE_NOT_FOUND {
+        return Ok(None);
+    }
+    check(e)?;
+    Ok(Some(Key(h)))
+}
+
+fn create(root: Root, path: &str) -> Result<Key, RegError> {
+    let p = wide(path);
+    let mut h = HKEY::default();
+    // SAFETY: as above; class is null, no security attributes (inherits).
+    let e = unsafe {
+        RegCreateKeyExW(
+            root.hkey(),
+            PCWSTR(p.as_ptr()),
+            None,
+            PCWSTR::null(),
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE | KEY_READ,
+            None,
+            &mut h,
+            None,
+        )
+    };
+    check(e)?;
+    Ok(Key(h))
+}
+
+/// Read one value. Missing key or value → `Value::Absent`.
+pub fn read(root: Root, path: &str, name: &str) -> Result<Value, RegError> {
+    let Some(key) = open(root, path, KEY_READ)? else {
+        return Ok(Value::Absent);
+    };
+    let n = wide(name);
+    let mut ty = REG_VALUE_TYPE::default();
+    let mut len = 0u32;
+    // SAFETY: querying the size only; all pointers valid for the call.
+    let e = unsafe { RegQueryValueExW(key.0, PCWSTR(n.as_ptr()), None, Some(&mut ty), None, Some(&mut len)) };
+    if e == ERROR_FILE_NOT_FOUND {
+        return Ok(Value::Absent);
+    }
+    check(e)?;
+    let mut buf = vec![0u8; len as usize + 2];
+    // SAFETY: buffer is at least `len` bytes; `len` is updated by the call.
+    let e = unsafe {
+        RegQueryValueExW(key.0, PCWSTR(n.as_ptr()), None, Some(&mut ty), Some(buf.as_mut_ptr()), Some(&mut len))
+    };
+    check(e)?;
+    let len = len as usize;
+    match ty {
+        REG_DWORD if len >= 4 => Ok(Value::Dword(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]))),
+        REG_SZ | REG_EXPAND_SZ => Ok(Value::Str(utf16z(&buf[..len]))),
+        other => Err(RegError::Unsupported(other.0)),
+    }
+}
+
+/// Write one value; `Value::Absent` deletes it. Creates the key when needed.
+pub fn write(root: Root, path: &str, name: &str, value: &Value) -> Result<(), RegError> {
+    let n = wide(name);
+    match value {
+        Value::Absent => {
+            let Some(key) = open(root, path, KEY_SET_VALUE)? else {
+                return Ok(());
+            };
+            // SAFETY: valid handle and name.
+            let e = unsafe { RegDeleteValueW(key.0, PCWSTR(n.as_ptr())) };
+            if e == ERROR_FILE_NOT_FOUND {
+                return Ok(());
+            }
+            check(e)
+        }
+        Value::Dword(d) => {
+            let key = create(root, path)?;
+            // SAFETY: 4-byte little-endian payload for REG_DWORD.
+            let e = unsafe { RegSetValueExW(key.0, PCWSTR(n.as_ptr()), None, REG_DWORD, Some(&d.to_le_bytes())) };
+            check(e)
+        }
+        Value::Str(s) => {
+            let key = create(root, path)?;
+            let w = wide(s);
+            let bytes: Vec<u8> = w.iter().flat_map(|u| u.to_le_bytes()).collect();
+            // SAFETY: null-terminated UTF-16 payload for REG_SZ.
+            let e = unsafe { RegSetValueExW(key.0, PCWSTR(n.as_ptr()), None, REG_SZ, Some(&bytes)) };
+            check(e)
+        }
+    }
+}
+
+/// Direct subkey names (e.g. TCP/IP interface GUIDs). Missing key → empty.
+pub fn subkeys(root: Root, path: &str) -> Result<Vec<String>, RegError> {
+    let Some(key) = open(root, path, KEY_READ)? else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    let mut buf = [0u16; 256];
+    for i in 0.. {
+        let mut len = buf.len() as u32;
+        // SAFETY: buffer of `len` UTF-16 units; the call writes at most that.
+        let e = unsafe { RegEnumKeyExW(key.0, i, Some(PWSTR(buf.as_mut_ptr())), &mut len, None, None, None, None) };
+        if e == WIN32_ERROR(ERROR_NO_MORE_ITEMS) {
+            break;
+        }
+        check(e)?;
+        out.push(String::from_utf16_lossy(&buf[..len as usize]));
+    }
+    Ok(out)
+}
+
+/* ---------------- backups ---------------- */
+
+/// One original value captured before a tweak changed it. `path` is a registry
+/// path, or a pseudo-path handled by the boost module (`spi:mouse`, `svc:SysMain`, `power:active`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupEntry {
+    pub root: Root,
+    pub path: String,
+    pub name: String,
+    pub value: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Backup {
+    pub tweak: String,
+    pub taken_at: u64,
+    pub entries: Vec<BackupEntry>,
+}
+
+/// Tweak ids come from the UI (hostile): only `[a-z0-9_]` reaches the filesystem.
+pub fn safe_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
+/// `%LOCALAPPDATA%\G2 Boost` (override with `G2BOOST_DATA_DIR`, used by tests).
+pub fn data_dir() -> PathBuf {
+    if let Some(d) = std::env::var_os("G2BOOST_DATA_DIR") {
+        return PathBuf::from(d);
+    }
+    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    base.join("G2 Boost")
+}
+
+fn backup_file(tweak: &str) -> PathBuf {
+    data_dir().join("backups").join(format!("{tweak}.json"))
+}
+
+pub fn load_backup(tweak: &str) -> Option<Backup> {
+    if !safe_id(tweak) {
+        return None;
+    }
+    let text = std::fs::read_to_string(backup_file(tweak)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+pub fn save_backup(b: &Backup) -> std::io::Result<()> {
+    if !safe_id(&b.tweak) {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "bad tweak id"));
+    }
+    let file = backup_file(&b.tweak);
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(file, serde_json::to_string_pretty(b).expect("serializable"))
+}
+
+pub fn delete_backup(tweak: &str) {
+    if safe_id(tweak) {
+        let _ = std::fs::remove_file(backup_file(tweak));
+    }
+}
+
+pub fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    const TEST_KEY: &str = r"Software\G2 Boost\Test\registry";
+
+    #[test]
+    fn roundtrip_dword_and_string_then_delete() {
+        write(Root::Hkcu, TEST_KEY, "d", &Value::Dword(42)).unwrap();
+        write(Root::Hkcu, TEST_KEY, "s", &Value::Str("olá".into())).unwrap();
+        assert_eq!(read(Root::Hkcu, TEST_KEY, "d").unwrap(), Value::Dword(42));
+        assert_eq!(read(Root::Hkcu, TEST_KEY, "s").unwrap(), Value::Str("olá".into()));
+        write(Root::Hkcu, TEST_KEY, "d", &Value::Absent).unwrap();
+        assert_eq!(read(Root::Hkcu, TEST_KEY, "d").unwrap(), Value::Absent);
+        // deleting again (or a missing key) is not an error
+        write(Root::Hkcu, TEST_KEY, "d", &Value::Absent).unwrap();
+        write(Root::Hkcu, r"Software\G2 Boost\Test\missing", "x", &Value::Absent).unwrap();
+        assert_eq!(read(Root::Hkcu, r"Software\G2 Boost\Test\missing", "x").unwrap(), Value::Absent);
+        assert!(subkeys(Root::Hkcu, r"Software\G2 Boost\Test").unwrap().iter().any(|k| k == "registry"));
+    }
+
+    #[test]
+    fn hklm_is_readable_without_admin() {
+        let v = read(Root::Hklm, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuild").unwrap();
+        assert!(matches!(v, Value::Str(_)));
+    }
+
+    /// One stable scratch dir for every test that touches the data dir (the env override is
+    /// process-wide, so all tests must agree on the same value).
+    pub(crate) fn test_data_dir() -> PathBuf {
+        std::env::temp_dir().join("g2boost-core-tests")
+    }
+
+    #[test]
+    fn backup_store_roundtrip_and_hostile_ids() {
+        // SAFETY: same value every data-dir test sets; see `test_data_dir`.
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", test_data_dir()) };
+        let b = Backup {
+            tweak: "unit_test".into(),
+            taken_at: now_unix(),
+            entries: vec![BackupEntry {
+                root: Root::Hkcu,
+                path: TEST_KEY.into(),
+                name: "d".into(),
+                value: Value::Absent,
+            }],
+        };
+        save_backup(&b).unwrap();
+        assert_eq!(load_backup("unit_test").unwrap().entries, b.entries);
+        delete_backup("unit_test");
+        assert!(load_backup("unit_test").is_none());
+        assert!(!safe_id("../evil"));
+        assert!(!safe_id("UPPER"));
+        assert!(load_backup("../../etc").is_none());
+    }
+}
