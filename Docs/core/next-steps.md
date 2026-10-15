@@ -2,7 +2,7 @@
 
 **Última revisão:** 2026-10-15 (madrugada)
 
-**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fase 4 (Boost) ✅ e Fase 2 (Limpeza) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). Próxima: Fase 5 — Rotinas (autostart, agendamento, RAM ao abrir jogo, bandeja). Planejamento GSD em `.planning/`.
+**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza) e 5 (Rotinas) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). Próximas: Fase 6 (disco: filtros, Lixeira, essenciais) e Fase 7 (rede: TCPing, DNS, gateway). Planejamento GSD em `.planning/`.
 
 Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat estão bloqueados pelo Kaspersky — disco e limpeza primeiro; rede e boost depois; MCP quando o core estiver estável.
 
@@ -13,14 +13,15 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 | **2 — Limpeza** ✅ 2026-10-15 (falta: essenciais grandes → fase 6; rotinas → fase 5) | catálogo portado dos .bat com caminhos reais · prévia por categoria · `ConfirmToken` · execução nativa junction-safe · histórico · Lixeira/DNS/`StartComponentCleanup` | substitui os dois .bat; Kaspersky silencioso no teste local (a confirmar elevado) |
 | **3 — Rede** | monitor (ICMP gateway/8.8.8.8/1.1.1.1; latência/jitter/perda/picos; gráfico) · speedtest Cloudflare + bufferbloat (nota A+…F) · ping p/ jogos (Steam SDR + lista curada) · MTR/Ping/TCPing · DNS ranking + aplicar/restaurar | paridade com as abas "Analisador de rede" e "DNS Optimizer" do ExitLag |
 | **4 — PC Boost** ✅ 2026-10-15 (falta: rotina de RAM → fase 5) | 16 tweaks `detect/apply/revert` + backup exato · efeitos visuais em 4 níveis · serviços (SysMain, telemetria, WSearch, Xbox) · presets Padrão/Alto desempenho/Personalizado · plano de energia · purge da standby list · Elevar via `runas` | paridade com "Ajustes de sistema" e "Limpeza de RAM" (manual) |
-| **5 — Rotinas** | iniciar com o Windows (tarefa agendada, highest) · limpeza agendada (ao ligar / a cada N h / diária / semanal) com categorias · limpar RAM ao abrir jogo (Steam `RunningAppID` + lista de exes) · bandeja · Configurações | app vive na bandeja e limpa sozinho; tudo visível no histórico |
+| **5 — Rotinas** ✅ 2026-10-15 | iniciar com o Windows (tarefa de logon `--tray`, Highest se elevado) · limpeza agendada (ao ligar / a cada N h / diária / semanal) com categorias · limpar RAM ao abrir jogo (Steam `RunningAppID` + exes + `steamapps\common`) · bandeja · Configurações | app vive na bandeja e limpa sozinho; tudo visível no histórico (verificar logon real + Highest pelo dono) |
 | **8 — MCP local** | `g2boost-mcp.exe` (stdio) · tools read-only + destrutivas com token · registro no Claude Desktop/Code · doc de uso | Claude da máquina analisa o scan e propõe limpeza; humano confirma na UI |
 | **9 — Release** | assinatura de código · instalador NSIS · auto-update · VirusTotal + submissão de falso positivo (Kaspersky/Microsoft) · README público | exe assinado instala limpo numa VM com Kaspersky |
 
 ## Feito (2026-10-15, madrugada — sessão autônoma após o dono decidir o escopo)
 - **Fase 4 (Boost):** `registry.rs` (HKCU/HKLM + backups JSON), `visualfx.rs` (17 itens do diálogo, 4 níveis, round-trip ao vivo ok), `boost.rs` (16 tweaks, SCM, SPI, energia, purge, `runas`); comandos Tauri; aba Boost com estado real, presets, níveis, pills de serviço, Elevar. Screenshot verificado: nível Média detectado = setup do dono.
 - **Fase 2 (Limpeza):** `cleanup.rs` (catálogo, prévia, `TokenStore`, execução, histórico), `tasksched.rs` (COM: rodar `StartComponentCleanup`, tarefa de logon), `system::running_processes`; comandos Tauri; página com prévia, painel de confirmação, progresso, resultado e histórico. Teste de junction NTFS real.
-- **GSD:** `.planning/` criado (config yolo, PROJECT/REQUIREMENTS/ROADMAP/STATE). `bun run check` verde (29 testes).
+- **Fase 5 (Rotinas):** `settings.rs`, `routines.rs` (agenda + detector de jogo), tarefa de logon via `tasksched.rs`, thread de rotinas + bandeja no shell Tauri, página Configurações nova, aba RAM religada (jogo atual, último purge, lista de exes). Round-trip da tarefa de logon como usuário comum: ok.
+- **GSD:** `.planning/` criado (config yolo, PROJECT/REQUIREMENTS/ROADMAP/STATE). `bun run check` verde (31 testes).
 - **Validado e descartado:** limpar Prefetch (1 arquivo / 0 MB na máquina do dono; SysMain off não grava `.pf`; anti-forense).
 
 ## Backlog (não prometido)

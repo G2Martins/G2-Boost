@@ -116,6 +116,29 @@ export type ExecItem = {
 export type RunRecord = { at: number; trigger: string; duration_ms: number; items: ExecItem[] };
 export type CleanupProgress = { done: number; total: number };
 
+export type Schedule =
+  | { mode: "off" }
+  | { mode: "at_logon" }
+  | { mode: "every_hours"; hours: number }
+  | { mode: "daily"; hour: number }
+  | { mode: "weekly"; weekday: number; hour: number };
+export type Settings = {
+  close_to_tray: boolean;
+  schedule: Schedule;
+  routine_categories: string[];
+  game_ram_clean: boolean;
+  game_exes: string[];
+};
+export type Game = { name: string; source: "steam" | "exe" | "steamapps" };
+export type AutostartStatus = { enabled: boolean };
+export type RoutineStatus = {
+  last_run: number | null;
+  game: Game | null;
+  elevated: boolean;
+  running: boolean;
+};
+export type GameEvent = { game: Game; freed_bytes: number; error: string | null };
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -162,6 +185,12 @@ export const backend = {
   cleanupExecute: (token: number, ids: string[]) =>
     callOrThrow<RunRecord>("cleanup_execute", { token, ids }),
   cleanupHistory: () => call<RunRecord[]>("cleanup_history"),
+
+  settingsGet: () => call<Settings>("settings_get"),
+  settingsSet: (settings: Settings) => callOrThrow<Settings>("settings_set", { settings }),
+  autostartStatus: () => call<AutostartStatus>("autostart_status"),
+  autostartSet: (on: boolean) => callOrThrow<AutostartStatus>("autostart_set", { on }),
+  routineStatus: () => call<RoutineStatus>("routine_status"),
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),

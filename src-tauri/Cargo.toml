@@ -18,7 +18,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 g2boost-core = { path = "../crates/core" }
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 # HTTP from Rust (no CORS) for public JSON sources: Steam SDR relay list. Scoped in capabilities.
 # native-tls = schannel (pure Rust bindings). The default rustls pulls `ring`, which needs a C compiler

@@ -18,6 +18,7 @@
 | Documento | Descrição |
 |-----------|-----------|
 | [tweaks.md](./boost/tweaks.md) | Catálogo de tweaks (registro, serviços, SPI, energia), efeitos visuais em níveis (data-driven), backup/revert, elevação, purge de RAM, testes. |
+| [routines.md](./boost/routines.md) | Iniciar com o Windows (tarefa de logon), limpeza agendada, RAM ao abrir jogo (detecção Steam/exe), bandeja, settings validados, testes. |
 
 ## cleanup/ — Limpeza
 

@@ -7,12 +7,17 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::cleanup::{self, ConfirmToken, PreviewItem, RunRecord, TokenStore};
+use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::network::{self, Hop, LatencyStats, Probe};
+use g2boost_core::routines::{self, Clock, Game, GameWatcher, RoutineState};
+use g2boost_core::settings::{self, Schedule, Settings};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
+use g2boost_core::tasksched;
 use g2boost_core::visualfx::Level;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
 const ROUTES: &[&str] = &["disk", "cleanup", "network", "boost", "settings"];
@@ -174,6 +179,139 @@ async fn cleanup_execute(
 #[tauri::command]
 fn cleanup_history() -> Vec<RunRecord> {
     cleanup::history()
+}
+
+/* ---------------- routines (settings, autostart, scheduler, game watcher, tray) ---------------- */
+
+const AUTOSTART_TASK: &str = "G2 Boost";
+
+struct Routines {
+    settings: Mutex<Settings>,
+    state: Mutex<RoutineState>,
+    game: Mutex<Option<Game>>,
+    ran_since_start: AtomicBool,
+    running: AtomicBool,
+}
+
+#[tauri::command]
+fn settings_get(r: State<'_, Routines>) -> Settings {
+    r.settings.lock().unwrap().clone()
+}
+
+/// Settings come from the UI, get sanitized in the core, and only then replace the live copy.
+#[tauri::command]
+fn settings_set(r: State<'_, Routines>, settings: Settings) -> Result<Settings, String> {
+    let saved = settings::save(&settings).map_err(|e| e.to_string())?;
+    *r.settings.lock().unwrap() = saved.clone();
+    Ok(saved)
+}
+
+#[derive(serde::Serialize)]
+struct AutostartStatus {
+    enabled: bool,
+}
+
+#[tauri::command]
+fn autostart_status() -> AutostartStatus {
+    AutostartStatus { enabled: tasksched::task_exists("\\", AUTOSTART_TASK) }
+}
+
+/// Logon task running this exe with `--tray`. Elevated now → "highest privileges" (routines that
+/// need admin work at logon); otherwise a least-privilege task, and those routines are skipped.
+#[tauri::command]
+fn autostart_set(on: bool) -> Result<AutostartStatus, String> {
+    if on {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        tasksched::register_logon_task(AUTOSTART_TASK, &exe, "--tray", 10, system::is_elevated())
+            .map_err(|e| e.to_string())?;
+    } else {
+        tasksched::delete_task(AUTOSTART_TASK).map_err(|e| e.to_string())?;
+    }
+    Ok(autostart_status())
+}
+
+#[derive(serde::Serialize)]
+struct RoutineStatus {
+    last_run: Option<u64>,
+    game: Option<Game>,
+    elevated: bool,
+    running: bool,
+}
+
+#[tauri::command]
+fn routine_status(r: State<'_, Routines>) -> RoutineStatus {
+    RoutineStatus {
+        last_run: r.state.lock().unwrap().last_run,
+        game: r.game.lock().unwrap().clone(),
+        elevated: system::is_elevated(),
+        running: r.running.load(Ordering::SeqCst),
+    }
+}
+
+#[derive(serde::Serialize, Clone)]
+struct GameEvent {
+    game: Game,
+    freed_bytes: u64,
+    error: Option<String>,
+}
+
+fn on_game_started(app: &AppHandle, game: Game) {
+    let result = boost::purge_standby_list();
+    let (freed, error) = match &result {
+        Ok(p) => (p.freed_bytes, None),
+        Err(e) => (0, Some(e.to_string())),
+    };
+    cleanup::record_run(&RunRecord {
+        at: g2boost_core::registry::now_unix(),
+        trigger: "game".into(),
+        duration_ms: 0,
+        items: vec![ExecItem { id: "ram_purge".into(), bytes_freed: freed, ..Default::default() }],
+    });
+    let _ = app.emit("game:started", GameEvent { game, freed_bytes: freed, error });
+}
+
+/// One background thread: game watcher every 5 s, scheduler check every 60 s.
+fn spawn_routines(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut watcher = GameWatcher::default();
+        let mut tick: u64 = 0;
+        loop {
+            std::thread::sleep(Duration::from_secs(5));
+            tick += 1;
+            let r = app.state::<Routines>();
+            let s = r.settings.lock().unwrap().clone();
+            if s.game_ram_clean {
+                let now = routines::detect_game(&s.game_exes);
+                *r.game.lock().unwrap() = now.clone();
+                if let Some(g) = watcher.observe(now) {
+                    on_game_started(&app, g);
+                }
+            } else {
+                *r.game.lock().unwrap() = None;
+            }
+            if tick.is_multiple_of(12) && !s.routine_categories.is_empty() && !r.running.load(Ordering::SeqCst) {
+                let last = r.state.lock().unwrap().last_run;
+                if routines::due(&s.schedule, Clock::now(), last, r.ran_since_start.load(Ordering::SeqCst)) {
+                    r.running.store(true, Ordering::SeqCst);
+                    let rec = cleanup::execute(&s.routine_categories, "routine", |_, _| {});
+                    r.ran_since_start.store(true, Ordering::SeqCst);
+                    let st = RoutineState { last_run: Some(rec.at) };
+                    routines::save_state(&st);
+                    *r.state.lock().unwrap() = st;
+                    r.running.store(false, Ordering::SeqCst);
+                    let _ = app.emit("routine:done", rec);
+                }
+            }
+        }
+    });
+}
+
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
 }
 
 /* ---------------- disk scan ---------------- */
@@ -340,6 +478,55 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .manage(DiskState::default())
         .manage(TokenStore::default())
+        .manage(Routines {
+            settings: Mutex::new(settings::load()),
+            state: Mutex::new(routines::load_state()),
+            game: Mutex::new(None),
+            ran_since_start: AtomicBool::new(false),
+            running: AtomicBool::new(false),
+        })
+        .setup(|app| {
+            // Tray: left click opens, menu has Open / Quit. Labels follow the default locale (pt-BR).
+            let open = MenuItem::with_id(app, "open", "Abrir", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let mut tray = TrayIconBuilder::with_id("main")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .tooltip("G2 Boost")
+                .on_menu_event(|app, e| match e.id().as_ref() {
+                    "open" => show_main(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, e| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                        show_main(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon().cloned() {
+                tray = tray.icon(icon);
+            }
+            tray.build(app)?;
+            // Started by the logon task: live in the tray until the user asks for the window.
+            if std::env::args().any(|a| a == "--tray")
+                && let Some(w) = app.get_webview_window("main")
+            {
+                let _ = w.hide();
+            }
+            spawn_routines(app.handle().clone());
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let r = window.state::<Routines>();
+                let s = r.settings.lock().unwrap();
+                if s.close_to_tray && (s.schedule != Schedule::Off || s.game_ram_clean) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             app_info,
             list_drives,
@@ -354,6 +541,11 @@ pub fn run() {
             cleanup_confirm,
             cleanup_execute,
             cleanup_history,
+            settings_get,
+            settings_set,
+            autostart_status,
+            autostart_set,
+            routine_status,
             disk_scan_start,
             disk_scan_cancel,
             disk_summary,

@@ -503,7 +503,7 @@ pub fn execute(ids: &[String], trigger: &str, mut on_progress: impl FnMut(usize,
         on_progress(i + 1, ids.len());
     }
     let record = RunRecord { at: registry::now_unix(), trigger: trigger.to_string(), duration_ms: t0.elapsed().as_millis() as u64, items };
-    append_history(&record);
+    record_run(&record);
     record
 }
 
@@ -570,7 +570,8 @@ pub fn history() -> Vec<RunRecord> {
     fs::read_to_string(history_file()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
 }
 
-fn append_history(r: &RunRecord) {
+/// Append one run (manual, routine or game trigger) to the local history.
+pub fn record_run(r: &RunRecord) {
     let mut all = history();
     all.push(r.clone());
     if all.len() > HISTORY_MAX {

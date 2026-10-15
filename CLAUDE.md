@@ -2,7 +2,7 @@
 
 > **Spec viva.** Porta-de-entrada lida pelo agente toda sessão. Não duplica os docs profundos — **aponta** pra eles. Atualize quando uma regra, comando, módulo ou hurdle mudar.
 >
-> **Última revisão:** 2026-10-15 (madrugada — fases 4 (boost) e 2 (limpeza) executadas)
+> **Última revisão:** 2026-10-15 (madrugada — fases 4 (boost), 2 (limpeza) e 5 (rotinas) executadas)
 > **Fonte única de regras:** [Docs/core/global-rules.md](Docs/core/global-rules.md) · **Roadmap:** [Docs/core/next-steps.md](Docs/core/next-steps.md) · **Estado/sprints:** `.planning/STATE.md` (local, gitignored — criar com `/gsd-new-project`) · **Índice de docs:** [Docs/README.md](Docs/README.md)
 > **Pasta:** renomeada para `G2 Boost` em 2026-10-14 (memória do Claude na chave `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
 > **Projeto-irmão de referência (organização de pastas, Docs, design):** `G:\1. Projetos\6. Grovic Data\Valerium-Portal` (`CLAUDE.md`, `Docs/core/design-system.md`, `Docs/core/global-rules.md`). Mesmas convenções, outro domínio.
@@ -46,7 +46,7 @@ Máquina de dev hoje (2026-10-14): Windows 11 Pro 26200, 32 GB RAM, **C: 40 GB l
 
 ## 3. Mapa de módulos (planejado)
 
-Layout real (Cargo workspace + Vite): `src/` (UI React: `components/shell`, `components/ui/primitives.tsx`, `pages/<módulo>.tsx`, `lib/` (i18n, backend, speedtest), `locales/`, `data/catalogs.ts`) · `src-tauri/` (shell Tauri: comandos IPC finos em `src/lib.rs`) · `crates/core` (lib Rust: `safety.rs` SafePath, `system.rs` Win32 read-only + processos, `disk.rs`, `network.rs`, `registry.rs` (HKCU/HKLM + backups JSON), `visualfx.rs`, `boost.rs`, `cleanup.rs`, `tasksched.rs` (COM)) · `crates/mcp` (a criar) · `Docs/` · `.planning/` (local). Toolchain fora do repo em `D:\dev` (ver [architecture.md §8](Docs/core/architecture.md)).
+Layout real (Cargo workspace + Vite): `src/` (UI React: `components/shell`, `components/ui/primitives.tsx`, `pages/<módulo>.tsx`, `lib/` (i18n, backend, speedtest), `locales/`, `data/catalogs.ts`) · `src-tauri/` (shell Tauri: comandos IPC finos em `src/lib.rs`) · `crates/core` (lib Rust: `safety.rs` SafePath, `system.rs` Win32 read-only + processos, `disk.rs`, `network.rs`, `registry.rs` (HKCU/HKLM + backups JSON), `visualfx.rs`, `boost.rs`, `cleanup.rs`, `tasksched.rs` (COM), `settings.rs`, `routines.rs`) · `crates/mcp` (a criar) · `Docs/` · `.planning/` (local). Toolchain fora do repo em `D:\dev` (ver [architecture.md §8](Docs/core/architecture.md)).
 
 | Módulo | O que faz | Doc |
 |---|---|---|
@@ -54,6 +54,7 @@ Layout real (Cargo workspace + Vite): `src/` (UI React: `components/shell`, `com
 | `cleanup` | **Feito (2026-10-15):** catálogo com caminhos reais (`crates/core/src/cleanup.rs`), prévia em bytes, `ConfirmToken` de uso único, execução nativa (sem atravessar junction, em uso = pulado), Lixeira/DNS/`StartComponentCleanup` via tarefa do Windows, histórico JSON; UI com confirmação, progresso e histórico. Sandbox test cria junction NTFS real. **Fora:** prefetch, spool (System32). **Pendente:** rotinas (fase 5), verificação com admin pelo dono. | [cleanup/catalog.md](Docs/cleanup/catalog.md) |
 | `network` | **Feito:** monitor (ICMP via `IcmpSendEcho2`, sem raw socket/admin — `crates/core/src/network.rs`), speedtest Cloudflare (`src/lib/speedtest.ts`), ping para jogos (Steam `GetSDRConfig` via `tauri-plugin-http`), MTR/Ping. **Pendente:** TCPing, gateway/AWS, ranking + troca de DNS por adaptador. | [exitlag.md](Docs/references/exitlag.md) |
 | `boost` | **Feito (2026-10-15):** 16 tweaks como dado (`crates/core/src/boost.rs`): registro HKCU/HKLM, serviços via SCM, mouse/teclado via SPI, plano Desempenho máximo, efeitos visuais em 4 níveis (`visualfx.rs`, data-driven pela metadata do diálogo), purge da standby list, relançar elevado (`runas`). Backup JSON exato antes de aplicar; sem backup, desligar grava o padrão documentado e a UI avisa. Presets Padrão / Alto desempenho / Personalizado. **Pendente:** verificar apply/revert admin na máquina do dono; rotina de RAM (fase 5). | [boost/tweaks.md](Docs/boost/tweaks.md) |
+| `routines` | **Feito (2026-10-15):** `settings.json` validado (`settings.rs`), agenda pura testável (`routines::due`: ao ligar / a cada N h / diária / semanal), detector de jogo (Steam `RunningAppID`, lista de exes, `steamapps\common`) com borda, purge ao abrir jogo (admin), tarefa de logon `G2 Boost --tray` (`Highest` se elevado, senão LUA), bandeja (Abrir/Sair, fechar = esconder com rotina ativa), página Configurações. **Pendente:** verificar tarefa Highest + purge real elevado; i18n do menu da bandeja. | [boost/routines.md](Docs/boost/routines.md) |
 | `mcp` | Binário stdio `*-mcp.exe`; tools read-only livres; destrutivas pedem token de confirmação emitido pela UI (named pipe). Nome de arquivo é **dado**, nunca instrução (prompt injection). | [architecture.md](Docs/core/architecture.md) |
 
 ## 4. Regras SEMPRE-ATIVAS
@@ -122,6 +123,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Design system** → [Docs/core/design-system.md](Docs/core/design-system.md)
 - **Boost (tweaks, efeitos visuais, serviços, RAM)** → [Docs/boost/tweaks.md](Docs/boost/tweaks.md)
 - **Limpeza (catálogo, prévia, token, histórico)** → [Docs/cleanup/catalog.md](Docs/cleanup/catalog.md)
+- **Rotinas (autostart, agenda, RAM ao abrir jogo, bandeja)** → [Docs/boost/routines.md](Docs/boost/routines.md)
 - **Referências** → [spacesniffer.md](Docs/references/spacesniffer.md) · [exitlag.md](Docs/references/exitlag.md) · [legacy-bat-scripts.md](Docs/references/legacy-bat-scripts.md)
 - **Segurança** → [kaspersky-false-positive.md](Docs/security/kaspersky-false-positive.md)
 - **Índice geral de docs** → [Docs/README.md](Docs/README.md)

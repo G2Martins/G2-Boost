@@ -18,13 +18,13 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { GameExesEditor } from "@/components/game-exes";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Badge,
   Button,
   Card,
   CardTitle,
-  EmptyState,
   HelpHint,
   Switch,
   Tabs,
@@ -46,9 +46,12 @@ import {
 import {
   backend,
   type FxLevel,
+  type GameEvent,
   inTauri,
   type MemoryStatus,
   type PurgeResult,
+  type RoutineStatus,
+  type Settings,
   type TweakState,
 } from "@/lib/backend";
 import { boot } from "@/lib/boot";
@@ -423,19 +426,39 @@ function RamTab({ elevated }: { elevated: boolean }) {
   const [last, setLast] = useState<{ at: Date; result: PurgeResult } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [auto, setAuto] = useState(true);
-  const [when, setWhen] = useState<"game" | "status">("game");
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [status, setStatus] = useState<RoutineStatus | null>(null);
+  const [lastGame, setLastGame] = useState<GameEvent | null>(null);
 
   useEffect(() => {
     let alive = true;
-    const tick = () => backend.memoryStatus().then((m) => alive && m && setMem(m));
+    const tick = () => {
+      backend.memoryStatus().then((m) => alive && m && setMem(m));
+      backend.routineStatus().then((s) => alive && s && setStatus(s));
+    };
     tick();
-    const id = setInterval(tick, 2000);
+    backend.settingsGet().then((s) => alive && s && setSettings(s));
+    const id = setInterval(tick, 3000);
+    let off: (() => void) | null = null;
+    backend.on<GameEvent>("game:started", setLastGame).then((u) => {
+      off = u;
+    });
     return () => {
       alive = false;
       clearInterval(id);
+      off?.();
     };
   }, []);
+
+  const save = async (patch: Partial<Settings>) => {
+    if (!settings) return;
+    setErr(null);
+    try {
+      setSettings(await backend.settingsSet({ ...settings, ...patch }));
+    } catch (e) {
+      setErr(errorText(e));
+    }
+  };
 
   const clean = async () => {
     setBusy(true);
@@ -512,78 +535,54 @@ function RamTab({ elevated }: { elevated: boolean }) {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="animate-rise" style={rise(1)}>
-          <CardTitle>
-            {t("boost.ram.routine")}
-            <span className="ml-3 inline-flex items-center gap-2 font-sans text-xs font-medium">
+          <CardTitle
+            help={t("settings.game.ram.hint")}
+            right={
               <Switch
-                checked={auto}
-                onCheckedChange={setAuto}
-                aria-label={t("boost.ram.automate")}
+                checked={!!settings?.game_ram_clean}
+                disabled={!settings}
+                onCheckedChange={(v) => save({ game_ram_clean: v })}
+                aria-label={t("settings.game.ram")}
               />
-              {t("boost.ram.automate")}
-            </span>
+            }
+          >
+            {t("settings.game.ram")}
           </CardTitle>
-          <p className="text-xs text-muted-foreground">{t("boost.ram.when")}</p>
-          <div className="mt-3 flex flex-col gap-3 text-[13px]">
-            <Radio
-              checked={when === "game"}
-              onChange={() => setWhen("game")}
-              label={t("boost.ram.when.game")}
-            />
-            <div className="flex items-center justify-between gap-3">
-              <Radio
-                checked={when === "status"}
-                onChange={() => setWhen("status")}
-                label={t("boost.ram.when.status")}
-              />
-              <span className="rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                {t("boost.ram.every", { hours: 12 })}
-              </span>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            {status?.game
+              ? t("settings.game.current", { name: status.game.name })
+              : t("settings.game.none")}
+          </p>
+          {lastGame ? (
+            <p className="mt-2 text-xs">
+              {lastGame.error
+                ? errorText(new Error(lastGame.error))
+                : t("settings.game.last", {
+                    name: lastGame.game.name,
+                    freed: formatBytes(lastGame.freed_bytes, locale),
+                  })}
+            </p>
+          ) : null}
+          {!elevated ? (
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-warning">
+              {t("settings.game.needs_admin")}
+              <ElevateButton route="boost" />
+            </p>
+          ) : null}
           <p className="mt-4 rounded-md border border-chart-1/30 bg-chart-1/10 px-3 py-2.5 text-xs text-foreground/90">
-            {t("boost.ram.notice")} {t("boost.ram.soon_routine")}
+            {t("boost.ram.notice")}
           </p>
         </Card>
         <Card className="animate-rise" style={rise(2)}>
-          <CardTitle
-            help={t("boost.ram.allowlist.help")}
-            right={
-              <Button variant="outline" size="sm" disabled title={t("common.soon")}>
-                + {t("boost.ram.allowlist.add")}
-              </Button>
-            }
-          >
-            {t("boost.ram.allowlist")}
-          </CardTitle>
-          <EmptyState
-            icon={<Server className="size-5" />}
-            title={t("boost.ram.allowlist.empty")}
-            body={t("boost.ram.allowlist.hint")}
+          <CardTitle help={t("settings.game.exes.hint")}>{t("settings.game.exes")}</CardTitle>
+          <GameExesEditor
+            exes={settings?.game_exes ?? []}
+            disabled={!settings}
+            onChange={(game_exes) => save({ game_exes })}
           />
         </Card>
       </div>
     </>
-  );
-}
-
-function Radio({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3">
-      <input type="radio" checked={checked} onChange={onChange} className="peer sr-only" />
-      <span className="flex size-4 items-center justify-center rounded-full border border-muted-foreground peer-checked:border-success">
-        <span className={cn("size-2 rounded-full", checked ? "bg-success" : "bg-transparent")} />
-      </span>
-      <span className={cn(checked ? "font-semibold" : "text-muted-foreground")}>{label}</span>
-    </label>
   );
 }
 
