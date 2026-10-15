@@ -96,6 +96,26 @@ export type TweakState = {
 };
 export type PurgeResult = { before_avail: number; after_avail: number; freed_bytes: number };
 
+export type PreviewItem = {
+  id: string;
+  bytes: number;
+  files: number;
+  measurable: boolean;
+  missing: boolean;
+  needs_admin: boolean;
+  blocked_by: string[];
+};
+export type ConfirmToken = { token: number; ids: string[] };
+export type ExecItem = {
+  id: string;
+  bytes_freed: number;
+  files_deleted: number;
+  skipped: number;
+  error: string | null;
+};
+export type RunRecord = { at: number; trigger: string; duration_ms: number; items: ExecItem[] };
+export type CleanupProgress = { done: number; total: number };
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -136,6 +156,12 @@ export const backend = {
   ramPurge: () => callOrThrow<PurgeResult>("ram_purge"),
   /** Relaunches the app elevated (UAC prompt) on `route`; this instance exits on success. */
   relaunchElevated: (route: string) => callOrThrow<void>("relaunch_elevated", { route }),
+
+  cleanupPreview: (ids: string[]) => callOrThrow<PreviewItem[]>("cleanup_preview", { ids }),
+  cleanupConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("cleanup_confirm", { ids }),
+  cleanupExecute: (token: number, ids: string[]) =>
+    callOrThrow<RunRecord>("cleanup_execute", { token, ids }),
+  cleanupHistory: () => call<RunRecord[]>("cleanup_history"),
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),

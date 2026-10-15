@@ -5,11 +5,13 @@
 //! `cmd`/`powershell`/`reg`/`net`/`sc` spawning anywhere in this crate.
 
 pub mod boost;
+pub mod cleanup;
 pub mod disk;
 pub mod network;
 pub mod registry;
 pub mod safety;
 pub mod system;
+pub mod tasksched;
 pub mod visualfx;
 
 /// Crate version, surfaced in the UI "about" footer.

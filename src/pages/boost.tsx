@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Badge,
@@ -74,20 +75,6 @@ const ICONS: Record<string, typeof Zap> = {
 };
 
 type StateMap = Record<string, TweakState>;
-
-/** Error codes from the Rust core → i18n. */
-function useErrorText() {
-  const { t } = useI18n();
-  return useCallback(
-    (e: unknown) => {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg === "needs_admin") return t("boost.error.needs_admin");
-      if (msg === "cancelled") return t("boost.error.cancelled");
-      return t("boost.error.generic", { error: msg });
-    },
-    [t],
-  );
-}
 
 export function BoostPage() {
   const { t } = useI18n();
@@ -153,25 +140,6 @@ function activePreset(states: StateMap): Preset {
     if (ok) return p;
   }
   return "custom";
-}
-
-function ElevateButton({ route, size = "sm" }: { route: string; size?: "sm" | "md" }) {
-  const { t } = useI18n();
-  const errorText = useErrorText();
-  const [err, setErr] = useState<string | null>(null);
-  return (
-    <span className="inline-flex items-center gap-2">
-      <Button
-        variant="outline"
-        size={size}
-        onClick={() => backend.relaunchElevated(route).catch((e) => setErr(errorText(e)))}
-      >
-        <ShieldCheck className="size-4" />
-        {t("boost.elevate")}
-      </Button>
-      {err ? <span className="text-xs text-destructive">{err}</span> : null}
-    </span>
-  );
 }
 
 function TweaksTab({ elevated }: { elevated: boolean }) {

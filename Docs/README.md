@@ -1,6 +1,6 @@
 # Documentação — G2 Boost
 
-**Última revisão:** 2026-10-14
+**Última revisão:** 2026-10-15
 
 Índice geral. Porta de entrada do agente: [../CLAUDE.md](../CLAUDE.md). Cada doc tem `**Última revisão:**` no topo; ler ANTES de codar, atualizar no MESMO PR que muda comportamento.
 
@@ -8,10 +8,22 @@
 
 | Documento | Descrição |
 |-----------|-----------|
-| [architecture.md](./core/architecture.md) | Opções de stack (Tauri 2 recomendado, Electron, .NET), modelo de processos/elevação, MCP, empacotamento e assinatura. **Decisão pendente.** |
+| [architecture.md](./core/architecture.md) | Stack decidida (Tauri 2), alternativas avaliadas, modelo de processos/elevação, MCP, empacotamento e assinatura, toolchain sem admin (§8). |
 | [global-rules.md](./core/global-rules.md) | **Regras globais** — segurança (caller hostil, destrutivo, nativo), testes, docs vivas, i18n, GSD, checklist de PR. Fonte única. |
 | [design-system.md](./core/design-system.md) | Tokens da paleta estilo ExitLag, tipografia, componentes base, convenção de gráficos/gauges. |
-| [next-steps.md](./core/next-steps.md) | Roadmap por fases (0 → 6) e backlog. |
+| [next-steps.md](./core/next-steps.md) | Roadmap por fases e backlog; seção "Feito" por sessão. |
+
+## boost/ — PC Boost
+
+| Documento | Descrição |
+|-----------|-----------|
+| [tweaks.md](./boost/tweaks.md) | Catálogo de tweaks (registro, serviços, SPI, energia), efeitos visuais em níveis (data-driven), backup/revert, elevação, purge de RAM, testes. |
+
+## cleanup/ — Limpeza
+
+| Documento | Descrição |
+|-----------|-----------|
+| [catalog.md](./cleanup/catalog.md) | Catálogo com caminhos reais, prévia, `ConfirmToken`, execução nativa (junction-safe), histórico, o que ficou fora e por quê. |
 
 ## references/ — Material de referência
 

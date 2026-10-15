@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
+use g2boost_core::cleanup::{self, ConfirmToken, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::network::{self, Hop, LatencyStats, Probe};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
@@ -122,6 +123,57 @@ fn relaunch_elevated(app: AppHandle, route: String) -> Result<(), String> {
     boost::relaunch_elevated(&["--route", &route]).map_err(|e| e.to_string())?;
     app.exit(0);
     Ok(())
+}
+
+/* ---------------- cleanup ---------------- */
+
+const MAX_CATEGORIES: usize = 64;
+
+#[tauri::command]
+async fn cleanup_preview(ids: Vec<String>) -> Vec<PreviewItem> {
+    if ids.len() > MAX_CATEGORIES {
+        return Vec::new();
+    }
+    tauri::async_runtime::spawn_blocking(move || cleanup::preview(&ids)).await.unwrap_or_default()
+}
+
+/// Issued only from the UI's confirmation dialog; single use, 2-minute TTL, bound to `ids`.
+#[tauri::command]
+fn cleanup_confirm(tokens: State<'_, TokenStore>, ids: Vec<String>) -> Result<ConfirmToken, String> {
+    if ids.is_empty() || ids.len() > MAX_CATEGORIES {
+        return Err("bad_selection".into());
+    }
+    Ok(tokens.issue(ids))
+}
+
+#[derive(serde::Serialize, Clone)]
+struct CleanupProgress {
+    done: usize,
+    total: usize,
+}
+
+#[tauri::command]
+async fn cleanup_execute(
+    app: AppHandle,
+    tokens: State<'_, TokenStore>,
+    token: u64,
+    ids: Vec<String>,
+) -> Result<RunRecord, String> {
+    if !tokens.consume(token, &ids) {
+        return Err("bad_token".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        cleanup::execute(&ids, "manual", |done, total| {
+            let _ = app.emit("cleanup:progress", CleanupProgress { done, total });
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cleanup_history() -> Vec<RunRecord> {
+    cleanup::history()
 }
 
 /* ---------------- disk scan ---------------- */
@@ -287,6 +339,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .manage(DiskState::default())
+        .manage(TokenStore::default())
         .invoke_handler(tauri::generate_handler![
             app_info,
             list_drives,
@@ -297,6 +350,10 @@ pub fn run() {
             boost_visual_fx_revert,
             ram_purge,
             relaunch_elevated,
+            cleanup_preview,
+            cleanup_confirm,
+            cleanup_execute,
+            cleanup_history,
             disk_scan_start,
             disk_scan_cancel,
             disk_summary,

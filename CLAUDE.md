@@ -2,7 +2,7 @@
 
 > **Spec viva.** Porta-de-entrada lida pelo agente toda sessão. Não duplica os docs profundos — **aponta** pra eles. Atualize quando uma regra, comando, módulo ou hurdle mudar.
 >
-> **Última revisão:** 2026-10-14 (noite — fase 0 executada)
+> **Última revisão:** 2026-10-15 (madrugada — fases 4 (boost) e 2 (limpeza) executadas)
 > **Fonte única de regras:** [Docs/core/global-rules.md](Docs/core/global-rules.md) · **Roadmap:** [Docs/core/next-steps.md](Docs/core/next-steps.md) · **Estado/sprints:** `.planning/STATE.md` (local, gitignored — criar com `/gsd-new-project`) · **Índice de docs:** [Docs/README.md](Docs/README.md)
 > **Pasta:** renomeada para `G2 Boost` em 2026-10-14 (memória do Claude na chave `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
 > **Projeto-irmão de referência (organização de pastas, Docs, design):** `G:\1. Projetos\6. Grovic Data\Valerium-Portal` (`CLAUDE.md`, `Docs/core/design-system.md`, `Docs/core/global-rules.md`). Mesmas convenções, outro domínio.
@@ -46,14 +46,14 @@ Máquina de dev hoje (2026-10-14): Windows 11 Pro 26200, 32 GB RAM, **C: 40 GB l
 
 ## 3. Mapa de módulos (planejado)
 
-Layout real (Cargo workspace + Vite): `src/` (UI React: `components/shell`, `components/ui/primitives.tsx`, `pages/<módulo>.tsx`, `lib/` (i18n, backend, speedtest), `locales/`, `data/catalogs.ts`) · `src-tauri/` (shell Tauri: comandos IPC finos em `src/lib.rs`) · `crates/core` (lib Rust: `safety.rs` SafePath, `system.rs` Win32 read-only; futuros `disk`, `cleanup`, `network`, `boost`) · `crates/mcp` (a criar) · `Docs/` · `.planning/` (local). Toolchain fora do repo em `D:\dev` (ver [architecture.md §8](Docs/core/architecture.md)).
+Layout real (Cargo workspace + Vite): `src/` (UI React: `components/shell`, `components/ui/primitives.tsx`, `pages/<módulo>.tsx`, `lib/` (i18n, backend, speedtest), `locales/`, `data/catalogs.ts`) · `src-tauri/` (shell Tauri: comandos IPC finos em `src/lib.rs`) · `crates/core` (lib Rust: `safety.rs` SafePath, `system.rs` Win32 read-only + processos, `disk.rs`, `network.rs`, `registry.rs` (HKCU/HKLM + backups JSON), `visualfx.rs`, `boost.rs`, `cleanup.rs`, `tasksched.rs` (COM)) · `crates/mcp` (a criar) · `Docs/` · `.planning/` (local). Toolchain fora do repo em `D:\dev` (ver [architecture.md §8](Docs/core/architecture.md)).
 
 | Módulo | O que faz | Doc |
 |---|---|---|
 | `disk` | **Feito:** scan paralelo (`crates/core/src/disk.rs`, rayon, pula reparse points; C: = 1,43 M arquivos em 64 s sem admin), árvore em memória (um `Node` por arquivo, ~150 MB), treemap squarified em canvas (`src/components/disk/treemap.tsx`, d3-hierarchy), maiores arquivos. **Pendente:** MFT quando admin, filtros (máscara, pasta, tamanho, idade), snapshots, Lixeira, "essenciais grandes". | [spacesniffer.md](Docs/references/spacesniffer.md) |
-| `cleanup` | Catálogo de categorias (id, caminhos, estratégia, risco, apps que precisam estar fechados, frequência) → prévia em bytes → execução nativa → histórico. Fonte: scripts legados. | [legacy-bat-scripts.md](Docs/references/legacy-bat-scripts.md) |
+| `cleanup` | **Feito (2026-10-15):** catálogo com caminhos reais (`crates/core/src/cleanup.rs`), prévia em bytes, `ConfirmToken` de uso único, execução nativa (sem atravessar junction, em uso = pulado), Lixeira/DNS/`StartComponentCleanup` via tarefa do Windows, histórico JSON; UI com confirmação, progresso e histórico. Sandbox test cria junction NTFS real. **Fora:** prefetch, spool (System32). **Pendente:** rotinas (fase 5), verificação com admin pelo dono. | [cleanup/catalog.md](Docs/cleanup/catalog.md) |
 | `network` | **Feito:** monitor (ICMP via `IcmpSendEcho2`, sem raw socket/admin — `crates/core/src/network.rs`), speedtest Cloudflare (`src/lib/speedtest.ts`), ping para jogos (Steam `GetSDRConfig` via `tauri-plugin-http`), MTR/Ping. **Pendente:** TCPing, gateway/AWS, ranking + troca de DNS por adaptador. | [exitlag.md](Docs/references/exitlag.md) |
-| `boost` | Tweaks com `detect / apply / revert` + backup `.reg`, presets, "não recomendado se…", plano de energia, limpeza de RAM (purge da standby list; **não** trim de working set). | [exitlag.md](Docs/references/exitlag.md) |
+| `boost` | **Feito (2026-10-15):** 16 tweaks como dado (`crates/core/src/boost.rs`): registro HKCU/HKLM, serviços via SCM, mouse/teclado via SPI, plano Desempenho máximo, efeitos visuais em 4 níveis (`visualfx.rs`, data-driven pela metadata do diálogo), purge da standby list, relançar elevado (`runas`). Backup JSON exato antes de aplicar; sem backup, desligar grava o padrão documentado e a UI avisa. Presets Padrão / Alto desempenho / Personalizado. **Pendente:** verificar apply/revert admin na máquina do dono; rotina de RAM (fase 5). | [boost/tweaks.md](Docs/boost/tweaks.md) |
 | `mcp` | Binário stdio `*-mcp.exe`; tools read-only livres; destrutivas pedem token de confirmação emitido pela UI (named pipe). Nome de arquivo é **dado**, nunca instrução (prompt injection). | [architecture.md](Docs/core/architecture.md) |
 
 ## 4. Regras SEMPRE-ATIVAS
@@ -72,14 +72,14 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Caveman full sempre** nas respostas. Código/commits/PR/docs/avisos de segurança = escrita normal.
 - **Commits sem co-author** — nunca `Co-Authored-By`/trailer de assistente. Sobrepõe o padrão do harness.
 
-## 5. Helpers de segurança canônicos (a criar no core — uso obrigatório)
+## 5. Helpers de segurança canônicos (no core — uso obrigatório)
 
 | Helper | Função |
 |---|---|
 | `SafePath::classify(path)` | Classifica raiz (sistema / perfil atual / outro perfil / removível / rede); bloqueia `C:\Windows\System32`, perfis de outros usuários, reparse points e junctions (equivalente ao `/XJ` do robocopy). |
-| `CleanupPlan::preview()` → `execute(ConfirmToken)` | Mede antes; executa só com token emitido pela UI após confirmação. MCP nunca gera token sozinho. |
-| `with_backup(tweak)` / `revert()` | Exporta a chave de registro antes de aplicar; reverter restaura o valor original (não um "padrão" chutado). |
-| `require_elevation()` | Confere token admin do processo; sem admin → erro claro, nunca auto-elevação. |
+| `cleanup::preview()` → `TokenStore::issue/consume` → `execute()` | Mede antes; executa só com token de uso único (2 min, amarrado aos ids) emitido pela UI após confirmação. MCP nunca gera token sozinho. |
+| `boost::apply(id, on)` + `registry::Backup` | Grava os valores originais (JSON) antes de aplicar; desligar restaura exatamente o backup. Sem backup → padrão documentado, avisado na UI. |
+| `system::is_elevated()` + `boost::relaunch_elevated()` | Caminhos admin retornam `needs_admin` sem tentar; "Elevar" relança via `ShellExecuteExW("runas")` com `--route`, nunca PowerShell. |
 | `redact(log)` | Sem caminhos de perfil/PII em logs persistidos. Sem telemetria por padrão. |
 
 ## 6. Common Hurdles (armadilhas conhecidas)
@@ -100,6 +100,10 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Kaspersky intercepta TLS** (`pip install` falhou com erro de certificado no subagente). Downloads via `curl`/`Invoke-WebRequest` passaram; se `pip`/`cargo` reclamarem de certificado, é o AV, não a rede.
 - **`tsc` é o gate de i18n**: `en.ts` usa `satisfies Record<keyof typeof ptBR, string>` — chave faltando ou sobrando quebra o typecheck. Não precisa de script separado.
 - **Comandos Tauri fora do Tauri** (`bun run dev` no browser) voltam `null` via `backend.ts` (`inTauri` guard) — a UI mostra "—", não quebra.
+- **Renomeou a pasta do repo? `cargo clean -p g2-boost`.** O build script do Tauri grava caminhos absolutos em `target/debug/build/tauri-*`; com o caminho velho o clippy/build morre com `failed to read plugin permissions ... Otimização PC\...`. Custou 6,5 GB de artefatos, recompila em ~3 min.
+- **`windows` crate:** `VARIANT` só existe com a feature `Win32_System_Ole` (além de `Win32_System_Com`/`Variant`); `BOOL` mora em `windows::core`; `LocalFree` em `Win32::Foundation`; `NtSetSystemInformation` não existe no crate (declarar `unsafe extern "system"` em `ntdll`); clippy 1.99 exige `as_chunks::<2>()` no lugar de `chunks_exact(2)`.
+- **Tarefa agendada de logon sem `SetUserId` = "qualquer usuário" → `E_ACCESSDENIED` sem admin.** Com `UserId = DOMÍNIO\usuário` o usuário comum registra a própria tarefa (round-trip testado).
+- **Efeitos visuais são data-driven:** `HKLM\...\Explorer\VisualEffects\<item>` traz `SPIActionGet/Set` ou `RegPath`. Tabela congelada em `visualfx.rs`; o nível Média bateu com o setup do dono na primeira detecção.
 
 ## 7. Antes de fechar qualquer fase
 
@@ -116,6 +120,8 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Arquitetura + decisão de stack** → [Docs/core/architecture.md](Docs/core/architecture.md)
 - **Regras de engenharia (completo)** → [Docs/core/global-rules.md](Docs/core/global-rules.md)
 - **Design system** → [Docs/core/design-system.md](Docs/core/design-system.md)
+- **Boost (tweaks, efeitos visuais, serviços, RAM)** → [Docs/boost/tweaks.md](Docs/boost/tweaks.md)
+- **Limpeza (catálogo, prévia, token, histórico)** → [Docs/cleanup/catalog.md](Docs/cleanup/catalog.md)
 - **Referências** → [spacesniffer.md](Docs/references/spacesniffer.md) · [exitlag.md](Docs/references/exitlag.md) · [legacy-bat-scripts.md](Docs/references/legacy-bat-scripts.md)
 - **Segurança** → [kaspersky-false-positive.md](Docs/security/kaspersky-false-positive.md)
 - **Índice geral de docs** → [Docs/README.md](Docs/README.md)
