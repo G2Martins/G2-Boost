@@ -34,6 +34,7 @@
 | [exitlag.md](./references/exitlag.md) | Spec por tela do ExitLag 5.23 (prints de 2026-10-14): o que replicar, como medir, o que fica fora de escopo, fontes de dados gratuitas. |
 | [binary-analysis.md](./references/binary-analysis.md) | Análise estática dos binários do ExitLag (`D:\ExitLag`, Qt 6 + driver NDIS/nfapi) e do SpaceSniffer: imports, strings, chaves de registro dos tweaks, método de limpeza de RAM, resolvers DNS. |
 | [legacy-bat-scripts.md](./references/legacy-bat-scripts.md) | Inventário dos scripts `Limpador Diario/Mensal 2026.bat` → catálogo de categorias de limpeza e tweaks, lições e bugs. |
+| [galdino-optimizer.md](./references/galdino-optimizer.md) | Extração do story do Galdino Optimizer (2026-10-14): painel com KPIs, pontuação de otimização, pontos de restauração, monitor em tempo real, ações recomendadas, Meu PC — com a API nativa de cada item e o que fica fora (temperatura de CPU exige driver). |
 
 ## security/ — Segurança
 
