@@ -7,8 +7,12 @@
 pub mod boost;
 pub mod cleanup;
 pub mod disk;
+pub mod hardware;
+pub mod monitor;
 pub mod network;
+pub mod recommend;
 pub mod registry;
+pub mod restore;
 pub mod routines;
 pub mod safety;
 pub mod settings;

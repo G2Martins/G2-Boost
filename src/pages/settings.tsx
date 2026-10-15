@@ -93,7 +93,7 @@ export function SettingsPage() {
       <PageBody>
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="animate-rise">
             <CardTitle
               help={t("settings.autostart.hint")}
@@ -134,6 +134,24 @@ export function SettingsPage() {
               {t("settings.tray")}
             </CardTitle>
             <p className="text-xs text-muted-foreground">{t("settings.tray.body")}</p>
+          </Card>
+          <Card className="animate-rise" style={rise(2)}>
+            <CardTitle
+              help={t("settings.restore_before_preset.hint")}
+              right={
+                <Switch
+                  checked={!!settings?.restore_before_preset}
+                  disabled={!settings}
+                  onCheckedChange={(v) => save({ restore_before_preset: v })}
+                  aria-label={t("settings.restore_before_preset")}
+                />
+              }
+            >
+              {t("settings.restore_before_preset")}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {t("settings.restore_before_preset.body")}
+            </p>
           </Card>
         </div>
 

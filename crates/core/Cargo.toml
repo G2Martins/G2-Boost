@@ -39,4 +39,12 @@ features = [
   "Win32_System_Variant",
   "Win32_System_LibraryLoader",
   "Win32_System_ProcessStatus",
+  "Win32_Graphics_Dxgi",
+  "Win32_System_Ioctl",
+  "Win32_System_TpmBaseServices",
+  "Win32_System_Performance",
+  "Win32_System_Wmi",
+  "Win32_System_Restore",
+  "Win32_System_Rpc",
+  "Win32_NetworkManagement_Ndis",
 ]

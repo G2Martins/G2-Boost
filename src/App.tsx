@@ -4,13 +4,16 @@ import { TooltipProvider } from "@/components/ui/primitives";
 import { backend } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider } from "@/lib/i18n";
+import { onNavigate } from "@/lib/nav";
 import { BoostPage } from "@/pages/boost";
 import { CleanupPage } from "@/pages/cleanup";
+import { DashboardPage } from "@/pages/dashboard";
 import { DiskPage } from "@/pages/disk";
 import { NetworkPage } from "@/pages/network";
 import { SettingsPage } from "@/pages/settings";
 
 const PAGES: Record<Route, () => React.JSX.Element> = {
+  dashboard: DashboardPage,
   disk: DiskPage,
   cleanup: CleanupPage,
   network: NetworkPage,
@@ -21,7 +24,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
 const isRoute = (r: string | null | undefined): r is Route => !!r && r in PAGES;
 
 export default function App() {
-  const [route, setRoute] = useState<Route>("disk");
+  const [route, setRoute] = useState<Route>("dashboard");
   const [version, setVersion] = useState("0.1.0");
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -35,6 +38,7 @@ export default function App() {
       }
       setReady(true);
     });
+    return onNavigate(setRoute);
   }, []);
   const Page = PAGES[route];
   return (

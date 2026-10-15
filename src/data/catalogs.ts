@@ -72,22 +72,36 @@ export const TWEAKS: Tweak[] = [
   { id: "game_mode", presets: ["default", "high"] },
   { id: "input_lag", presets: ["default", "high"] },
   { id: "keyboard", presets: ["default", "high"] },
-  { id: "tips", presets: ["default", "high"] },
   { id: "mouse", presets: ["high"] },
-  { id: "svc_sysmain", admin: true, presets: ["default", "high"] },
+  { id: "tips", presets: ["default", "high"] },
+  { id: "show_extensions", presets: ["default", "high"] },
+  { id: "widgets_off", presets: ["default", "high"] },
+  { id: "search_highlights_off", presets: ["default", "high"] },
+  { id: "silent_apps_off", presets: ["default", "high"] },
+  { id: "advertising_id_off", presets: ["default", "high"] },
+  { id: "compat_telemetry_off", admin: true, presets: ["default", "high"] },
   { id: "svc_telemetry", admin: true, presets: ["default", "high"] },
+  { id: "svc_sysmain", admin: true, presets: ["default", "high"] },
   { id: "power_plan", admin: true, presets: ["high"] },
   { id: "hags", admin: true, reboot: true, presets: ["high"] },
   { id: "mmcss", admin: true, presets: ["high"] },
   { id: "network_latency", admin: true, reboot: true, presets: ["high"] },
   { id: "svc_search", admin: true, presets: ["high"] },
-  { id: "svc_xbox", admin: true, presets: ["high"] },
+  // Already Manual/stopped on Windows: zero gain, real side effects (Game Pass) → custom only.
+  { id: "svc_xbox", admin: true, presets: [] },
+  { id: "svc_dps", admin: true, presets: [] },
+  { id: "svc_geolocation", admin: true, presets: [] },
+  // The one lever with measured FPS (~5 %) and the one that lowers security: opt-in, reboot.
+  { id: "hvci_off", admin: true, beta: true, reboot: true, presets: [] },
   { id: "priority_sep", admin: true, beta: true, presets: [] },
   { id: "perf_counters", admin: true, beta: true, presets: [] },
 ];
 /** Visual-effects level each preset applies. */
 export const PRESET_FX_LEVEL = { default: "balanced", high: "performance" } as const;
 export const FX_LEVELS = ["appearance", "minimal", "balanced", "performance"] as const;
+/** i18n for the Rust-side category / "not recommended here" reason codes. */
+export const categoryKey = (c: string) => `boost.category.${c}` as I18nKey;
+export const reasonKey = (r: string) => `boost.reason.${r}` as I18nKey;
 export const tweakName = (id: string) => `boost.tweak.${id}` as I18nKey;
 export const tweakDesc = (id: string) => `boost.tweak.${id}.desc` as I18nKey;
 export const tweakWarn = (id: string) => `boost.tweak.${id}.warn` as I18nKey;

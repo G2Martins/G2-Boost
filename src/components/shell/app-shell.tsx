@@ -3,6 +3,7 @@ import {
   CircleHelp,
   Gauge,
   HardDrive,
+  LayoutDashboard,
   type LucideIcon,
   Radar,
   Search,
@@ -13,9 +14,10 @@ import type { ReactNode } from "react";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export type Route = "disk" | "cleanup" | "network" | "boost" | "settings";
+export type Route = "dashboard" | "disk" | "cleanup" | "network" | "boost" | "settings";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
+  { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
   { route: "disk", icon: HardDrive, label: "nav.disk" },
   { route: "cleanup", icon: Sparkles, label: "nav.cleanup" },
   { route: "network", icon: Radar, label: "nav.network" },
@@ -39,7 +41,7 @@ export function AppShell({
       <aside className="flex w-16 shrink-0 flex-col items-center border-r border-border bg-surface py-3">
         <button
           type="button"
-          onClick={() => onNavigate("disk")}
+          onClick={() => onNavigate("dashboard")}
           aria-label={t("app.name")}
           className="mb-4 flex size-10 items-center justify-center"
         >

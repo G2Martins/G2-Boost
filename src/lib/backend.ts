@@ -10,6 +10,7 @@ export type AppInfo = {
   core_version: string;
   os: string;
   elevated: boolean;
+  user: string;
   start_route: string | null;
   start_tab: string | null;
   autorun: boolean;
@@ -88,6 +89,7 @@ export type TweakState = {
   id: string;
   admin: boolean;
   beta: boolean;
+  category: TweakCategory;
   status: TweakStatus;
   has_backup: boolean;
   level: FxLevel | null;
@@ -128,6 +130,72 @@ export type Settings = {
   routine_categories: string[];
   game_ram_clean: boolean;
   game_exes: string[];
+  restore_before_preset: boolean;
+};
+
+export type Gpu = {
+  name: string;
+  vram_bytes: number;
+  vendor: "nvidia" | "amd" | "intel" | "other";
+};
+export type Disk = {
+  index: number;
+  model: string;
+  bus: "nvme" | "sata" | "usb" | "sas" | "raid" | "other";
+  size_bytes: number;
+  ssd: boolean | null;
+  system: boolean;
+};
+export type Profile = {
+  computer: string;
+  os: string;
+  cpu: string;
+  cores_physical: number;
+  cores_logical: number;
+  ram_bytes: number;
+  uptime_secs: number;
+  gpus: Gpu[];
+  board: string | null;
+  system_model: string | null;
+  disks: Disk[];
+  system_disk_ssd: boolean | null;
+  secure_boot: boolean | null;
+  tpm: string | null;
+  laptop: boolean;
+  elevated: boolean;
+};
+export type TweakCategory = "performance" | "privacy" | "appearance" | "network";
+export type Recommendation = { id: string; recommended: boolean; reason: string | null };
+export type Facts = {
+  system_ssd: boolean | null;
+  laptop: boolean;
+  gpu_vendor: string | null;
+  hags_supported: boolean;
+  game_pass: boolean;
+  outlook: boolean;
+};
+export type Score = { recommended: number; active: number; percent: number; pending: string[] };
+export type Recommendations = { facts: Facts; items: Recommendation[]; score: Score };
+export type RestoreStatus = {
+  enabled: boolean | null;
+  count: number;
+  last: string | null;
+  frequency_minutes: number;
+};
+export type CreateOutcome = "created" | "skipped";
+export type MonitorSample = {
+  ts: number;
+  cpu_pct: number;
+  cpu_mhz: number;
+  gpu_pct: number;
+  gpu_mem_bytes: number;
+  gpu_temp_c: number | null;
+  ram_used: number;
+  ram_total: number;
+  disk_pct: number;
+  disk_bytes_s: number;
+  net_rx_bytes_s: number;
+  net_tx_bytes_s: number;
 };
 export type Game = { name: string; source: "steam" | "exe" | "steamapps" };
 export type AutostartStatus = { enabled: boolean };
@@ -191,6 +259,14 @@ export const backend = {
   autostartStatus: () => call<AutostartStatus>("autostart_status"),
   autostartSet: (on: boolean) => callOrThrow<AutostartStatus>("autostart_set", { on }),
   routineStatus: () => call<RoutineStatus>("routine_status"),
+
+  systemProfile: (refresh = false) => call<Profile>("system_profile", { refresh }),
+  recommendations: (refresh = false) => call<Recommendations>("recommendations", { refresh }),
+  monitorStart: () => call<void>("monitor_start"),
+  monitorStop: () => call<void>("monitor_stop"),
+  restoreStatus: () => call<RestoreStatus>("restore_status"),
+  restoreCreate: (description: string) =>
+    callOrThrow<CreateOutcome>("restore_create", { description }),
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),

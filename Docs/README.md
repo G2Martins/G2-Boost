@@ -19,6 +19,7 @@
 |-----------|-----------|
 | [tweaks.md](./boost/tweaks.md) | Catálogo de tweaks (registro, serviços, SPI, energia), efeitos visuais em níveis (data-driven), backup/revert, elevação, purge de RAM, testes. |
 | [routines.md](./boost/routines.md) | Iniciar com o Windows (tarefa de logon), limpeza agendada, RAM ao abrir jogo (detecção Steam/exe), bandeja, settings validados, testes. |
+| [dashboard.md](./boost/dashboard.md) | Painel (KPIs: pontuação por hardware, pontos de restauração, bytes para limpar, RAM), monitor em tempo real (PDH/NVML), Meu PC (SMBIOS, DXGI, IOCTLs, TPM, Secure Boot), regras de recomendação. |
 
 ## cleanup/ — Limpeza
 
@@ -34,6 +35,7 @@
 | [exitlag.md](./references/exitlag.md) | Spec por tela do ExitLag 5.23 (prints de 2026-10-14): o que replicar, como medir, o que fica fora de escopo, fontes de dados gratuitas. |
 | [binary-analysis.md](./references/binary-analysis.md) | Análise estática dos binários do ExitLag (`D:\ExitLag`, Qt 6 + driver NDIS/nfapi) e do SpaceSniffer: imports, strings, chaves de registro dos tweaks, método de limpeza de RAM, resolvers DNS. |
 | [legacy-bat-scripts.md](./references/legacy-bat-scripts.md) | Inventário dos scripts `Limpador Diario/Mensal 2026.bat` → catálogo de categorias de limpeza e tweaks, lições e bugs. |
+| [windows-services-research.md](./references/windows-services-research.md) | Pesquisa com fontes (Galdino Tech, winutil, Microsoft, benchmarks): o que cada serviço faz, padrão do Win11, efeitos colaterais, ganho real para jogos, mitos (Prefetch, Nagle, RAM cleaners, VBS/HVCI). Base das decisões de preset. |
 | [galdino-optimizer.md](./references/galdino-optimizer.md) | Extração do story do Galdino Optimizer (2026-10-14): painel com KPIs, pontuação de otimização, pontos de restauração, monitor em tempo real, ações recomendadas, Meu PC — com a API nativa de cada item e o que fica fora (temperatura de CPU exige driver). |
 
 ## security/ — Segurança

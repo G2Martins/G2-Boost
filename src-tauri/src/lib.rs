@@ -6,10 +6,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use std::sync::atomic::AtomicU32;
+
 use g2boost_core::boost::{self, PurgeResult, TweakState};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
+use g2boost_core::hardware::{self, Profile};
+use g2boost_core::monitor::Monitor;
 use g2boost_core::network::{self, Hop, LatencyStats, Probe};
+use g2boost_core::recommend::{self, Facts, Recommendation, Score};
+use g2boost_core::restore::{self, CreateOutcome, RestoreStatus};
 use g2boost_core::routines::{self, Clock, Game, GameWatcher, RoutineState};
 use g2boost_core::settings::{self, Schedule, Settings};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
@@ -20,7 +26,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["disk", "cleanup", "network", "boost", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "network", "boost", "settings"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -43,6 +49,8 @@ struct AppInfo {
     core_version: &'static str,
     os: String,
     elevated: bool,
+    /// Windows account name, for the dashboard greeting.
+    user: String,
     /// Dev aids: `G2BOOST_START_ROUTE=network` / `G2BOOST_START_TAB=tools` open the app there
     /// (screenshots, manual tests). Harmless if unset.
     start_route: Option<String>,
@@ -60,6 +68,7 @@ fn app_info() -> AppInfo {
         core_version: g2boost_core::VERSION,
         os: system::os_version(),
         elevated: system::is_elevated(),
+        user: std::env::var("USERNAME").unwrap_or_default(),
         start_route: start_route(),
         start_tab: std::env::var("G2BOOST_START_TAB").ok(),
         autorun: std::env::var("G2BOOST_AUTORUN").is_ok_and(|v| v == "1"),
@@ -179,6 +188,96 @@ async fn cleanup_execute(
 #[tauri::command]
 fn cleanup_history() -> Vec<RunRecord> {
     cleanup::history()
+}
+
+/* ---------------- dashboard: hardware profile, recommendations, monitor, restore points ---------------- */
+
+#[derive(Default)]
+struct Dashboard {
+    profile: Mutex<Option<Profile>>,
+    facts: Mutex<Option<Facts>>,
+    monitor_subs: AtomicU32,
+    monitor_running: AtomicBool,
+}
+
+#[tauri::command]
+async fn system_profile(state: State<'_, Dashboard>, refresh: bool) -> Result<Profile, String> {
+    if !refresh && let Some(p) = state.profile.lock().unwrap().clone() {
+        return Ok(p);
+    }
+    let p = tauri::async_runtime::spawn_blocking(hardware::profile).await.map_err(|e| e.to_string())?;
+    *state.profile.lock().unwrap() = Some(p.clone());
+    Ok(p)
+}
+
+#[derive(serde::Serialize)]
+struct Recommendations {
+    facts: Facts,
+    items: Vec<Recommendation>,
+    score: Score,
+}
+
+#[tauri::command]
+async fn recommendations(state: State<'_, Dashboard>, refresh: bool) -> Result<Recommendations, String> {
+    let cached = if refresh { None } else { state.facts.lock().unwrap().clone() };
+    let facts = match cached {
+        Some(f) => f,
+        None => {
+            let f = tauri::async_runtime::spawn_blocking(recommend::facts).await.map_err(|e| e.to_string())?;
+            *state.facts.lock().unwrap() = Some(f.clone());
+            f
+        }
+    };
+    let items = recommend::recommend(&facts);
+    let states = tauri::async_runtime::spawn_blocking(boost::detect_all).await.map_err(|e| e.to_string())?;
+    let score = recommend::score(&items, &states);
+    Ok(Recommendations { facts, items, score })
+}
+
+/// Reference-counted: the sampling thread lives while at least one page listens to `monitor:tick`.
+#[tauri::command]
+fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
+    state.monitor_subs.fetch_add(1, Ordering::SeqCst);
+    if state.monitor_running.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let st = app.state::<Dashboard>();
+        if let Some(mut m) = Monitor::new() {
+            loop {
+                std::thread::sleep(Duration::from_secs(1));
+                if st.monitor_subs.load(Ordering::SeqCst) == 0 {
+                    break;
+                }
+                let _ = app.emit("monitor:tick", m.sample());
+            }
+        }
+        st.monitor_running.store(false, Ordering::SeqCst);
+    });
+}
+
+#[tauri::command]
+fn monitor_stop(state: State<'_, Dashboard>) {
+    let mut cur = state.monitor_subs.load(Ordering::SeqCst);
+    while cur > 0 {
+        match state.monitor_subs.compare_exchange(cur, cur - 1, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => break,
+            Err(v) => cur = v,
+        }
+    }
+}
+
+#[tauri::command]
+async fn restore_status() -> RestoreStatus {
+    tauri::async_runtime::spawn_blocking(restore::status).await.unwrap_or(RestoreStatus { enabled: None, count: 0, last: None, frequency_minutes: 1440 })
+}
+
+#[tauri::command]
+async fn restore_create(description: String) -> Result<CreateOutcome, String> {
+    let d: String = description.chars().filter(|c| !c.is_control()).take(120).collect();
+    tauri::async_runtime::spawn_blocking(move || restore::create(&d).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /* ---------------- routines (settings, autostart, scheduler, game watcher, tray) ---------------- */
@@ -478,6 +577,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .manage(DiskState::default())
         .manage(TokenStore::default())
+        .manage(Dashboard::default())
         .manage(Routines {
             settings: Mutex::new(settings::load()),
             state: Mutex::new(routines::load_state()),
@@ -546,6 +646,12 @@ pub fn run() {
             autostart_status,
             autostart_set,
             routine_status,
+            system_profile,
+            recommendations,
+            monitor_start,
+            monitor_stop,
+            restore_status,
+            restore_create,
             disk_scan_start,
             disk_scan_cancel,
             disk_summary,

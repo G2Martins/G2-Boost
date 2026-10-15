@@ -32,11 +32,14 @@ pub struct Settings {
     pub game_ram_clean: bool,
     /// Extra game executables (lowercase `name.exe`) besides Steam detection.
     pub game_exes: Vec<String>,
+    /// Create a System Restore point before applying a preset (when elevated).
+    pub restore_before_preset: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            restore_before_preset: true,
             close_to_tray: true,
             schedule: Schedule::Off,
             routine_categories: cleanup::CATALOG
@@ -107,6 +110,7 @@ mod tests {
     #[test]
     fn sanitize_drops_unknown_categories_bad_exes_and_clamps() {
         let s = sanitize(Settings {
+            restore_before_preset: true,
             close_to_tray: false,
             schedule: Schedule::EveryHours { hours: 0 },
             routine_categories: vec!["temp_user".into(), "nope".into(), "temp_user".into(), "../x".into()],

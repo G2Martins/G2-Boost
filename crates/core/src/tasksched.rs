@@ -39,13 +39,13 @@ fn map(e: windows::core::Error) -> TaskError {
 }
 
 /// COM apartment for the current thread; uninitialised on drop unless the thread already
-/// had COM in another mode (then we just borrow it).
-struct Com {
+/// had COM in another mode (then we just borrow it). Shared with the WMI client in `restore`.
+pub(crate) struct Com {
     owned: bool,
 }
 
 impl Com {
-    fn init() -> Result<Self, TaskError> {
+    pub(crate) fn init() -> Result<Self, TaskError> {
         // SAFETY: plain COM initialisation on this thread.
         let hr = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
         if hr == RPC_E_CHANGED_MODE {
@@ -100,6 +100,40 @@ pub fn task_exists(folder_path: &str, name: &str) -> bool {
     folder(&svc, folder_path)
         .and_then(|f| unsafe { f.GetTask(&BSTR::from(name)) }.map_err(map))
         .is_ok()
+}
+
+/// Enabled flag of `\folder\name`; `Ok(None)` when the folder or task does not exist.
+pub fn task_enabled(folder_path: &str, name: &str) -> Result<Option<bool>, TaskError> {
+    let _com = Com::init()?;
+    let svc = service()?;
+    let f = match folder(&svc, folder_path) {
+        Ok(f) => f,
+        Err(TaskError::NotFound) => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    // SAFETY: valid folder; BSTR name.
+    match unsafe { f.GetTask(&BSTR::from(name)) } {
+        Ok(task) => Ok(Some(unsafe { task.Enabled() }.map_err(map)?.as_bool())),
+        Err(e) if e.code() == E_FILE_NOT_FOUND => Ok(None),
+        Err(e) => Err(map(e)),
+    }
+}
+
+/// Enable/disable an existing task (admin for Microsoft's tasks). Missing task = no-op.
+pub fn set_task_enabled(folder_path: &str, name: &str, enabled: bool) -> Result<(), TaskError> {
+    let _com = Com::init()?;
+    let svc = service()?;
+    let f = match folder(&svc, folder_path) {
+        Ok(f) => f,
+        Err(TaskError::NotFound) => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    // SAFETY: valid folder/task; VARIANT_BOOL flag.
+    match unsafe { f.GetTask(&BSTR::from(name)) } {
+        Ok(task) => unsafe { task.SetEnabled(if enabled { VARIANT_TRUE } else { VARIANT_FALSE }) }.map_err(map),
+        Err(e) if e.code() == E_FILE_NOT_FOUND => Ok(()),
+        Err(e) => Err(map(e)),
+    }
 }
 
 /// Start an existing task (e.g. Windows' StartComponentCleanup) and return immediately.
@@ -189,6 +223,14 @@ mod tests {
     fn windows_component_cleanup_task_is_visible() {
         assert!(task_exists("\\Microsoft\\Windows\\Servicing", "StartComponentCleanup"));
         assert!(!task_exists("\\", "G2 Boost definitely-not-a-task"));
+        // The Compatibility Appraiser task exists on every Windows 10/11 (renamed "… Exp" on 24H2+) and is readable without admin.
+        let folder = "\\Microsoft\\Windows\\Application Experience";
+        assert!(
+            task_enabled(folder, "Microsoft Compatibility Appraiser").unwrap().is_some()
+                || task_enabled(folder, "Microsoft Compatibility Appraiser Exp").unwrap().is_some()
+        );
+        assert_eq!(task_enabled("\\No\\Such\\Folder", "x").unwrap(), None);
+        assert_eq!(task_enabled("\\", "G2 Boost definitely-not-a-task").unwrap(), None);
     }
 
     /// Registers a least-privilege task as the current user, then deletes it. Ignored by

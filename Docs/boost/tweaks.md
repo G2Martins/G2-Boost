@@ -40,6 +40,22 @@ A UI calcula o preset ativo comparando o estado real (tweaks "indisponíveis" s�
 | `priority_sep` (beta) | `Win32PrioritySeparation=0x26` | HKLM `Control\PriorityControl` (padrão 2) | sim | não | encoder/build em segundo plano |
 | `perf_counters` (beta) | `Disable Performance Counters=1` | HKLM `Perflib` | sim | não | usa perfmon/telemetria |
 
+### Adicionados em 2026-10-15 (pesquisa de serviços + extração do Galdino Optimizer)
+
+| id | O que faz | Mecanismo | Admin | Preset | Categoria |
+|---|---|---|---|---|---|
+| `show_extensions` | Explorer mostra extensões | HKCU `Explorer\Advanced\HideFileExt=0` | não | Padrão + Alto | Aparência |
+| `widgets_off` | Widgets/notícias off | HKCU `Explorer\Advanced\TaskbarDa=0` | não | Padrão + Alto | Aparência |
+| `search_highlights_off` | destaques/Bing na pesquisa off | HKCU `SearchSettings\IsDynamicSearchBoxEnabled=0`, `Search\BingSearchEnabled=0` | não | Padrão + Alto | Privacidade |
+| `silent_apps_off` | apps promovidos/pré-instalados off | HKCU `ContentDeliveryManager\SilentInstalledAppsEnabled=0`, `PreInstalledAppsEnabled=0`, `OemPreInstalledAppsEnabled=0` | não | Padrão + Alto | Privacidade |
+| `advertising_id_off` | ID de publicidade off | HKCU `AdvertisingInfo\Enabled=0` | não | Padrão + Alto | Privacidade |
+| `compat_telemetry_off` | CompatTelRunner/CEIP off | tarefas `\Microsoft\Windows\Application Experience\{Microsoft Compatibility Appraiser, … Exp, ProgramDataUpdater}` e `\…\Customer Experience Improvement Program\{Consolidator, UsbCeip}` via `IRegisteredTask::SetEnabled` (ausentes são ignoradas) | sim | Padrão + Alto | Privacidade |
+| `svc_dps` | DPS Disabled | SCM | sim | Personalizado | Desempenho |
+| `svc_geolocation` | lfsvc Disabled | SCM | sim | Personalizado | Privacidade |
+| `hvci_off` (beta) | Isolamento de Núcleo off | HKLM `DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity\Enabled=0` (reboot) | sim | Personalizado | Desempenho |
+
+**Mudanças de preset pela evidência** ([../references/windows-services-research.md](../references/windows-services-research.md)): `svc_xbox` saiu do Alto desempenho (serviços já Manual/parados → ganho nulo, efeitos reais no Game Pass); `svc_sysmain` continua no Padrão por decisão do dono, mas `recommend()` o tira da lista em HD mecânico. Cada tweak tem `category` (Desempenho / Privacidade / Aparência / Rede) e, no card, o motivo de "não recomendado neste PC" ([dashboard.md](dashboard.md)).
+
 **Fora, de propósito:** `Psched\NonBestEffortLimit` (fica em `Policies` — gatilho do Kaspersky, efeito desprezível), `MSMQ\TCPNoDelay` (cargo cult, só MSMQ), Prefetch (ver `legacy-bat-scripts.md`), Windows Update/Defender/Spooler.
 
 Serviços: `WSearch` é "automático (início atrasado)"; o revert restaura o tipo de início gravado, mas não a flag de atraso (`ChangeServiceConfig2W` fica para quando alguém sentir falta). Serviço ausente na máquina (ex.: Xbox em LTSC) é ignorado; se nenhum existir, o card mostra "Indisponível".

@@ -2,7 +2,7 @@
 
 **Última revisão:** 2026-10-15 (madrugada)
 
-**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza) e 5 (Rotinas) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). Próximas: Fase 6 (disco: filtros, Lixeira, essenciais) e Fase 7 (rede: TCPing, DNS, gateway). Planejamento GSD em `.planning/`.
+**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). Próximas: 6.5 Meu PC completo (CPU-Z/Speccy user-mode, WinSAT), 7 disco, 8 rede, 9 IA no app + MCP (contexto do PC, estimativa de FPS com fontes), 10 release. Planejamento GSD em `.planning/`.
 
 Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat estão bloqueados pelo Kaspersky — disco e limpeza primeiro; rede e boost depois; MCP quando o core estiver estável.
 
@@ -13,6 +13,7 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 | **2 — Limpeza** ✅ 2026-10-15 (falta: essenciais grandes → fase 6; rotinas → fase 5) | catálogo portado dos .bat com caminhos reais · prévia por categoria · `ConfirmToken` · execução nativa junction-safe · histórico · Lixeira/DNS/`StartComponentCleanup` | substitui os dois .bat; Kaspersky silencioso no teste local (a confirmar elevado) |
 | **3 — Rede** | monitor (ICMP gateway/8.8.8.8/1.1.1.1; latência/jitter/perda/picos; gráfico) · speedtest Cloudflare + bufferbloat (nota A+…F) · ping p/ jogos (Steam SDR + lista curada) · MTR/Ping/TCPing · DNS ranking + aplicar/restaurar | paridade com as abas "Analisador de rede" e "DNS Optimizer" do ExitLag |
 | **4 — PC Boost** ✅ 2026-10-15 (falta: rotina de RAM → fase 5) | 16 tweaks `detect/apply/revert` + backup exato · efeitos visuais em 4 níveis · serviços (SysMain, telemetria, WSearch, Xbox) · presets Padrão/Alto desempenho/Personalizado · plano de energia · purge da standby list · Elevar via `runas` | paridade com "Ajustes de sistema" e "Limpeza de RAM" (manual) |
+| **6 — Painel, Meu PC e Monitor** ✅ 2026-10-15 | KPIs (pontuação por hardware, pontos de restauração, bytes para limpar, RAM) · Boost agora · monitor CPU/GPU/RAM/disco/rede 1 s · Meu PC (SMBIOS/DXGI/IOCTL/TPM/Secure Boot) · recomendações por hardware · tweaks privacidade/aparência · `hvci_off` beta | painel abre sem admin em < 2 s com dados reais (verificado por screenshot) |
 | **5 — Rotinas** ✅ 2026-10-15 | iniciar com o Windows (tarefa de logon `--tray`, Highest se elevado) · limpeza agendada (ao ligar / a cada N h / diária / semanal) com categorias · limpar RAM ao abrir jogo (Steam `RunningAppID` + exes + `steamapps\common`) · bandeja · Configurações | app vive na bandeja e limpa sozinho; tudo visível no histórico (verificar logon real + Highest pelo dono) |
 | **8 — MCP local** | `g2boost-mcp.exe` (stdio) · tools read-only + destrutivas com token · registro no Claude Desktop/Code · doc de uso | Claude da máquina analisa o scan e propõe limpeza; humano confirma na UI |
 | **9 — Release** | assinatura de código · instalador NSIS · auto-update · VirusTotal + submissão de falso positivo (Kaspersky/Microsoft) · README público | exe assinado instala limpo numa VM com Kaspersky |
@@ -21,7 +22,8 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 - **Fase 4 (Boost):** `registry.rs` (HKCU/HKLM + backups JSON), `visualfx.rs` (17 itens do diálogo, 4 níveis, round-trip ao vivo ok), `boost.rs` (16 tweaks, SCM, SPI, energia, purge, `runas`); comandos Tauri; aba Boost com estado real, presets, níveis, pills de serviço, Elevar. Screenshot verificado: nível Média detectado = setup do dono.
 - **Fase 2 (Limpeza):** `cleanup.rs` (catálogo, prévia, `TokenStore`, execução, histórico), `tasksched.rs` (COM: rodar `StartComponentCleanup`, tarefa de logon), `system::running_processes`; comandos Tauri; página com prévia, painel de confirmação, progresso, resultado e histórico. Teste de junction NTFS real.
 - **Fase 5 (Rotinas):** `settings.rs`, `routines.rs` (agenda + detector de jogo), tarefa de logon via `tasksched.rs`, thread de rotinas + bandeja no shell Tauri, página Configurações nova, aba RAM religada (jogo atual, último purge, lista de exes). Round-trip da tarefa de logon como usuário comum: ok.
-- **GSD:** `.planning/` criado (config yolo, PROJECT/REQUIREMENTS/ROADMAP/STATE). `bun run check` verde (31 testes).
+- **Fase 6 (Painel):** `hardware.rs` (SMBIOS parser testado, DXGI, storage IOCTLs com SSD/HD, TPM, Secure Boot), `monitor.rs` (PDH + NVML), `restore.rs` (WMI + `SRSetRestorePointW`), `recommend.rs` (regras + score), 9 tweaks novos com categoria; shell com `Dashboard` (perfil cacheado, monitor refcount, restore, recomendações); UI Painel (KpiCard, Gauge, LiveLine), Meu PC, badges de categoria/motivo no Boost, ponto de restauração antes do preset. Pesquisa de serviços com fontes em `Docs/references/windows-services-research.md` (Xbox saiu do Alto; HVCI = única alavanca real, opt-in).
+- **GSD:** `.planning/` criado (config yolo, PROJECT/REQUIREMENTS/ROADMAP/STATE). `bun run check` verde (38 testes).
 - **Validado e descartado:** limpar Prefetch (1 arquivo / 0 MB na máquina do dono; SysMain off não grava `.pf`; anti-forense).
 
 ## Backlog (não prometido)

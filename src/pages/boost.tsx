@@ -33,10 +33,12 @@ import {
   TabsTrigger,
 } from "@/components/ui/primitives";
 import {
+  categoryKey,
   DNS_PROVIDERS,
   FX_LEVELS,
   PRESET_FX_LEVEL,
   type Preset,
+  reasonKey,
   TWEAKS,
   type Tweak,
   tweakDesc,
@@ -50,6 +52,7 @@ import {
   inTauri,
   type MemoryStatus,
   type PurgeResult,
+  type Recommendation,
   type RoutineStatus,
   type Settings,
   type TweakState,
@@ -153,6 +156,9 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [run, setRun] = useState<{ done: number; total: number } | null>(null);
   const [skipped, setSkipped] = useState(0);
+  const [recs, setRecs] = useState<Record<string, Recommendation>>({});
+  const [restoreBefore, setRestoreBefore] = useState(true);
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await backend.boostState();
@@ -161,6 +167,12 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+  useEffect(() => {
+    backend
+      .recommendations()
+      .then((r) => r && setRecs(Object.fromEntries(r.items.map((x) => [x.id, x]))));
+    backend.settingsGet().then((s) => s && setRestoreBefore(s.restore_before_preset));
+  }, []);
 
   const put = (s: TweakState) => setStates((m) => ({ ...(m ?? {}), [s.id]: s }));
 
@@ -193,6 +205,16 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
       if (tw.id === "visual_fx") return s.level !== PRESET_FX_LEVEL[p];
       return (s.status === "on") !== tw.presets.includes(p);
     });
+    if (restoreBefore && elevated && todo.length > 0) {
+      try {
+        const out = await backend.restoreCreate(t("dash.restore.description"));
+        setRestoreMsg(
+          out === "created" ? t("boost.preset.restore_created") : t("boost.preset.restore_skipped"),
+        );
+      } catch (e) {
+        setRestoreMsg(errorText(e));
+      }
+    }
     const runnable = todo.filter((tw) => !tw.admin || elevated);
     setSkipped(todo.length - runnable.length);
     setRun({ done: 0, total: runnable.length });
@@ -245,6 +267,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
             </button>
           ))}
         </div>
+        {restoreMsg ? <p className="w-full text-xs text-muted-foreground">{restoreMsg}</p> : null}
         {run ? (
           <p className="w-full text-xs text-muted-foreground">
             {t("boost.preset.applying", { done: run.done, total: run.total })}
@@ -267,6 +290,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
             elevated={elevated}
             busy={busy === tw.id || run !== null}
             error={errors[tw.id]}
+            rec={recs[tw.id]}
             onToggle={(on, level) => setTweak(tw, on, level)}
           />
         ))}
@@ -282,6 +306,7 @@ function TweakCard({
   elevated,
   busy,
   error,
+  rec,
   onToggle,
 }: {
   tw: Tweak;
@@ -290,6 +315,7 @@ function TweakCard({
   elevated: boolean;
   busy: boolean;
   error?: string;
+  rec?: Recommendation;
   onToggle: (on: boolean, level?: FxLevel) => void;
 }) {
   const { t } = useI18n();
@@ -392,6 +418,19 @@ function TweakCard({
             )}
           >
             {t(`boost.state.${state.status}` as const)}
+          </Badge>
+        ) : null}
+        {state ? (
+          <Badge className="bg-card-hover text-muted-foreground">
+            {t(categoryKey(state.category))}
+          </Badge>
+        ) : null}
+        {rec && !rec.recommended && rec.reason ? (
+          <Badge
+            className="bg-warning/15 text-warning"
+            title={t("boost.not_recommended_here", { reason: t(reasonKey(rec.reason)) })}
+          >
+            {t(reasonKey(rec.reason))}
           </Badge>
         ) : null}
         {tw.admin ? (

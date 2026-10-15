@@ -42,6 +42,7 @@ use windows::core::{GUID, HRESULT, PCWSTR};
 
 use crate::registry::{self, Backup, BackupEntry, Root, Value, wide};
 use crate::system;
+use crate::tasksched;
 use crate::visualfx::{self, Level};
 
 /* ---------------- errors ---------------- */
@@ -60,6 +61,8 @@ pub enum BoostError {
     Registry(#[from] registry::RegError),
     #[error("{0}")]
     VisualFx(#[from] visualfx::FxError),
+    #[error("{0}")]
+    Task(#[from] tasksched::TaskError),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("win32: {0}")]
@@ -139,6 +142,17 @@ enum Kind {
     Power,
     /// The visual-effects level (see `visualfx`).
     VisualFx,
+    /// Scheduled tasks (folder, name) to disable — e.g. the Compatibility Appraiser.
+    Tasks(&'static [(&'static str, &'static str)]),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Category {
+    Performance,
+    Privacy,
+    Appearance,
+    Network,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -146,6 +160,7 @@ pub struct Tweak {
     pub id: &'static str,
     pub admin: bool,
     pub beta: bool,
+    pub category: Category,
     kind: Kind,
 }
 
@@ -212,6 +227,43 @@ const PRIORITY_SEP: &[RegOp] = &[op(
     Desired::Dword(0x26),
     Desired::Dword(2),
 )];
+const EXPLORER_ADV: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+const SHOW_EXTENSIONS: &[RegOp] = &[op(HKCU, EXPLORER_ADV, "HideFileExt", Desired::Dword(0), Desired::Dword(1))];
+const WIDGETS_OFF: &[RegOp] = &[op(HKCU, EXPLORER_ADV, "TaskbarDa", Desired::Dword(0), Desired::Dword(1))];
+const SEARCH_HIGHLIGHTS_OFF: &[RegOp] = &[
+    op(HKCU, r"Software\Microsoft\Windows\CurrentVersion\SearchSettings", "IsDynamicSearchBoxEnabled", Desired::Dword(0), Desired::Dword(1)),
+    op(HKCU, r"Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", Desired::Dword(0), Desired::Absent),
+];
+const SILENT_APPS_OFF: &[RegOp] = &[
+    op(HKCU, CDM, "SilentInstalledAppsEnabled", Desired::Dword(0), Desired::Dword(1)),
+    op(HKCU, CDM, "PreInstalledAppsEnabled", Desired::Dword(0), Desired::Dword(1)),
+    op(HKCU, CDM, "OemPreInstalledAppsEnabled", Desired::Dword(0), Desired::Dword(1)),
+];
+const ADVERTISING_ID_OFF: &[RegOp] = &[op(
+    HKCU,
+    r"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
+    "Enabled",
+    Desired::Dword(0),
+    Desired::Dword(1),
+)];
+/// Core Isolation / Memory Integrity. The only lever with a measured FPS gain (~5 %, Tom's
+/// Hardware) and the only one that lowers security. Beta, custom preset only, reboot.
+const HVCI_OFF: &[RegOp] = &[op(
+    HKLM,
+    r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+    "Enabled",
+    Desired::Dword(0),
+    Desired::Dword(1),
+)];
+/// Compatibility telemetry (CompatTelRunner) and CEIP run from these tasks, not from a service.
+/// Task names differ by build ("… Appraiser" up to 23H2, "… Appraiser Exp" on 24H2+); missing ones are skipped.
+const TASKS_COMPAT_TELEMETRY: &[(&str, &str)] = &[
+    (r"\Microsoft\Windows\Application Experience", "Microsoft Compatibility Appraiser"),
+    (r"\Microsoft\Windows\Application Experience", "Microsoft Compatibility Appraiser Exp"),
+    (r"\Microsoft\Windows\Application Experience", "ProgramDataUpdater"),
+    (r"\Microsoft\Windows\Customer Experience Improvement Program", "Consolidator"),
+    (r"\Microsoft\Windows\Customer Experience Improvement Program", "UsbCeip"),
+];
 const TCP_OPS: [(&str, Desired, Desired); 3] = [
     ("TcpAckFrequency", Desired::Dword(1), Desired::Absent),
     ("TCPNoDelay", Desired::Dword(1), Desired::Absent),
@@ -232,29 +284,43 @@ const SVC_XBOX: &[Svc] = &[
     Svc { name: "XboxNetApiSvc", default_start: MANUAL },
     Svc { name: "XboxGipSvc", default_start: MANUAL },
 ];
+const SVC_DPS: &[Svc] = &[Svc { name: "DPS", default_start: AUTO }];
+const SVC_GEOLOCATION: &[Svc] = &[Svc { name: "lfsvc", default_start: MANUAL }];
 
-const fn tw(id: &'static str, admin: bool, beta: bool, kind: Kind) -> Tweak {
-    Tweak { id, admin, beta, kind }
+const fn tw(id: &'static str, admin: bool, beta: bool, category: Category, kind: Kind) -> Tweak {
+    Tweak { id, admin, beta, category, kind }
 }
 
+use Category::{Appearance, Network, Performance, Privacy};
+
 /// The catalog. Presets live in the UI (`src/data/catalogs.ts`); mechanics live here.
+/// Evidence for the service choices: Docs/references/windows-services-research.md.
 pub const TWEAKS: &[Tweak] = &[
-    tw("game_mode", false, false, Kind::Registry(GAME_MODE)),
-    tw("input_lag", false, false, Kind::Registry(INPUT_LAG)),
-    tw("tips", false, false, Kind::Registry(TIPS)),
-    tw("keyboard", false, false, Kind::Keyboard),
-    tw("mouse", false, false, Kind::Mouse),
-    tw("visual_fx", false, false, Kind::VisualFx),
-    tw("power_plan", true, false, Kind::Power),
-    tw("hags", true, false, Kind::Registry(HAGS)),
-    tw("mmcss", true, false, Kind::Registry(MMCSS)),
-    tw("network_latency", true, false, Kind::TcpInterfaces),
-    tw("svc_sysmain", true, false, Kind::Services(SVC_SYSMAIN)),
-    tw("svc_telemetry", true, false, Kind::Services(SVC_TELEMETRY)),
-    tw("svc_search", true, false, Kind::Services(SVC_SEARCH)),
-    tw("svc_xbox", true, false, Kind::Services(SVC_XBOX)),
-    tw("priority_sep", true, true, Kind::Registry(PRIORITY_SEP)),
-    tw("perf_counters", true, true, Kind::Registry(PERF_COUNTERS)),
+    tw("visual_fx", false, false, Appearance, Kind::VisualFx),
+    tw("game_mode", false, false, Performance, Kind::Registry(GAME_MODE)),
+    tw("input_lag", false, false, Performance, Kind::Registry(INPUT_LAG)),
+    tw("keyboard", false, false, Performance, Kind::Keyboard),
+    tw("mouse", false, false, Performance, Kind::Mouse),
+    tw("tips", false, false, Privacy, Kind::Registry(TIPS)),
+    tw("show_extensions", false, false, Appearance, Kind::Registry(SHOW_EXTENSIONS)),
+    tw("widgets_off", false, false, Appearance, Kind::Registry(WIDGETS_OFF)),
+    tw("search_highlights_off", false, false, Privacy, Kind::Registry(SEARCH_HIGHLIGHTS_OFF)),
+    tw("silent_apps_off", false, false, Privacy, Kind::Registry(SILENT_APPS_OFF)),
+    tw("advertising_id_off", false, false, Privacy, Kind::Registry(ADVERTISING_ID_OFF)),
+    tw("compat_telemetry_off", true, false, Privacy, Kind::Tasks(TASKS_COMPAT_TELEMETRY)),
+    tw("svc_telemetry", true, false, Privacy, Kind::Services(SVC_TELEMETRY)),
+    tw("svc_sysmain", true, false, Performance, Kind::Services(SVC_SYSMAIN)),
+    tw("power_plan", true, false, Performance, Kind::Power),
+    tw("hags", true, false, Performance, Kind::Registry(HAGS)),
+    tw("mmcss", true, false, Performance, Kind::Registry(MMCSS)),
+    tw("network_latency", true, false, Network, Kind::TcpInterfaces),
+    tw("svc_search", true, false, Performance, Kind::Services(SVC_SEARCH)),
+    tw("svc_xbox", true, false, Performance, Kind::Services(SVC_XBOX)),
+    tw("svc_dps", true, false, Performance, Kind::Services(SVC_DPS)),
+    tw("svc_geolocation", true, false, Privacy, Kind::Services(SVC_GEOLOCATION)),
+    tw("hvci_off", true, true, Performance, Kind::Registry(HVCI_OFF)),
+    tw("priority_sep", true, true, Performance, Kind::Registry(PRIORITY_SEP)),
+    tw("perf_counters", true, true, Performance, Kind::Registry(PERF_COUNTERS)),
 ];
 
 pub fn find(id: &str) -> Result<&'static Tweak, BoostError> {
@@ -286,6 +352,7 @@ pub struct TweakState {
     pub id: &'static str,
     pub admin: bool,
     pub beta: bool,
+    pub category: Category,
     pub status: Status,
     pub has_backup: bool,
     /// Visual effects only: the level the current state matches (None = custom mix).
@@ -322,6 +389,7 @@ pub fn detect(t: &Tweak) -> TweakState {
         id: t.id,
         admin: t.admin,
         beta: t.beta,
+        category: t.category,
         status: Status::Unavailable,
         has_backup: registry::load_backup(t.id).is_some(),
         level: None,
@@ -394,6 +462,19 @@ pub fn detect(t: &Tweak) -> TweakState {
                 None => Status::Partial,
             };
         }
+        Kind::Tasks(list) => {
+            let mut total = 0;
+            let mut disabled = 0;
+            for (folder, name) in list {
+                if let Ok(Some(enabled)) = tasksched::task_enabled(folder, name) {
+                    total += 1;
+                    if !enabled {
+                        disabled += 1;
+                    }
+                }
+            }
+            st.status = status_of(disabled, total);
+        }
     }
     st
 }
@@ -422,6 +503,8 @@ pub fn apply(id: &str, on: bool) -> Result<TweakState, BoostError> {
     } else {
         apply_default(t)?;
     }
+    // Explorer/shell settings (file extensions, widgets, search box) pick this up live.
+    visualfx::broadcast_setting_change();
     Ok(detect(t))
 }
 
@@ -518,6 +601,15 @@ fn capture(t: &Tweak) -> Result<Vec<BackupEntry>, BoostError> {
             out.push(entry(visualfx::VISUAL_FX_SETTING_PATH, visualfx::VISUAL_FX_SETTING_NAME, Value::Dword(visualfx::read_setting())));
             out
         }
+        Kind::Tasks(list) => {
+            let mut out = Vec::new();
+            for (folder, name) in list {
+                if let Some(enabled) = tasksched::task_enabled(folder, name)? {
+                    out.push(entry(format!("task:{folder}|{name}"), "enabled", Value::Dword(enabled as u32)));
+                }
+            }
+            out
+        }
     })
 }
 
@@ -553,6 +645,11 @@ fn apply_on(t: &Tweak) -> Result<(), BoostError> {
             let g = ensure_ultimate_scheme()?;
             set_active_scheme(&g)?;
         }
+        Kind::Tasks(list) => {
+            for (folder, name) in list {
+                tasksched::set_task_enabled(folder, name, false)?;
+            }
+        }
         Kind::VisualFx => unreachable!("handled by apply_visual_fx"),
     }
     Ok(())
@@ -587,6 +684,11 @@ fn apply_default(t: &Tweak) -> Result<(), BoostError> {
             spi_set_u32(SPI_SETKEYBOARDSPEED, 31)?;
         }
         Kind::Power => set_active_scheme(&BALANCED)?,
+        Kind::Tasks(list) => {
+            for (folder, name) in list {
+                tasksched::set_task_enabled(folder, name, true)?;
+            }
+        }
         Kind::VisualFx => unreachable!("handled by revert_visual_fx"),
     }
     Ok(())
@@ -620,6 +722,11 @@ fn restore_entries(entries: &[BackupEntry]) -> Result<(), BoostError> {
                     && let Ok(g) = GUID::try_from(s.as_str())
                 {
                     set_active_scheme(&g)?;
+                }
+            }
+            p if p.starts_with("task:") => {
+                if let Some((folder, name)) = p[5..].split_once('|') {
+                    tasksched::set_task_enabled(folder, name, dword.unwrap_or(1) != 0)?;
                 }
             }
             p if p.starts_with("svc:") => {
@@ -942,7 +1049,7 @@ mod tests {
         op(HKCU, TEST_PATH, "alpha", Desired::Dword(1), Desired::Dword(0)),
         op(HKCU, TEST_PATH, "beta", Desired::Str("on"), Desired::Absent),
     ];
-    const TEST_TWEAK: Tweak = tw("unit_test_tweak", false, false, Kind::Registry(TEST_OPS));
+    const TEST_TWEAK: Tweak = tw("unit_test_tweak", false, false, Performance, Kind::Registry(TEST_OPS));
 
     #[test]
     fn detect_all_reports_every_tweak_without_admin() {
