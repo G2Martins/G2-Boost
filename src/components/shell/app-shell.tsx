@@ -1,5 +1,6 @@
 import {
   Bell,
+  Bot,
   CircleHelp,
   Gauge,
   HardDrive,
@@ -14,7 +15,7 @@ import type { ReactNode } from "react";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export type Route = "dashboard" | "disk" | "cleanup" | "network" | "boost" | "settings";
+export type Route = "dashboard" | "disk" | "cleanup" | "network" | "boost" | "ai" | "settings";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
@@ -22,6 +23,7 @@ const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "cleanup", icon: Sparkles, label: "nav.cleanup" },
   { route: "network", icon: Radar, label: "nav.network" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
+  { route: "ai", icon: Bot, label: "nav.ai" },
 ];
 
 export function AppShell({

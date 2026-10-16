@@ -1,0 +1,19 @@
+[package]
+name = "g2boost-mcp"
+description = "G2 Boost MCP server (stdio): read-only PC diagnostics for Claude Desktop / Claude Code / other MCP clients"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "g2boost-mcp"
+path = "src/main.rs"
+
+[dependencies]
+g2boost-core = { path = "../core" }
+rmcp = { version = "3.5", features = ["transport-io"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std"] }
+serde = { workspace = true }
+serde_json = { workspace = true }

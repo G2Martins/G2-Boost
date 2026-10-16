@@ -8,8 +8,10 @@ use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, CoCreateInstance, CoSetProxyBlanket, EOAC_NONE, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
 };
 use windows::Win32::System::Rpc::{RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE};
+use windows::Win32::System::Ole::{SafeArrayGetElement, SafeArrayGetLBound, SafeArrayGetUBound};
 use windows::Win32::System::Variant::{
-    VARIANT, VT_BOOL, VT_BSTR, VT_I2, VT_I4, VT_I8, VT_NULL, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8, VariantClear,
+    VARENUM, VARIANT, VT_ARRAY, VT_BOOL, VT_BSTR, VT_I2, VT_I4, VT_I8, VT_NULL, VT_R4, VT_R8, VT_TYPEMASK, VT_UI1, VT_UI2,
+    VT_UI4, VT_UI8, VariantClear,
 };
 use windows::Win32::System::Wmi::{
     IWbemClassObject, IWbemLocator, WBEM_FLAG_FORWARD_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_GENERIC_FLAG_TYPE, WBEM_INFINITE,
@@ -28,6 +30,8 @@ pub enum WmiValue {
     Int(i64),
     Float(f64),
     Str(String),
+    /// Integer arrays (e.g. `Win32_DeviceGuard.SecurityServicesRunning`).
+    IntList(Vec<i64>),
 }
 
 impl WmiValue {
@@ -53,6 +57,24 @@ fn variant_value(v: &VARIANT) -> WmiValue {
     unsafe {
         let inner = &v.Anonymous.Anonymous;
         let u = &inner.Anonymous;
+        if inner.vt.0 & VT_ARRAY.0 != 0 {
+            let elem = VARENUM(inner.vt.0 & VT_TYPEMASK.0);
+            let psa = u.parray;
+            if psa.is_null() || !matches!(elem, VT_I4 | VT_UI4) {
+                return WmiValue::Null;
+            }
+            let (Ok(lo), Ok(hi)) = (SafeArrayGetLBound(psa, 1), SafeArrayGetUBound(psa, 1)) else {
+                return WmiValue::Null;
+            };
+            let mut out = Vec::new();
+            for i in lo..=hi {
+                let mut x = 0i32;
+                if SafeArrayGetElement(psa, &i, (&mut x as *mut i32).cast()).is_ok() {
+                    out.push(i64::from(x));
+                }
+            }
+            return WmiValue::IntList(out);
+        }
         match inner.vt {
             VT_BSTR => WmiValue::Str((*u.bstrVal).to_string()),
             VT_BOOL => WmiValue::Bool(u.boolVal.as_bool()),

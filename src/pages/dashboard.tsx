@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { AdvisorCard } from "@/components/advisor-card";
 import { useErrorText } from "@/components/elevate-button";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
@@ -351,6 +352,8 @@ function Overview({ elevated }: { elevated: boolean }) {
       </div>
 
       <MonitorCard samples={samples} metric={metric} setMetric={setMetric} profile={profile} />
+
+      <AdvisorCard style={rise(5)} />
 
       <Card className="animate-rise" style={rise(5)}>
         <CardTitle

@@ -5,6 +5,7 @@ import { backend } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider } from "@/lib/i18n";
 import { onNavigate } from "@/lib/nav";
+import { AiPage } from "@/pages/ai";
 import { BoostPage } from "@/pages/boost";
 import { CleanupPage } from "@/pages/cleanup";
 import { DashboardPage } from "@/pages/dashboard";
@@ -18,6 +19,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   cleanup: CleanupPage,
   network: NetworkPage,
   boost: BoostPage,
+  ai: AiPage,
   settings: SettingsPage,
 };
 

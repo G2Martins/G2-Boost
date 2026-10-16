@@ -12,7 +12,7 @@
 | [global-rules.md](./core/global-rules.md) | **Regras globais** — segurança (caller hostil, destrutivo, nativo), testes, docs vivas, i18n, GSD, checklist de PR. Fonte única. |
 | [design-system.md](./core/design-system.md) | Tokens da paleta estilo ExitLag, tipografia, componentes base, convenção de gráficos/gauges. |
 | [next-steps.md](./core/next-steps.md) | Roadmap por fases e backlog; seção "Feito" por sessão. |
-| [ai-advisor.md](./core/ai-advisor.md) | **Proposta** da fase 9: IA no app (BYOK Claude/OpenAI/Gemini) + servidor MCP stdio sobre a mesma camada de tools read-only; context pack do PC; estimativa de FPS com busca em fontes confiáveis; temperaturas e upgrades. |
+| [ai-advisor.md](./core/ai-advisor.md) | Fase 9 implementada: conselheiro local (17 achados + classe para jogos), context pack sem PII, assistente no app (Claude SDK / ChatGPT / Gemini, BYOK no Cofre do Windows, busca restrita a fontes de benchmark), servidor MCP stdio só leitura e como registrar. |
 
 ## boost/ — PC Boost
 

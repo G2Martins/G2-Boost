@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["src-tauri", "crates/core"]
+members = ["src-tauri", "crates/core", "crates/mcp"]
 exclude = ["tools/vswhom-sys-stub"]
 
 [workspace.package]

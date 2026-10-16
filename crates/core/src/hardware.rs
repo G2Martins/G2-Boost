@@ -10,10 +10,12 @@ use std::mem::size_of;
 
 use serde::Serialize;
 use windows::Win32::Devices::Display::{
-    DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME, DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE,
-    DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_TARGET_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes,
-    QDC_ONLY_ACTIVE_PATHS, QueryDisplayConfig,
+    DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME, DISPLAYCONFIG_MODE_INFO,
+    DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE, DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SOURCE_DEVICE_NAME,
+    DISPLAYCONFIG_TARGET_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QDC_ONLY_ACTIVE_PATHS,
+    QueryDisplayConfig,
 };
+use windows::Win32::Graphics::Gdi::{DEVMODEW, ENUM_DISPLAY_SETTINGS_MODE, EnumDisplaySettingsW};
 use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE};
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
 use windows::Win32::Storage::FileSystem::{
@@ -123,6 +125,8 @@ pub struct MonitorInfo {
     pub width: u32,
     pub height: u32,
     pub refresh_hz: f32,
+    /// Highest refresh the driver offers at the current resolution (0 = unknown).
+    pub max_refresh_hz: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -486,9 +490,50 @@ fn monitors() -> Vec<MonitorInfo> {
             .unwrap_or((0, 0));
         let r = p.targetInfo.refreshRate;
         let refresh_hz = if r.Denominator > 0 { r.Numerator as f32 / r.Denominator as f32 } else { 0.0 };
-        out.push(MonitorInfo { name: if name.is_empty() { format!("Monitor {}", out.len() + 1) } else { name }, width, height, refresh_hz });
+        let max_refresh_hz = gdi_device_name(p).map(|dev| max_refresh_at(&dev, width, height)).unwrap_or(0);
+        out.push(MonitorInfo {
+            name: if name.is_empty() { format!("Monitor {}", out.len() + 1) } else { name },
+            width,
+            height,
+            refresh_hz,
+            max_refresh_hz,
+        });
     }
     out
+}
+
+/// `\\.\DISPLAY1` for a path's source (needed by `EnumDisplaySettingsW`).
+fn gdi_device_name(p: &DISPLAYCONFIG_PATH_INFO) -> Option<Vec<u16>> {
+    // SAFETY: zeroed request with the header filled as the API requires.
+    let mut req: DISPLAYCONFIG_SOURCE_DEVICE_NAME = unsafe { std::mem::zeroed() };
+    req.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+    req.header.size = size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
+    req.header.adapterId = p.sourceInfo.adapterId;
+    req.header.id = p.sourceInfo.id;
+    if unsafe { DisplayConfigGetDeviceInfo(&mut req.header) } != 0 {
+        return None;
+    }
+    let end = req.viewGdiDeviceName.iter().position(|&c| c == 0).unwrap_or(req.viewGdiDeviceName.len());
+    let mut v = req.viewGdiDeviceName[..end].to_vec();
+    v.push(0);
+    Some(v)
+}
+
+/// Highest refresh rate the driver offers at this resolution ("the monitor supports 144 Hz").
+fn max_refresh_at(device: &[u16], width: u32, height: u32) -> u32 {
+    let mut best = 0u32;
+    for i in 0..2000u32 {
+        // SAFETY: DEVMODEW with dmSize set; the call fills it for mode index `i`.
+        let mut dm: DEVMODEW = unsafe { std::mem::zeroed() };
+        dm.dmSize = size_of::<DEVMODEW>() as u16;
+        if !unsafe { EnumDisplaySettingsW(PCWSTR(device.as_ptr()), ENUM_DISPLAY_SETTINGS_MODE(i), &mut dm) }.as_bool() {
+            break;
+        }
+        if dm.dmPelsWidth == width && dm.dmPelsHeight == height {
+            best = best.max(dm.dmDisplayFrequency);
+        }
+    }
+    best
 }
 
 /* ---------------- SMBIOS ---------------- */

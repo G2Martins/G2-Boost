@@ -9,6 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
+use g2boost_core::{advisor, context, secrets, steam};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -27,7 +28,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "network", "boost", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "network", "boost", "ai", "settings"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -345,6 +346,65 @@ async fn report_save() -> Result<String, String> {
     .map_err(|e| e.to_string())??;
     let _ = tauri_plugin_opener::reveal_item_in_dir(&path);
     Ok(path.to_string_lossy().into_owned())
+}
+
+/* ---------------- advisor, games, AI context + keys ---------------- */
+
+#[tauri::command]
+async fn advisor_report(state: State<'_, Dashboard>) -> Result<advisor::Report, String> {
+    let cached = state.profile.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = cached.unwrap_or_else(hardware::profile);
+        let sat = winsat::last().ok();
+        let drv = p.gpus.first().and_then(|g| g.driver.clone());
+        let sample = Monitor::new().map(|mut m| {
+            std::thread::sleep(Duration::from_millis(800));
+            m.sample()
+        });
+        advisor::analyze(&p, &advisor::env(sample, sat, drv.as_deref()))
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn steam_games() -> Vec<steam::Game> {
+    tauri::async_runtime::spawn_blocking(steam::installed).await.unwrap_or_default()
+}
+
+/// The exact JSON the assistant will send (shown to the user before sending).
+#[tauri::command]
+async fn ai_context() -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let sample = Monitor::new().map(|mut m| {
+            std::thread::sleep(Duration::from_millis(800));
+            m.sample()
+        });
+        context::build(sample)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn ai_key_status() -> std::collections::BTreeMap<&'static str, bool> {
+    secrets::PROVIDERS.iter().map(|p| (*p, matches!(secrets::get(p), Ok(Some(_))))).collect()
+}
+
+#[tauri::command]
+fn ai_key_set(provider: String, key: String) -> Result<(), String> {
+    secrets::set(&provider, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn ai_key_delete(provider: String) -> Result<(), String> {
+    secrets::delete(&provider).map_err(|e| e.to_string())
+}
+
+/// Handed to the webview only for the duration of one request (see Docs/core/ai-advisor.md §1).
+#[tauri::command]
+fn ai_key_get(provider: String) -> Result<String, String> {
+    secrets::get(&provider).map_err(|e| e.to_string())?.ok_or_else(|| "no_key".into())
 }
 
 /* ---------------- routines (settings, autostart, scheduler, game watcher, tray) ---------------- */
@@ -722,6 +782,13 @@ pub fn run() {
             winsat_last,
             winsat_start,
             report_save,
+            advisor_report,
+            steam_games,
+            ai_context,
+            ai_key_status,
+            ai_key_set,
+            ai_key_delete,
+            ai_key_get,
             disk_scan_start,
             disk_scan_cancel,
             disk_summary,

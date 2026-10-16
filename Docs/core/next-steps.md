@@ -2,7 +2,7 @@
 
 **Última revisão:** 2026-10-15 (madrugada)
 
-**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). Próximas: 9 IA no app + MCP (advisor de upgrades/temperaturas, contexto do PC, estimativa de FPS com fontes), 7 disco, 8 rede, 10 release. Planejamento GSD em `.planning/`.
+**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). **9 IA + MCP ✅** (conselheiro local, assistente no app com 3 provedores, `g2boost-mcp.exe` só leitura). Próximas: 7 disco (filtros/Lixeira/essenciais), 8 rede (TCPing/DNS), 10 release (assinar, empacotar o MCP). Planejamento GSD em `.planning/`.
 
 Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat estão bloqueados pelo Kaspersky — disco e limpeza primeiro; rede e boost depois; MCP quando o core estiver estável.
 
@@ -23,7 +23,9 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 - **Fase 2 (Limpeza):** `cleanup.rs` (catálogo, prévia, `TokenStore`, execução, histórico), `tasksched.rs` (COM: rodar `StartComponentCleanup`, tarefa de logon), `system::running_processes`; comandos Tauri; página com prévia, painel de confirmação, progresso, resultado e histórico. Teste de junction NTFS real.
 - **Fase 5 (Rotinas):** `settings.rs`, `routines.rs` (agenda + detector de jogo), tarefa de logon via `tasksched.rs`, thread de rotinas + bandeja no shell Tauri, página Configurações nova, aba RAM religada (jogo atual, último purge, lista de exes). Round-trip da tarefa de logon como usuário comum: ok.
 - **Fase 6 (Painel):** `hardware.rs` (SMBIOS parser testado, DXGI, storage IOCTLs com SSD/HD, TPM, Secure Boot), `monitor.rs` (PDH + NVML), `restore.rs` (WMI + `SRSetRestorePointW`), `recommend.rs` (regras + score), 9 tweaks novos com categoria; shell com `Dashboard` (perfil cacheado, monitor refcount, restore, recomendações); UI Painel (KpiCard, Gauge, LiveLine), Meu PC, badges de categoria/motivo no Boost, ponto de restauração antes do preset. Pesquisa de serviços com fontes em `Docs/references/windows-services-research.md` (Xbox saiu do Alto; HVCI = única alavanca real, opt-in).
-- **GSD:** `.planning/` criado (config yolo, PROJECT/REQUIREMENTS/ROADMAP/STATE). `bun run check` verde (38 testes).
+- **Fase 6.5:** Meu PC no nível user-mode do CPU-Z/Speccy (CPUID, caches, microcode, pentes, BIOS, driver/PCIe/potência GPU, monitores com Hz máximo, WinSAT ler/rodar, relatório, RAPL, clock efetivo). Análise estática dos dois: ambos usam o driver `cpuz.sys`.
+- **Fase 9:** `advisor.rs`, `context.rs`, `steam.rs`, `secrets.rs`, `crates/mcp` (9 tools só leitura, testado por JSON-RPC), página Assistente IA, card de sugestões no Painel.
+- **GSD:** `.planning/` criado (config yolo, PROJECT/REQUIREMENTS/ROADMAP/STATE). `bun run check` verde (49 testes).
 - **Validado e descartado:** limpar Prefetch (1 arquivo / 0 MB na máquina do dono; SysMain off não grava `.pf`; anti-forense).
 
 ## Backlog (não prometido)

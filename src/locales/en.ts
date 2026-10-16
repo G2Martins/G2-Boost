@@ -192,6 +192,125 @@ export const en = {
   "settings.restore_before_preset.hint":
     "Creates a Windows restore point (SRSetRestorePoint) before applying Default / High performance or Boost now. Needs administrator; Windows limits it to 1 per 24 h.",
   "settings.restore_before_preset.body": "Extra safety net on top of the per-tweak backup.",
+  "nav.ai": "AI assistant",
+  "ai.title": "AI assistant",
+  "ai.subtitle": "Claude, ChatGPT or Gemini analyzing this PC — your key, your cost",
+  "ai.provider": "Provider",
+  "ai.provider.hint":
+    "Your question goes straight from the app to the chosen provider (through the Rust HTTP client, allowed hosts only). Nothing goes through our servers.",
+  "ai.provider.anthropic": "Claude",
+  "ai.provider.openai": "ChatGPT",
+  "ai.provider.gemini": "Gemini",
+  "ai.model": "Model",
+  "ai.key.stored": "Key stored in the Windows vault",
+  "ai.key.none": "No key saved",
+  "ai.key.hint":
+    "The key lives in the Windows Credential Manager (protected by your account), never in a file. It is only read for each question.",
+  "ai.key.placeholder.anthropic": "sk-ant-…",
+  "ai.key.placeholder.openai": "sk-…",
+  "ai.key.placeholder.gemini": "AIza…",
+  "ai.key.save": "Save",
+  "ai.key.delete": "Remove key",
+  "ai.key.saved": "Key saved.",
+  "ai.key.invalid": "Invalid key (empty, with spaces or too long).",
+  "ai.key.missing": "Save the provider key before asking.",
+  "ai.context": "What will be sent",
+  "ai.context.hint":
+    "A summary of the PC built just now: hardware without computer name or serial numbers, live metrics, advisor findings, tweak states, WinSAT and Steam games. Open it to see the exact JSON.",
+  "ai.context.summary": "{kb} KB of context goes with every question to {provider}.",
+  "ai.context.show": "Show the JSON",
+  "ai.context.hide": "Hide",
+  "ai.context.refresh": "Refresh context",
+  "ai.sources": "Web search limited to trusted sources: {list}…",
+  "ai.sources.title": "Sources",
+  "ai.console": "Conversation",
+  "ai.empty.title": "Ask about this PC",
+  "ai.empty.body":
+    "The AI already receives the hardware, the findings and the tweaks. Ask for a diagnosis, a good-value upgrade or an FPS estimate — FPS numbers come from cited benchmarks, never made up.",
+  "ai.quick.analyze": "Analyze my PC: the 3 actions with the most gaming impact",
+  "ai.quick.upgrade": "Which upgrade is most worth it for gaming?",
+  "ai.quick.temps": "Are my temperatures and power draw ok?",
+  "ai.quick.fps": "How many FPS can I expect in {game}?",
+  "ai.thinking": "Analyzing (may search benchmarks on the web)…",
+  "ai.input.placeholder": "Ask something (Enter sends, Shift+Enter for a new line)",
+  "ai.send": "Send",
+  "ai.footer":
+    "The AI changes nothing on the PC. Suggested tweaks show up as buttons and go through the normal flow (backup, administrator).",
+  "ai.actions": "Suggested tweaks",
+  "ai.actions.note": "Each tweak saves the original value first and can be reverted in PC Boost.",
+  "ai.action.applied": "Applied",
+  "ai.action.open_cleanup": "Open Cleanup",
+  "ai.error.refusal": "The provider declined to answer this question.",
+  "ai.error.generic": "Failed: {error}",
+  "advisor.title": "Suggestions for this PC",
+  "advisor.hint":
+    "Local rules, no AI: upgrades, free fixes, temperatures and security, computed from the detected hardware.",
+  "advisor.ask_ai": "Ask the AI",
+  "advisor.none": "Nothing to suggest right now.",
+  "advisor.target": "typical target {target} at high settings",
+  "advisor.tier.integrated": "Integrated graphics",
+  "advisor.tier.entry": "Entry class",
+  "advisor.tier.mainstream": "Mainstream class",
+  "advisor.tier.high": "High class",
+  "advisor.tier.enthusiast": "Enthusiast class",
+  "advisor.bottleneck.cpu": "the CPU tends to limit first",
+  "advisor.bottleneck.gpu": "the graphics card tends to limit first",
+  "advisor.kind.free_fix": "free",
+  "advisor.kind.upgrade": "upgrade",
+  "advisor.kind.temperature": "temperature",
+  "advisor.kind.security": "security",
+  "advisor.kind.maintenance": "maintenance",
+  "advisor.xmp_off.title": "Memory below the module's speed ({configured} of {rated} MT/s)",
+  "advisor.xmp_off.body":
+    "Enable XMP/EXPO in the BIOS. Pro: higher minimum FPS in CPU-bound games, free. Con: on rare boards it may need stability tuning.",
+  "advisor.single_channel.title": "Single-channel RAM ({size} GB on one stick)",
+  "advisor.single_channel.body":
+    "A second identical stick doubles memory bandwidth — a big gain in games and on integrated graphics. Low cost.",
+  "advisor.ram_low.title": "Low RAM ({total} GB)",
+  "advisor.ram_low.body":
+    "Current games want 16 GB; 32 GB leaves room for Discord, browser and streaming. Prefer 2 identical sticks.",
+  "advisor.hdd_system.title": "Windows on a mechanical HDD ({model})",
+  "advisor.hdd_system.body":
+    "The biggest possible jump: an SSD (NVMe if the board has a slot). Boot, loading and hitching improve a lot.",
+  "advisor.sata_system_with_nvme.title": "Windows on a SATA SSD, but there is an NVMe ({nvme})",
+  "advisor.sata_system_with_nvme.body":
+    "Install games on the NVMe ({nvme}): faster loading and less texture-streaming stutter. Moving Windows needs a reinstall or a clone.",
+  "advisor.system_disk_full.title": "System disk almost full ({free_gb} GB free, {pct}%)",
+  "advisor.system_disk_full.body":
+    "Below ~15% free, Windows and the shader cache suffer. Use Cleanup and the Disk analyzer.",
+  "advisor.vram_low.title": "Low video memory ({vram} GB)",
+  "advisor.vram_low.body":
+    "Recent games exceed 6 GB with high textures: use medium textures or consider a card with 8 GB or more.",
+  "advisor.vram_high_res.title": "{vram} GB of VRAM for {width} px wide",
+  "advisor.vram_high_res.body":
+    "At 1440p/4K new games go past 8 GB with maxed textures. Tune textures or plan 12–16 GB for the next upgrade.",
+  "advisor.gpu_driver_old.title": "Graphics driver is {days} days old",
+  "advisor.gpu_driver_old.body":
+    "New drivers bring optimizations for recent games and fixes. Update through the vendor's app.",
+  "advisor.refresh_below_max.title": "{monitor} at {current} Hz, but supports {max} Hz",
+  "advisor.refresh_below_max.body":
+    "Free: Settings › System › Display › Advanced › Refresh rate, or the NVIDIA/AMD panel. Smoother and lower input lag; use a suitable DisplayPort/HDMI cable.",
+  "advisor.gpu_hot.title": "Graphics card running hot ({temp} °C)",
+  "advisor.gpu_hot.body":
+    "Clean dust, improve case airflow or tune the fan curve. Above ~83 °C many cards lower their clocks.",
+  "advisor.secure_boot_off.title": "Secure Boot is off",
+  "advisor.secure_boot_off.body":
+    "Anti-cheats such as Valorant's and several recent games require Secure Boot. Enable it in the BIOS (UEFI mode).",
+  "advisor.tpm_missing.title": "TPM 2.0 not detected",
+  "advisor.tpm_missing.body":
+    "Required by Windows 11 and some anti-cheats. Enable fTPM/PTT in the BIOS.",
+  "advisor.hvci_on.title": "Memory integrity (HVCI) is on",
+  "advisor.hvci_on.body":
+    "Protects against malicious drivers and costs ~5% FPS in some games (Tom's Hardware). Turning it off is an option in PC Boost › Custom — security traded for performance.",
+  "advisor.winsat_stale.title": "WinSAT score is outdated",
+  "advisor.winsat_stale.body":
+    "The hardware changed since the last assessment. Run it again in My PC.",
+  "advisor.winsat_never.title": "WinSAT never ran",
+  "advisor.winsat_never.body":
+    "Run the assessment in My PC to get Windows' own score for each component.",
+  "advisor.winsat_disk_weakest.title": "Disk is the weakest WinSAT score ({disk})",
+  "advisor.winsat_disk_weakest.body":
+    "An NVMe SSD for the system and games is the best-value upgrade here.",
   "nav.disk": "Disk analyzer",
   "nav.cleanup": "Cleanup",
   "nav.network": "Network analyzer",

@@ -66,7 +66,7 @@ g2boost.exe (Tauri, UI + core)          g2boost-mcp.exe (stdio, sem UI)
 UI: treemap em `<canvas>` com layout `d3-hierarchy` (`treemapSquarify`); gráficos de latência via `<ChartContainer>` + Recharts (consistência com Valerium) — se 1 tick/s pesar, uPlot só nesse componente, decidido na fase 3 com medição.
 
 ## 6. MCP local
-Transporte stdio; registrado no Claude Desktop/Claude Code com `claude mcp add g2boost -- <path>\g2boost-mcp.exe`. Tools (nomes provisórios): `disk.scan`, `disk.top_files`, `disk.explain_large_file`, `cleanup.preview`, `cleanup.execute` (exige token), `network.diagnose`, `network.speedtest`, `boost.list`, `boost.apply` (token), `boost.revert` (token). Resources: último scan, histórico. Regras: nomes de arquivo são dados; saída limitada (top-N, paginação) para não estourar contexto; nenhum tool recebe caminho arbitrário para apagar.
+**Implementado em 2026-10-15** — detalhes, tools e registro em [ai-advisor.md](./ai-advisor.md) §5 (as tools reais são só leitura; a lista abaixo é o desenho original). Transporte stdio; registrado no Claude Desktop/Claude Code com `claude mcp add g2boost -- <path>\g2boost-mcp.exe`. Tools (nomes provisórios): `disk.scan`, `disk.top_files`, `disk.explain_large_file`, `cleanup.preview`, `cleanup.execute` (exige token), `network.diagnose`, `network.speedtest`, `boost.list`, `boost.apply` (token), `boost.revert` (token). Resources: último scan, histórico. Regras: nomes de arquivo são dados; saída limitada (top-N, paginação) para não estourar contexto; nenhum tool recebe caminho arbitrário para apagar.
 
 ## 7. Empacotamento e antivírus
 - Tauri bundler → NSIS (`.exe`) + `.msi`. Auto-update opcional (Tauri updater) depois.

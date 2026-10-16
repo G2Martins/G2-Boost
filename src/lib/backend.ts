@@ -179,7 +179,13 @@ export type CpuDetail = {
   hyperthreading: boolean;
   virtualization: boolean;
 };
-export type MonitorInfo = { name: string; width: number; height: number; refresh_hz: number };
+export type MonitorInfo = {
+  name: string;
+  width: number;
+  height: number;
+  refresh_hz: number;
+  max_refresh_hz: number;
+};
 export type Profile = {
   computer: string;
   os: string;
@@ -261,6 +267,23 @@ export type RoutineStatus = {
 };
 export type GameEvent = { game: Game; freed_bytes: number; error: string | null };
 
+export type FindingSeverity = "info" | "warn" | "critical";
+export type FindingKind = "free_fix" | "upgrade" | "temperature" | "security" | "maintenance";
+export type Finding = {
+  id: string;
+  severity: FindingSeverity;
+  kind: FindingKind;
+  params: Record<string, string>;
+};
+export type Tier = "integrated" | "entry" | "mainstream" | "high" | "enthusiast";
+export type GamingClass = {
+  tier: Tier | null;
+  target: "1080p" | "1440p" | "4k" | null;
+  likely_bottleneck: "cpu" | "gpu" | null;
+};
+export type AdvisorReport = { findings: Finding[]; gaming: GamingClass };
+export type SteamGame = { appid: number; name: string; size_bytes: number; library: string };
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -324,6 +347,13 @@ export const backend = {
   winsatLast: () => call<WinSat>("winsat_last"),
   winsatStart: () => callOrThrow<void>("winsat_start"),
   reportSave: () => callOrThrow<string>("report_save"),
+  advisorReport: () => call<AdvisorReport>("advisor_report"),
+  steamGames: () => call<SteamGame[]>("steam_games"),
+  aiContext: () => callOrThrow<unknown>("ai_context"),
+  aiKeyStatus: () => call<Record<string, boolean>>("ai_key_status"),
+  aiKeySet: (provider: string, key: string) => callOrThrow<void>("ai_key_set", { provider, key }),
+  aiKeyDelete: (provider: string) => callOrThrow<void>("ai_key_delete", { provider }),
+  aiKeyGet: (provider: string) => callOrThrow<string>("ai_key_get", { provider }),
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),

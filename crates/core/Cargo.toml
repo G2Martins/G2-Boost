@@ -50,4 +50,5 @@ features = [
   "Win32_System_AssessmentTool",
   "Win32_Devices_Display",
   "Win32_Graphics_Gdi",
+  "Win32_Security_Credentials",
 ]

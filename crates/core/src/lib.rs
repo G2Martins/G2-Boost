@@ -4,8 +4,10 @@
 //! config files, file names). Validation lives here, never in the UI. No
 //! `cmd`/`powershell`/`reg`/`net`/`sc` spawning anywhere in this crate.
 
+pub mod advisor;
 pub mod boost;
 pub mod cleanup;
+pub mod context;
 pub mod disk;
 pub mod hardware;
 pub mod monitor;
@@ -16,7 +18,9 @@ pub mod registry;
 pub mod restore;
 pub mod routines;
 pub mod safety;
+pub mod secrets;
 pub mod settings;
+pub mod steam;
 pub mod system;
 pub mod tasksched;
 pub mod visualfx;
