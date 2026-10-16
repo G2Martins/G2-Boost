@@ -1,12 +1,20 @@
 //! Hardware / OS profile ("Meu PC"). Read-only and without admin: registry, SMBIOS
-//! (`GetSystemFirmwareTable`), DXGI, storage IOCTLs, TPM base services, Secure Boot state.
-//! The SSD/HDD answer here also drives the SysMain recommendation.
+//! (`GetSystemFirmwareTable`), CPUID, DXGI, storage IOCTLs, display config, TPM base
+//! services, Secure Boot state, NVML (NVIDIA, user-mode). The SSD/HDD answer here also
+//! drives the SysMain recommendation. Everything CPU-Z/Speccy get from a kernel driver
+//! (temperatures, voltages, SPD/XMP tables, chipset registers) is deliberately absent.
 
+use std::collections::BTreeMap;
 use std::ffi::c_void;
 use std::mem::size_of;
 
 use serde::Serialize;
-use windows::Win32::Foundation::{CloseHandle, HANDLE};
+use windows::Win32::Devices::Display::{
+    DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME, DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE,
+    DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_TARGET_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes,
+    QDC_ONLY_ACTIVE_PATHS, QueryDisplayConfig,
+};
+use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE};
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
 use windows::Win32::Storage::FileSystem::{
     BusTypeNvme, BusTypeRAID, BusTypeSas, BusTypeSata, BusTypeUsb, CreateFileW, FILE_FLAGS_AND_ATTRIBUTES, FILE_SHARE_READ,
@@ -20,13 +28,15 @@ use windows::Win32::System::Ioctl::{
 };
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 use windows::Win32::System::SystemInformation::{
-    ComputerNameDnsHostname, GetComputerNameExW, GetLogicalProcessorInformationEx, GetPhysicallyInstalledSystemMemory,
-    GetSystemFirmwareTable, GetTickCount64, RSMB, RelationProcessorCore, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
+    CacheData, CacheInstruction, ComputerNameDnsHostname, GetComputerNameExW, GetLogicalProcessorInformationEx,
+    GetPhysicallyInstalledSystemMemory, GetSystemFirmwareTable, GetTickCount64, LOGICAL_PROCESSOR_RELATIONSHIP, RSMB,
+    RelationCache, RelationProcessorCore, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
 };
 use windows::Win32::System::Threading::{ALL_PROCESSOR_GROUPS, GetActiveProcessorCount};
 use windows::Win32::System::TpmBaseServices::{TPM_DEVICE_INFO, Tbsi_GetDeviceInfo};
 use windows::core::{PCWSTR, PWSTR};
 
+use crate::nvml;
 use crate::registry::{self, Root, Value, wide};
 use crate::system;
 
@@ -36,6 +46,12 @@ pub struct Gpu {
     pub vram_bytes: u64,
     /// `nvidia` | `amd` | `intel` | `other`
     pub vendor: &'static str,
+    /// Driver version (+ date) from the display class registry key, or NVML.
+    pub driver: Option<String>,
+    /// "PCIe 3.0 x8" (NVML only for now).
+    pub pcie: Option<String>,
+    /// Power limit in watts (NVML only).
+    pub power_limit_w: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -50,18 +66,84 @@ pub struct Disk {
     pub system: bool,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct Bios {
+    pub vendor: String,
+    pub version: String,
+    pub date: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct MemoryModule {
+    /// "DIMM_A1" (device locator) and "BANK 0" (bank locator) as the board names them.
+    pub slot: String,
+    pub bank: String,
+    pub size_bytes: u64,
+    /// SPD/JEDEC speed the firmware reports (MT/s).
+    pub speed_mts: u32,
+    /// Speed actually configured (MT/s; SMBIOS 3.0+, 0 when unknown).
+    pub configured_mts: u32,
+    /// Rated speed guessed from the part number ("CMK16GX4M1E3200C16" → 3200), if any.
+    pub rated_mts: Option<u32>,
+    /// "DDR4", "DDR5", "LPDDR5" …
+    pub kind: String,
+    pub form_factor: String,
+    pub manufacturer: String,
+    pub part_number: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct CacheInfo {
+    pub level: u8,
+    /// `data` | `instruction` | `unified`
+    pub kind: &'static str,
+    /// Instances (e.g. 6 for "6 × 32 KB").
+    pub count: u32,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct CpuDetail {
+    pub vendor: String,
+    pub family: u32,
+    pub model: u32,
+    pub stepping: u32,
+    pub flags: Vec<&'static str>,
+    /// Microcode revision from the registry ("0xF6").
+    pub microcode: Option<String>,
+    pub caches: Vec<CacheInfo>,
+    pub hyperthreading: bool,
+    /// VMX (Intel) / SVM (AMD) present in CPUID.
+    pub virtualization: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MonitorInfo {
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
+    pub refresh_hz: f32,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Profile {
     pub computer: String,
     /// "Windows 11 Pro 24H2 (build 26200.1234)"
     pub os: String,
     pub cpu: String,
+    pub cpu_detail: CpuDetail,
     pub cores_physical: u32,
     pub cores_logical: u32,
     pub ram_bytes: u64,
+    pub memory: Vec<MemoryModule>,
+    pub memory_slots: Option<u16>,
+    /// Modules configured below the speed guessed from their part number (XMP/EXPO likely off).
+    pub memory_below_rated: bool,
     pub uptime_secs: u64,
     pub gpus: Vec<Gpu>,
+    pub monitors: Vec<MonitorInfo>,
     pub board: Option<String>,
+    pub bios: Option<Bios>,
     pub system_model: Option<String>,
     pub disks: Vec<Disk>,
     pub system_disk_ssd: Option<bool>,
@@ -76,16 +158,25 @@ pub fn profile() -> Profile {
     let smbios = read_smbios().unwrap_or_default();
     let disks = disks();
     let system_disk_ssd = disks.iter().find(|d| d.system).and_then(|d| d.ssd);
+    let cores_physical = physical_cores();
+    let cores_logical = unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) };
+    let memory_below_rated = smbios.memory.iter().any(|m| m.size_bytes > 0 && m.configured_mts > 0 && m.rated_mts.is_some_and(|r| m.configured_mts < r));
     Profile {
         computer: computer_name(),
         os: os_string(),
         cpu: cpu_name(),
-        cores_physical: physical_cores(),
-        cores_logical: unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) },
+        cpu_detail: cpu_detail(cores_physical, cores_logical),
+        cores_physical,
+        cores_logical,
         ram_bytes: installed_ram(),
+        memory: smbios.memory,
+        memory_slots: smbios.memory_slots,
+        memory_below_rated,
         uptime_secs: unsafe { GetTickCount64() } / 1000,
         gpus: gpus(),
+        monitors: monitors(),
         board: smbios.board,
+        bios: smbios.bios,
         system_model: smbios.system,
         disks,
         system_disk_ssd,
@@ -121,6 +212,8 @@ fn reg_dword(root: Root, path: &str, name: &str) -> Option<u32> {
 }
 
 const CURRENT_VERSION: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+const CPU0: &str = r"HARDWARE\DESCRIPTION\System\CentralProcessor\0";
+const DISPLAY_CLASS: &str = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
 
 /// Edition ids as Windows spells them → what people call them.
 fn edition_label(id: &str) -> String {
@@ -149,37 +242,130 @@ fn os_string() -> String {
 }
 
 fn cpu_name() -> String {
-    reg_str(Root::Hklm, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString")
+    reg_str(Root::Hklm, CPU0, "ProcessorNameString")
         .map(|s| s.split_whitespace().collect::<Vec<_>>().join(" "))
         .unwrap_or_else(|| "CPU".into())
 }
 
-fn physical_cores() -> u32 {
+/// All `GetLogicalProcessorInformationEx` records of one relationship, as raw bytes + walker.
+fn logical_processor_records(relationship: LOGICAL_PROCESSOR_RELATIONSHIP) -> Vec<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX> {
     let mut len = 0u32;
     // SAFETY: size probe (fails with ERROR_INSUFFICIENT_BUFFER and fills `len`).
-    let _ = unsafe { GetLogicalProcessorInformationEx(RelationProcessorCore, None, &mut len) };
+    let _ = unsafe { GetLogicalProcessorInformationEx(relationship, None, &mut len) };
     if len == 0 {
-        return 0;
+        return Vec::new();
     }
     let mut buf = vec![0u8; len as usize];
-    // SAFETY: buffer of `len` bytes, 8-byte aligned enough for the variable-size records we walk by `Size`.
-    if unsafe { GetLogicalProcessorInformationEx(RelationProcessorCore, Some(buf.as_mut_ptr().cast()), &mut len) }.is_err() {
-        return 0;
+    // SAFETY: buffer of `len` bytes; records are walked by their own `Size`.
+    if unsafe { GetLogicalProcessorInformationEx(relationship, Some(buf.as_mut_ptr().cast()), &mut len) }.is_err() {
+        return Vec::new();
     }
-    let mut cores = 0u32;
+    let mut out = Vec::new();
     let mut pos = 0usize;
     while pos + 8 <= len as usize {
-        // SAFETY: each record starts with Relationship (u32) + Size (u32); we only read those.
+        // SAFETY: a full record (header + union) is at least `Size` bytes; we copy by value.
         let rec = unsafe { std::ptr::read_unaligned(buf.as_ptr().add(pos).cast::<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>()) };
-        if rec.Relationship == RelationProcessorCore {
-            cores += 1;
-        }
         if rec.Size == 0 {
             break;
         }
+        out.push(rec);
         pos += rec.Size as usize;
     }
-    cores
+    out
+}
+
+fn physical_cores() -> u32 {
+    logical_processor_records(RelationProcessorCore).iter().filter(|r| r.Relationship == RelationProcessorCore).count() as u32
+}
+
+fn caches() -> Vec<CacheInfo> {
+    let mut agg: BTreeMap<(u8, &'static str), (u32, u64)> = BTreeMap::new();
+    for rec in logical_processor_records(RelationCache) {
+        if rec.Relationship != RelationCache {
+            continue;
+        }
+        // SAFETY: `Cache` is the active union member for RelationCache records.
+        let c = unsafe { rec.Anonymous.Cache };
+        let kind = if c.Type == CacheData {
+            "data"
+        } else if c.Type == CacheInstruction {
+            "instruction"
+        } else {
+            "unified"
+        };
+        let e = agg.entry((c.Level, kind)).or_insert((0, u64::from(c.CacheSize)));
+        e.0 += 1;
+    }
+    agg.into_iter().map(|((level, kind), (count, size_bytes))| CacheInfo { level, kind, count, size_bytes }).collect()
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(unused_unsafe)]
+fn cpuid_detail() -> (String, u32, u32, u32, Vec<&'static str>, bool, bool) {
+    use std::arch::x86_64::{__cpuid, __cpuid_count};
+    // SAFETY: CPUID is available on every x86-64 CPU Windows 10/11 runs on.
+    let (l0, l1, l7, e1) = unsafe { (__cpuid(0), __cpuid(1), __cpuid_count(7, 0), __cpuid(0x8000_0001)) };
+    let mut vendor = Vec::with_capacity(12);
+    for r in [l0.ebx, l0.edx, l0.ecx] {
+        vendor.extend_from_slice(&r.to_le_bytes());
+    }
+    let vendor = String::from_utf8_lossy(&vendor).trim().to_string();
+    let eax = l1.eax;
+    let (stepping, model, family, ext_model, ext_family) = (eax & 0xF, (eax >> 4) & 0xF, (eax >> 8) & 0xF, (eax >> 16) & 0xF, (eax >> 20) & 0xFF);
+    let fam = if family == 0xF { family + ext_family } else { family };
+    let mdl = if family == 6 || family == 0xF { (ext_model << 4) | model } else { model };
+    let bit = |v: u32, b: u32| v & (1 << b) != 0;
+    let table: [(&str, bool); 20] = [
+        ("MMX", bit(l1.edx, 23)),
+        ("SSE", bit(l1.edx, 25)),
+        ("SSE2", bit(l1.edx, 26)),
+        ("SSE3", bit(l1.ecx, 0)),
+        ("SSSE3", bit(l1.ecx, 9)),
+        ("SSE4.1", bit(l1.ecx, 19)),
+        ("SSE4.2", bit(l1.ecx, 20)),
+        ("FMA3", bit(l1.ecx, 12)),
+        ("AES", bit(l1.ecx, 25)),
+        ("AVX", bit(l1.ecx, 28)),
+        ("F16C", bit(l1.ecx, 29)),
+        ("AVX2", bit(l7.ebx, 5)),
+        ("BMI1", bit(l7.ebx, 3)),
+        ("BMI2", bit(l7.ebx, 8)),
+        ("AVX-512F", bit(l7.ebx, 16)),
+        ("SHA", bit(l7.ebx, 29)),
+        ("x86-64", bit(e1.edx, 29)),
+        ("NX", bit(e1.edx, 20)),
+        ("VMX", bit(l1.ecx, 5)),
+        ("SVM", bit(e1.ecx, 2)),
+    ];
+    let flags: Vec<&'static str> = table.iter().filter(|(_, on)| *on).map(|(n, _)| *n).collect();
+    let virt = bit(l1.ecx, 5) || bit(e1.ecx, 2);
+    let ht_flag = bit(l1.edx, 28);
+    (vendor, fam, mdl, stepping, flags, virt, ht_flag)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn cpuid_detail() -> (String, u32, u32, u32, Vec<&'static str>, bool, bool) {
+    (String::new(), 0, 0, 0, Vec::new(), false, false)
+}
+
+fn cpu_detail(cores_physical: u32, cores_logical: u32) -> CpuDetail {
+    let (vendor, family, model, stepping, flags, virtualization, ht_flag) = cpuid_detail();
+    let microcode = match registry::read(Root::Hklm, CPU0, "Update Revision") {
+        Ok(Value::Binary(b)) if b.len() >= 8 => Some(format!("0x{:X}", u32::from_le_bytes([b[4], b[5], b[6], b[7]]))),
+        Ok(Value::Binary(b)) if b.len() >= 4 => Some(format!("0x{:X}", u32::from_le_bytes([b[0], b[1], b[2], b[3]]))),
+        _ => None,
+    };
+    CpuDetail {
+        vendor,
+        family,
+        model,
+        stepping,
+        flags,
+        microcode,
+        caches: caches(),
+        hyperthreading: ht_flag && cores_logical > cores_physical,
+        virtualization,
+    }
 }
 
 fn installed_ram() -> u64 {
@@ -192,8 +378,35 @@ fn installed_ram() -> u64 {
     }
 }
 
+/* ---------------- GPU ---------------- */
+
+/// "32.0.16.1714 (2026-07-20)" from the display class key whose DriverDesc matches `name`.
+fn gpu_driver(name: &str) -> Option<String> {
+    for sub in registry::subkeys(Root::Hklm, DISPLAY_CLASS).unwrap_or_default() {
+        if !sub.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        let path = format!(r"{DISPLAY_CLASS}\{sub}");
+        if reg_str(Root::Hklm, &path, "DriverDesc").as_deref() != Some(name) {
+            continue;
+        }
+        let version = reg_str(Root::Hklm, &path, "DriverVersion")?;
+        // DriverDate is "M-D-YYYY".
+        let date = reg_str(Root::Hklm, &path, "DriverDate").and_then(|d| {
+            let mut it = d.split('-');
+            let (m, day, y) = (it.next()?, it.next()?, it.next()?);
+            Some(format!("{y}-{:0>2}-{:0>2}", m, day))
+        });
+        return Some(match date {
+            Some(d) => format!("{version} ({d})"),
+            None => version,
+        });
+    }
+    None
+}
+
 fn gpus() -> Vec<Gpu> {
-    let mut out = Vec::new();
+    let mut out: Vec<Gpu> = Vec::new();
     // SAFETY: DXGI factory enumeration; every interface is released by drop.
     unsafe {
         let Ok(factory) = CreateDXGIFactory1::<IDXGIFactory1>() else {
@@ -216,12 +429,64 @@ fn gpus() -> Vec<Gpu> {
                 0x8086 => "intel",
                 _ => "other",
             };
-            let gpu = Gpu { name: String::from_utf16_lossy(&desc.Description[..end]), vram_bytes: desc.DedicatedVideoMemory as u64, vendor };
+            let name = String::from_utf16_lossy(&desc.Description[..end]);
             // DXGI can list the same card twice (one entry per LUID alias); keep one per name+VRAM.
-            if !out.iter().any(|g: &Gpu| g.name == gpu.name && g.vram_bytes == gpu.vram_bytes) {
-                out.push(gpu);
+            if out.iter().any(|g| g.name == name && g.vram_bytes == desc.DedicatedVideoMemory as u64) {
+                continue;
             }
+            let nv = if vendor == "nvidia" && out.iter().all(|g| g.vendor != "nvidia") { nvml::get() } else { None };
+            out.push(Gpu {
+                driver: gpu_driver(&name).or_else(|| nv.and_then(|n| n.driver_version())),
+                pcie: nv.and_then(|n| n.pcie()).map(|(g, w)| format!("PCIe {g}.0 x{w}")),
+                power_limit_w: nv.and_then(|n| n.power_limit_w()),
+                name,
+                vram_bytes: desc.DedicatedVideoMemory as u64,
+                vendor,
+            });
         }
+    }
+    out
+}
+
+/* ---------------- monitors ---------------- */
+
+fn monitors() -> Vec<MonitorInfo> {
+    let mut n_paths = 0u32;
+    let mut n_modes = 0u32;
+    // SAFETY: size probe for the active-paths query.
+    if unsafe { GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut n_paths, &mut n_modes) } != ERROR_SUCCESS || n_paths == 0 {
+        return Vec::new();
+    }
+    // SAFETY: zeroed POD arrays sized by the probe; filled by QueryDisplayConfig.
+    let mut paths: Vec<DISPLAYCONFIG_PATH_INFO> = vec![unsafe { std::mem::zeroed() }; n_paths as usize];
+    let mut modes: Vec<DISPLAYCONFIG_MODE_INFO> = vec![unsafe { std::mem::zeroed() }; n_modes as usize];
+    let rc = unsafe { QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &mut n_paths, paths.as_mut_ptr(), &mut n_modes, modes.as_mut_ptr(), None) };
+    if rc != ERROR_SUCCESS {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for p in &paths[..n_paths as usize] {
+        // SAFETY: zeroed request with the header filled as the API requires.
+        let mut req: DISPLAYCONFIG_TARGET_DEVICE_NAME = unsafe { std::mem::zeroed() };
+        req.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+        req.header.size = size_of::<DISPLAYCONFIG_TARGET_DEVICE_NAME>() as u32;
+        req.header.adapterId = p.targetInfo.adapterId;
+        req.header.id = p.targetInfo.id;
+        let name = if unsafe { DisplayConfigGetDeviceInfo(&mut req.header) } == 0 {
+            let end = req.monitorFriendlyDeviceName.iter().position(|&c| c == 0).unwrap_or(req.monitorFriendlyDeviceName.len());
+            String::from_utf16_lossy(&req.monitorFriendlyDeviceName[..end])
+        } else {
+            String::new()
+        };
+        let (width, height) = modes[..n_modes as usize]
+            .iter()
+            .find(|m| m.infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE && m.id == p.sourceInfo.id && m.adapterId == p.sourceInfo.adapterId)
+            // SAFETY: sourceMode is the active union member for SOURCE entries.
+            .map(|m| unsafe { (m.Anonymous.sourceMode.width, m.Anonymous.sourceMode.height) })
+            .unwrap_or((0, 0));
+        let r = p.targetInfo.refreshRate;
+        let refresh_hz = if r.Denominator > 0 { r.Numerator as f32 / r.Denominator as f32 } else { 0.0 };
+        out.push(MonitorInfo { name: if name.is_empty() { format!("Monitor {}", out.len() + 1) } else { name }, width, height, refresh_hz });
     }
     out
 }
@@ -233,6 +498,9 @@ pub(crate) struct Smbios {
     pub system: Option<String>,
     pub board: Option<String>,
     pub chassis: Option<u8>,
+    pub bios: Option<Bios>,
+    pub memory_slots: Option<u16>,
+    pub memory: Vec<MemoryModule>,
 }
 
 fn read_smbios() -> Option<Smbios> {
@@ -247,6 +515,61 @@ fn read_smbios() -> Option<Smbios> {
         return None;
     }
     Some(parse_smbios(&buf[..(got as usize).min(buf.len())]))
+}
+
+fn memory_type_label(t: u8) -> String {
+    match t {
+        0x18 => "DDR3",
+        0x1A => "DDR4",
+        0x1B => "LPDDR",
+        0x1C => "LPDDR2",
+        0x1D => "LPDDR3",
+        0x1E => "LPDDR4",
+        0x22 => "DDR5",
+        0x23 => "LPDDR5",
+        0x02 => "Unknown",
+        _ => "DRAM",
+    }
+    .to_string()
+}
+
+fn form_factor_label(f: u8) -> String {
+    match f {
+        0x09 => "DIMM",
+        0x0D => "SO-DIMM",
+        0x0F => "FB-DIMM",
+        0x0E => "Die",
+        _ => "",
+    }
+    .to_string()
+}
+
+/// "CMK16GX4M1E3200C16" → 3200, "KF560C36BBEK2-32" → 5600 (two-digit hundreds → ×100). Best effort.
+pub(crate) fn rated_from_part_number(part: &str) -> Option<u32> {
+    let bytes = part.as_bytes();
+    let mut i = 0;
+    let mut best: Option<u32> = None;
+    while i < bytes.len() {
+        if bytes[i].is_ascii_digit() {
+            let start = i;
+            while i < bytes.len() && bytes[i].is_ascii_digit() {
+                i += 1;
+            }
+            let n: u32 = part[start..i].parse().unwrap_or(0);
+            let candidate = match i - start {
+                4 if (1600..=9000).contains(&n) => Some(n),
+                // Kingston "KF432…" / "KF560…": DDR generation digit followed by speed ÷ 100.
+                3 if (3..=5).contains(&(n / 100)) && (16..=90).contains(&(n % 100)) => Some((n % 100) * 100),
+                _ => None,
+            };
+            if let Some(c) = candidate {
+                best = Some(best.map_or(c, |b| b.max(c)));
+            }
+        } else {
+            i += 1;
+        }
+    }
+    best
 }
 
 /// `raw` is the RawSMBIOSData blob: 8-byte header, then the structure table.
@@ -280,24 +603,60 @@ pub(crate) fn parse_smbios(raw: &[u8]) -> Smbios {
             strings.push(String::from_utf8_lossy(&table[start..p]).trim().to_string());
             p += 1;
         }
+        if strings.is_empty() {
+            p += 1; // no strings: the section is exactly "\0\0"
+        }
         let s = |idx: u8| -> Option<String> {
             if idx == 0 { None } else { strings.get(idx as usize - 1).filter(|v| !v.is_empty()).cloned() }
         };
-        let field = |off: usize| table.get(pos + off).copied().unwrap_or(0);
+        let b = |off: usize| if off < len { table[pos + off] } else { 0 };
+        let w = |off: usize| if off + 1 < len { u16::from_le_bytes([table[pos + off], table[pos + off + 1]]) } else { 0 };
+        let d = |off: usize| if off + 3 < len { u32::from_le_bytes([table[pos + off], table[pos + off + 1], table[pos + off + 2], table[pos + off + 3]]) } else { 0 };
         match kind {
+            0 if len >= 9 => {
+                info.bios = Some(Bios { vendor: s(b(4)).unwrap_or_default(), version: s(b(5)).unwrap_or_default(), date: s(b(8)).unwrap_or_default() });
+            }
             1 if len >= 6 => {
-                let v = [s(field(4)), s(field(5))].into_iter().flatten().collect::<Vec<_>>().join(" ");
+                let v = [s(b(4)), s(b(5))].into_iter().flatten().collect::<Vec<_>>().join(" ");
                 if !v.is_empty() {
                     info.system = Some(v);
                 }
             }
             2 if len >= 6 => {
-                let v = [s(field(4)), s(field(5))].into_iter().flatten().collect::<Vec<_>>().join(" ");
+                let v = [s(b(4)), s(b(5))].into_iter().flatten().collect::<Vec<_>>().join(" ");
                 if !v.is_empty() {
                     info.board = Some(v);
                 }
             }
-            3 if len >= 6 => info.chassis = Some(field(5) & 0x7F),
+            3 if len >= 6 => info.chassis = Some(b(5) & 0x7F),
+            16 if len >= 0x0F => {
+                let n = w(0x0D);
+                if n > 0 {
+                    info.memory_slots = Some(info.memory_slots.unwrap_or(0) + n);
+                }
+            }
+            17 if len >= 0x15 => {
+                let raw_size = w(0x0C);
+                let size_bytes = match raw_size {
+                    0 | 0xFFFF => 0,
+                    0x7FFF => u64::from(d(0x1C)) * 1024 * 1024,
+                    v if v & 0x8000 != 0 => u64::from(v & 0x7FFF) * 1024,
+                    v => u64::from(v) * 1024 * 1024,
+                };
+                let part_number = s(b(0x1A)).unwrap_or_default();
+                info.memory.push(MemoryModule {
+                    slot: s(b(0x10)).unwrap_or_default(),
+                    bank: s(b(0x11)).unwrap_or_default(),
+                    size_bytes,
+                    speed_mts: u32::from(w(0x15)),
+                    configured_mts: u32::from(w(0x20)),
+                    rated_mts: rated_from_part_number(&part_number),
+                    kind: memory_type_label(b(0x12)),
+                    form_factor: form_factor_label(b(0x0E)),
+                    manufacturer: s(b(0x17)).unwrap_or_default(),
+                    part_number,
+                });
+            }
             127 => break,
             _ => {}
         }
@@ -466,31 +825,85 @@ mod tests {
     use super::*;
 
     fn smbios_blob() -> Vec<u8> {
-        // RawSMBIOSData header (8 bytes) + Type 1 + Type 2 + Type 3 + Type 127.
+        // RawSMBIOSData header (8 bytes) + Type 0 + Type 1 + Type 2 + Type 3 + Type 16 + Type 17 ×2 + Type 127.
         let mut v = vec![0u8, 3, 4, 0, 0, 0, 0, 0];
-        // Type 1 (System): length 27 in real tables; 8 is enough for our reader (manufacturer @4, product @5).
+        // Type 0 (BIOS): vendor @4=1, version @5=2, date @8=3; length 24.
+        let mut t0 = vec![0u8; 24];
+        t0[0] = 0;
+        t0[1] = 24;
+        t0[4] = 1;
+        t0[5] = 2;
+        t0[8] = 3;
+        v.extend(t0);
+        v.extend(b"American Megatrends International, LLC.\x00F10\x0007/06/2023\x00\x00");
         v.extend([1, 8, 1, 0, 1, 2, 0, 0]);
         v.extend(b"Gigabyte\0X870\0\0");
-        // Type 2 (Baseboard)
         v.extend([2, 8, 2, 0, 1, 2, 0, 0]);
         v.extend(b"Gigabyte Technology Co., Ltd.\0X870 AORUS ELITE\0\0");
-        // Type 3 (Chassis): type @5 = 3 (desktop)
         v.extend([3, 8, 3, 0, 1, 3, 0, 0]);
         v.extend(b"Default string\0\0");
+        // Type 16: number of devices @0x0D = 4; length 0x17.
+        let mut t16 = vec![0u8; 0x17];
+        t16[0] = 16;
+        t16[1] = 0x17;
+        t16[0x0D] = 4;
+        v.extend(t16);
+        v.extend(b"\0\0");
+        // Type 17 ×2: 16 GB DDR4 @2133 configured 3200, Corsair CMK16GX4M1E3200C16; then an empty slot.
+        let mut t17 = vec![0u8; 0x28];
+        t17[0] = 17;
+        t17[1] = 0x28;
+        t17[0x0C] = (16384u16 & 0xFF) as u8;
+        t17[0x0D] = (16384u16 >> 8) as u8;
+        t17[0x0E] = 0x09;
+        t17[0x10] = 1;
+        t17[0x11] = 2;
+        t17[0x12] = 0x1A;
+        t17[0x15] = (2133u16 & 0xFF) as u8;
+        t17[0x16] = (2133u16 >> 8) as u8;
+        t17[0x17] = 3;
+        t17[0x1A] = 4;
+        t17[0x20] = (3200u16 & 0xFF) as u8;
+        t17[0x21] = (3200u16 >> 8) as u8;
+        v.extend(t17);
+        v.extend(b"DIMM_A2\0BANK 1\0Corsair\0CMK16GX4M1E3200C16\0\0");
+        let mut empty = vec![0u8; 0x28];
+        empty[0] = 17;
+        empty[1] = 0x28;
+        empty[0x10] = 1;
+        v.extend(empty);
+        v.extend(b"DIMM_B1\0\0");
         v.extend([127, 4, 4, 0]);
         v.extend([0, 0]);
         v
     }
 
     #[test]
-    fn smbios_parser_reads_system_board_and_chassis() {
+    fn smbios_parser_reads_everything_we_use() {
         let s = parse_smbios(&smbios_blob());
         assert_eq!(s.system.as_deref(), Some("Gigabyte X870"));
         assert_eq!(s.board.as_deref(), Some("Gigabyte Technology Co., Ltd. X870 AORUS ELITE"));
         assert_eq!(s.chassis, Some(3));
+        assert_eq!(s.bios, Some(Bios { vendor: "American Megatrends International, LLC.".into(), version: "F10".into(), date: "07/06/2023".into() }));
+        assert_eq!(s.memory_slots, Some(4));
+        assert_eq!(s.memory.len(), 2);
+        let m = &s.memory[0];
+        assert_eq!((m.size_bytes, m.speed_mts, m.configured_mts, m.rated_mts), (16 << 30, 2133, 3200, Some(3200)));
+        assert_eq!((m.kind.as_str(), m.form_factor.as_str(), m.slot.as_str(), m.bank.as_str()), ("DDR4", "DIMM", "DIMM_A2", "BANK 1"));
+        assert_eq!(s.memory[1].size_bytes, 0, "empty slot");
         assert_eq!(parse_smbios(&[0u8; 4]), Smbios::default());
         assert!(!is_laptop(Some(3)));
         assert!(is_laptop(Some(10)));
+    }
+
+    #[test]
+    fn rated_speed_from_part_numbers() {
+        assert_eq!(rated_from_part_number("CMK16GX4M1E3200C16"), Some(3200));
+        assert_eq!(rated_from_part_number("KF560C36BBEK2-32"), Some(6000));
+        assert_eq!(rated_from_part_number("KF432C16BB/8"), Some(3200));
+        assert_eq!(rated_from_part_number("F4-3600C16-16GTZNC"), Some(3600));
+        assert_eq!(rated_from_part_number("HMA81GU6CJR8N-VK"), None);
+        assert_eq!(rated_from_part_number(""), None);
     }
 
     #[test]
@@ -506,5 +919,11 @@ mod tests {
         assert!(p.system_disk_ssd.is_some());
         assert!(!p.gpus.is_empty());
         assert!(p.uptime_secs > 0);
+        assert!(p.cpu_detail.flags.contains(&"SSE2"), "x86-64 always has SSE2");
+        assert!(p.cpu_detail.family > 0);
+        assert!(p.cpu_detail.caches.iter().any(|c| c.level == 1), "L1 reported");
+        assert!(!p.monitors.is_empty() && p.monitors[0].width > 0 && p.monitors[0].refresh_hz > 10.0);
+        assert!(p.memory.iter().any(|m| m.size_bytes > 0), "at least one populated DIMM");
+        assert!(p.bios.as_ref().is_some_and(|b| !b.version.is_empty()));
     }
 }

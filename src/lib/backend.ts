@@ -137,6 +137,9 @@ export type Gpu = {
   name: string;
   vram_bytes: number;
   vendor: "nvidia" | "amd" | "intel" | "other";
+  driver: string | null;
+  pcie: string | null;
+  power_limit_w: number | null;
 };
 export type Disk = {
   index: number;
@@ -146,16 +149,53 @@ export type Disk = {
   ssd: boolean | null;
   system: boolean;
 };
+export type Bios = { vendor: string; version: string; date: string };
+export type MemoryModule = {
+  slot: string;
+  bank: string;
+  size_bytes: number;
+  speed_mts: number;
+  configured_mts: number;
+  rated_mts: number | null;
+  kind: string;
+  form_factor: string;
+  manufacturer: string;
+  part_number: string;
+};
+export type CacheInfo = {
+  level: number;
+  kind: "data" | "instruction" | "unified";
+  count: number;
+  size_bytes: number;
+};
+export type CpuDetail = {
+  vendor: string;
+  family: number;
+  model: number;
+  stepping: number;
+  flags: string[];
+  microcode: string | null;
+  caches: CacheInfo[];
+  hyperthreading: boolean;
+  virtualization: boolean;
+};
+export type MonitorInfo = { name: string; width: number; height: number; refresh_hz: number };
 export type Profile = {
   computer: string;
   os: string;
   cpu: string;
+  cpu_detail: CpuDetail;
   cores_physical: number;
   cores_logical: number;
   ram_bytes: number;
+  memory: MemoryModule[];
+  memory_slots: number | null;
+  memory_below_rated: boolean;
   uptime_secs: number;
   gpus: Gpu[];
+  monitors: MonitorInfo[];
   board: string | null;
+  bios: Bios | null;
   system_model: string | null;
   disks: Disk[];
   system_disk_ssd: boolean | null;
@@ -163,6 +203,16 @@ export type Profile = {
   tpm: string | null;
   laptop: boolean;
   elevated: boolean;
+};
+export type WinSat = {
+  state: number;
+  base: number | null;
+  cpu: number | null;
+  memory: number | null;
+  graphics: number | null;
+  d3d: number | null;
+  disk: number | null;
+  taken: string | null;
 };
 export type TweakCategory = "performance" | "privacy" | "appearance" | "network";
 export type Recommendation = { id: string; recommended: boolean; reason: string | null };
@@ -190,6 +240,10 @@ export type MonitorSample = {
   gpu_pct: number;
   gpu_mem_bytes: number;
   gpu_temp_c: number | null;
+  gpu_core_mhz: number | null;
+  gpu_mem_mhz: number | null;
+  gpu_power_w: number | null;
+  cpu_power_w: number | null;
   ram_used: number;
   ram_total: number;
   disk_pct: number;
@@ -267,6 +321,9 @@ export const backend = {
   restoreStatus: () => call<RestoreStatus>("restore_status"),
   restoreCreate: (description: string) =>
     callOrThrow<CreateOutcome>("restore_create", { description }),
+  winsatLast: () => call<WinSat>("winsat_last"),
+  winsatStart: () => callOrThrow<void>("winsat_start"),
+  reportSave: () => callOrThrow<string>("report_save"),
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),

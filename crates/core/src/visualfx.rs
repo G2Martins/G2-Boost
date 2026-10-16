@@ -166,6 +166,7 @@ pub fn get_item(id: &str) -> Result<bool, FxError> {
                 Value::Dword(d) => d != 0,
                 Value::Absent => return Ok(absent_is_on),
                 Value::Str(s) => s != "0",
+                Value::Binary(b) => b.first().is_some_and(|x| *x != 0),
             };
             Ok(raw != inverted)
         }

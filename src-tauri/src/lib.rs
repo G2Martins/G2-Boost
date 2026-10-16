@@ -21,6 +21,7 @@ use g2boost_core::settings::{self, Schedule, Settings};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
 use g2boost_core::tasksched;
 use g2boost_core::visualfx::Level;
+use g2boost_core::winsat::{self, WinSat};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
@@ -278,6 +279,72 @@ async fn restore_create(description: String) -> Result<CreateOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || restore::create(&d).map_err(|e| e.to_string()))
         .await
         .map_err(|e| e.to_string())?
+}
+
+/* ---------------- WinSAT + report ---------------- */
+
+#[tauri::command]
+async fn winsat_last() -> Result<WinSat, String> {
+    tauri::async_runtime::spawn_blocking(winsat::last).await.map_err(|e| e.to_string())?
+}
+
+/// Starts Windows' own formal assessment (admin, 2–5 min, full-screen D3D tests).
+#[tauri::command]
+async fn winsat_start() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| winsat::start_formal().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Write `Documents\G2 Boost\g2boost-<stamp>.json` (+ `.txt`) with the profile, WinSAT and tweak
+/// states, then reveal it in Explorer. Returns the JSON path.
+#[tauri::command]
+async fn report_save() -> Result<String, String> {
+    let path = tauri::async_runtime::spawn_blocking(|| -> Result<PathBuf, String> {
+        let profile = hardware::profile();
+        let sat = winsat::last().unwrap_or_default();
+        let tweaks = boost::detect_all();
+        let dir = std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .ok_or("no profile dir")?
+            .join("Documents")
+            .join("G2 Boost");
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let stamp = {
+            let clock = Clock::now();
+            format!("{}-{:02}{:02}{:02}", clock.unix, clock.hour, clock.minute, clock.second)
+        };
+        let json = dir.join(format!("g2boost-{stamp}.json"));
+        let body = serde_json::json!({ "generated_unix": g2boost_core::registry::now_unix(), "profile": profile, "winsat": sat, "tweaks": tweaks });
+        std::fs::write(&json, serde_json::to_string_pretty(&body).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        let mut txt = String::new();
+        txt.push_str(&format!("G2 Boost report\nComputer: {}\nOS: {}\nCPU: {} ({} cores / {} threads)\nRAM: {:.1} GB\n", profile.computer, profile.os, profile.cpu, profile.cores_physical, profile.cores_logical, profile.ram_bytes as f64 / 1e9));
+        for m in &profile.memory {
+            if m.size_bytes > 0 {
+                txt.push_str(&format!("  DIMM {}: {:.0} GB {} {} MT/s (SPD {} MT/s) {} {}\n", m.slot, m.size_bytes as f64 / (1u64 << 30) as f64, m.kind, m.configured_mts, m.speed_mts, m.manufacturer, m.part_number));
+            }
+        }
+        for g in &profile.gpus {
+            txt.push_str(&format!("GPU: {} {:.0} GB VRAM driver {} {}\n", g.name, g.vram_bytes as f64 / 1e9, g.driver.as_deref().unwrap_or("?"), g.pcie.as_deref().unwrap_or("")));
+        }
+        for mo in &profile.monitors {
+            txt.push_str(&format!("Monitor: {} {}x{} @ {:.0} Hz\n", mo.name, mo.width, mo.height, mo.refresh_hz));
+        }
+        txt.push_str(&format!("Board: {}\nBIOS: {}\n", profile.board.as_deref().unwrap_or("?"), profile.bios.as_ref().map(|b| format!("{} {} {}", b.vendor, b.version, b.date)).unwrap_or_default()));
+        for d in &profile.disks {
+            txt.push_str(&format!("Disk {}: {} {} {:.0} GB {}{}\n", d.index, d.model, d.bus, d.size_bytes as f64 / 1e9, match d.ssd { Some(true) => "SSD", Some(false) => "HDD", None => "?" }, if d.system { " [system]" } else { "" }));
+        }
+        txt.push_str(&format!("Secure Boot: {:?}  TPM: {:?}\nWinSAT: base {:?} cpu {:?} memory {:?} graphics {:?} d3d {:?} disk {:?}\n", profile.secure_boot, profile.tpm, sat.base, sat.cpu, sat.memory, sat.graphics, sat.d3d, sat.disk));
+        for t in &tweaks {
+            txt.push_str(&format!("tweak {}: {:?}\n", t.id, t.status));
+        }
+        std::fs::write(dir.join(format!("g2boost-{stamp}.txt")), txt).map_err(|e| e.to_string())?;
+        Ok(json)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let _ = tauri_plugin_opener::reveal_item_in_dir(&path);
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /* ---------------- routines (settings, autostart, scheduler, game watcher, tray) ---------------- */
@@ -652,6 +719,9 @@ pub fn run() {
             monitor_stop,
             restore_status,
             restore_create,
+            winsat_last,
+            winsat_start,
+            report_save,
             disk_scan_start,
             disk_scan_cancel,
             disk_summary,

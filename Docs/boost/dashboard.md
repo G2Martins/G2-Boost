@@ -49,7 +49,27 @@ PDH por nome em inglês (`PdhAddEnglishCounterW`): `\Processor Information(_Tota
 | TPM | `Tbsi_GetDeviceInfo` |
 | Notebook | chassi SMBIOS (8–11, 14, 30–32) ou bateria (`GetSystemPowerStatus`) |
 
-Tudo sem admin. Backlog "Meu PC completo" (CPU-Z/Speccy): [../references/speccy-cpuz.md](../references/speccy-cpuz.md).
+Tudo sem admin.
+
+### Meu PC completo (fase 6.5, subconjunto user-mode do CPU-Z/Speccy — [../references/speccy-cpuz.md](../references/speccy-cpuz.md))
+
+| Dado | API |
+|---|---|
+| Fabricante, família/modelo/stepping (hex, como o CPU-Z), instruções (MMX…AVX2/AVX-512, AES, SHA, BMI), virtualização, HT | `__cpuid` (folhas 0, 1, 7, 0x80000001) |
+| Caches L1d/L1i/L2/L3 (tamanho × instâncias) | `GetLogicalProcessorInformationEx(RelationCache)` |
+| Microcode | registro `CentralProcessor\0\Update Revision` (REG_BINARY) |
+| Pentes de RAM: slot, tamanho, tipo (DDR4/DDR5…), formato, velocidade SPD × configurada, fabricante, part number; slots totais | SMBIOS tipos 17 e 16 |
+| "XMP/EXPO desligado?" | configurada < nominal inferida do part number (`CMK16GX4M1E3200C16` → 3200, `KF560…` → 6000) |
+| BIOS (marca, versão, data) | SMBIOS tipo 0 |
+| Driver da GPU (versão + data) | `Control\Class\{4d36e968…}` (`DriverDesc`/`DriverVersion`/`DriverDate`) ou NVML |
+| PCIe atual, limite de potência, clocks, potência, temperatura (NVIDIA) | NVML (`nvml.rs`) |
+| Monitores (nome, resolução, Hz) | `QueryDisplayConfig` + `DisplayConfigGetDeviceInfo(GET_TARGET_NAME)` |
+| WinSAT (nota base + CPU/RAM/gráficos/D3D/disco) | WMI `Win32_WinSAT` (`wmi.rs`, COM, sem admin); "Rodar avaliação" = COM `CInitiateWinSAT::InitiateFormalAssessment` (admin, 2–5 min). Nunca `winsat.exe`. |
+| Potência do pacote da CPU | PDH `\Energy Meter(RAPL_Package0_PKG)\Power` (mW) |
+| Clock efetivo (turbo) | PDH `Processor Frequency` × `% Processor Performance` ÷ 100 (fallback `CallNtPowerInformation`) |
+| Relatório | `report_save`: `Documentos\G2 Boost\g2boost-<stamp>.json` + `.txt` (perfil, WinSAT, estado dos tweaks), abre no Explorer |
+
+**Não fazemos (exigem driver de kernel, como o `cpuz.sys` dos dois apps):** temperatura de CPU, VID/multiplicador/bus, voltagens e ventoinhas (Super I/O), tabela SPD/XMP e timings reais de RAM, registradores de chipset. Bench próprio de CPU e S.M.A.R.T. (elevado) = backlog.
 
 ## Testes
 `hardware`: parser SMBIOS com blob sintético (tipos 1/2/3), perfil ao vivo (núcleos, RAM, discos com disco do sistema, GPU). `monitor`: duas amostras em faixa (CPU/GPU/disco 0–100, clock > 0). `restore`: parse de `CreationTime`, status sem admin, `create` recusa sem admin. `recommend`: regras com perfis fictícios (SSD desktop, HD notebook com Game Pass/Outlook) e cálculo de score. `tasksched`: Compatibility Appraiser legível ("… Exp" no 24H2+).

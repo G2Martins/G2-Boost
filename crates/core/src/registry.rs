@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, WIN32_ERROR};
 use windows::Win32::System::Registry::{
-    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_DWORD, REG_EXPAND_SZ,
+    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_BINARY, REG_DWORD, REG_EXPAND_SZ,
     REG_OPTION_NON_VOLATILE, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegCreateKeyExW, RegDeleteValueW,
     RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
 };
@@ -52,6 +52,7 @@ impl Root {
 pub enum Value {
     Dword(u32),
     Str(String),
+    Binary(Vec<u8>),
     Absent,
 }
 
@@ -142,6 +143,7 @@ pub fn read(root: Root, path: &str, name: &str) -> Result<Value, RegError> {
     match ty {
         REG_DWORD if len >= 4 => Ok(Value::Dword(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]))),
         REG_SZ | REG_EXPAND_SZ => Ok(Value::Str(utf16z(&buf[..len]))),
+        REG_BINARY => Ok(Value::Binary(buf[..len].to_vec())),
         other => Err(RegError::Unsupported(other.0)),
     }
 }
@@ -173,6 +175,12 @@ pub fn write(root: Root, path: &str, name: &str, value: &Value) -> Result<(), Re
             let bytes: Vec<u8> = w.iter().flat_map(|u| u.to_le_bytes()).collect();
             // SAFETY: null-terminated UTF-16 payload for REG_SZ.
             let e = unsafe { RegSetValueExW(key.0, PCWSTR(n.as_ptr()), None, REG_SZ, Some(&bytes)) };
+            check(e)
+        }
+        Value::Binary(b) => {
+            let key = create(root, path)?;
+            // SAFETY: raw bytes for REG_BINARY.
+            let e = unsafe { RegSetValueExW(key.0, PCWSTR(n.as_ptr()), None, REG_BINARY, Some(b)) };
             check(e)
         }
     }

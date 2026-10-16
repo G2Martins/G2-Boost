@@ -47,4 +47,7 @@ features = [
   "Win32_System_Restore",
   "Win32_System_Rpc",
   "Win32_NetworkManagement_Ndis",
+  "Win32_System_AssessmentTool",
+  "Win32_Devices_Display",
+  "Win32_Graphics_Gdi",
 ]

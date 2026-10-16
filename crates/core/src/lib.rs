@@ -10,6 +10,7 @@ pub mod disk;
 pub mod hardware;
 pub mod monitor;
 pub mod network;
+pub mod nvml;
 pub mod recommend;
 pub mod registry;
 pub mod restore;
@@ -19,6 +20,8 @@ pub mod settings;
 pub mod system;
 pub mod tasksched;
 pub mod visualfx;
+pub mod winsat;
+pub mod wmi;
 
 /// Crate version, surfaced in the UI "about" footer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

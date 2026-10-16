@@ -13,7 +13,6 @@ use serde::Serialize;
 use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, IF_TYPE_SOFTWARE_LOOPBACK, MIB_IF_TABLE2};
 use windows::Win32::NetworkManagement::Ndis::IfOperStatusUp;
-use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows::Win32::System::Performance::{
     PDH_FMT_COUNTERVALUE, PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PDH_MORE_DATA,
     PdhAddEnglishCounterW, PdhCloseQuery, PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhGetFormattedCounterValue,
@@ -23,6 +22,7 @@ use windows::Win32::System::Power::{CallNtPowerInformation, PROCESSOR_POWER_INFO
 use windows::Win32::System::Threading::{ALL_PROCESSOR_GROUPS, GetActiveProcessorCount};
 use windows::core::PCWSTR;
 
+use crate::nvml::{self, Nvml};
 use crate::registry::{now_unix, wide};
 use crate::system;
 
@@ -31,9 +31,14 @@ pub struct Sample {
     pub ts: u64,
     pub cpu_pct: f32,
     pub cpu_mhz: u32,
+    /// Package power from the RAPL energy meter (PDH `Energy Meter`); None when the counter is absent.
+    pub cpu_power_w: Option<f32>,
     pub gpu_pct: f32,
     pub gpu_mem_bytes: u64,
     pub gpu_temp_c: Option<u32>,
+    pub gpu_core_mhz: Option<u32>,
+    pub gpu_mem_mhz: Option<u32>,
+    pub gpu_power_w: Option<f32>,
     pub ram_used: u64,
     pub ram_total: u64,
     pub disk_pct: f32,
@@ -95,59 +100,23 @@ fn values(c: &Option<Counter>) -> Vec<(String, f64)> {
         .collect()
 }
 
-/* ---------------- NVML (NVIDIA only, optional) ---------------- */
-
-type NvmlInit = unsafe extern "C" fn() -> i32;
-type NvmlHandleByIndex = unsafe extern "C" fn(u32, *mut *mut c_void) -> i32;
-type NvmlTemperature = unsafe extern "C" fn(*mut c_void, u32, *mut u32) -> i32;
-
-struct Nvml {
-    device: *mut c_void,
-    temperature: NvmlTemperature,
-}
-
-impl Nvml {
-    fn load() -> Option<Self> {
-        let lib = wide("nvml.dll");
-        // SAFETY: well-known NVIDIA user-mode library; symbols resolved by name with the documented C ABI.
-        unsafe {
-            let h = LoadLibraryW(PCWSTR(lib.as_ptr())).ok()?;
-            let init: NvmlInit = std::mem::transmute(GetProcAddress(h, windows::core::s!("nvmlInit_v2"))?);
-            let by_index: NvmlHandleByIndex = std::mem::transmute(GetProcAddress(h, windows::core::s!("nvmlDeviceGetHandleByIndex_v2"))?);
-            let temperature: NvmlTemperature = std::mem::transmute(GetProcAddress(h, windows::core::s!("nvmlDeviceGetTemperature"))?);
-            if init() != 0 {
-                return None;
-            }
-            let mut device = null_mut();
-            if by_index(0, &mut device) != 0 {
-                return None;
-            }
-            Some(Self { device, temperature })
-        }
-    }
-
-    fn gpu_temp(&self) -> Option<u32> {
-        let mut t = 0u32;
-        // SAFETY: valid device handle; sensor 0 = NVML_TEMPERATURE_GPU.
-        (unsafe { (self.temperature)(self.device, 0, &mut t) } == 0).then_some(t)
-    }
-}
-
 /* ---------------- monitor ---------------- */
 
 pub struct Monitor {
     query: PDH_HQUERY,
     cpu: Option<Counter>,
+    cpu_perf: Option<Counter>,
+    cpu_freq: Option<Counter>,
+    cpu_power: Option<Counter>,
     gpu_util: Option<Counter>,
     gpu_mem: Option<Counter>,
     disk_time: Option<Counter>,
     disk_bytes: Option<Counter>,
     last_net: Option<(Instant, u64, u64)>,
-    nvml: Option<Nvml>,
     primed: bool,
 }
 
-// SAFETY: PDH handles and the NVML device pointer are only used from the thread that owns the Monitor.
+// SAFETY: PDH handles are only used from the thread that owns the Monitor.
 unsafe impl Send for Monitor {}
 
 impl Monitor {
@@ -162,12 +131,15 @@ impl Monitor {
         let mut m = Self {
             query,
             cpu,
+            // Effective clock = nominal frequency × % performance (turbo shows > 100 %), like Task Manager.
+            cpu_perf: add_counter(query, r"\Processor Information(_Total)\% Processor Performance"),
+            cpu_freq: add_counter(query, r"\Processor Information(_Total)\Processor Frequency"),
+            cpu_power: add_counter(query, r"\Energy Meter(RAPL_Package0_PKG)\Power"),
             gpu_util: add_counter(query, r"\GPU Engine(*)\Utilization Percentage"),
             gpu_mem: add_counter(query, r"\GPU Adapter Memory(*)\Dedicated Usage"),
             disk_time: add_counter(query, r"\PhysicalDisk(_Total)\% Disk Time"),
             disk_bytes: add_counter(query, r"\PhysicalDisk(_Total)\Disk Bytes/sec"),
             last_net: None,
-            nvml: Nvml::load(),
             primed: false,
         };
         // Rate counters need two collections; prime now so the first real sample is meaningful.
@@ -240,14 +212,23 @@ impl Monitor {
         let gpu_pct = per_engine.values().cloned().fold(0.0, f64::max).min(100.0) as f32;
         let gpu_mem_bytes = values(&self.gpu_mem).iter().map(|(_, v)| *v as u64).sum();
         let mem = system::memory_status();
+        let nv = nvml::get();
 
         Sample {
             ts: now_unix(),
             cpu_pct: value(&self.cpu).unwrap_or(0.0).clamp(0.0, 100.0) as f32,
-            cpu_mhz: Self::cpu_mhz(),
+            cpu_mhz: match (value(&self.cpu_freq), value(&self.cpu_perf)) {
+                (Some(f), Some(p)) if f > 0.0 && p > 0.0 => (f * p / 100.0).round() as u32,
+                _ => Self::cpu_mhz(),
+            },
+            // The counter reports milliwatts on current builds; tolerate a watts-scaled provider too.
+            cpu_power_w: value(&self.cpu_power).filter(|v| *v > 0.0).map(|v| (if v > 500.0 { v / 1000.0 } else { v }) as f32),
             gpu_pct,
             gpu_mem_bytes,
-            gpu_temp_c: self.nvml.as_ref().and_then(Nvml::gpu_temp),
+            gpu_temp_c: nv.and_then(Nvml::temperature_c),
+            gpu_core_mhz: nv.and_then(|n| n.clock_mhz(0)),
+            gpu_mem_mhz: nv.and_then(|n| n.clock_mhz(2)),
+            gpu_power_w: nv.and_then(Nvml::power_w),
             ram_used: mem.as_ref().map(|m| m.total_bytes - m.avail_bytes).unwrap_or(0),
             ram_total: mem.as_ref().map(|m| m.total_bytes).unwrap_or(0),
             disk_pct: value(&self.disk_time).unwrap_or(0.0).clamp(0.0, 100.0) as f32,

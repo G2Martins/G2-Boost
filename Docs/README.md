@@ -12,6 +12,7 @@
 | [global-rules.md](./core/global-rules.md) | **Regras globais** — segurança (caller hostil, destrutivo, nativo), testes, docs vivas, i18n, GSD, checklist de PR. Fonte única. |
 | [design-system.md](./core/design-system.md) | Tokens da paleta estilo ExitLag, tipografia, componentes base, convenção de gráficos/gauges. |
 | [next-steps.md](./core/next-steps.md) | Roadmap por fases e backlog; seção "Feito" por sessão. |
+| [ai-advisor.md](./core/ai-advisor.md) | **Proposta** da fase 9: IA no app (BYOK Claude/OpenAI/Gemini) + servidor MCP stdio sobre a mesma camada de tools read-only; context pack do PC; estimativa de FPS com busca em fontes confiáveis; temperaturas e upgrades. |
 
 ## boost/ — PC Boost
 
@@ -36,6 +37,7 @@
 | [binary-analysis.md](./references/binary-analysis.md) | Análise estática dos binários do ExitLag (`D:\ExitLag`, Qt 6 + driver NDIS/nfapi) e do SpaceSniffer: imports, strings, chaves de registro dos tweaks, método de limpeza de RAM, resolvers DNS. |
 | [legacy-bat-scripts.md](./references/legacy-bat-scripts.md) | Inventário dos scripts `Limpador Diario/Mensal 2026.bat` → catálogo de categorias de limpeza e tweaks, lições e bugs. |
 | [windows-services-research.md](./references/windows-services-research.md) | Pesquisa com fontes (Galdino Tech, winutil, Microsoft, benchmarks): o que cada serviço faz, padrão do Win11, efeitos colaterais, ganho real para jogos, mitos (Prefetch, Nagle, RAM cleaners, VBS/HVCI). Base das decisões de preset. |
+| [speccy-cpuz.md](./references/speccy-cpuz.md) | Análise estática do CPU-Z 3.01 e Speccy 1.34: os dois carregam o driver de kernel `cpuz.sys`; tabela funcionalidade × mecanismo × o que fazemos sem driver; licença; o que não copiar. |
 | [galdino-optimizer.md](./references/galdino-optimizer.md) | Extração do story do Galdino Optimizer (2026-10-14): painel com KPIs, pontuação de otimização, pontos de restauração, monitor em tempo real, ações recomendadas, Meu PC — com a API nativa de cada item e o que fica fora (temperatura de CPU exige driver). |
 
 ## security/ — Segurança

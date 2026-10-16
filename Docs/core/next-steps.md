@@ -2,7 +2,7 @@
 
 **Última revisão:** 2026-10-15 (madrugada)
 
-**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). Próximas: 6.5 Meu PC completo (CPU-Z/Speccy user-mode, WinSAT), 7 disco, 8 rede, 9 IA no app + MCP (contexto do PC, estimativa de FPS com fontes), 10 release. Planejamento GSD em `.planning/`.
+**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). Próximas: 9 IA no app + MCP (advisor de upgrades/temperaturas, contexto do PC, estimativa de FPS com fontes), 7 disco, 8 rede, 10 release. Planejamento GSD em `.planning/`.
 
 Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat estão bloqueados pelo Kaspersky — disco e limpeza primeiro; rede e boost depois; MCP quando o core estiver estável.
 

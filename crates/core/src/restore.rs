@@ -4,23 +4,14 @@
 //! we report "skipped" instead of pretending.
 
 use serde::Serialize;
-use windows::Win32::System::Com::{
-    CLSCTX_INPROC_SERVER, CoCreateInstance, CoSetProxyBlanket, EOAC_NONE, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
-};
 use windows::Win32::System::Restore::{
     BEGIN_SYSTEM_CHANGE, END_SYSTEM_CHANGE, MODIFY_SETTINGS, RESTOREPOINTINFOW, SRSetRestorePointW, STATEMGRSTATUS,
 };
-use windows::Win32::System::Rpc::{RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE};
-use windows::Win32::System::Variant::{VARIANT, VT_BSTR, VariantClear};
-use windows::Win32::System::Wmi::{
-    IWbemClassObject, IWbemLocator, WBEM_FLAG_FORWARD_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_GENERIC_FLAG_TYPE, WBEM_INFINITE,
-    WbemLocator,
-};
-use windows::core::{BSTR, PCWSTR, w};
 
 use crate::registry::{self, Root, Value};
 use crate::system;
 use crate::tasksched::{Com, TaskError};
+use crate::wmi;
 
 const SR_KEY: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore";
 
@@ -58,7 +49,7 @@ pub enum RestoreError {
 }
 
 /// "20261014213000.000000-180" → "2026-10-14 21:30"
-fn wmi_datetime(s: &str) -> Option<String> {
+pub(crate) fn wmi_datetime(s: &str) -> Option<String> {
     if s.len() < 12 || !s.is_char_boundary(12) {
         return None;
     }
@@ -71,46 +62,12 @@ fn wmi_datetime(s: &str) -> Option<String> {
 
 /// (count, newest CreationTime) from `SELECT CreationTime FROM SystemRestore`.
 fn wmi_points() -> Result<(u32, Option<String>), RestoreError> {
-    let _com = Com::init()?;
-    // SAFETY: standard WMI client sequence; every COM object is released on drop.
-    unsafe {
-        let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER).map_err(|e| RestoreError::Wmi(e.message()))?;
-        let empty = BSTR::new();
-        let services = locator
-            .ConnectServer(&BSTR::from(r"ROOT\DEFAULT"), &empty, &empty, &empty, 0, &empty, None)
-            .map_err(|e| RestoreError::Wmi(e.message()))?;
-        CoSetProxyBlanket(&services, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, PCWSTR::null(), RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, None, EOAC_NONE)
-            .map_err(|e| RestoreError::Wmi(e.message()))?;
-        let flags = WBEM_GENERIC_FLAG_TYPE(WBEM_FLAG_FORWARD_ONLY.0 | WBEM_FLAG_RETURN_IMMEDIATELY.0);
-        let rows = services
-            .ExecQuery(&BSTR::from("WQL"), &BSTR::from("SELECT CreationTime FROM SystemRestore"), flags, None)
-            .map_err(|e| RestoreError::Wmi(e.message()))?;
-        let mut count = 0u32;
-        let mut newest: Option<String> = None;
-        loop {
-            let mut objs: [Option<IWbemClassObject>; 1] = [None];
-            let mut returned = 0u32;
-            let hr = rows.Next(WBEM_INFINITE, &mut objs, &mut returned);
-            if hr.is_err() || returned == 0 {
-                break;
-            }
-            let Some(obj) = objs[0].take() else {
-                break;
-            };
-            count += 1;
-            let mut v = VARIANT::default();
-            if obj.Get(w!("CreationTime"), 0, &mut v, None, None).is_ok() {
-                if v.Anonymous.Anonymous.vt == VT_BSTR {
-                    let s = (*v.Anonymous.Anonymous.Anonymous.bstrVal).to_string();
-                    if newest.as_deref().is_none_or(|n| s.as_str() > n) {
-                        newest = Some(s);
-                    }
-                }
-                let _ = VariantClear(&mut v);
-            }
-        }
-        Ok((count, newest.and_then(|s| wmi_datetime(&s))))
-    }
+    let rows = wmi::query(r"ROOT\DEFAULT", "SELECT CreationTime FROM SystemRestore", &["CreationTime"]).map_err(RestoreError::Wmi)?;
+    let newest = rows
+        .iter()
+        .filter_map(|r| r.get("CreationTime").and_then(|v| v.as_str()).map(str::to_string))
+        .max();
+    Ok((rows.len() as u32, newest.and_then(|s| wmi_datetime(&s))))
 }
 
 pub fn status() -> RestoreStatus {

@@ -6,13 +6,12 @@ import {
   MemoryStick,
   Monitor,
   Network,
-  RefreshCw,
   RotateCcw,
   ShieldCheck,
   Sparkles,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
@@ -24,7 +23,6 @@ import {
   Card,
   CardTitle,
   EmptyState,
-  MetricRow,
   Tabs,
   TabsContent,
   TabsList,
@@ -44,6 +42,7 @@ import { boot } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { navigate } from "@/lib/nav";
 import { cn, formatBytes } from "@/lib/utils";
+import { MyPc } from "@/pages/mypc";
 
 const WINDOW = 60;
 const DEFAULT_CLEANUP = CLEANUP_CATALOG.filter((c) => c.defaultOn).map((c) => c.id);
@@ -80,7 +79,7 @@ export function DashboardPage() {
           </TabsContent>
           <TabsContent value="mypc">
             <PageBody className="px-0 pb-0">
-              <MyPc />
+              <MyPc elevated={info?.elevated ?? false} />
             </PageBody>
           </TabsContent>
         </Tabs>
@@ -537,7 +536,11 @@ function MonitorCard({
               : undefined
           }
         />
-        <Chip label={t("dash.monitor.cpu_temp")} value="—" sub={t("dash.monitor.cpu_temp.na")} />
+        <Chip
+          label={t("dash.monitor.cpu_power")}
+          value={last?.cpu_power_w != null ? `${last.cpu_power_w.toFixed(0)} W` : "—"}
+          sub={t("dash.monitor.cpu_temp.na")}
+        />
         <Chip
           label={t("dash.monitor.disk_rate")}
           value={last ? `${(last.disk_bytes_s / (1024 * 1024)).toFixed(1)} MB/s` : "—"}
@@ -558,7 +561,11 @@ function MonitorCard({
           value={last ? formatBytes(last.ram_used, locale) : "—"}
           sub={profile ? formatBytes(profile.ram_bytes, locale, 0) : undefined}
         />
-        <Chip label={t("dash.monitor.gpu")} value={profile?.gpus[0]?.name ?? "—"} />
+        <Chip
+          label={t("dash.monitor.gpu_clock")}
+          value={last?.gpu_core_mhz != null ? `${last.gpu_core_mhz} MHz` : "—"}
+          sub={last?.gpu_power_w != null ? `${last.gpu_power_w.toFixed(0)} W` : undefined}
+        />
       </div>
     </Card>
   );
@@ -574,158 +581,6 @@ function Chip({ label, value, sub }: { label: string; value: string; sub?: strin
         {value}
       </div>
       {sub ? <div className="num truncate text-[10px] text-muted-foreground">{sub}</div> : null}
-    </div>
-  );
-}
-
-/* ================= Meu PC ================= */
-
-function MyPc() {
-  const { t, locale } = useI18n();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [busy, setBusy] = useState(false);
-  const started = useRef(false);
-  const load = useCallback(async (refresh: boolean) => {
-    setBusy(true);
-    const p = await backend.systemProfile(refresh);
-    if (p) setProfile(p);
-    setBusy(false);
-  }, []);
-  useEffect(() => {
-    if (!started.current) {
-      started.current = true;
-      void load(false);
-    }
-  }, [load]);
-
-  const uptime = (secs: number) =>
-    t("mypc.uptime_value", { h: Math.floor(secs / 3600), m: Math.floor((secs % 3600) / 60) });
-  const yn = (v: boolean | null) => (v === null ? "—" : v ? t("settings.yes") : t("settings.no"));
-
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card className="animate-rise">
-        <CardTitle
-          right={
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy || !inTauri}
-              onClick={() => load(true)}
-              aria-label={t("mypc.refresh")}
-            >
-              <RefreshCw className={cn("size-4", busy && "animate-spin")} />
-            </Button>
-          }
-        >
-          <Cpu className="size-4" />
-          {t("mypc.hardware")}
-        </CardTitle>
-        <div className="divide-y divide-border">
-          <MetricRow label={t("mypc.computer")} value={profile?.computer ?? "—"} />
-          <MetricRow label={t("mypc.os")} value={profile?.os ?? "—"} />
-          <MetricRow label={t("mypc.cpu")} value={profile?.cpu ?? "—"} />
-          <MetricRow
-            label={t("mypc.cores")}
-            value={
-              profile
-                ? t("mypc.cores_value", {
-                    phys: profile.cores_physical,
-                    logical: profile.cores_logical,
-                  })
-                : "—"
-            }
-          />
-          <MetricRow
-            label={t("mypc.ram")}
-            value={profile ? formatBytes(profile.ram_bytes, locale, 0) : "—"}
-          />
-          {(profile?.gpus ?? []).map((g) => (
-            <MetricRow
-              key={g.name}
-              label={t("mypc.gpu")}
-              value={`${g.name} · ${formatBytes(g.vram_bytes, locale, 0)}`}
-            />
-          ))}
-          <MetricRow label={t("mypc.board")} value={profile?.board ?? "—"} />
-          {profile?.system_model && profile.system_model !== profile.board ? (
-            <MetricRow label={t("mypc.model")} value={profile.system_model} />
-          ) : null}
-          <MetricRow
-            label={t("mypc.type")}
-            value={profile ? (profile.laptop ? t("mypc.laptop") : t("mypc.desktop")) : "—"}
-          />
-          <MetricRow label={t("mypc.uptime")} value={profile ? uptime(profile.uptime_secs) : "—"} />
-        </div>
-      </Card>
-      <div className="flex flex-col gap-4">
-        <Card className="animate-rise" style={rise(1)}>
-          <CardTitle>
-            <ShieldCheck className="size-4" />
-            {t("mypc.security")}
-          </CardTitle>
-          <div className="divide-y divide-border">
-            <MetricRow
-              label={t("mypc.secure_boot")}
-              value={profile ? yn(profile.secure_boot) : "—"}
-              ok={profile?.secure_boot ?? undefined}
-            />
-            <MetricRow
-              label={t("mypc.tpm")}
-              value={profile ? (profile.tpm ?? t("mypc.tpm.none")) : "—"}
-              ok={profile ? profile.tpm !== null : undefined}
-            />
-            <MetricRow
-              label={t("settings.elevated")}
-              value={profile ? yn(profile.elevated) : "—"}
-              ok={profile?.elevated}
-            />
-          </div>
-        </Card>
-        <Card className="animate-rise" style={rise(2)}>
-          <CardTitle>
-            <HardDrive className="size-4" />
-            {t("mypc.disks")}
-          </CardTitle>
-          {profile && profile.disks.length > 0 ? (
-            <ul className="divide-y divide-border text-sm">
-              {profile.disks.map((d) => (
-                <li key={d.index} className="flex flex-wrap items-center gap-2 py-2">
-                  <span className="min-w-0 flex-1 truncate font-medium" title={d.model}>
-                    {d.model}
-                  </span>
-                  <Badge className="bg-card-hover text-muted-foreground">
-                    {t(`mypc.bus.${d.bus}` as const)}
-                  </Badge>
-                  <Badge
-                    className={cn(
-                      d.ssd === true
-                        ? "bg-success/12 text-success"
-                        : d.ssd === false
-                          ? "bg-warning/12 text-warning"
-                          : "bg-card-hover text-muted-foreground",
-                    )}
-                  >
-                    {d.ssd === true
-                      ? t("mypc.ssd")
-                      : d.ssd === false
-                        ? t("mypc.hdd")
-                        : t("mypc.media_unknown")}
-                  </Badge>
-                  {d.system ? (
-                    <Badge className="bg-primary/15 text-primary">{t("mypc.system_disk")}</Badge>
-                  ) : null}
-                  <span className="num text-xs text-muted-foreground">
-                    {formatBytes(d.size_bytes, locale, 0)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-muted-foreground">—</p>
-          )}
-        </Card>
-      </div>
     </div>
   );
 }
