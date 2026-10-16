@@ -13,6 +13,9 @@ export function useErrorText() {
       if (msg === "needs_admin") return t("boost.error.needs_admin");
       if (msg === "cancelled") return t("boost.error.cancelled");
       if (msg === "bad_token") return t("cleanup.error.bad_token");
+      if (msg === "protected_item") return t("boost.startup.protected");
+      if (msg === "protected_path") return t("disk.recycle.protected");
+      if (msg === "scan_running") return t("disk.recycle.scan_running");
       return t("boost.error.generic", { error: msg });
     },
     [t],

@@ -47,7 +47,8 @@ export const en = {
   "dash.monitor.cores": "cores / threads",
   "dash.monitor.gpu_temp": "GPU temp.",
   "dash.monitor.cpu_temp": "CPU temp.",
-  "dash.monitor.cpu_temp.na": "CPU temp needs a kernel driver",
+  "dash.monitor.cpu_temp_value": "CPU at {temp} °C",
+  "dash.monitor.cpu_temp.na": "CPU temp: run HWiNFO or LibreHardwareMonitor",
   "dash.monitor.vram": "VRAM",
   "dash.monitor.disk_rate": "disk",
   "dash.monitor.net_rate": "↓ {rx}/s · ↑ {tx}/s",
@@ -123,6 +124,20 @@ export const en = {
   "mypc.secure_boot": "Secure Boot",
   "mypc.tpm": "TPM",
   "mypc.tpm.none": "not detected",
+  "mypc.fw.boot": "Boot mode",
+  "mypc.fw.boot.uefi": "UEFI",
+  "mypc.fw.boot.legacy": "Legacy (CSM)",
+  "mypc.fw.virt": "Virtualization (VT-x/AMD-V)",
+  "mypc.fw.virt.hyperv": "on (Hyper-V/VBS running)",
+  "mypc.fw.rebar": "Resizable BAR",
+  "mypc.fw.xmp": "RAM at XMP/EXPO",
+  "mypc.fw.bios_age": "BIOS age",
+  "mypc.fw.years": "{n} years",
+  "mypc.fw.fast_startup": "Fast Startup",
+  "mypc.fw.hibernation": "Hibernation",
+  "mypc.fw.unknown": "cannot tell",
+  "mypc.fw.note":
+    "Read from Windows, no driver. C-states, power limits and fan curves are invisible to the OS — only the BIOS itself shows them.",
   "mypc.disks": "Disks",
   "mypc.ssd": "SSD",
   "mypc.hdd": "Mechanical HDD",
@@ -141,6 +156,7 @@ export const en = {
   "boost.reason.hdd": "mechanical HDD",
   "boost.reason.unknown_disk": "disk type unknown",
   "boost.reason.laptop": "laptop",
+  "boost.reason.windows10": "Windows 11 only",
   "boost.reason.hags_unsupported": "driver without HAGS",
   "boost.reason.game_pass": "Game Pass/Xbox installed",
   "boost.reason.outlook": "Outlook installed",
@@ -238,6 +254,14 @@ export const en = {
     "The AI changes nothing on the PC. Suggested tweaks show up as buttons and go through the normal flow (backup, administrator).",
   "ai.actions": "Suggested tweaks",
   "ai.actions.note": "Each tweak saves the original value first and can be reverted in PC Boost.",
+  "ai.action.startup": "Remove from startup: {name}",
+  "ai.action.startup_off": "Turn off",
+  "ai.action.startup_done": "No longer starts with Windows (turn it back on in PC Boost › Startup)",
+  "ai.mcp.title": "Use with Claude Desktop / Claude Code",
+  "ai.mcp.hint":
+    "MCP (Model Context Protocol): the Claude on your machine reads this PC's diagnostics straight from G2 Boost. Read-only — nothing is changed through it.",
+  "ai.mcp.body":
+    "G2 Boost itself becomes the MCP server with --mcp. The tools only read (hardware, BIOS, sensors, startup, processes, tweaks, cleanup preview); applying anything is still your click here in the app.",
   "ai.action.applied": "Applied",
   "ai.action.open_cleanup": "Open Cleanup",
   "ai.error.refusal": "The provider declined to answer this question.",
@@ -302,6 +326,18 @@ export const en = {
   "advisor.hvci_on.title": "Memory integrity (HVCI) is on",
   "advisor.hvci_on.body":
     "Protects against malicious drivers and costs ~5% FPS in some games (Tom's Hardware). Turning it off is an option in PC Boost › Custom — security traded for performance.",
+  "advisor.cpu_hot.title": "CPU running hot ({temp} °C)",
+  "advisor.cpu_hot.body":
+    "Above ~90 °C the CPU throttles and FPS drops. Clean the dust, check the cooler and thermal paste, use the Balanced plan outside games and cap FPS at the monitor refresh rate — less heat without losing smoothness.",
+  "advisor.legacy_boot.title": "Windows booted in legacy mode (CSM)",
+  "advisor.legacy_boot.body":
+    "Without UEFI there is no Secure Boot, which anti-cheats such as Valorant's require. Convert the disk to GPT (Microsoft MBR2GPT) and switch to UEFI in the BIOS — back up first.",
+  "advisor.rebar_off.title": "Resizable BAR is off ({bar_mb} MB aperture)",
+  "advisor.rebar_off.body":
+    "On RTX 30/40/50 and RX 6000+ cards ReBAR adds a few % FPS in many games. Enable “Above 4G Decoding” and “Re-Size BAR” in the BIOS (requires UEFI mode). Free.",
+  "advisor.bios_old.title": "BIOS about {years} years old ({version})",
+  "advisor.bios_old.body":
+    "BIOS updates bring microcode, memory compatibility and security fixes. Update only from the motherboard maker's website, on stable power — never during a storm or on battery.",
   "advisor.winsat_stale.title": "WinSAT score is outdated",
   "advisor.winsat_stale.body":
     "The hardware changed since the last assessment. Run it again in My PC.",
@@ -334,7 +370,7 @@ export const en = {
   "disk.title": "Disk analyzer",
   "disk.subtitle": "What is eating your space",
   "disk.tab.treemap": "Disk map",
-  "disk.tab.largest": "Largest files",
+  "disk.tab.largest": "Files & filters",
   "disk.tab.essentials": "Large essentials",
   "disk.drive": "Drive",
   "disk.scan": "Scan",
@@ -363,7 +399,55 @@ export const en = {
   "disk.class.binary": "Binary/VM",
   "disk.class.document": "Document",
   "disk.class.other": "Other",
-  "disk.filter.placeholder": "Filter: *.mp4; >1gb; <3months; \\temp",
+  "disk.filter.placeholder": "Filter: *.mp4  >1gb  >6m (older than 6 months)  name",
+  "disk.filter.help":
+    "Combine terms: *.mp4 or .mkv (extension), >1gb / <200mb (size), >6m / <7d (untouched for over 6 months / changed in the last 7 days; d, w, m, y) and any word of the name.",
+  "disk.filter.matched": "{count} files · {size}",
+  "disk.select": "Select",
+  "disk.reveal": "Show in folder",
+  "disk.recycle": "Recycle Bin",
+  "disk.recycle.selected": "Send {count} to the Recycle Bin ({size})",
+  "disk.recycle.confirm_title": "Send {count} item(s) to the Recycle Bin — {size}",
+  "disk.recycle.confirm_body":
+    "It goes to the Recycle Bin and can be restored from there. If something is too big for the Bin, Windows itself asks before deleting it for good. System folders and other users' folders are blocked.",
+  "disk.recycle.confirm": "Send to Recycle Bin",
+  "disk.recycle.done": "{count} item(s) in the Recycle Bin · {size} freed once you empty it",
+  "disk.recycle.failed": "{count} were not moved (in use or cancelled).",
+  "disk.recycle.protected":
+    "Protected item: system folder, another user's folder, drive/profile root or folder link (junction).",
+  "disk.recycle.scan_running": "Wait for the scan to finish.",
+  "disk.ess.none": "None of the known items were found on this drive.",
+  "disk.ess.unreadable": "needs admin to measure",
+  "disk.ess.pagefile.title": "Page file (pagefile.sys)",
+  "disk.ess.pagefile.body":
+    "Windows virtual memory. Do not delete or disable it: games and Windows itself crash without it. If it is huge, keep it 'system managed' or move it to another SSD in System › About › Advanced settings › Performance.",
+  "disk.ess.hiberfil.title": "Hibernation (hiberfil.sys)",
+  "disk.ess.hiberfil.body":
+    "Stores RAM when hibernating and powers Fast Startup. On a desktop you can turn hibernation off in Windows Power Options and get the space back; on a laptop think twice (low battery = hibernate).",
+  "disk.ess.swapfile.title": "App swap (swapfile.sys)",
+  "disk.ess.swapfile.body":
+    "Used by Microsoft Store apps. Small and managed by Windows: leave it alone.",
+  "disk.ess.winsxs.title": "Component store (WinSxS)",
+  "disk.ess.winsxs.body":
+    "The base of Windows and its updates; much of it is hard links, so the size shown is inflated. Never delete by hand: use Cleanup › Component cleanup (DISM), which removes only superseded versions.",
+  "disk.ess.windows_old.title": "Previous Windows (Windows.old)",
+  "disk.ess.windows_old.body":
+    "A copy of Windows from before the last feature update, to roll back. It goes away by itself after ~10 days; if the system is stable, remove it with Windows Disk Cleanup (System files › Previous installations).",
+  "disk.ess.recycle_bin.title": "Recycle Bin ($Recycle.Bin)",
+  "disk.ess.recycle_bin.body":
+    "Deleted files that can still come back. Empty it in Cleanup › Recycle Bin once you are sure.",
+  "disk.ess.restore_points.title": "Restore points (System Volume Information)",
+  "disk.ess.restore_points.body":
+    "Restore points and shadow copies. Do not touch the folder: adjust the limit in System Protection; the G2 Boost dashboard shows and creates restore points.",
+  "disk.ess.wu_download.title": "Windows Update downloads",
+  "disk.ess.wu_download.body":
+    "Update packages already downloaded. Safe to remove with Cleanup › Windows Update cache.",
+  "disk.ess.installer.title": "Installer cache (Windows\\Installer)",
+  "disk.ess.installer.body":
+    "Needed to repair and uninstall programs. Do not delete by hand — uninstalling programs you do not use is the safe way to shrink it.",
+  "disk.ess.package_cache.title": "Package cache (ProgramData\\Package Cache)",
+  "disk.ess.package_cache.body":
+    "Installers for Visual Studio, runtimes and SDKs, used to repair and update. Deleting breaks uninstalls; shrink it by removing the owning program.",
   "disk.help.treemap":
     "Each rectangle is a file or folder; the area is its size on disk. Double-click to enter a folder.",
   "disk.help.essentials":
@@ -528,7 +612,6 @@ export const en = {
   "network.tools.timeout": "timed out",
   "network.tools.hop": "Hop",
   "network.tools.loss": "Loss",
-  "network.tools.tcping_soon": "TCPing (timed TCP connect) lands in the next phase.",
   "network.tools.error": "Failed: {error}",
   "network.tools.pick": "Pick your test",
   "network.tools.target": "Server IP or domain",
@@ -540,6 +623,30 @@ export const en = {
   "boost.tab.tweaks": "System tweaks",
   "boost.tab.ram": "RAM cleaner",
   "boost.tab.dns": "DNS Optimizer",
+  "boost.tab.startup": "Startup",
+  "boost.startup.title": "Apps that start with Windows",
+  "boost.startup.help":
+    "Turning an item off here does what Task Manager does: the app stays installed and its entry stays where it was — it just stops launching on its own. Turn it back on any time.",
+  "boost.startup.count": "{on} of {total} on",
+  "boost.startup.refresh": "Refresh list",
+  "boost.startup.note":
+    "Fewer apps at boot = Windows ready sooner and fewer processes fighting the game for CPU and RAM. All-users items need administrator.",
+  "boost.startup.apps": "Startup",
+  "boost.startup.empty": "No apps are set to start with Windows.",
+  "boost.startup.security": "security",
+  "boost.startup.protected":
+    "This item belongs to Windows Security and G2 Boost does not turn it off.",
+  "boost.startup.loc.user_run": "this user",
+  "boost.startup.loc.machine_run": "all users",
+  "boost.startup.loc.machine_run32": "all users (32-bit)",
+  "boost.startup.loc.user_folder": "Startup folder",
+  "boost.startup.loc.common_folder": "Startup folder (all users)",
+  "boost.procs.title": "Heaviest right now",
+  "boost.procs.help":
+    "Processes grouped by executable (e.g. chrome.exe ×24), adding up RAM and the last second of CPU. Windows components are shown for reference only.",
+  "boost.procs.system": "Windows",
+  "boost.procs.note":
+    "G2 Boost never closes processes: close the app before playing or take it out of startup.",
   "boost.presets": "System performance improvements",
   "boost.preset.default": "Default",
   "boost.preset.high": "High performance",
@@ -559,6 +666,11 @@ export const en = {
   "boost.tweak.input_lag.desc":
     "Turns off Windows fullscreen optimizations for every game (FSE), which delay frame presentation.",
   "boost.tweak.input_lag.warn": "you rely on overlays that need optimized windowed mode.",
+  "boost.tweak.windowed_optimizations": "Optimizations for windowed games",
+  "boost.tweak.windowed_optimizations.desc":
+    "DirectX 10/11 games in windowed or borderless mode use the flip model: lower latency plus VRR/Auto HDR support. Same switch as Settings › Display › Graphics (Windows 11).",
+  "boost.tweak.windowed_optimizations.warn":
+    "an old game starts flickering or stuttering in windowed mode — you can turn it off for that game alone in Settings › Display › Graphics.",
   "boost.tweak.keyboard": "Reduce keyboard input delay",
   "boost.tweak.keyboard.desc":
     "Shorter repeat delay and faster repeat rate (SystemParametersInfo).",
@@ -666,9 +778,19 @@ export const en = {
   "boost.dns.pick_fastest": "Choose the fastest",
   "boost.dns.restore": "Restore Windows default",
   "boost.dns.windows": "Windows (automatic)",
-  "boost.dns.soon":
-    "DNS measurement and switching use the Windows API (Rust) and land in the next phase.",
 
+  "boost.dns.adapter": "Adapter {name} · DNS in use: {servers} ({mode})",
+  "boost.dns.static": "set manually",
+  "boost.dns.auto": "automatic (DHCP)",
+  "boost.dns.applied": "DNS applied to {name}.",
+  "boost.dns.restored": "DNS restored to what it was before.",
+  "boost.dns.loss": "{loss}% loss",
+  "boost.dns.measuring": "Measuring…",
+  "boost.dns.timeout": "no reply",
+  "boost.dns.no_adapter": "No connected adapter.",
+  "network.monitor.gateway": "Router",
+  "network.tools.tcping_hint":
+    "Format host:port (default 443). Times the TCP handshake — works where ping (ICMP) is blocked, like game servers.",
   "settings.title": "Settings",
   "settings.subtitle": "Language, version and diagnostics",
   "settings.language": "Language",

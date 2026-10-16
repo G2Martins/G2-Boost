@@ -1,17 +1,20 @@
 import {
   ChevronRight,
   FileWarning,
+  FolderOpen,
   HardDrive,
   LayoutGrid,
   Loader2,
   Play,
+  Search,
   Square,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FILE_CLASSES, Treemap } from "@/components/disk/treemap";
+import { useErrorText } from "@/components/elevate-button";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
-  Badge,
   Button,
   Card,
   CardTitle,
@@ -24,9 +27,12 @@ import {
 import {
   type BigFile,
   backend,
+  type DiskSearch,
   type DriveInfo,
+  type Essential,
   inTauri,
   type NodeView,
+  type RecycleOutcome,
   type ScanProgressEvent,
   type ScanSummary,
 } from "@/lib/backend";
@@ -35,6 +41,8 @@ import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
 type Crumb = { ids: number[]; name: string };
+/** One thing the user picked to send to the Recycle Bin. */
+type Pick = { ids: number[]; path: string; size: number };
 
 export function DiskPage() {
   const { t, locale } = useI18n();
@@ -46,6 +54,10 @@ export function DiskPage() {
   const [view, setView] = useState<NodeView | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
   const [top, setTop] = useState<BigFile[]>([]);
+  const [folderPick, setFolderPick] = useState<Pick[] | null>(null);
+  const [folderMsg, setFolderMsg] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const errorText = useErrorText();
   const scanning = progress !== null;
   const started = useRef(false);
 
@@ -112,6 +124,15 @@ export function DiskPage() {
     if (!v) return;
     setView(v);
     setCrumbs((c) => [...c, { ids: v.ids, name: v.name }]);
+  };
+  /** After a recycle: same folder, fresh sizes; children ids changed, so re-read from the root. */
+  const refreshAfterRecycle = async (o: RecycleOutcome) => {
+    setFolderMsg(
+      t("disk.recycle.done", { count: o.recycled, size: formatBytes(o.bytes, locale) }) +
+        (o.failed ? ` ${t("disk.recycle.failed", { count: o.failed })}` : ""),
+    );
+    setVersion((v) => v + 1);
+    await loadRoot();
   };
   const jump = async (i: number) => {
     const c = crumbs[i];
@@ -222,7 +243,48 @@ export function DiskPage() {
                           ? ` · +${view.others_count} ${t("disk.others")} (${formatBytes(view.others_size, locale, 0)})`
                           : ""}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          backend.diskReveal(view.ids).catch((e) => setFolderMsg(errorText(e)))
+                        }
+                      >
+                        <FolderOpen className="size-3.5" />
+                        {t("disk.reveal")}
+                      </Button>
+                      {view.ids.length > 0 ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setFolderPick([
+                              {
+                                ids: view.ids,
+                                path: crumbs.map((c) => c.name).join("\\"),
+                                size: view.size,
+                              },
+                            ])
+                          }
+                        >
+                          <Trash2 className="size-3.5" />
+                          {t("disk.recycle")}
+                        </Button>
+                      ) : null}
                     </nav>
+                    {folderMsg ? (
+                      <p className="mb-2 text-xs text-foreground/90">{folderMsg}</p>
+                    ) : null}
+                    {folderPick ? (
+                      <RecycleConfirm
+                        picks={folderPick}
+                        onCancel={() => setFolderPick(null)}
+                        onDone={async (o) => {
+                          setFolderPick(null);
+                          await refreshAfterRecycle(o);
+                        }}
+                      />
+                    ) : null}
                     <Treemap root={view} onOpen={open} locale={locale} />
                     <p className="mt-2 text-[11px] text-muted-foreground">{t("disk.hint.open")}</p>
                   </>
@@ -244,64 +306,17 @@ export function DiskPage() {
           </TabsContent>
           <TabsContent value="largest">
             <PageBody className="px-0 pb-0">
-              <Card className="animate-rise">
-                <CardTitle>{t("disk.tab.largest")}</CardTitle>
-                {top.length ? (
-                  <table className="w-full text-xs">
-                    <thead className="text-muted-foreground">
-                      <tr className="border-b border-border">
-                        <th className="py-2 text-left font-medium">#</th>
-                        <th className="py-2 text-left font-medium">{t("disk.col.path")}</th>
-                        <th className="py-2 text-right font-medium">{t("disk.col.size")}</th>
-                        <th className="py-2 text-right font-medium">{t("disk.col.modified")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {top.map((f, i) => (
-                        <tr key={f.path} className="border-b border-border/60 last:border-0">
-                          <td className="num py-1.5 text-muted-foreground">{i + 1}</td>
-                          <td className="num max-w-[640px] truncate py-1.5" title={f.path}>
-                            {f.path}
-                          </td>
-                          <td className="num py-1.5 text-right font-semibold">
-                            {formatBytes(f.size, locale)}
-                          </td>
-                          <td className="num py-1.5 text-right text-muted-foreground">
-                            {f.mtime ? new Date(f.mtime * 1000).toLocaleDateString(locale) : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <EmptyState
-                    icon={<HardDrive className="size-5" />}
-                    title={t("disk.empty.title")}
-                    body={t("disk.empty.largest")}
-                  />
-                )}
-              </Card>
+              <FilesTab
+                hasScan={summary !== null}
+                version={version}
+                fallback={top}
+                onRecycled={refreshAfterRecycle}
+              />
             </PageBody>
           </TabsContent>
           <TabsContent value="essentials">
             <PageBody className="px-0 pb-0">
-              <Card className="animate-rise">
-                <CardTitle
-                  help={t("disk.help.essentials")}
-                  right={
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("common.soon")}
-                    </Badge>
-                  }
-                >
-                  {t("disk.tab.essentials")}
-                </CardTitle>
-                <EmptyState
-                  icon={<FileWarning className="size-5" />}
-                  title={t("common.soon")}
-                  body={t("disk.help.essentials")}
-                />
-              </Card>
+              <EssentialsTab hasScan={summary !== null} version={version} />
             </PageBody>
           </TabsContent>
         </Tabs>
@@ -405,5 +420,284 @@ function DiskBar({ free, total }: { free: number; total: number }) {
         style={{ width: `${Math.round(used * 100)}%` }}
       />
     </span>
+  );
+}
+
+/** Confirmation before the Recycle Bin: what, how much, and that Windows may still ask. */
+function RecycleConfirm({
+  picks,
+  onCancel,
+  onDone,
+}: {
+  picks: Pick[];
+  onCancel: () => void;
+  onDone: (o: RecycleOutcome) => void | Promise<void>;
+}) {
+  const { t, locale } = useI18n();
+  const errorText = useErrorText();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const total = picks.reduce((a, p) => a + p.size, 0);
+  const go = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onDone(await backend.diskRecycle(picks.map((p) => p.ids)));
+    } catch (e) {
+      setErr(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mb-3 rounded-md border border-warning/40 bg-warning/5 p-3">
+      <p className="flex items-center gap-2 text-sm font-semibold">
+        <Trash2 className="size-4 text-warning" />
+        {t("disk.recycle.confirm_title", { count: picks.length, size: formatBytes(total, locale) })}
+      </p>
+      <ul className="mt-2 space-y-0.5 text-xs">
+        {picks.slice(0, 8).map((p) => (
+          <li key={p.ids.join("/")} className="flex gap-2">
+            <span className="num min-w-0 flex-1 truncate" title={p.path}>
+              {p.path}
+            </span>
+            <span className="num text-muted-foreground">{formatBytes(p.size, locale)}</span>
+          </li>
+        ))}
+        {picks.length > 8 ? <li className="text-muted-foreground">+{picks.length - 8}</li> : null}
+      </ul>
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("disk.recycle.confirm_body")}</p>
+      {err ? <p className="mt-1 text-xs text-destructive">{err}</p> : null}
+      <div className="mt-3 flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
+          {t("common.cancel")}
+        </Button>
+        <Button variant="primary" size="sm" onClick={go} disabled={busy}>
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+          {t("disk.recycle.confirm")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const FILTER_EXAMPLES = [">1gb", "*.mp4 *.mkv", "*.iso *.zip", ">6m >500mb", "*.log"];
+
+/** Largest files, narrowed by a filter; pick rows → Recycle Bin. */
+function FilesTab({
+  hasScan,
+  version,
+  fallback,
+  onRecycled,
+}: {
+  hasScan: boolean;
+  version: number;
+  fallback: BigFile[];
+  onRecycled: (o: RecycleOutcome) => Promise<void>;
+}) {
+  const { t, locale } = useI18n();
+  const errorText = useErrorText();
+  const [query, setQuery] = useState("");
+  const [res, setRes] = useState<DiskSearch | null>(null);
+  const [picked, setPicked] = useState<Record<string, BigFile>>({});
+  const [confirm, setConfirm] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` re-runs the search after a recycle
+  useEffect(() => {
+    if (!hasScan) return;
+    const id = setTimeout(async () => {
+      setRes(await backend.diskSearch(query, 200));
+      setPicked({});
+    }, 250);
+    return () => clearTimeout(id);
+  }, [query, hasScan, version]);
+
+  const files = res?.files ?? fallback;
+  const picks = Object.values(picked);
+  const keyOf = (f: BigFile) => f.ids.join("/");
+  const toggle = (f: BigFile) =>
+    setPicked((cur) => {
+      const next = { ...cur };
+      if (next[keyOf(f)]) delete next[keyOf(f)];
+      else next[keyOf(f)] = f;
+      return next;
+    });
+
+  if (!hasScan) {
+    return (
+      <Card className="animate-rise">
+        <EmptyState
+          icon={<HardDrive className="size-5" />}
+          title={t("disk.empty.title")}
+          body={t("disk.empty.largest")}
+        />
+      </Card>
+    );
+  }
+  return (
+    <Card className="animate-rise">
+      <CardTitle help={t("disk.filter.help")}>{t("disk.tab.largest")}</CardTitle>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-w-[260px] flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 py-2 focus-within:border-ring">
+          <Search className="size-4 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("disk.filter.placeholder")}
+            className="num w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            spellCheck={false}
+            maxLength={200}
+          />
+        </label>
+        {FILTER_EXAMPLES.map((ex) => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => setQuery(ex)}
+            className="num rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {res ? (
+          <span className="num">
+            {t("disk.filter.matched", {
+              count: res.matched.toLocaleString(locale),
+              size: formatBytes(res.matched_bytes, locale),
+            })}
+          </span>
+        ) : null}
+        {picks.length > 0 ? (
+          <Button variant="primary" size="sm" className="ml-auto" onClick={() => setConfirm(true)}>
+            <Trash2 className="size-3.5" />
+            {t("disk.recycle.selected", {
+              count: picks.length,
+              size: formatBytes(
+                picks.reduce((a, f) => a + f.size, 0),
+                locale,
+              ),
+            })}
+          </Button>
+        ) : null}
+      </div>
+      {msg ? <p className="mt-2 text-xs text-foreground/90">{msg}</p> : null}
+      {confirm ? (
+        <div className="mt-3">
+          <RecycleConfirm
+            picks={picks.map((f) => ({ ids: f.ids, path: f.path, size: f.size }))}
+            onCancel={() => setConfirm(false)}
+            onDone={async (o) => {
+              setConfirm(false);
+              setMsg(
+                t("disk.recycle.done", { count: o.recycled, size: formatBytes(o.bytes, locale) }),
+              );
+              await onRecycled(o);
+            }}
+          />
+        </div>
+      ) : null}
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-muted-foreground">
+            <tr className="border-b border-border">
+              <th className="w-8 py-2" aria-label={t("disk.select")} />
+              <th className="py-2 text-left font-medium">{t("disk.col.path")}</th>
+              <th className="py-2 text-right font-medium">{t("disk.col.size")}</th>
+              <th className="py-2 text-right font-medium">{t("disk.col.modified")}</th>
+              <th className="w-10 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {files.map((f) => (
+              <tr
+                key={keyOf(f)}
+                className={cn(
+                  "border-b border-border/60 last:border-0",
+                  picked[keyOf(f)] && "bg-primary/5",
+                )}
+              >
+                <td className="py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(picked[keyOf(f)])}
+                    onChange={() => toggle(f)}
+                    aria-label={f.path}
+                    className="accent-[hsl(var(--primary))]"
+                  />
+                </td>
+                <td className="num max-w-[640px] truncate py-1.5" title={f.path}>
+                  {f.path}
+                </td>
+                <td className="num py-1.5 text-right font-semibold">
+                  {formatBytes(f.size, locale)}
+                </td>
+                <td className="num py-1.5 text-right text-muted-foreground">
+                  {f.mtime ? new Date(f.mtime * 1000).toLocaleDateString(locale) : "—"}
+                </td>
+                <td className="py-1.5 text-right">
+                  <button
+                    type="button"
+                    title={t("disk.reveal")}
+                    aria-label={t("disk.reveal")}
+                    onClick={() => backend.diskReveal(f.ids).catch((e) => setMsg(errorText(e)))}
+                    className="rounded p-1 text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                  >
+                    <FolderOpen className="size-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/** Big system items with what they are and the safe way to shrink each. */
+function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number }) {
+  const { t, locale } = useI18n();
+  const [items, setItems] = useState<Essential[] | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` refreshes sizes after a recycle
+  useEffect(() => {
+    if (hasScan) backend.diskEssentials().then((e) => setItems(e ?? []));
+  }, [hasScan, version]);
+  return (
+    <Card className="animate-rise">
+      <CardTitle help={t("disk.help.essentials")}>{t("disk.tab.essentials")}</CardTitle>
+      {!hasScan || items === null ? (
+        <EmptyState
+          icon={<FileWarning className="size-5" />}
+          title={t("disk.empty.title")}
+          body={t("disk.help.essentials")}
+        />
+      ) : items.length === 0 ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">{t("disk.ess.none")}</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {[...items]
+            .sort((a, b) => b.size - a.size)
+            .map((e) => (
+              <li key={e.id} className="py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-display text-[14px] font-semibold">
+                    {t(`disk.ess.${e.id}.title` as I18nKey)}
+                  </span>
+                  <span className="num text-[11px] text-muted-foreground">{e.path}</span>
+                  <span className="num ml-auto text-sm font-semibold">
+                    {e.size > 0 ? formatBytes(e.size, locale) : t("disk.ess.unreadable")}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t(`disk.ess.${e.id}.body` as I18nKey)}
+                </p>
+              </li>
+            ))}
+        </ul>
+      )}
+    </Card>
   );
 }

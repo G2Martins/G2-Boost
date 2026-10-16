@@ -27,7 +27,7 @@ import {
   TRUSTED_DOMAINS,
   type Turn,
 } from "@/lib/ai";
-import { backend, inTauri } from "@/lib/backend";
+import { backend, inTauri, type StartupItem } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
 import { navigate } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -336,6 +336,8 @@ export function AiPage() {
                 {t("ai.sources", { list: TRUSTED_DOMAINS.slice(0, 6).join(", ") })}
               </p>
             </Card>
+
+            <McpCard />
           </div>
 
           {/* ---------------- console ---------------- */}
@@ -451,7 +453,27 @@ function AnswerExtras({ answer }: { answer: Answer }) {
       setDone((d) => ({ ...d, [id]: errorText(e) }));
     }
   };
-  const hasActions = answer.actions.tweaks.length > 0 || answer.actions.cleanup.length > 0;
+  // Startup names from the model are matched against the live list (enabled, not protected);
+  // anything else is dropped. Rust validates the item again on click.
+  const [startup, setStartup] = useState<StartupItem[]>([]);
+  useEffect(() => {
+    if (answer.actions.startup.length === 0) return;
+    backend.startupList().then((list) => {
+      const wanted = new Set(answer.actions.startup);
+      setStartup((list ?? []).filter((i) => wanted.has(i.name) && i.enabled && !i.protected));
+    });
+  }, [answer.actions.startup]);
+  const disableStartup = async (it: StartupItem) => {
+    const k = `startup:${it.location}:${it.name}`;
+    try {
+      await backend.startupSet(it.location, it.name, false);
+      setDone((d) => ({ ...d, [k]: t("ai.action.startup_done") }));
+    } catch (e) {
+      setDone((d) => ({ ...d, [k]: errorText(e) }));
+    }
+  };
+  const hasActions =
+    answer.actions.tweaks.length > 0 || answer.actions.cleanup.length > 0 || startup.length > 0;
   return (
     <>
       {hasActions ? (
@@ -481,6 +503,31 @@ function AnswerExtras({ answer }: { answer: Answer }) {
                       onClick={() => apply(id)}
                     >
                       {t("common.apply")}
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+            {startup.map((it) => {
+              const k = `startup:${it.location}:${it.name}`;
+              return (
+                <li key={k} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span>{t("ai.action.startup", { name: it.name })}</span>
+                  {it.needs_admin ? (
+                    <Badge className="bg-card-hover text-muted-foreground">
+                      {t("common.admin_required")}
+                    </Badge>
+                  ) : null}
+                  {done[k] ? (
+                    <span className="ml-auto text-xs text-muted-foreground">{done[k]}</span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      onClick={() => disableStartup(it)}
+                    >
+                      {t("ai.action.startup_off")}
                     </Button>
                   )}
                 </li>
@@ -518,5 +565,42 @@ function AnswerExtras({ answer }: { answer: Answer }) {
         </div>
       ) : null}
     </>
+  );
+}
+
+/** How to plug this PC into Claude Desktop / Claude Code: the app binary serves MCP with `--mcp`. */
+function McpCard() {
+  const { t } = useI18n();
+  const [exe, setExe] = useState<string | null>(null);
+  useEffect(() => {
+    backend.appInfo().then((i) => setExe(i?.exe ?? null));
+  }, []);
+  const path = exe ?? "C:\\…\\G2 Boost.exe";
+  const cli = `claude mcp add g2boost -- "${path}" --mcp`;
+  const desktop = JSON.stringify(
+    { mcpServers: { g2boost: { command: path, args: ["--mcp"] } } },
+    null,
+    2,
+  );
+  return (
+    <Card className="animate-rise" style={rise(2)}>
+      <CardTitle help={t("ai.mcp.hint")}>
+        <Bot className="size-4" />
+        {t("ai.mcp.title")}
+      </CardTitle>
+      <p className="text-xs text-muted-foreground">{t("ai.mcp.body")}</p>
+      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Claude Code
+      </p>
+      <pre className="mt-1 overflow-x-auto rounded-md border border-border bg-background/70 p-2 font-mono text-[10px] text-foreground/90">
+        {cli}
+      </pre>
+      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Claude Desktop · claude_desktop_config.json
+      </p>
+      <pre className="mt-1 overflow-x-auto rounded-md border border-border bg-background/70 p-2 font-mono text-[10px] text-foreground/90">
+        {desktop}
+      </pre>
+    </Card>
   );
 }

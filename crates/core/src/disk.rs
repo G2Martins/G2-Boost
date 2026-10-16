@@ -206,31 +206,345 @@ pub struct BigFile {
     pub size: u64,
     pub path: String,
     pub mtime: u64,
+    /// Index path in the scan tree (for reveal / recycle).
+    pub ids: Vec<u32>,
 }
 
-/// Largest `n` files anywhere under `root` (min-heap, one pass).
-pub fn top_files(root: &Node, n: usize) -> Vec<BigFile> {
-    let mut heap: BinaryHeap<std::cmp::Reverse<BigFile>> = BinaryHeap::with_capacity(n + 1);
-    fn rec(node: &Node, prefix: &str, heap: &mut BinaryHeap<std::cmp::Reverse<BigFile>>, n: usize) {
-        for c in &node.children {
-            let path = if prefix.is_empty() { c.name.clone() } else { format!("{prefix}\\{}", c.name) };
-            if c.is_dir {
-                rec(c, &path, heap, n);
-            } else {
-                if heap.len() == n && heap.peek().is_some_and(|r| r.0.size >= c.size) {
-                    continue;
-                }
-                heap.push(std::cmp::Reverse(BigFile { size: c.size, path, mtime: c.mtime }));
-                if heap.len() > n {
-                    heap.pop();
-                }
+/// Filter typed in the UI. Tokens are AND-ed, extensions OR-ed:
+/// `*.mp4 .mkv` extension · `>1gb` / `<200mb` size · `>6m` / `<7d` age (d, w, m, y) · `word` name contains.
+#[derive(Debug, Default, PartialEq)]
+pub struct Filter {
+    pub exts: Vec<String>,
+    pub min_bytes: u64,
+    pub max_bytes: Option<u64>,
+    pub older_than_s: Option<u64>,
+    pub newer_than_s: Option<u64>,
+    pub contains: Vec<String>,
+}
+
+fn size_unit(u: &str) -> Option<u64> {
+    Some(match u {
+        "b" => 1,
+        "k" | "kb" => 1 << 10,
+        "m" | "mb" => 1 << 20,
+        "g" | "gb" => 1 << 30,
+        "t" | "tb" => 1 << 40,
+        _ => return None,
+    })
+}
+
+fn age_unit(u: &str) -> Option<u64> {
+    Some(match u {
+        "d" => 86_400,
+        "w" => 7 * 86_400,
+        "mo" | "m" => 30 * 86_400,
+        "y" => 365 * 86_400,
+        _ => return None,
+    })
+}
+
+pub fn parse_filter(q: &str) -> Filter {
+    let mut f = Filter::default();
+    for tok in q.split_whitespace().map(str::to_ascii_lowercase) {
+        if let Some(ext) = tok.strip_prefix("*.").or_else(|| tok.strip_prefix('.')) {
+            if !ext.is_empty() {
+                f.exts.push(ext.to_string());
             }
+            continue;
+        }
+        let (op, rest) = match tok.as_bytes().first() {
+            Some(b'>') => ('>', &tok[1..]),
+            Some(b'<') => ('<', &tok[1..]),
+            _ => {
+                f.contains.push(tok.clone());
+                continue;
+            }
+        };
+        let split = rest.find(|c: char| !(c.is_ascii_digit() || c == '.')).unwrap_or(rest.len());
+        let (num, unit) = rest.split_at(split);
+        let Ok(n) = num.parse::<f64>() else { continue };
+        // "m" alone means months (sizes use "mb"), so `>6m` is age and `>6mb` is size.
+        if unit != "m"
+            && let Some(mul) = size_unit(unit)
+        {
+            let v = (n * mul as f64) as u64;
+            if op == '>' { f.min_bytes = v } else { f.max_bytes = Some(v) }
+        } else if let Some(mul) = age_unit(unit) {
+            let v = (n * mul as f64) as u64;
+            if op == '>' { f.older_than_s = Some(v) } else { f.newer_than_s = Some(v) }
         }
     }
-    rec(root, &root.name, &mut heap, n);
-    let mut out: Vec<BigFile> = heap.into_iter().map(|r| r.0).collect();
-    out.sort_by_key(|a| std::cmp::Reverse(a.size));
-    out
+    f
+}
+
+impl Filter {
+    pub fn matches(&self, name: &str, size: u64, mtime: u64, now: u64) -> bool {
+        let lower = name.to_ascii_lowercase();
+        let age = now.saturating_sub(mtime);
+        (self.exts.is_empty() || lower.rsplit_once('.').is_some_and(|(_, e)| self.exts.iter().any(|x| x == e)))
+            && size >= self.min_bytes
+            && self.max_bytes.is_none_or(|m| size <= m)
+            && self.older_than_s.is_none_or(|s| mtime > 0 && age >= s)
+            && self.newer_than_s.is_none_or(|s| mtime > 0 && age <= s)
+            && self.contains.iter().all(|c| lower.contains(c.as_str()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchResult {
+    /// Largest matches first (at most `n`).
+    pub files: Vec<BigFile>,
+    pub matched: u64,
+    pub matched_bytes: u64,
+}
+
+/// Files under `root` matching `f`: totals for all of them, the largest `n` listed (min-heap, one pass).
+pub fn search(root: &Node, f: &Filter, now: u64, n: usize) -> SearchResult {
+    struct Acc<'a> {
+        f: &'a Filter,
+        now: u64,
+        n: usize,
+        heap: BinaryHeap<std::cmp::Reverse<BigFile>>,
+        matched: u64,
+        bytes: u64,
+    }
+    fn rec(node: &Node, prefix: &str, ids: &mut Vec<u32>, acc: &mut Acc) {
+        for (i, c) in node.children.iter().enumerate() {
+            ids.push(i as u32);
+            if c.is_dir {
+                rec(c, &format!("{prefix}\\{}", c.name), ids, acc);
+            } else if acc.f.matches(&c.name, c.size, c.mtime, acc.now) {
+                acc.matched += 1;
+                acc.bytes += c.size;
+                if acc.heap.len() < acc.n || acc.heap.peek().is_some_and(|r| r.0.size < c.size) {
+                    let path = format!("{prefix}\\{}", c.name);
+                    acc.heap.push(std::cmp::Reverse(BigFile { size: c.size, path, mtime: c.mtime, ids: ids.clone() }));
+                    if acc.heap.len() > acc.n {
+                        acc.heap.pop();
+                    }
+                }
+            }
+            ids.pop();
+        }
+    }
+    let mut acc = Acc { f, now, n, heap: BinaryHeap::with_capacity(n + 1), matched: 0, bytes: 0 };
+    rec(root, &root.name, &mut Vec::new(), &mut acc);
+    let mut files: Vec<BigFile> = acc.heap.into_iter().map(|r| r.0).collect();
+    files.sort_by_key(|a| std::cmp::Reverse(a.size));
+    SearchResult { files, matched: acc.matched, matched_bytes: acc.bytes }
+}
+
+/// Largest `n` files anywhere under `root`.
+pub fn top_files(root: &Node, n: usize) -> Vec<BigFile> {
+    search(root, &Filter::default(), 0, n).files
+}
+
+/// Absolute path of the node at `ids` (the root node's name is the scanned path).
+pub fn path_of(root: &Node, ids: &[u32]) -> Option<PathBuf> {
+    let mut s = root.name.clone();
+    let mut n = root;
+    for &i in ids {
+        n = n.children.get(i as usize)?;
+        s.push('\\');
+        s.push_str(&n.name);
+    }
+    Some(PathBuf::from(if ids.is_empty() && s.ends_with(':') { format!("{s}\\") } else { s }))
+}
+
+/// Big system items people find in SpaceSniffer and wonder about, as paths relative to the
+/// scanned drive root. The UI explains each one and points to the safe way to shrink it.
+pub const ESSENTIALS: &[(&str, &str)] = &[
+    ("pagefile", "pagefile.sys"),
+    ("hiberfil", "hiberfil.sys"),
+    ("swapfile", "swapfile.sys"),
+    ("winsxs", r"Windows\WinSxS"),
+    ("windows_old", "Windows.old"),
+    ("recycle_bin", "$Recycle.Bin"),
+    ("restore_points", "System Volume Information"),
+    ("wu_download", r"Windows\SoftwareDistribution\Download"),
+    ("installer", r"Windows\Installer"),
+    ("package_cache", r"ProgramData\Package Cache"),
+];
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Essential {
+    pub id: &'static str,
+    pub path: String,
+    pub size: u64,
+}
+
+/// Which [`ESSENTIALS`] exist under `root` and how big they are (0 = present but unreadable).
+pub fn essentials(root: &Node) -> Vec<Essential> {
+    ESSENTIALS
+        .iter()
+        .filter_map(|(id, rel)| {
+            let mut n = root;
+            for part in rel.split('\\') {
+                n = n.children.iter().find(|c| c.name.eq_ignore_ascii_case(part))?;
+            }
+            Some(Essential { id, path: format!("{}\\{rel}", root.name), size: n.size })
+        })
+        .collect()
+}
+
+/* ---------------- reveal + recycle ---------------- */
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum RecycleError {
+    #[error("not_found")]
+    NotFound,
+    /// System folders, other users' profiles, drive/profile roots, junctions.
+    #[error("protected_path")]
+    Protected,
+    #[error("shell error {0}")]
+    Shell(i32),
+}
+
+/// May the user send `p` to the Recycle Bin from the treemap? Pure, so it is tested.
+pub(crate) fn recyclable(p: &Path, windows_dir: &Path, profile: &Path) -> bool {
+    let Ok(safe) = crate::safety::SafePath::classify(p, windows_dir, profile) else {
+        return false;
+    };
+    if !matches!(safe.class(), crate::safety::PathClass::UserProfile | crate::safety::PathClass::Other) {
+        return false;
+    }
+    let l = p.to_string_lossy().trim_end_matches('\\').to_ascii_lowercase();
+    let prof = profile.to_string_lossy().trim_end_matches('\\').to_ascii_lowercase();
+    // Roots whose loss breaks the machine or the account; what lives below them is fine.
+    let roots = [
+        prof.clone(),
+        format!(r"{prof}\appdata"),
+        format!(r"{prof}\appdata\local"),
+        format!(r"{prof}\appdata\roaming"),
+        format!(r"{prof}\appdata\locallow"),
+    ];
+    let drive_root = l.len() <= 2;
+    let program_files = l.len() > 3 && matches!(&l[3..], "program files" | "program files (x86)" | "users" | "programdata");
+    !(drive_root || program_files || roots.contains(&l))
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecycleOutcome {
+    pub recycled: u32,
+    pub bytes: u64,
+    pub failed: u32,
+}
+
+fn is_reparse(md: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    md.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+/// Detach the node at `ids` and subtract its size/count from every ancestor.
+fn remove(n: &mut Node, ids: &[u32]) -> Option<Node> {
+    let (&first, rest) = ids.split_first()?;
+    let gone = if rest.is_empty() {
+        if first as usize >= n.children.len() {
+            return None;
+        }
+        n.children.remove(first as usize)
+    } else {
+        remove(n.children.get_mut(first as usize)?, rest)?
+    };
+    n.size = n.size.saturating_sub(gone.size);
+    n.files = n.files.saturating_sub(gone.files);
+    Some(gone)
+}
+
+/// Send the selected nodes to the Recycle Bin. The user picked them in the treemap and confirmed
+/// in the app; Windows itself asks before anything too big for the Bin is deleted for good.
+pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome, RecycleError> {
+    use windows::Win32::UI::Shell::{FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
+    use windows::core::PCWSTR;
+
+    // Drop entries nested inside another selected entry; deepest/last first keeps ids valid while removing.
+    let mut sel: Vec<Vec<u32>> = selection.to_vec();
+    sel.sort();
+    sel.dedup();
+    let sel: Vec<Vec<u32>> = sel.iter().filter(|s| !sel.iter().any(|o| o.len() < s.len() && s.starts_with(o))).cloned().collect();
+    if sel.is_empty() {
+        return Err(RecycleError::NotFound);
+    }
+    let win = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let profile = crate::cleanup::env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
+    let mut paths = Vec::with_capacity(sel.len());
+    for ids in &sel {
+        let p = path_of(root, ids).ok_or(RecycleError::NotFound)?;
+        let md = fs::symlink_metadata(&p).map_err(|_| RecycleError::NotFound)?;
+        if ids.is_empty() || is_reparse(&md) || !recyclable(&p, &win, &profile) {
+            return Err(RecycleError::Protected);
+        }
+        paths.push(p);
+    }
+    let t0 = Instant::now();
+    // Double-NUL-terminated list.
+    let mut from: Vec<u16> = Vec::new();
+    for p in &paths {
+        use std::os::windows::ffi::OsStrExt;
+        from.extend(p.as_os_str().encode_wide());
+        from.push(0);
+    }
+    from.push(0);
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: PCWSTR(from.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMATION.0 | FOF_WANTNUKEWARNING.0) as u16,
+        ..Default::default()
+    };
+    // SAFETY: `from` outlives the call; the struct is fully initialised.
+    let rc = unsafe { SHFileOperationW(&mut op) };
+    // Whatever is gone now was recycled (some items may be in use or the user cancelled).
+    let mut out = RecycleOutcome { recycled: 0, bytes: 0, failed: 0 };
+    let mut order: Vec<(usize, &Vec<u32>)> = sel.iter().enumerate().collect();
+    order.sort_by(|a, b| b.1.cmp(a.1));
+    for (i, ids) in order {
+        if fs::symlink_metadata(&paths[i]).is_err() {
+            if let Some(n) = remove(root, ids) {
+                out.recycled += 1;
+                out.bytes += n.size;
+            }
+        } else {
+            out.failed += 1;
+        }
+    }
+    if out.recycled > 0 {
+        crate::cleanup::record_run(&crate::cleanup::RunRecord {
+            at: crate::registry::now_unix(),
+            trigger: "disk_recycle".into(),
+            duration_ms: t0.elapsed().as_millis() as u64,
+            items: vec![crate::cleanup::ExecItem {
+                id: "disk_recycle".into(),
+                bytes_freed: out.bytes,
+                files_deleted: u64::from(out.recycled),
+                skipped: u64::from(out.failed),
+                error: None,
+            }],
+        });
+    }
+    if rc != 0 && out.recycled == 0 && !op.fAnyOperationsAborted.as_bool() {
+        return Err(RecycleError::Shell(rc));
+    }
+    Ok(out)
+}
+
+/// Open Explorer with the item selected (shell API, no `explorer.exe` spawn).
+pub fn reveal(p: &Path) -> Result<(), RecycleError> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::Common::ITEMIDLIST;
+    use windows::Win32::UI::Shell::{SHOpenFolderAndSelectItems, SHParseDisplayName};
+    use windows::core::PCWSTR;
+
+    fs::symlink_metadata(p).map_err(|_| RecycleError::NotFound)?;
+    let _com = crate::tasksched::Com::init().map_err(|_| RecycleError::Shell(-1))?;
+    let w = crate::registry::wide(&p.to_string_lossy());
+    let mut pidl: *mut ITEMIDLIST = std::ptr::null_mut();
+    // SAFETY: NUL-terminated path; the PIDL is freed with CoTaskMemFree as documented.
+    unsafe {
+        SHParseDisplayName(PCWSTR(w.as_ptr()), None, &mut pidl, 0, None).map_err(|e| RecycleError::Shell(e.code().0))?;
+        let r = SHOpenFolderAndSelectItems(pidl, None, 0);
+        CoTaskMemFree(Some(pidl as *const std::ffi::c_void));
+        r.map_err(|e| RecycleError::Shell(e.code().0))
+    }
 }
 
 #[cfg(test)]
@@ -275,6 +589,103 @@ mod tests {
         assert_eq!(top.len(), 2);
         assert!(top[0].path.ends_with("a\\deep\\two.bin"));
         assert_eq!(top[1].size, 3000);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn filter_syntax() {
+        let f = parse_filter("*.MP4 .mkv >1gb <6m clip");
+        assert_eq!(f.exts, vec!["mp4", "mkv"]);
+        assert_eq!(f.min_bytes, 1 << 30);
+        assert_eq!(f.newer_than_s, Some(6 * 30 * 86_400));
+        assert_eq!(f.contains, vec!["clip"]);
+        let now = 1_000_000_000;
+        assert!(f.matches("My Clip.mp4", 2 << 30, now - 86_400, now));
+        assert!(!f.matches("My Clip.mp4", 100, now - 86_400, now), "too small");
+        assert!(!f.matches("My Clip.avi", 2 << 30, now - 86_400, now), "wrong extension");
+        assert!(!f.matches("other.mp4", 2 << 30, now - 86_400, now), "name");
+        let old = parse_filter(">1y <500mb");
+        assert_eq!((old.older_than_s, old.max_bytes), (Some(365 * 86_400), Some(500 << 20)));
+        assert!(old.matches("a.log", 10, now - 400 * 86_400, now));
+        assert!(!old.matches("a.log", 10, 0, now), "unknown mtime never counts as old");
+        assert_eq!(parse_filter(">6mb").min_bytes, 6 << 20);
+        assert_eq!(parse_filter(">abc"), Filter::default());
+    }
+
+    #[test]
+    fn search_paths_and_removal() {
+        let dir = sandbox("search");
+        let p = ScanProgress::default();
+        let (mut tree, _) = scan(&dir, &p, &AtomicBool::new(false)).unwrap();
+        let r = search(&tree, &parse_filter(".bin >2000b"), 0, 10);
+        assert_eq!((r.matched, r.matched_bytes), (2, 8000));
+        assert_eq!(r.files[0].ids, vec![0, 0, 0]); // a/deep/two.bin
+        assert_eq!(path_of(&tree, &r.files[0].ids).unwrap(), dir.join(r"a\deep\two.bin"));
+        let gone = remove(&mut tree, &[0, 0]).unwrap(); // a/deep
+        assert_eq!(gone.size, 5000);
+        assert_eq!((tree.size, tree.files), (4100, 3));
+        assert_eq!(tree.children[0].size, 3000);
+        assert!(remove(&mut tree, &[9]).is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn essentials_found_by_relative_path() {
+        let leaf = |name: &str, size: u64| Node { name: name.into(), size, is_dir: false, files: 1, mtime: 0, children: vec![] };
+        let dir = |name: &str, children: Vec<Node>| Node {
+            name: name.into(),
+            size: children.iter().map(|c| c.size).sum(),
+            is_dir: true,
+            files: children.len() as u64,
+            mtime: 0,
+            children,
+        };
+        let root = dir("C:", vec![leaf("pagefile.sys", 8 << 30), dir("Windows", vec![dir("WinSxS", vec![leaf("x", 7 << 30)])])]);
+        let e = essentials(&root);
+        assert_eq!(e.len(), 2);
+        assert_eq!((e[0].id, e[0].size), ("pagefile", 8 << 30));
+        assert_eq!((e[1].id, e[1].path.as_str()), ("winsxs", r"C:\Windows\WinSxS"));
+    }
+
+    #[test]
+    fn recycle_guard() {
+        let win = Path::new(r"C:\Windows");
+        let prof = Path::new(r"C:\Users\me");
+        for ok in [r"C:\Users\me\Downloads\big.iso", r"C:\Users\me\AppData\Local\Temp\x", r"D:\Games\Old", r"C:\Program Files (x86)\Steam\steamapps\common\Old"] {
+            assert!(recyclable(Path::new(ok), win, prof), "{ok}");
+        }
+        for no in [
+            r"C:\", r"C:", r"D:\", r"C:\Windows\Temp", r"C:\Windows\System32\x.dll", r"C:\Users\other\Desktop\a.txt",
+            r"C:\Users\me", r"C:\Users\me\AppData", r"C:\Users\me\AppData\Local", r"C:\Program Files", r"C:\ProgramData\x",
+            r"C:\Users", r"\\server\share\x", r"C:\Users\me\..\other",
+        ] {
+            assert!(!recyclable(Path::new(no), win, prof), "{no}");
+        }
+    }
+
+    #[test]
+    fn recycle_refuses_root_and_unknown_ids() {
+        let dir = sandbox("refuse");
+        let p = ScanProgress::default();
+        let (mut tree, _) = scan(&dir, &p, &AtomicBool::new(false)).unwrap();
+        assert_eq!(recycle(&mut tree, &[vec![]]).unwrap_err(), RecycleError::Protected);
+        assert_eq!(recycle(&mut tree, &[vec![42]]).unwrap_err(), RecycleError::NotFound);
+        assert_eq!(recycle(&mut tree, &[]).unwrap_err(), RecycleError::NotFound);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Real Recycle Bin round trip on a throwaway file (manual: `cargo test -- --ignored recycle_live`).
+    #[test]
+    #[ignore]
+    fn recycle_live() {
+        // SAFETY: same override every data-dir test in this crate uses (keeps the real history clean).
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
+        let dir = sandbox("live");
+        let p = ScanProgress::default();
+        let (mut tree, _) = scan(&dir, &p, &AtomicBool::new(false)).unwrap();
+        let out = recycle(&mut tree, &[vec![2], vec![0, 1]]).unwrap(); // root.bin + a/one.bin
+        assert_eq!((out.recycled, out.bytes, out.failed), (2, 3100, 0));
+        assert!(!dir.join("root.bin").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -10,7 +10,7 @@ use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, WIN32_ERRO
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_BINARY, REG_DWORD, REG_EXPAND_SZ,
     REG_OPTION_NON_VOLATILE, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegCreateKeyExW, RegDeleteValueW,
-    RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+    RegEnumKeyExW, RegEnumValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -197,6 +197,27 @@ pub fn subkeys(root: Root, path: &str) -> Result<Vec<String>, RegError> {
         let mut len = buf.len() as u32;
         // SAFETY: buffer of `len` UTF-16 units; the call writes at most that.
         let e = unsafe { RegEnumKeyExW(key.0, i, Some(PWSTR(buf.as_mut_ptr())), &mut len, None, None, None, None) };
+        if e == WIN32_ERROR(ERROR_NO_MORE_ITEMS) {
+            break;
+        }
+        check(e)?;
+        out.push(String::from_utf16_lossy(&buf[..len as usize]));
+    }
+    Ok(out)
+}
+
+/// Every value name under a key (Run keys, StartupApproved…). Missing key → empty.
+/// Values are read through [`read`] so the type handling stays in one place.
+pub fn value_names(root: Root, path: &str) -> Result<Vec<String>, RegError> {
+    let Some(key) = open(root, path, KEY_READ)? else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    let mut buf = vec![0u16; 16_384]; // max value name length is 16 383 chars
+    for i in 0.. {
+        let mut len = buf.len() as u32;
+        // SAFETY: name buffer of `len` UTF-16 units; data not requested.
+        let e = unsafe { RegEnumValueW(key.0, i, Some(PWSTR(buf.as_mut_ptr())), &mut len, None, None, None, None) };
         if e == WIN32_ERROR(ERROR_NO_MORE_ITEMS) {
             break;
         }

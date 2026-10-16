@@ -71,6 +71,7 @@ export const TWEAKS: Tweak[] = [
   { id: "visual_fx", presets: ["default", "high"] },
   { id: "game_mode", presets: ["default", "high"] },
   { id: "input_lag", presets: ["default", "high"] },
+  { id: "windowed_optimizations", presets: ["default", "high"] },
   { id: "keyboard", presets: ["default", "high"] },
   { id: "mouse", presets: ["high"] },
   { id: "tips", presets: ["default", "high"] },
@@ -105,18 +106,3 @@ export const reasonKey = (r: string) => `boost.reason.${r}` as I18nKey;
 export const tweakName = (id: string) => `boost.tweak.${id}` as I18nKey;
 export const tweakDesc = (id: string) => `boost.tweak.${id}.desc` as I18nKey;
 export const tweakWarn = (id: string) => `boost.tweak.${id}.warn` as I18nKey;
-
-/* ---------- DNS providers (same 10 ExitLag ships). ---------- */
-export type DnsProvider = { id: string; name: string; primary: string; secondary: string };
-export const DNS_PROVIDERS: DnsProvider[] = [
-  { id: "cloudflare", name: "Cloudflare", primary: "1.1.1.1", secondary: "1.0.0.1" },
-  { id: "quad9", name: "Quad9", primary: "9.9.9.9", secondary: "149.112.112.112" },
-  { id: "google", name: "Google", primary: "8.8.8.8", secondary: "8.8.4.4" },
-  { id: "nextdns", name: "NextDNS", primary: "45.90.28.0", secondary: "45.90.30.0" },
-  { id: "opendns", name: "OpenDNS", primary: "208.67.222.222", secondary: "208.67.220.220" },
-  { id: "controld", name: "Control D", primary: "76.76.2.0", secondary: "76.76.10.0" },
-  { id: "adguard", name: "AdGuard", primary: "94.140.14.14", secondary: "94.140.15.15" },
-  { id: "verisign", name: "Verisign", primary: "64.6.64.6", secondary: "64.6.65.6" },
-  { id: "comodo", name: "Comodo", primary: "8.26.56.26", secondary: "8.20.247.20" },
-  { id: "neustar", name: "Neustar", primary: "156.154.70.5", secondary: "156.154.71.5" },
-];

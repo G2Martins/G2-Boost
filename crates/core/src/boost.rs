@@ -144,6 +144,8 @@ enum Kind {
     VisualFx,
     /// Scheduled tasks (folder, name) to disable — e.g. the Compatibility Appraiser.
     Tasks(&'static [(&'static str, &'static str)]),
+    /// One `Key=1;` flag inside `DirectXUserGlobalSettings` (Settings › Display › Graphics).
+    DxFlag(&'static str),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -173,6 +175,41 @@ const CDM: &str = r"Software\Microsoft\Windows\CurrentVersion\ContentDeliveryMan
 const MM_PROFILE: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
 const MM_GAMES: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
 const TCP_INTERFACES: &str = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+
+const DX_PREFS: &str = r"Software\Microsoft\DirectX\UserGpuPreferences";
+const DX_GLOBAL: &str = "DirectXUserGlobalSettings";
+
+/// `DirectXUserGlobalSettings` holds `Key=Value;` pairs shared with Auto HDR and VRR:
+/// change one key, keep the others.
+pub(crate) fn dx_set(current: &str, key: &str, value: Option<&str>) -> String {
+    let mut out: String = current
+        .split(';')
+        .filter(|kv| !kv.is_empty() && kv.split('=').next() != Some(key))
+        .map(|kv| format!("{kv};"))
+        .collect();
+    if let Some(v) = value {
+        out.push_str(&format!("{key}={v};"));
+    }
+    out
+}
+
+pub(crate) fn dx_get<'a>(current: &'a str, key: &str) -> Option<&'a str> {
+    current.split(';').find_map(|kv| kv.split_once('=').filter(|(k, _)| *k == key).map(|(_, v)| v))
+}
+
+fn dx_read() -> Result<String, BoostError> {
+    Ok(match registry::read(HKCU, DX_PREFS, DX_GLOBAL)? {
+        Value::Str(s) => s,
+        _ => String::new(),
+    })
+}
+
+fn dx_write(key: &str, value: Option<&str>) -> Result<(), BoostError> {
+    let next = dx_set(&dx_read()?, key, value);
+    let v = if next.is_empty() { Value::Absent } else { Value::Str(next) };
+    registry::write(HKCU, DX_PREFS, DX_GLOBAL, &v)?;
+    Ok(())
+}
 
 const fn op(root: Root, path: &'static str, name: &'static str, on: Desired, off: Desired) -> RegOp {
     RegOp { root, path, name, on, off }
@@ -299,6 +336,7 @@ pub const TWEAKS: &[Tweak] = &[
     tw("visual_fx", false, false, Appearance, Kind::VisualFx),
     tw("game_mode", false, false, Performance, Kind::Registry(GAME_MODE)),
     tw("input_lag", false, false, Performance, Kind::Registry(INPUT_LAG)),
+    tw("windowed_optimizations", false, false, Performance, Kind::DxFlag("SwapEffectUpgradeEnable")),
     tw("keyboard", false, false, Performance, Kind::Keyboard),
     tw("mouse", false, false, Performance, Kind::Mouse),
     tw("tips", false, false, Privacy, Kind::Registry(TIPS)),
@@ -475,6 +513,11 @@ pub fn detect(t: &Tweak) -> TweakState {
             }
             st.status = status_of(disabled, total);
         }
+        Kind::DxFlag(key) => {
+            if let Ok(s) = dx_read() {
+                st.status = if dx_get(&s, key) == Some("1") { Status::On } else { Status::Off };
+            }
+        }
     }
     st
 }
@@ -610,6 +653,8 @@ fn capture(t: &Tweak) -> Result<Vec<BackupEntry>, BoostError> {
             }
             out
         }
+        // The whole string: revert restores Auto HDR / VRR flags exactly as they were.
+        Kind::DxFlag(_) => vec![entry(DX_PREFS, DX_GLOBAL, registry::read(HKCU, DX_PREFS, DX_GLOBAL)?)],
     })
 }
 
@@ -650,6 +695,7 @@ fn apply_on(t: &Tweak) -> Result<(), BoostError> {
                 tasksched::set_task_enabled(folder, name, false)?;
             }
         }
+        Kind::DxFlag(key) => dx_write(key, Some("1"))?,
         Kind::VisualFx => unreachable!("handled by apply_visual_fx"),
     }
     Ok(())
@@ -689,6 +735,7 @@ fn apply_default(t: &Tweak) -> Result<(), BoostError> {
                 tasksched::set_task_enabled(folder, name, true)?;
             }
         }
+        Kind::DxFlag(key) => dx_write(key, None)?,
         Kind::VisualFx => unreachable!("handled by revert_visual_fx"),
     }
     Ok(())
@@ -1050,6 +1097,19 @@ mod tests {
         op(HKCU, TEST_PATH, "beta", Desired::Str("on"), Desired::Absent),
     ];
     const TEST_TWEAK: Tweak = tw("unit_test_tweak", false, false, Performance, Kind::Registry(TEST_OPS));
+
+    #[test]
+    fn dx_flags_keep_other_keys() {
+        let cur = "AutoHDREnable=1;SwapEffectUpgradeEnable=0;VRROptimizeEnable=0;";
+        let on = dx_set(cur, "SwapEffectUpgradeEnable", Some("1"));
+        assert_eq!(on, "AutoHDREnable=1;VRROptimizeEnable=0;SwapEffectUpgradeEnable=1;");
+        assert_eq!(dx_get(&on, "SwapEffectUpgradeEnable"), Some("1"));
+        assert_eq!(dx_get(&on, "AutoHDREnable"), Some("1"));
+        assert_eq!(dx_set(&on, "SwapEffectUpgradeEnable", None), "AutoHDREnable=1;VRROptimizeEnable=0;");
+        assert_eq!(dx_set("", "SwapEffectUpgradeEnable", None), "");
+        assert_eq!(dx_set("", "SwapEffectUpgradeEnable", Some("1")), "SwapEffectUpgradeEnable=1;");
+        assert_eq!(dx_get("SwapEffectUpgradeEnableX=1;", "SwapEffectUpgradeEnable"), None);
+    }
 
     #[test]
     fn detect_all_reports_every_tweak_without_admin() {

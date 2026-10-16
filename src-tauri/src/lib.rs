@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, context, secrets, steam};
+use g2boost_core::{advisor, context, dns, firmware, procs, secrets, sensors, startup, steam};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -61,6 +61,8 @@ struct AppInfo {
     autorun: bool,
     /// `G2BOOST_SCAN_PATH`: root the disk page scans on autorun (defaults to the first drive).
     scan_path: Option<String>,
+    /// This executable (shown in the MCP registration hint).
+    exe: String,
 }
 
 #[tauri::command]
@@ -75,6 +77,7 @@ fn app_info() -> AppInfo {
         start_tab: std::env::var("G2BOOST_START_TAB").ok(),
         autorun: std::env::var("G2BOOST_AUTORUN").is_ok_and(|v| v == "1"),
         scan_path: std::env::var("G2BOOST_SCAN_PATH").ok(),
+        exe: std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
     }
 }
 
@@ -356,12 +359,11 @@ async fn advisor_report(state: State<'_, Dashboard>) -> Result<advisor::Report, 
     tauri::async_runtime::spawn_blocking(move || {
         let p = cached.unwrap_or_else(hardware::profile);
         let sat = winsat::last().ok();
-        let drv = p.gpus.first().and_then(|g| g.driver.clone());
         let sample = Monitor::new().map(|mut m| {
             std::thread::sleep(Duration::from_millis(800));
             m.sample()
         });
-        advisor::analyze(&p, &advisor::env(sample, sat, drv.as_deref()))
+        advisor::analyze(&p, &advisor::env(&p, sample, sat))
     })
     .await
     .map_err(|e| e.to_string())
@@ -632,6 +634,56 @@ fn disk_top_files(state: State<'_, DiskState>, n: u32) -> Vec<BigFile> {
     disk::top_files(&tree, (n as usize).clamp(1, 500))
 }
 
+/// Filtered file list (`*.mp4 >1gb >6m`), largest first.
+#[tauri::command]
+async fn disk_search(state: State<'_, DiskState>, query: String, n: u32) -> Result<Option<disk::SearchResult>, String> {
+    let Some(tree) = state.tree.lock().unwrap().clone() else {
+        return Ok(None);
+    };
+    let q: String = query.chars().take(200).collect();
+    tauri::async_runtime::spawn_blocking(move || {
+        Some(disk::search(&tree, &disk::parse_filter(&q), g2boost_core::registry::now_unix(), (n as usize).clamp(1, 500)))
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn disk_essentials(state: State<'_, DiskState>) -> Vec<disk::Essential> {
+    state.tree.lock().unwrap().clone().map(|t| disk::essentials(&t)).unwrap_or_default()
+}
+
+#[tauri::command]
+async fn disk_reveal(state: State<'_, DiskState>, ids: Vec<u32>) -> Result<(), String> {
+    let tree = state.tree.lock().unwrap().clone().ok_or("no_scan")?;
+    let p = disk::path_of(&tree, &ids).ok_or("not_found")?;
+    tauri::async_runtime::spawn_blocking(move || disk::reveal(&p).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Recycle Bin for items the user picked (the UI confirmed first). The tree is taken out of
+/// the state while the shell works, so other commands never wait on a Windows dialog.
+#[tauri::command]
+async fn disk_recycle(state: State<'_, DiskState>, selection: Vec<Vec<u32>>) -> Result<disk::RecycleOutcome, String> {
+    if selection.is_empty() || selection.len() > 500 {
+        return Err("bad_selection".into());
+    }
+    if state.running.load(Ordering::SeqCst) {
+        return Err("scan_running".into());
+    }
+    let arc = state.tree.lock().unwrap().take().ok_or("no_scan")?;
+    let (tree, res) = tauri::async_runtime::spawn_blocking(move || {
+        let mut tree = Arc::try_unwrap(arc).unwrap_or_else(|a| (*a).clone());
+        let res = disk::recycle(&mut tree, &selection);
+        (tree, res)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    *state.tree.lock().unwrap() = Some(Arc::new(tree));
+    res.map_err(|e| e.to_string())
+}
+
 /* ---------------- network ---------------- */
 
 #[derive(serde::Serialize)]
@@ -697,8 +749,127 @@ async fn trace_host(
     .map_err(|e| e.to_string())?
 }
 
+/// TCPing: `count` timed TCP handshakes to `host:port`, reported like a ping.
+#[tauri::command]
+async fn tcping_host(host: String, port: u16, count: u32, timeout_ms: u32, interval_ms: u32) -> Result<PingReport, String> {
+    if port == 0 {
+        return Err("invalid_port".into());
+    }
+    let count = clamp(count, 1, 50);
+    let timeout = clamp(timeout_ms, 100, 5000);
+    let interval = clamp(interval_ms, 0, 2000);
+    tauri::async_runtime::spawn_blocking(move || {
+        let ip = network::resolve_v4(&host).map_err(|e| e.to_string())?;
+        let mut probes = Vec::with_capacity(count as usize);
+        for i in 0..count {
+            probes.push(match network::tcping(ip, port, timeout) {
+                Some(ms) => Probe::Reply { from: ip, rtt_ms: ms.round().max(0.0) as u32 },
+                None => Probe::Timeout,
+            });
+            if i + 1 < count && interval > 0 {
+                std::thread::sleep(Duration::from_millis(u64::from(interval)));
+            }
+        }
+        let samples: Vec<Option<f64>> = probes
+            .iter()
+            .map(|p| match p {
+                Probe::Reply { rtt_ms, .. } => Some(f64::from(*rtt_ms)),
+                _ => None,
+            })
+            .collect();
+        Ok(PingReport { host, ip, probes, stats: network::latency_stats(&samples) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/* ---------------- DNS optimizer ---------------- */
+
+#[derive(serde::Serialize)]
+struct DnsAdapterView {
+    #[serde(flatten)]
+    adapter: dns::Adapter,
+    has_backup: bool,
+}
+
+#[tauri::command]
+async fn dns_adapters() -> Vec<DnsAdapterView> {
+    tauri::async_runtime::spawn_blocking(|| {
+        dns::adapters()
+            .into_iter()
+            .map(|a| DnsAdapterView { has_backup: dns::has_backup(&a.guid), adapter: a })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn dns_rank(samples: u32) -> Vec<dns::RankEntry> {
+    tauri::async_runtime::spawn_blocking(move || dns::rank(samples)).await.unwrap_or_default()
+}
+
+/// Apply a catalog provider (never an arbitrary string from the UI) to one adapter. Admin.
+#[tauri::command]
+async fn dns_apply(guid: String, provider: String) -> Result<(), String> {
+    let (_, _, p, s) = *dns::PROVIDERS.iter().find(|(id, ..)| *id == provider).ok_or("unknown_provider")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        dns::apply(&guid, Ipv4Addr::from(p), Some(Ipv4Addr::from(s))).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn dns_restore(guid: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || dns::restore(&guid).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/* ---------------- startup apps, processes, firmware, sensors ---------------- */
+
+#[tauri::command]
+async fn startup_list() -> Vec<startup::StartupItem> {
+    tauri::async_runtime::spawn_blocking(startup::list).await.unwrap_or_default()
+}
+
+/// Toggle via `StartupApproved` (Task Manager semantics); the item must exist in the live list.
+#[tauri::command]
+async fn startup_set(location: startup::Location, name: String, enabled: bool) -> Result<startup::StartupItem, String> {
+    tauri::async_runtime::spawn_blocking(move || startup::set_enabled(location, &name, enabled).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn procs_top() -> Vec<procs::ProcGroup> {
+    tauri::async_runtime::spawn_blocking(|| procs::top(Duration::from_millis(1000), 15)).await.unwrap_or_default()
+}
+
+#[tauri::command]
+async fn firmware_info(state: State<'_, Dashboard>) -> Result<firmware::Firmware, String> {
+    let cached = state.profile.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || firmware::read(&cached.unwrap_or_else(hardware::profile)))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn sensors_read() -> Option<sensors::External> {
+    tauri::async_runtime::spawn_blocking(sensors::read).await.ok().flatten()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // `G2 Boost.exe --mcp`: stdio MCP server for Claude Desktop / Claude Code, no window.
+    // One signed binary instead of a sidecar; the server is read-only (crates/mcp).
+    if std::env::args().any(|a| a == "--mcp") {
+        if let Err(e) = tauri::async_runtime::block_on(g2boost_mcp::serve()) {
+            eprintln!("g2boost mcp: {e}");
+        }
+        return;
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
@@ -794,8 +965,22 @@ pub fn run() {
             disk_summary,
             disk_tree,
             disk_top_files,
+            disk_search,
+            disk_essentials,
+            disk_reveal,
+            disk_recycle,
             ping_host,
-            trace_host
+            trace_host,
+            tcping_host,
+            dns_adapters,
+            dns_rank,
+            dns_apply,
+            dns_restore,
+            startup_list,
+            startup_set,
+            procs_top,
+            firmware_info,
+            sensors_read
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,8 +7,10 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use crate::firmware::{self, Firmware};
 use crate::hardware::Profile;
 use crate::monitor::Sample;
+use crate::sensors;
 use crate::system;
 use crate::winsat::WinSat;
 use crate::wmi;
@@ -80,18 +82,26 @@ pub struct Env {
     pub winsat: Option<WinSat>,
     /// Days since the GPU driver date (when known).
     pub gpu_driver_age_days: Option<u32>,
+    pub firmware: Option<Firmware>,
+    /// CPU temperature from HWiNFO / LibreHardwareMonitor when one of them is running.
+    pub cpu_temp_c: Option<f64>,
 }
 
-pub fn env(sample: Option<Sample>, winsat: Option<WinSat>, gpu_driver: Option<&str>) -> Env {
+/// Gather everything the rules need for this machine (no admin, ~1 s).
+pub fn env(p: &Profile, sample: Option<Sample>, winsat: Option<WinSat>) -> Env {
     let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
     let sys = system::list_drives().into_iter().find(|d| d.letter.eq_ignore_ascii_case(&drive));
+    let gpu_driver = p.gpus.first().and_then(|g| g.driver.clone());
+    let cpu_temp_c = sample.as_ref().and_then(|s| s.cpu_temp_c).or_else(|| sensors::read().and_then(|x| x.cpu_temp_c));
     Env {
         system_free_bytes: sys.as_ref().map(|d| d.free_bytes),
         system_total_bytes: sys.as_ref().map(|d| d.total_bytes),
         hvci_running: hvci_running(),
         sample,
         winsat,
-        gpu_driver_age_days: gpu_driver.and_then(driver_age_days),
+        gpu_driver_age_days: gpu_driver.as_deref().and_then(driver_age_days),
+        firmware: Some(firmware::read(p)),
+        cpu_temp_c,
     }
 }
 
@@ -116,7 +126,7 @@ pub(crate) fn driver_age_days(driver: &str) -> Option<u32> {
 }
 
 /// Howard Hinnant's days-from-civil (proleptic Gregorian), days since 1970-01-01.
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -285,6 +295,34 @@ pub fn analyze(p: &Profile, e: &Env) -> Report {
         f.push(finding("hvci_on", Severity::Info, Kind::Security, &[]));
     }
 
+    if let Some(t) = e.cpu_temp_c {
+        if t >= 95.0 {
+            f.push(finding("cpu_hot", Severity::Critical, Kind::Temperature, &[("temp", format!("{t:.0}"))]));
+        } else if t >= 88.0 {
+            f.push(finding("cpu_hot", Severity::Warn, Kind::Temperature, &[("temp", format!("{t:.0}"))]));
+        }
+    }
+
+    // --- firmware / BIOS ---
+    if let Some(fw) = &e.firmware {
+        if fw.boot_mode == Some("legacy") {
+            f.push(finding("legacy_boot", Severity::Warn, Kind::Security, &[]));
+        }
+        // Resizable BAR matters on RTX 30+ / RX 6000+; the card reports a 256 MB BAR when it is off.
+        let modern_gpu = p.gpus.iter().any(|g| {
+            let n = g.name.to_ascii_uppercase();
+            ["RTX 30", "RTX 40", "RTX 50", "RX 6", "RX 7", "RX 9", "ARC"].iter().any(|k| n.contains(k))
+        });
+        if fw.resizable_bar == Some(false) && modern_gpu {
+            f.push(finding("rebar_off", Severity::Info, Kind::FreeFix, &[("bar_mb", fw.bar1_mb.unwrap_or(256).to_string())]));
+        }
+        if let Some(days) = fw.bios_age_days
+            && days > 3 * 365
+        {
+            f.push(finding("bios_old", Severity::Info, Kind::Maintenance, &[("years", format!("{:.0}", days as f64 / 365.0)), ("version", fw.bios_version.clone().unwrap_or_default())]));
+        }
+    }
+
     // --- WinSAT ---
     if let Some(w) = &e.winsat {
         if w.state == 2 {
@@ -389,10 +427,15 @@ mod tests {
             sample: Some(Sample { gpu_temp_c: Some(91), ..Default::default() }),
             winsat: Some(WinSat { state: 2, ..Default::default() }),
             gpu_driver_age_days: Some(400),
+            firmware: Some(Firmware { boot_mode: Some("legacy"), resizable_bar: Some(false), bar1_mb: Some(256), bios_age_days: Some(2000), ..Default::default() }),
+            cpu_temp_c: Some(96.0),
             ..Default::default()
         };
         let got = ids(&analyze(&p, &e));
-        for id in ["xmp_off", "single_channel", "ram_low", "hdd_system", "system_disk_full", "vram_low", "gpu_driver_old", "gpu_hot", "secure_boot_off", "tpm_missing", "winsat_stale"] {
+        for id in [
+            "xmp_off", "single_channel", "ram_low", "hdd_system", "system_disk_full", "vram_low", "gpu_driver_old", "gpu_hot", "secure_boot_off", "tpm_missing", "winsat_stale",
+            "cpu_hot", "legacy_boot", "rebar_off", "bios_old",
+        ] {
             assert!(got.contains(&id), "{id} missing in {got:?}");
         }
         assert_eq!(analyze(&p, &e).findings[0].severity, Severity::Critical);

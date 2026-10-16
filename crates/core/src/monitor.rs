@@ -33,6 +33,8 @@ pub struct Sample {
     pub cpu_mhz: u32,
     /// Package power from the RAPL energy meter (PDH `Energy Meter`); None when the counter is absent.
     pub cpu_power_w: Option<f32>,
+    /// From HWiNFO / LibreHardwareMonitor when running (no driver of ours).
+    pub cpu_temp_c: Option<f64>,
     pub gpu_pct: f32,
     pub gpu_mem_bytes: u64,
     pub gpu_temp_c: Option<u32>,
@@ -114,6 +116,8 @@ pub struct Monitor {
     disk_bytes: Option<Counter>,
     last_net: Option<(Instant, u64, u64)>,
     primed: bool,
+    ext_tick: u32,
+    cpu_temp: Option<f64>,
 }
 
 // SAFETY: PDH handles are only used from the thread that owns the Monitor.
@@ -141,6 +145,8 @@ impl Monitor {
             disk_bytes: add_counter(query, r"\PhysicalDisk(_Total)\Disk Bytes/sec"),
             last_net: None,
             primed: false,
+            ext_tick: 0,
+            cpu_temp: None,
         };
         // Rate counters need two collections; prime now so the first real sample is meaningful.
         m.collect();
@@ -213,10 +219,15 @@ impl Monitor {
         let gpu_mem_bytes = values(&self.gpu_mem).iter().map(|(_, v)| *v as u64).sum();
         let mem = system::memory_status();
         let nv = nvml::get();
+        if self.ext_tick.is_multiple_of(5) {
+            self.cpu_temp = crate::sensors::read().and_then(|x| x.cpu_temp_c);
+        }
+        self.ext_tick = self.ext_tick.wrapping_add(1);
 
         Sample {
             ts: now_unix(),
             cpu_pct: value(&self.cpu).unwrap_or(0.0).clamp(0.0, 100.0) as f32,
+            cpu_temp_c: self.cpu_temp,
             cpu_mhz: match (value(&self.cpu_freq), value(&self.cpu_perf)) {
                 (Some(f), Some(p)) if f > 0.0 && p > 0.0 => (f * p / 100.0).round() as u32,
                 _ => Self::cpu_mhz(),

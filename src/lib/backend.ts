@@ -15,6 +15,7 @@ export type AppInfo = {
   start_tab: string | null;
   autorun: boolean;
   scan_path: string | null;
+  exe: string;
 };
 
 export type DriveInfo = {
@@ -60,7 +61,10 @@ export type NodeView = {
   others_size: number;
   others_count: number;
 };
-export type BigFile = { size: number; path: string; mtime: number };
+export type BigFile = { size: number; path: string; mtime: number; ids: number[] };
+export type DiskSearch = { files: BigFile[]; matched: number; matched_bytes: number };
+export type Essential = { id: string; path: string; size: number };
+export type RecycleOutcome = { recycled: number; bytes: number; failed: number };
 export type ScanSummary = {
   root: string;
   files: number;
@@ -250,6 +254,8 @@ export type MonitorSample = {
   gpu_mem_mhz: number | null;
   gpu_power_w: number | null;
   cpu_power_w: number | null;
+  /** From HWiNFO / LibreHardwareMonitor when one of them runs. */
+  cpu_temp_c: number | null;
   ram_used: number;
   ram_total: number;
   disk_pct: number;
@@ -284,6 +290,76 @@ export type GamingClass = {
 export type AdvisorReport = { findings: Finding[]; gaming: GamingClass };
 export type SteamGame = { appid: number; name: string; size_bytes: number; library: string };
 
+export type DnsAdapter = {
+  guid: string;
+  name: string;
+  description: string;
+  dns: string[];
+  gateway: string | null;
+  static_dns: string[];
+  provider: string | null;
+  link_mbps: number;
+  has_backup: boolean;
+};
+export type DnsRankEntry = {
+  id: string;
+  name: string;
+  primary: string;
+  secondary: string;
+  median_ms: number | null;
+  loss_pct: number;
+};
+
+export type StartupLocation =
+  | "user_run"
+  | "machine_run"
+  | "machine_run32"
+  | "user_folder"
+  | "common_folder";
+export type StartupItem = {
+  name: string;
+  command: string;
+  location: StartupLocation;
+  enabled: boolean;
+  needs_admin: boolean;
+  protected: boolean;
+};
+export type ProcGroup = {
+  name: string;
+  count: number;
+  ram_bytes: number;
+  cpu_pct: number;
+  system: boolean;
+};
+export type Firmware = {
+  boot_mode: "uefi" | "legacy" | null;
+  secure_boot: boolean | null;
+  tpm: string | null;
+  virtualization_enabled: boolean;
+  hypervisor_present: boolean;
+  resizable_bar: boolean | null;
+  bar1_mb: number | null;
+  memory_at_rated_speed: boolean | null;
+  bios_vendor: string | null;
+  bios_version: string | null;
+  bios_date: string | null;
+  bios_age_days: number | null;
+  fast_startup: boolean | null;
+  hibernation: boolean | null;
+};
+export type SensorReading = {
+  sensor: string;
+  label: string;
+  kind: "temperature" | "voltage" | "fan" | "power" | "clock" | "other";
+  value: number;
+  unit: string;
+};
+export type ExternalSensors = {
+  source: "hwinfo" | "libre_hardware_monitor";
+  cpu_temp_c: number | null;
+  readings: SensorReading[];
+};
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -316,6 +392,11 @@ export const backend = {
   diskTree: (ids: number[], depth = 2, maxChildren = 80) =>
     call<NodeView | null>("disk_tree", { ids, depth, maxChildren }),
   diskTopFiles: (n = 50) => call<BigFile[]>("disk_top_files", { n }),
+  diskSearch: (query: string, n = 200) => call<DiskSearch>("disk_search", { query, n }),
+  diskEssentials: () => call<Essential[]>("disk_essentials"),
+  diskReveal: (ids: number[]) => callOrThrow<void>("disk_reveal", { ids }),
+  diskRecycle: (selection: number[][]) =>
+    callOrThrow<RecycleOutcome>("disk_recycle", { selection }),
 
   boostState: () => call<TweakState[]>("boost_state"),
   boostApply: (id: string, on: boolean) => callOrThrow<TweakState>("boost_apply", { id, on }),
@@ -357,6 +438,18 @@ export const backend = {
 
   pingHost: (host: string, count: number, timeoutMs: number, intervalMs: number) =>
     callOrThrow<PingReport>("ping_host", { host, count, timeoutMs, intervalMs }),
+  tcpingHost: (host: string, port: number, count: number, timeoutMs: number, intervalMs: number) =>
+    callOrThrow<PingReport>("tcping_host", { host, port, count, timeoutMs, intervalMs }),
+  dnsAdapters: () => call<DnsAdapter[]>("dns_adapters"),
+  dnsRank: (samples = 6) => call<DnsRankEntry[]>("dns_rank", { samples }),
+  dnsApply: (guid: string, provider: string) => callOrThrow<void>("dns_apply", { guid, provider }),
+  dnsRestore: (guid: string) => callOrThrow<void>("dns_restore", { guid }),
+  startupList: () => call<StartupItem[]>("startup_list"),
+  startupSet: (location: StartupLocation, name: string, enabled: boolean) =>
+    callOrThrow<StartupItem>("startup_set", { location, name, enabled }),
+  procsTop: () => call<ProcGroup[]>("procs_top"),
+  firmwareInfo: () => call<Firmware>("firmware_info"),
+  sensorsRead: () => call<ExternalSensors>("sensors_read"),
   traceHost: (host: string, maxHops: number, probes: number, timeoutMs: number) =>
     callOrThrow<Hop[]>("trace_host", { host, maxHops, probes, timeoutMs }),
 

@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome check src *.ts && cargo clippy --workspace --all-targets -- -D warnings",
     "format": "biome check --write src *.ts",
-    "test": "cargo test --workspace",
+    "test": "bun test tests && cargo test --workspace",
     "check": "bun run typecheck && bun run lint && bun run test"
   },
   "dependencies": {

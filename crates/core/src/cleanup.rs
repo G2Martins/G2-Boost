@@ -109,7 +109,7 @@ pub fn find(id: &str) -> Option<&'static Category> {
     CATALOG.iter().find(|c| c.id == id)
 }
 
-fn env_dir(var: &str) -> Option<PathBuf> {
+pub(crate) fn env_dir(var: &str) -> Option<PathBuf> {
     std::env::var_os(var).map(PathBuf::from).filter(|p| p.is_absolute())
 }
 
@@ -330,6 +330,11 @@ fn empty_recycle_bin() -> Result<(), String> {
         Err(e) if e.code().0 as u32 == 0x8000_FFFF => Ok(()),
         Err(e) => Err(e.message()),
     }
+}
+
+/// Best-effort DNS cache flush (used after changing resolvers).
+pub fn flush_dns_cache() {
+    let _ = dns_flush();
 }
 
 /// `DnsFlushResolverCache` is exported by dnsapi.dll but not declared in the SDK headers.

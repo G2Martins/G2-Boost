@@ -20,6 +20,8 @@ pub struct Facts {
     pub hags_supported: bool,
     pub game_pass: bool,
     pub outlook: bool,
+    /// Build 22000+ (the windowed-games optimization only exists there).
+    pub windows11: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -50,6 +52,10 @@ pub fn facts() -> Facts {
         ),
         game_pass,
         outlook,
+        windows11: matches!(
+            registry::read(Root::Hklm, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber"),
+            Ok(Value::Str(b)) if b.parse::<u32>().is_ok_and(|n| n >= 22_000)
+        ),
     }
 }
 
@@ -70,6 +76,7 @@ pub fn recommend(f: &Facts) -> Vec<Recommendation> {
                 "svc_xbox" => (false, Some("preference")),
                 "svc_search" if f.outlook => (false, Some("outlook")),
                 "mouse" => (false, Some("preference")),
+                "windowed_optimizations" if !f.windows11 => (false, Some("windows10")),
                 "hvci_off" => (false, Some("security")),
                 "svc_dps" | "svc_geolocation" => (false, Some("preference")),
                 _ if t.beta => (false, Some("beta")),
@@ -122,7 +129,7 @@ mod tests {
 
     #[test]
     fn rules_follow_the_hardware() {
-        let ssd_desktop = Facts { system_ssd: Some(true), hags_supported: true, ..Default::default() };
+        let ssd_desktop = Facts { system_ssd: Some(true), hags_supported: true, windows11: true, ..Default::default() };
         let r = recommend(&ssd_desktop);
         assert_eq!(r.len(), boost::TWEAKS.len());
         assert!(by(&r, "svc_sysmain").recommended);
@@ -132,6 +139,7 @@ mod tests {
         assert!(!by(&r, "svc_xbox").recommended, "zero gain, real side effects: custom only");
         assert_eq!(by(&r, "hvci_off").reason, Some("security"));
         assert_eq!(by(&r, "perf_counters").reason, Some("beta"));
+        assert!(by(&r, "windowed_optimizations").recommended);
 
         let hdd_laptop = Facts { system_ssd: Some(false), laptop: true, game_pass: true, outlook: true, ..Default::default() };
         let r = recommend(&hdd_laptop);
@@ -140,6 +148,7 @@ mod tests {
         assert_eq!(by(&r, "hags").reason, Some("hags_unsupported"));
         assert_eq!(by(&r, "svc_xbox").reason, Some("game_pass"));
         assert_eq!(by(&r, "svc_search").reason, Some("outlook"));
+        assert_eq!(by(&r, "windowed_optimizations").reason, Some("windows10"));
         assert_eq!(recommend(&Facts::default()).iter().find(|r| r.id == "svc_sysmain").unwrap().reason, Some("unknown_disk"));
     }
 

@@ -190,9 +190,29 @@ pub fn latency_stats(samples: &[Option<f64>]) -> LatencyStats {
     }
 }
 
+/// TCPing: time to complete a TCP handshake with `ip:port` (works where ICMP is filtered,
+/// e.g. game servers). `None` = timeout/refused. No admin, no raw sockets.
+pub fn tcping(ip: Ipv4Addr, port: u16, timeout_ms: u32) -> Option<f64> {
+    let addr = std::net::SocketAddr::from((ip, port));
+    let t0 = std::time::Instant::now();
+    let stream = std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(u64::from(timeout_ms))).ok()?;
+    let ms = t0.elapsed().as_secs_f64() * 1000.0;
+    let _ = stream.shutdown(std::net::Shutdown::Both);
+    Some(ms)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tcping_reaches_a_local_listener() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        assert!(tcping(Ipv4Addr::LOCALHOST, port, 1000).is_some());
+        drop(l);
+        assert!(tcping(Ipv4Addr::LOCALHOST, port, 300).is_none(), "closed port");
+    }
 
     #[test]
     fn loopback_replies() {

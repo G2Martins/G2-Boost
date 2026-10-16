@@ -4,6 +4,7 @@ import {
   Gauge as GaugeIcon,
   Keyboard,
   Lightbulb,
+  Lock,
   Monitor,
   MousePointer2,
   Network,
@@ -34,7 +35,6 @@ import {
 } from "@/components/ui/primitives";
 import {
   categoryKey,
-  DNS_PROVIDERS,
   FX_LEVELS,
   PRESET_FX_LEVEL,
   type Preset,
@@ -47,14 +47,18 @@ import {
 } from "@/data/catalogs";
 import {
   backend,
+  type DnsAdapter,
+  type DnsRankEntry,
   type FxLevel,
   type GameEvent,
   inTauri,
   type MemoryStatus,
+  type ProcGroup,
   type PurgeResult,
   type Recommendation,
   type RoutineStatus,
   type Settings,
+  type StartupItem,
   type TweakState,
 } from "@/lib/backend";
 import { boot } from "@/lib/boot";
@@ -65,6 +69,7 @@ const ICONS: Record<string, typeof Zap> = {
   visual_fx: Monitor,
   game_mode: Zap,
   input_lag: MousePointer2,
+  windowed_optimizations: Monitor,
   keyboard: Keyboard,
   tips: Lightbulb,
   mouse: MousePointer2,
@@ -102,7 +107,12 @@ export function BoostPage() {
       </TabsContent>
       <TabsContent value="dns">
         <PageBody className="px-0 pb-0">
-          <DnsTab />
+          <DnsTab elevated={elevated} />
+        </PageBody>
+      </TabsContent>
+      <TabsContent value="startup">
+        <PageBody className="px-0 pb-0">
+          <StartupTab elevated={elevated} />
         </PageBody>
       </TabsContent>
       <span className="sr-only">{t("boost.title")}</span>
@@ -119,13 +129,16 @@ function PageHeaderWithTabs({ children }: { children: React.ReactNode }) {
       tabs={
         <Tabs
           defaultValue={
-            boot.startTab === "ram" || boot.startTab === "dns" ? boot.startTab : "tweaks"
+            boot.startTab === "ram" || boot.startTab === "dns" || boot.startTab === "startup"
+              ? boot.startTab
+              : "tweaks"
           }
         >
           <TabsList>
             <TabsTrigger value="tweaks">{t("boost.tab.tweaks")}</TabsTrigger>
             <TabsTrigger value="ram">{t("boost.tab.ram")}</TabsTrigger>
             <TabsTrigger value="dns">{t("boost.tab.dns")}</TabsTrigger>
+            <TabsTrigger value="startup">{t("boost.tab.startup")}</TabsTrigger>
           </TabsList>
           {children}
         </Tabs>
@@ -625,50 +638,287 @@ function RamTab({ elevated }: { elevated: boolean }) {
   );
 }
 
-function DnsTab() {
+function DnsTab({ elevated }: { elevated: boolean }) {
   const { t } = useI18n();
+  const errorText = useErrorText();
+  const [adapters, setAdapters] = useState<DnsAdapter[] | null>(null);
+  const [rank, setRank] = useState<DnsRankEntry[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const measure = useCallback(async () => {
+    setBusy(true);
+    const [a, r] = await Promise.all([backend.dnsAdapters(), backend.dnsRank(6)]);
+    if (a) setAdapters(a);
+    if (r) setRank(r);
+    setBusy(false);
+  }, []);
+  useEffect(() => {
+    void measure();
+  }, [measure]);
+
+  const main = adapters?.[0] ?? null;
+  const fastest = rank?.find((r) => r.median_ms !== null) ?? null;
+
+  const apply = async (provider: string) => {
+    if (!main) return;
+    setMsg(null);
+    try {
+      await backend.dnsApply(main.guid, provider);
+      setMsg(t("boost.dns.applied", { name: main.name }));
+      setAdapters(await backend.dnsAdapters());
+    } catch (e) {
+      setMsg(errorText(e));
+    }
+  };
+  const restore = async () => {
+    if (!main) return;
+    setMsg(null);
+    try {
+      await backend.dnsRestore(main.guid);
+      setMsg(t("boost.dns.restored"));
+      setAdapters(await backend.dnsAdapters());
+    } catch (e) {
+      setMsg(errorText(e));
+    }
+  };
+
   return (
     <>
-      <Card className="animate-rise flex items-center gap-3 py-4">
+      <Card className="animate-rise flex flex-wrap items-center gap-3 py-4">
         <span className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-wide">
           {t("boost.dns.title")}
           <HelpHint text={t("boost.dns.help")} />
         </span>
-        <span className="text-xs text-muted-foreground">{t("boost.dns.soon")}</span>
+        {!elevated ? <ElevateButton route="boost" /> : null}
         <div className="ml-auto flex gap-2">
           <Button
             variant="outline"
-            disabled
-            title={t("common.soon")}
+            disabled={busy || !inTauri}
+            onClick={measure}
             aria-label={t("boost.dns.rank")}
           >
-            <RefreshCw className="size-4" />
+            <RefreshCw className={cn("size-4", busy && "animate-spin")} />
           </Button>
-          <Button variant="outline" disabled title={t("common.soon")}>
+          <Button
+            variant="primary"
+            disabled={!elevated || !fastest || !main || busy}
+            onClick={() => fastest && apply(fastest.id)}
+          >
+            {t("boost.dns.pick_fastest")}
+          </Button>
+          <Button variant="outline" disabled={!elevated || !main || busy} onClick={restore}>
             {t("boost.dns.restore")}
           </Button>
         </div>
+        <p className="w-full text-xs text-muted-foreground">
+          {main
+            ? t("boost.dns.adapter", {
+                name: main.name,
+                servers: main.dns.join(", ") || "—",
+                mode: main.static_dns.length > 0 ? t("boost.dns.static") : t("boost.dns.auto"),
+              })
+            : adapters
+              ? t("boost.dns.no_adapter")
+              : t("boost.dns.measuring")}
+        </p>
+        {msg ? <p className="w-full text-xs text-foreground/90">{msg}</p> : null}
       </Card>
-      {DNS_PROVIDERS.map((p, i) => (
-        <Card
-          key={p.id}
-          className="panel-hover animate-rise flex items-center gap-4 py-4"
-          style={rise(i)}
+      {(rank ?? []).map((r, i) => {
+        const current = main?.provider === r.id;
+        const isFastest = fastest?.id === r.id;
+        return (
+          <Card
+            key={r.id}
+            className="panel-hover animate-rise flex flex-wrap items-center gap-4 py-4"
+            style={rise(i)}
+          >
+            <span className="num flex size-9 items-center justify-center rounded-md border border-border font-display font-semibold">
+              {i + 1}
+            </span>
+            <span className="font-display text-[14px] font-semibold">{r.name}</span>
+            <span className="num text-xs text-muted-foreground">
+              {r.primary} / {r.secondary}
+            </span>
+            {current ? (
+              <Badge className="bg-success/15 text-success">{t("boost.dns.current")}</Badge>
+            ) : null}
+            {isFastest ? (
+              <Badge className="bg-chart-1/15 text-chart-1">{t("boost.dns.fastest")}</Badge>
+            ) : null}
+            <span className="ml-auto text-xs text-muted-foreground">{t("boost.dns.avg")}</span>
+            <span className="num w-20 text-right text-xs font-semibold">
+              {r.median_ms === null ? t("boost.dns.timeout") : `${r.median_ms.toFixed(1)} ms`}
+            </span>
+            {r.loss_pct > 0 ? (
+              <span className="num text-[11px] text-warning">
+                {t("boost.dns.loss", { loss: Math.round(r.loss_pct) })}
+              </span>
+            ) : null}
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!elevated || current || !main || busy}
+              onClick={() => apply(r.id)}
+            >
+              {t("boost.dns.pick")}
+            </Button>
+          </Card>
+        );
+      })}
+    </>
+  );
+}
+
+/** Startup apps (Task Manager semantics) + what is heavy right now. Nothing is killed. */
+function StartupTab({ elevated }: { elevated: boolean }) {
+  const { t, locale } = useI18n();
+  const errorText = useErrorText();
+  const [items, setItems] = useState<StartupItem[] | null>(null);
+  const [procs, setProcs] = useState<ProcGroup[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    const [i, p] = await Promise.all([backend.startupList(), backend.procsTop()]);
+    if (i) setItems(i);
+    if (p) setProcs(p);
+    setBusy(false);
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const toggle = async (it: StartupItem, on: boolean) => {
+    setMsg(null);
+    try {
+      const next = await backend.startupSet(it.location, it.name, on);
+      setItems((cur) =>
+        (cur ?? []).map((x) => (x.location === it.location && x.name === it.name ? next : x)),
+      );
+    } catch (e) {
+      setMsg(errorText(e));
+    }
+  };
+
+  const enabled = items?.filter((i) => i.enabled).length ?? 0;
+  const ramMax = Math.max(1, ...(procs ?? []).map((p) => p.ram_bytes));
+
+  return (
+    <>
+      <Card className="animate-rise flex flex-wrap items-center gap-3 py-4">
+        <span className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-wide">
+          {t("boost.startup.title")}
+          <HelpHint text={t("boost.startup.help")} />
+        </span>
+        {items ? (
+          <Badge className="bg-card-hover text-muted-foreground">
+            {t("boost.startup.count", { on: enabled, total: items.length })}
+          </Badge>
+        ) : null}
+        {!elevated && items?.some((i) => i.needs_admin) ? <ElevateButton route="boost" /> : null}
+        <Button
+          variant="outline"
+          className="ml-auto"
+          disabled={busy || !inTauri}
+          onClick={load}
+          aria-label={t("boost.startup.refresh")}
         >
-          <span className="num flex size-9 items-center justify-center rounded-md border border-border font-display font-semibold">
-            –
-          </span>
-          <span className="font-display text-[14px] font-semibold">{p.name}</span>
-          <span className="num text-xs text-muted-foreground">
-            {p.primary} / {p.secondary}
-          </span>
-          <span className="ml-auto text-xs text-muted-foreground">{t("boost.dns.avg")}</span>
-          <span className="num w-16 text-xs font-semibold">—</span>
-          <Button variant="secondary" size="sm" disabled title={t("common.soon")}>
-            {t("boost.dns.pick")}
-          </Button>
+          <RefreshCw className={cn("size-4", busy && "animate-spin")} />
+        </Button>
+        <p className="w-full text-xs text-muted-foreground">{t("boost.startup.note")}</p>
+        {msg ? <p className="w-full text-xs text-foreground/90">{msg}</p> : null}
+      </Card>
+
+      <div className="grid gap-3 xl:grid-cols-[1.25fr_1fr]">
+        <Card className="animate-rise min-w-0 py-3" style={rise(1)}>
+          <CardTitle className="mb-2">{t("boost.startup.apps")}</CardTitle>
+          {items && items.length === 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              {t("boost.startup.empty")}
+            </p>
+          ) : null}
+          <ul className="divide-y divide-border">
+            {(items ?? []).map((it) => {
+              const locked = it.protected || (it.needs_admin && !elevated);
+              return (
+                <li key={`${it.location}:${it.name}`} className="flex items-center gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        "truncate text-sm font-medium",
+                        !it.enabled && "text-muted-foreground line-through decoration-border",
+                      )}
+                    >
+                      {it.name}
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground" title={it.command}>
+                      {t(`boost.startup.loc.${it.location}`)} · {it.command}
+                    </p>
+                  </div>
+                  {it.protected ? (
+                    <Badge className="bg-card-hover text-muted-foreground">
+                      <Lock className="mr-1 size-3" />
+                      {t("boost.startup.security")}
+                    </Badge>
+                  ) : it.needs_admin && !elevated ? (
+                    <Badge className="bg-card-hover text-muted-foreground">
+                      {t("common.admin_required")}
+                    </Badge>
+                  ) : null}
+                  <Switch
+                    checked={it.enabled}
+                    disabled={locked}
+                    onCheckedChange={(on) => toggle(it, on)}
+                    aria-label={it.name}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         </Card>
-      ))}
+
+        <Card className="animate-rise min-w-0 py-3" style={rise(2)}>
+          <CardTitle className="mb-2 flex items-center gap-2">
+            {t("boost.procs.title")}
+            <HelpHint text={t("boost.procs.help")} />
+          </CardTitle>
+          <ul className="space-y-2">
+            {(procs ?? []).map((p) => (
+              <li key={p.name} className="text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="truncate font-medium">{p.name}</span>
+                  {p.count > 1 ? (
+                    <span className="num text-[11px] text-muted-foreground">×{p.count}</span>
+                  ) : null}
+                  {p.system ? (
+                    <Badge className="bg-card-hover text-muted-foreground">
+                      {t("boost.procs.system")}
+                    </Badge>
+                  ) : null}
+                  <span className="num ml-auto text-xs text-muted-foreground">
+                    {p.cpu_pct.toFixed(1)}%
+                  </span>
+                  <span className="num w-20 text-right text-xs font-semibold">
+                    {formatBytes(p.ram_bytes, locale)}
+                  </span>
+                </div>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-card-hover">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      p.system ? "bg-muted-foreground/40" : "bg-chart-1",
+                    )}
+                    style={{ width: `${(p.ram_bytes / ramMax) * 100}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[11px] text-muted-foreground">{t("boost.procs.note")}</p>
+        </Card>
+      </div>
     </>
   );
 }

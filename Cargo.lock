@@ -1213,6 +1213,7 @@ name = "g2-boost"
 version = "0.1.0"
 dependencies = [
  "g2boost-core",
+ "g2boost-mcp",
  "serde",
  "serde_json",
  "tauri",

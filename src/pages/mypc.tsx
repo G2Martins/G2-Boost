@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, MetricRow } from "@/components/ui/primitives";
-import { backend, inTauri, type Profile, type WinSat } from "@/lib/backend";
+import { backend, type Firmware, inTauri, type Profile, type WinSat } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ export function MyPc({ elevated }: { elevated: boolean }) {
   const errorText = useErrorText();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sat, setSat] = useState<WinSat | null>(null);
+  const [fw, setFw] = useState<Firmware | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [satBusy, setSatBusy] = useState(false);
@@ -33,6 +34,8 @@ export function MyPc({ elevated }: { elevated: boolean }) {
     const [p, w] = await Promise.all([backend.systemProfile(refresh), backend.winsatLast()]);
     if (p) setProfile(p);
     if (w) setSat(w);
+    const f = await backend.firmwareInfo();
+    if (f) setFw(f);
     setBusy(false);
   }, []);
   useEffect(() => {
@@ -142,7 +145,13 @@ export function MyPc({ elevated }: { elevated: boolean }) {
             />
             <MetricRow
               label={t("mypc.virtualization")}
-              value={cpu ? yn(cpu.virtualization) : "—"}
+              value={
+                fw?.hypervisor_present
+                  ? t("mypc.fw.virt.hyperv")
+                  : cpu
+                    ? yn(cpu.virtualization)
+                    : "—"
+              }
             />
             <MetricRow label={t("mypc.microcode")} value={cpu?.microcode ?? "—"} />
           </div>
@@ -376,7 +385,51 @@ export function MyPc({ elevated }: { elevated: boolean }) {
                 value={profile ? (profile.tpm ?? t("mypc.tpm.none")) : "—"}
                 ok={profile ? profile.tpm !== null : undefined}
               />
+              <MetricRow
+                label={t("mypc.fw.boot")}
+                value={fw?.boot_mode ? t(`mypc.fw.boot.${fw.boot_mode}`) : "—"}
+                ok={fw?.boot_mode ? fw.boot_mode === "uefi" : undefined}
+              />
+              <MetricRow
+                label={t("mypc.fw.virt")}
+                value={
+                  fw
+                    ? fw.hypervisor_present
+                      ? t("mypc.fw.virt.hyperv")
+                      : yn(fw.virtualization_enabled)
+                    : "—"
+                }
+              />
+              <MetricRow
+                label={t("mypc.fw.rebar")}
+                value={
+                  fw?.resizable_bar == null
+                    ? t("mypc.fw.unknown")
+                    : `${yn(fw.resizable_bar)} (${fw.bar1_mb} MB)`
+                }
+                ok={fw?.resizable_bar ?? undefined}
+              />
+              <MetricRow
+                label={t("mypc.fw.xmp")}
+                value={
+                  fw?.memory_at_rated_speed == null
+                    ? t("mypc.fw.unknown")
+                    : yn(fw.memory_at_rated_speed)
+                }
+                ok={fw?.memory_at_rated_speed ?? undefined}
+              />
+              <MetricRow
+                label={t("mypc.fw.bios_age")}
+                value={
+                  fw?.bios_age_days != null
+                    ? t("mypc.fw.years", { n: (fw.bios_age_days / 365).toFixed(1) })
+                    : "—"
+                }
+              />
+              <MetricRow label={t("mypc.fw.fast_startup")} value={fw ? yn(fw.fast_startup) : "—"} />
+              <MetricRow label={t("mypc.fw.hibernation")} value={fw ? yn(fw.hibernation) : "—"} />
             </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("mypc.fw.note")}</p>
           </Card>
         </div>
 

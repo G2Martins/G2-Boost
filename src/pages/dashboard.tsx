@@ -542,7 +542,11 @@ function MonitorCard({
         <Chip
           label={t("dash.monitor.cpu_power")}
           value={last?.cpu_power_w != null ? `${last.cpu_power_w.toFixed(0)} W` : "—"}
-          sub={t("dash.monitor.cpu_temp.na")}
+          sub={
+            last?.cpu_temp_c != null
+              ? t("dash.monitor.cpu_temp_value", { temp: Math.round(last.cpu_temp_c) })
+              : t("dash.monitor.cpu_temp.na")
+          }
         />
         <Chip
           label={t("dash.monitor.disk_rate")}

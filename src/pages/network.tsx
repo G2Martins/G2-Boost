@@ -73,10 +73,11 @@ export function NetworkPage() {
 
 /* ================= Monitor (ICMP every second, 60-sample window) ================= */
 
-const TARGETS = [
+type Target = { id: string; host: string; label: string; color: string };
+const TARGETS: Target[] = [
   { id: "google", host: "8.8.8.8", label: "Google", color: "hsl(var(--chart-1))" },
   { id: "cloudflare", host: "1.1.1.1", label: "Cloudflare", color: "hsl(var(--chart-2))" },
-] as const;
+];
 const WINDOW = 60;
 type Sample = { t: number; rtt: (number | null)[] };
 
@@ -108,14 +109,40 @@ function Monitor() {
   const { t, locale } = useI18n();
   const [on, setOn] = useState(inTauri);
   const [samples, setSamples] = useState<Sample[]>([]);
+  const [gateway, setGateway] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
+  // The router is the first hop: if it spikes, the problem is the local network, not the internet.
+  const targets = useMemo<Target[]>(
+    () =>
+      gateway
+        ? [
+            ...TARGETS,
+            {
+              id: "gateway",
+              host: gateway,
+              label: t("network.monitor.gateway"),
+              color: "hsl(var(--chart-3))",
+            },
+          ]
+        : TARGETS,
+    [gateway, t],
+  );
+  useEffect(() => {
+    backend.dnsAdapters().then((a) => {
+      const gw = a?.find((x) => x.gateway)?.gateway ?? null;
+      if (gw) {
+        setSamples([]);
+        setGateway(gw);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!on) return;
     let alive = true;
     const tick = async () => {
       const rtt = await Promise.all(
-        TARGETS.map((tg) =>
+        targets.map((tg) =>
           backend
             .pingHost(tg.host, 1, 900, 0)
             .then((r) => (r.probes[0]?.kind === "reply" ? r.probes[0].rtt_ms : null))
@@ -131,7 +158,7 @@ function Monitor() {
       alive = false;
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, [on]);
+  }, [on, targets]);
 
   const primary = useMemo(() => statsOf(samples.map((s) => s.rtt[0] ?? null)), [samples]);
   const enough = samples.length >= 10;
@@ -203,7 +230,7 @@ function Monitor() {
           <CardTitle
             right={
               <span className="flex gap-4 text-xs">
-                {TARGETS.map((tg) => (
+                {targets.map((tg) => (
                   <span key={tg.id} className="flex items-center gap-1.5">
                     <span className="size-2 rounded-full" style={{ background: tg.color }} />
                     {tg.label}
@@ -215,7 +242,7 @@ function Monitor() {
             {t("network.chart")}
           </CardTitle>
           {samples.length ? (
-            <LatencyChart samples={samples} />
+            <LatencyChart samples={samples} targets={targets} />
           ) : (
             <EmptyState
               icon={<Activity className="size-5" />}
@@ -249,7 +276,7 @@ function Monitor() {
   );
 }
 
-function LatencyChart({ samples }: { samples: Sample[] }) {
+function LatencyChart({ samples, targets }: { samples: Sample[]; targets: Target[] }) {
   const W = 800;
   const H = 220;
   const padL = 36;
@@ -300,7 +327,7 @@ function LatencyChart({ samples }: { samples: Sample[] }) {
           </text>
         </g>
       ))}
-      {TARGETS.map((tg, idx) => (
+      {targets.map((tg, idx) => (
         <path
           key={tg.id}
           d={line(idx)}
@@ -801,6 +828,13 @@ function hopStats(h: Hop) {
   };
 }
 
+/** "host:port" → [host, port]; default port 443. IPv4/hostnames only. */
+function splitHostPort(v: string): [string, number] {
+  const m = v.match(/^(.+?):(\d{1,5})$/);
+  const port = m ? Number(m[2]) : 443;
+  return [m ? (m[1] ?? v) : v, port > 0 && port < 65536 ? port : 443];
+}
+
 function Tools() {
   const { t, locale } = useI18n();
   const [tool, setTool] = useState<Tool>("MTR");
@@ -825,7 +859,10 @@ function Tools() {
     setHops(null);
     try {
       if (tool === "Ping") setPing(await backend.pingHost(target.trim(), 10, 1500, 300));
-      else if (tool === "MTR") setHops(await backend.traceHost(target.trim(), 30, 3, 1500));
+      else if (tool === "TCPing") {
+        const [host, portText] = splitHostPort(target.trim());
+        setPing(await backend.tcpingHost(host, portText, 10, 1500, 300));
+      } else if (tool === "MTR") setHops(await backend.traceHost(target.trim(), 30, 3, 1500));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -866,12 +903,7 @@ function Tools() {
             spellCheck={false}
           />
         </label>
-        <Button
-          variant="primary"
-          onClick={start}
-          disabled={busy || !inTauri || tool === "TCPing" || !target.trim()}
-          title={tool === "TCPing" ? t("common.soon") : undefined}
-        >
+        <Button variant="primary" onClick={start} disabled={busy || !inTauri || !target.trim()}>
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
           {t("common.start")}
         </Button>
@@ -990,7 +1022,7 @@ function Tools() {
               busy ? t("network.tools.running", { tool }) : t("network.tools.empty.title", { tool })
             }
             body={
-              tool === "TCPing" ? t("network.tools.tcping_soon") : t("network.tools.empty.body")
+              tool === "TCPing" ? t("network.tools.tcping_hint") : t("network.tools.empty.body")
             }
           />
         )}

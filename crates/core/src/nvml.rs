@@ -26,7 +26,18 @@ pub struct Nvml {
     pcie_gen: Option<FnDevU32>,
     pcie_width: Option<FnDevU32>,
     driver: Option<FnStr>,
+    bar1: Option<FnBar1>,
 }
+
+/// `nvmlBAR1Memory_t`: total / free / used bytes of the BAR1 aperture.
+#[repr(C)]
+#[derive(Default)]
+struct Bar1Memory {
+    total: u64,
+    free: u64,
+    used: u64,
+}
+type FnBar1 = unsafe extern "C" fn(*mut c_void, *mut Bar1Memory) -> i32;
 
 // SAFETY: NVML is documented thread-safe; the device handle is an opaque, process-wide token.
 unsafe impl Send for Nvml {}
@@ -72,6 +83,7 @@ impl Nvml {
                 pcie_gen: sym!(h, "nvmlDeviceGetCurrPcieLinkGeneration", FnDevU32),
                 pcie_width: sym!(h, "nvmlDeviceGetCurrPcieLinkWidth", FnDevU32),
                 driver: sym!(h, "nvmlSystemGetDriverVersion", FnStr),
+                bar1: sym!(h, "nvmlDeviceGetBAR1MemoryInfo", FnBar1),
             })
         }
     }
@@ -108,6 +120,14 @@ impl Nvml {
     /// (generation, lanes), e.g. (3, 8) for "PCIe 3.0 x8".
     pub fn pcie(&self) -> Option<(u32, u32)> {
         Some((self.dev_u32(self.pcie_gen)?, self.dev_u32(self.pcie_width)?))
+    }
+
+    /// BAR1 aperture size. 256 MiB = classic BAR; ≈ VRAM size = Resizable BAR on.
+    pub fn bar1_total_bytes(&self) -> Option<u64> {
+        let f = self.bar1?;
+        let mut m = Bar1Memory::default();
+        // SAFETY: valid device handle; struct matches nvmlBAR1Memory_t.
+        (unsafe { f(self.device, &mut m) } == 0).then_some(m.total)
     }
 
     pub fn driver_version(&self) -> Option<String> {

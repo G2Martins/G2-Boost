@@ -45,7 +45,8 @@ export const ptBR = {
   "dash.monitor.cores": "núcleos / threads",
   "dash.monitor.gpu_temp": "temp. GPU",
   "dash.monitor.cpu_temp": "temp. CPU",
-  "dash.monitor.cpu_temp.na": "temp. CPU exige driver de kernel",
+  "dash.monitor.cpu_temp_value": "CPU a {temp} °C",
+  "dash.monitor.cpu_temp.na": "temp. CPU: abra o HWiNFO ou LibreHardwareMonitor",
   "dash.monitor.vram": "VRAM",
   "dash.monitor.disk_rate": "disco",
   "dash.monitor.net_rate": "↓ {rx}/s · ↑ {tx}/s",
@@ -121,6 +122,20 @@ export const ptBR = {
   "mypc.secure_boot": "Secure Boot",
   "mypc.tpm": "TPM",
   "mypc.tpm.none": "não detectado",
+  "mypc.fw.boot": "Modo de boot",
+  "mypc.fw.boot.uefi": "UEFI",
+  "mypc.fw.boot.legacy": "Legado (CSM)",
+  "mypc.fw.virt": "Virtualização (VT-x/AMD-V)",
+  "mypc.fw.virt.hyperv": "ligada (Hyper-V/VBS ativo)",
+  "mypc.fw.rebar": "Resizable BAR",
+  "mypc.fw.xmp": "RAM no XMP/EXPO",
+  "mypc.fw.bios_age": "Idade da BIOS",
+  "mypc.fw.years": "{n} anos",
+  "mypc.fw.fast_startup": "Inicialização rápida",
+  "mypc.fw.hibernation": "Hibernação",
+  "mypc.fw.unknown": "não dá para saber",
+  "mypc.fw.note":
+    "Lido do Windows, sem driver. C-states, limites de energia e curvas de ventoinha não aparecem para o sistema — só na própria BIOS.",
   "mypc.disks": "Discos",
   "mypc.ssd": "SSD",
   "mypc.hdd": "HD mecânico",
@@ -139,6 +154,7 @@ export const ptBR = {
   "boost.reason.hdd": "HD mecânico",
   "boost.reason.unknown_disk": "disco não identificado",
   "boost.reason.laptop": "notebook",
+  "boost.reason.windows10": "só existe no Windows 11",
   "boost.reason.hags_unsupported": "driver sem HAGS",
   "boost.reason.game_pass": "Game Pass/Xbox instalado",
   "boost.reason.outlook": "Outlook instalado",
@@ -236,6 +252,14 @@ export const ptBR = {
     "A IA não altera nada no PC. Ajustes sugeridos aparecem como botões e passam pelo fluxo normal (backup, administrador).",
   "ai.actions": "Ajustes sugeridos",
   "ai.actions.note": "Cada ajuste salva o valor original antes e pode ser revertido no PC Boost.",
+  "ai.action.startup": "Tirar da inicialização: {name}",
+  "ai.action.startup_off": "Desligar",
+  "ai.action.startup_done": "Não inicia mais com o Windows (religue em PC Boost › Inicialização)",
+  "ai.mcp.title": "Usar no Claude Desktop / Claude Code",
+  "ai.mcp.hint":
+    "MCP (Model Context Protocol): o Claude da sua máquina consulta o diagnóstico deste PC direto do G2 Boost. Só leitura — nada é alterado por ali.",
+  "ai.mcp.body":
+    "O próprio G2 Boost vira o servidor MCP com --mcp. As ferramentas só leem (hardware, BIOS, sensores, inicialização, processos, ajustes, prévia de limpeza); aplicar qualquer coisa continua sendo um clique seu aqui no app.",
   "ai.action.applied": "Aplicado",
   "ai.action.open_cleanup": "Abrir Limpeza",
   "ai.error.refusal": "O provedor recusou responder a esta pergunta.",
@@ -300,6 +324,18 @@ export const ptBR = {
   "advisor.hvci_on.title": "Integridade de memória (HVCI) ligada",
   "advisor.hvci_on.body":
     "Protege contra drivers maliciosos e custa ~5% de FPS em alguns jogos (Tom's Hardware). Desligar é opção no PC Boost › Personalizado — troca segurança por desempenho.",
+  "advisor.cpu_hot.title": "Processador quente ({temp} °C)",
+  "advisor.cpu_hot.body":
+    "Acima de ~90 °C o processador reduz o clock (throttling) e o FPS cai. Limpe a poeira, confira o cooler e a pasta térmica, use o plano Equilibrado fora dos jogos e limite o FPS ao refresh do monitor — menos calor sem perder fluidez.",
+  "advisor.legacy_boot.title": "Windows iniciado em modo legado (CSM)",
+  "advisor.legacy_boot.body":
+    "Sem UEFI não há Secure Boot, exigido por anti-cheats como o do Valorant. Converter o disco para GPT (MBR2GPT da Microsoft) e trocar para UEFI na BIOS — faça backup antes.",
+  "advisor.rebar_off.title": "Resizable BAR desligado (janela de {bar_mb} MB)",
+  "advisor.rebar_off.body":
+    "Em placas RTX 30/40/50 e RX 6000+ o ReBAR dá alguns % de FPS em vários jogos. Ligue “Above 4G Decoding” e “Re-Size BAR” na BIOS (exige modo UEFI). Grátis.",
+  "advisor.bios_old.title": "BIOS com cerca de {years} anos ({version})",
+  "advisor.bios_old.body":
+    "Atualizações de BIOS trazem microcódigo, compatibilidade de memória e correções de segurança. Atualize só pelo site do fabricante da placa, com energia estável — nunca durante tempestade ou na bateria.",
   "advisor.winsat_stale.title": "Nota do WinSAT desatualizada",
   "advisor.winsat_stale.body": "O hardware mudou desde a última avaliação. Rode de novo em Meu PC.",
   "advisor.winsat_never.title": "WinSAT nunca rodou",
@@ -331,7 +367,7 @@ export const ptBR = {
   "disk.title": "Analisador de disco",
   "disk.subtitle": "Quem está ocupando o seu espaço",
   "disk.tab.treemap": "Mapa do disco",
-  "disk.tab.largest": "Maiores arquivos",
+  "disk.tab.largest": "Arquivos e filtros",
   "disk.tab.essentials": "Essenciais grandes",
   "disk.drive": "Unidade",
   "disk.scan": "Escanear",
@@ -360,7 +396,55 @@ export const ptBR = {
   "disk.class.binary": "Binário/VM",
   "disk.class.document": "Documento",
   "disk.class.other": "Outros",
-  "disk.filter.placeholder": "Filtro: *.mp4; >1gb; <3months; \\temp",
+  "disk.filter.placeholder": "Filtro: *.mp4  >1gb  >6m (mais de 6 meses)  nome",
+  "disk.filter.help":
+    "Combine termos: *.mp4 ou .mkv (extensão), >1gb / <200mb (tamanho), >6m / <7d (sem mexer há mais de 6 meses / mexido nos últimos 7 dias; d, w, m, y) e qualquer palavra do nome.",
+  "disk.filter.matched": "{count} arquivos · {size}",
+  "disk.select": "Selecionar",
+  "disk.reveal": "Mostrar na pasta",
+  "disk.recycle": "Lixeira",
+  "disk.recycle.selected": "Enviar {count} para a Lixeira ({size})",
+  "disk.recycle.confirm_title": "Enviar {count} item(ns) para a Lixeira — {size}",
+  "disk.recycle.confirm_body":
+    "Vai para a Lixeira e pode ser restaurado de lá. Se algo for grande demais para a Lixeira, o próprio Windows pergunta antes de apagar de vez. Pastas do sistema e de outros usuários são bloqueadas.",
+  "disk.recycle.confirm": "Enviar para a Lixeira",
+  "disk.recycle.done": "{count} item(ns) na Lixeira · {size} liberados ao esvaziá-la",
+  "disk.recycle.failed": "{count} não foram (em uso ou cancelado).",
+  "disk.recycle.protected":
+    "Item protegido: pasta do sistema, de outro usuário, raiz do disco/perfil ou atalho de pasta (junção).",
+  "disk.recycle.scan_running": "Espere a varredura terminar.",
+  "disk.ess.none": "Nenhum dos itens conhecidos foi encontrado nesta unidade.",
+  "disk.ess.unreadable": "precisa de admin para medir",
+  "disk.ess.pagefile.title": "Arquivo de paginação (pagefile.sys)",
+  "disk.ess.pagefile.body":
+    "Memória virtual do Windows. Não apague nem desligue: jogos e o próprio sistema travam sem ela. Se ocupa demais, deixe 'gerenciado pelo sistema' ou mova para outro SSD em Sistema › Sobre › Configurações avançadas › Desempenho.",
+  "disk.ess.hiberfil.title": "Hibernação (hiberfil.sys)",
+  "disk.ess.hiberfil.body":
+    "Guarda a RAM ao hibernar e alimenta a Inicialização rápida. Em desktop dá para desligar a hibernação nas Opções de energia do Windows e recuperar esse espaço; em notebook pense antes (bateria acabando = hibernar).",
+  "disk.ess.swapfile.title": "Swap de apps (swapfile.sys)",
+  "disk.ess.swapfile.body":
+    "Usado pelos apps da Microsoft Store. Pequeno e gerenciado pelo Windows: deixe como está.",
+  "disk.ess.winsxs.title": "Repositório de componentes (WinSxS)",
+  "disk.ess.winsxs.body":
+    "Base do Windows e das atualizações; boa parte são links, então o tamanho mostrado exagera. Nunca apague à mão: use Limpeza › Limpeza de componentes (DISM), que remove só versões substituídas.",
+  "disk.ess.windows_old.title": "Windows anterior (Windows.old)",
+  "disk.ess.windows_old.body":
+    "Cópia do Windows antes da última atualização grande, para voltar atrás. Some sozinha em ~10 dias; se o sistema está estável, remova pela Limpeza de Disco do Windows (Arquivos de sistema › Instalações anteriores).",
+  "disk.ess.recycle_bin.title": "Lixeira ($Recycle.Bin)",
+  "disk.ess.recycle_bin.body":
+    "Arquivos excluídos que ainda podem voltar. Esvazie em Limpeza › Lixeira quando tiver certeza.",
+  "disk.ess.restore_points.title": "Pontos de restauração (System Volume Information)",
+  "disk.ess.restore_points.body":
+    "Pontos de restauração e cópias de sombra. Não mexa na pasta: ajuste o limite em Proteção do sistema; o Painel do G2 Boost mostra e cria pontos.",
+  "disk.ess.wu_download.title": "Downloads do Windows Update",
+  "disk.ess.wu_download.body":
+    "Pacotes de atualização já baixados. Podem ser removidos com segurança por Limpeza › Cache do Windows Update.",
+  "disk.ess.installer.title": "Cache de instaladores (Windows\\Installer)",
+  "disk.ess.installer.body":
+    "Necessário para reparar e desinstalar programas. Não apague à mão — desinstalar programas que você não usa é o jeito seguro de reduzir.",
+  "disk.ess.package_cache.title": "Cache de pacotes (ProgramData\\Package Cache)",
+  "disk.ess.package_cache.body":
+    "Instaladores de Visual Studio, runtimes e SDKs, usados para reparar e atualizar. Apagar quebra desinstalações; reduza removendo o programa dono.",
   "disk.help.treemap":
     "Cada retângulo é um arquivo ou pasta; a área é o tamanho em disco. Duplo clique entra na pasta.",
   "disk.help.essentials":
@@ -525,7 +609,6 @@ export const ptBR = {
   "network.tools.timeout": "tempo esgotado",
   "network.tools.hop": "Salto",
   "network.tools.loss": "Perda",
-  "network.tools.tcping_soon": "TCPing (conexão TCP cronometrada) chega na próxima fase.",
   "network.tools.error": "Falha: {error}",
   "network.tools.pick": "Escolha seu teste",
   "network.tools.target": "IP do servidor ou domínio",
@@ -537,6 +620,29 @@ export const ptBR = {
   "boost.tab.tweaks": "Ajustes de sistema",
   "boost.tab.ram": "Limpeza de RAM",
   "boost.tab.dns": "DNS Optimizer",
+  "boost.tab.startup": "Inicialização",
+  "boost.startup.title": "Apps que iniciam com o Windows",
+  "boost.startup.help":
+    "Desligar aqui faz o mesmo que o Gerenciador de Tarefas: o app continua instalado e a entrada fica onde estava — só deixa de abrir sozinho. Ligue de volta quando quiser.",
+  "boost.startup.count": "{on} de {total} ligados",
+  "boost.startup.refresh": "Atualizar lista",
+  "boost.startup.note":
+    "Menos apps no boot = Windows pronto mais rápido e menos processos disputando CPU e RAM com o jogo. Itens de todos os usuários pedem administrador.",
+  "boost.startup.apps": "Inicialização",
+  "boost.startup.empty": "Nenhum app configurado para iniciar com o Windows.",
+  "boost.startup.security": "segurança",
+  "boost.startup.protected": "Este item é da Segurança do Windows e não é desligado pelo G2 Boost.",
+  "boost.startup.loc.user_run": "este usuário",
+  "boost.startup.loc.machine_run": "todos os usuários",
+  "boost.startup.loc.machine_run32": "todos os usuários (32 bits)",
+  "boost.startup.loc.user_folder": "pasta Inicializar",
+  "boost.startup.loc.common_folder": "pasta Inicializar (todos)",
+  "boost.procs.title": "Mais pesados agora",
+  "boost.procs.help":
+    "Processos agrupados pelo executável (ex.: chrome.exe ×24), somando RAM e CPU do último segundo. Componentes do Windows aparecem só para referência.",
+  "boost.procs.system": "Windows",
+  "boost.procs.note":
+    "O G2 Boost não fecha processos: feche o app antes de jogar ou tire-o da inicialização.",
   "boost.presets": "Melhorias no desempenho do sistema",
   "boost.preset.default": "Padrão",
   "boost.preset.high": "Alto desempenho",
@@ -556,6 +662,11 @@ export const ptBR = {
   "boost.tweak.input_lag.desc":
     "Desliga as otimizações de tela cheia do Windows para todos os jogos (FSE), que atrasam a exibição do quadro.",
   "boost.tweak.input_lag.warn": "você depende de overlays que exigem o modo janela otimizado.",
+  "boost.tweak.windowed_optimizations": "Otimizações para jogos em janela",
+  "boost.tweak.windowed_optimizations.desc":
+    "Jogos DirectX 10/11 em janela ou sem borda passam a usar o modelo flip: menos latência e suporte a VRR/Auto HDR. A mesma opção de Configurações › Tela › Gráficos (Windows 11).",
+  "boost.tweak.windowed_optimizations.warn":
+    "algum jogo antigo passou a piscar ou travar em janela — dá para desligar só para ele em Configurações › Tela › Gráficos.",
   "boost.tweak.keyboard": "Reduzir tempo de entrada do teclado",
   "boost.tweak.keyboard.desc":
     "Menor atraso e maior taxa de repetição de teclas (SystemParametersInfo).",
@@ -664,9 +775,19 @@ export const ptBR = {
   "boost.dns.pick_fastest": "Escolher o mais rápido",
   "boost.dns.restore": "Restaurar padrão do Windows",
   "boost.dns.windows": "Windows (automático)",
-  "boost.dns.soon":
-    "A medição e a troca de DNS usam a API do Windows (Rust) e chegam na próxima fase.",
 
+  "boost.dns.adapter": "Adaptador {name} · DNS em uso: {servers} ({mode})",
+  "boost.dns.static": "configurado à mão",
+  "boost.dns.auto": "automático (DHCP)",
+  "boost.dns.applied": "DNS aplicado em {name}.",
+  "boost.dns.restored": "DNS restaurado ao que era antes.",
+  "boost.dns.loss": "{loss}% perda",
+  "boost.dns.measuring": "Medindo…",
+  "boost.dns.timeout": "sem resposta",
+  "boost.dns.no_adapter": "Nenhum adaptador conectado.",
+  "network.monitor.gateway": "Roteador",
+  "network.tools.tcping_hint":
+    "Formato host:porta (padrão 443). Mede o handshake TCP — funciona onde o ping (ICMP) é bloqueado, como em servidores de jogo.",
   "settings.title": "Configurações",
   "settings.subtitle": "Idioma, versão e diagnóstico",
   "settings.language": "Idioma",
