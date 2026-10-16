@@ -1,0 +1,85 @@
+LICENÇA DE USO DE SOFTWARE — G2 BOOST
+Versão 1.0 — 16 de outubro de 2026
+
+Copyright (c) 2026 Grovic Data. Todos os direitos reservados.
+
+Ao instalar, copiar ou usar o G2 Boost, você concorda com estes termos. Se não concordar, não instale nem use o software.
+
+1. TITULARIDADE
+O G2 Boost — programa, código-fonte, código-objeto, interface, documentação, nomes, marcas e logotipos — é de titularidade exclusiva da Grovic Data e está protegido pela Lei nº 9.609/1998 (Lei do Software), pela Lei nº 9.610/1998 (Direitos Autorais) e por tratados internacionais. Esta licença concede direito de uso; não transfere propriedade.
+
+2. LICENÇA CONCEDIDA
+A Grovic Data concede a você uma licença pessoal, não exclusiva, intransferível e revogável para instalar e usar o G2 Boost, na forma de código-objeto distribuída pela Grovic Data ou por canal autorizado por ela, em computadores de sua propriedade ou sob o seu controle.
+
+3. RESTRIÇÕES
+Sem autorização prévia e por escrito da Grovic Data, é proibido:
+a) copiar, distribuir, sublicenciar, vender, alugar, emprestar ou disponibilizar o software ou o seu instalador a terceiros, inclusive em sites de download e pacotes de terceiros;
+b) modificar, traduzir, adaptar ou criar obras derivadas;
+c) descompilar, desmontar ou fazer engenharia reversa, salvo na medida em que a lei aplicável o permita expressamente apesar desta restrição;
+d) remover ou alterar avisos de direitos autorais, marcas ou licenças;
+e) usar o software para violar a lei ou direitos de terceiros.
+
+4. CÓDIGO-FONTE
+O acesso ao código-fonte, quando houver, é restrito a pessoas autorizadas pela Grovic Data e não amplia os direitos desta licença.
+
+5. COMPONENTES DE TERCEIROS
+O G2 Boost inclui componentes de código aberto regidos pelas suas próprias licenças, listados no arquivo THIRD_PARTY_NOTICES.md que acompanha o software. Nada nesta licença restringe os direitos que essas licenças concedem sobre os respectivos componentes.
+
+6. FUNCIONAMENTO E RESPONSABILIDADE DO USUÁRIO
+O G2 Boost altera configurações do Windows, remove arquivos ou envia itens para a Lixeira somente por ação do usuário, com prévia e confirmação, e guarda cópia dos valores originais dos ajustes para permitir reverter. A decisão de aplicar cada ajuste ou limpeza é do usuário. Recomenda-se criar um ponto de restauração do Windows antes de várias alterações.
+
+7. PRIVACIDADE
+O G2 Boost não coleta telemetria. Os diagnósticos ficam no seu computador. Se você usar o assistente de IA, o contexto exibido na tela é enviado ao provedor que você escolher (Anthropic, OpenAI ou Google), com a sua própria chave de API, guardada no Gerenciador de Credenciais do Windows; aplica-se a política de privacidade desse provedor.
+
+8. AUSÊNCIA DE GARANTIA
+Na máxima extensão permitida pela lei, o software é fornecido "NO ESTADO EM QUE SE ENCONTRA", sem garantias de qualquer natureza, expressas ou implícitas, incluindo adequação a um propósito específico, ganho de desempenho, compatibilidade ou ausência de erros.
+
+9. LIMITAÇÃO DE RESPONSABILIDADE
+Na máxima extensão permitida pela lei, a Grovic Data não responde por danos indiretos, incidentais, especiais ou consequenciais, lucros cessantes, perda de dados ou de uso, decorrentes do uso ou da impossibilidade de uso do software. Nada nesta licença limita direitos irrenunciáveis do consumidor previstos na Lei nº 8.078/1990 (Código de Defesa do Consumidor).
+
+10. RESCISÃO
+Esta licença termina automaticamente se você descumprir qualquer dos seus termos. Nesse caso, você deve desinstalar o software e apagar todas as cópias.
+
+11. ATUALIZAÇÕES
+Versões futuras podem ser acompanhadas de termos atualizados, que valerão para essas versões.
+
+12. LEI APLICÁVEL E FORO
+Esta licença é regida pelas leis da República Federativa do Brasil. Fica eleito o foro do domicílio do consumidor, quando aplicável o Código de Defesa do Consumidor; nos demais casos, o foro da comarca da sede da Grovic Data.
+
+13. IDIOMA
+Em caso de divergência entre esta versão em português e a tradução em inglês abaixo, prevalece a versão em português.
+
+------------------------------------------------------------------------------------------
+
+G2 BOOST SOFTWARE LICENSE (English translation)
+Version 1.0 — October 16, 2026
+
+Copyright (c) 2026 Grovic Data. All rights reserved.
+
+By installing, copying or using G2 Boost you agree to these terms. If you do not agree, do not install or use the software.
+
+1. OWNERSHIP. G2 Boost — program, source code, object code, interface, documentation, names, trademarks and logos — is the exclusive property of Grovic Data, protected by Brazilian Law 9,609/1998 (Software Law), Law 9,610/1998 (Copyright) and international treaties. This license grants a right of use; it does not transfer ownership.
+
+2. LICENSE GRANT. Grovic Data grants you a personal, non-exclusive, non-transferable, revocable license to install and use G2 Boost, in the object-code form distributed by Grovic Data or a channel it authorizes, on computers you own or control.
+
+3. RESTRICTIONS. Without Grovic Data's prior written permission you may not: (a) copy, distribute, sublicense, sell, rent, lend or make the software or its installer available to third parties, including download sites and third-party bundles; (b) modify, translate, adapt or create derivative works; (c) decompile, disassemble or reverse engineer it, except to the extent applicable law expressly permits despite this restriction; (d) remove or alter copyright, trademark or license notices; (e) use the software to break the law or infringe the rights of others.
+
+4. SOURCE CODE. Access to the source code, where any exists, is limited to people authorized by Grovic Data and does not extend the rights in this license.
+
+5. THIRD-PARTY COMPONENTS. G2 Boost includes open-source components governed by their own licenses, listed in THIRD_PARTY_NOTICES.md shipped with the software. Nothing in this license restricts the rights those licenses grant for their components.
+
+6. OPERATION AND USER RESPONSIBILITY. G2 Boost changes Windows settings, removes files or moves items to the Recycle Bin only on the user's action, with a preview and confirmation, and keeps a copy of the original values of each tweak so it can be reverted. The decision to apply each tweak or cleanup is the user's. Creating a Windows restore point before several changes is recommended.
+
+7. PRIVACY. G2 Boost collects no telemetry. Diagnostics stay on your computer. If you use the AI assistant, the context shown on screen is sent to the provider you choose (Anthropic, OpenAI or Google) with your own API key, stored in Windows Credential Manager; that provider's privacy policy applies.
+
+8. NO WARRANTY. To the maximum extent permitted by law, the software is provided "AS IS", without warranties of any kind, express or implied, including fitness for a particular purpose, performance gains, compatibility or freedom from errors.
+
+9. LIMITATION OF LIABILITY. To the maximum extent permitted by law, Grovic Data is not liable for indirect, incidental, special or consequential damages, lost profits, or loss of data or use arising from the use of or inability to use the software. Nothing in this license limits non-waivable consumer rights under Brazilian Law 8,078/1990 (Consumer Protection Code) or the mandatory law of your country.
+
+10. TERMINATION. This license ends automatically if you breach any of its terms; you must then uninstall the software and delete all copies.
+
+11. UPDATES. Future versions may come with updated terms, which apply to those versions.
+
+12. GOVERNING LAW AND VENUE. This license is governed by the laws of the Federative Republic of Brazil. Venue: the consumer's domicile where the Consumer Protection Code applies; otherwise, the courts of the district of Grovic Data's registered office.
+
+13. LANGUAGE. If this English translation and the Portuguese version differ, the Portuguese version prevails.

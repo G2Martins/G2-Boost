@@ -1,0 +1,13 @@
+<Configuration>
+  <!-- Windows Sandbox: test the unsigned installer on a throwaway Windows. Adjust HostFolder if the repo moves. -->
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>G:\1. Projetos\2.Projetos_Programação\G2 Boost\target\release\bundle\nsis</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\G2Boost-installer</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>explorer.exe C:\Users\WDAGUtilityAccount\Desktop\G2Boost-installer</Command>
+  </LogonCommand>
+</Configuration>

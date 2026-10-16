@@ -1,47 +1,59 @@
 # Documentação — G2 Boost
 
-**Última revisão:** 2026-10-15
+**Última revisão:** 2026-10-16
 
-Índice geral. Porta de entrada do agente: [../CLAUDE.md](../CLAUDE.md). Cada doc tem `**Última revisão:**` no topo; ler ANTES de codar, atualizar no MESMO PR que muda comportamento.
+Índice da documentação viva. Porta de entrada do agente: [../CLAUDE.md](../CLAUDE.md). Cada doc
+traz `**Última revisão:**` no topo; ler **antes** de codar e atualizar no **mesmo** PR que muda o
+comportamento.
+
+## Por onde começar
+
+| Quero… | Leia |
+| --- | --- |
+| Entender a arquitetura e o porquê do Tauri | [core/architecture.md](./core/architecture.md) |
+| Saber as regras (segurança, testes, i18n, docs) | [core/global-rules.md](./core/global-rules.md) |
+| Ver o que está feito e o que vem | [core/next-steps.md](./core/next-steps.md) |
+| Mexer na interface | [core/design-system.md](./core/design-system.md) |
+| Publicar uma versão | [release/distribution-and-trust.md](./release/distribution-and-trust.md) |
 
 ## core/ — Visão, arquitetura e engenharia
 
 | Documento | Descrição |
-|-----------|-----------|
-| [architecture.md](./core/architecture.md) | Stack decidida (Tauri 2), alternativas avaliadas, modelo de processos/elevação, MCP, empacotamento e assinatura, toolchain sem admin (§8). |
-| [global-rules.md](./core/global-rules.md) | **Regras globais** — segurança (caller hostil, destrutivo, nativo), testes, docs vivas, i18n, GSD, checklist de PR. Fonte única. |
-| [design-system.md](./core/design-system.md) | Tokens da paleta estilo ExitLag, tipografia, componentes base, convenção de gráficos/gauges. |
-| [next-steps.md](./core/next-steps.md) | Roadmap por fases e backlog; seção "Feito" por sessão. |
-| [ai-advisor.md](./core/ai-advisor.md) | Fase 9 implementada: conselheiro local (17 achados + classe para jogos), context pack sem PII, assistente no app (Claude SDK / ChatGPT / Gemini, BYOK no Cofre do Windows, busca restrita a fontes de benchmark), servidor MCP stdio só leitura e como registrar. |
+| --- | --- |
+| [architecture.md](./core/architecture.md) | Stack (Tauri 2: core Rust + UI React), alternativas avaliadas, processos e elevação, MCP, empacotamento, toolchain sem admin fora do C: (§8). |
+| [global-rules.md](./core/global-rules.md) | **Fonte única das regras**: todo caller é hostil, destrutivo = prévia + confirmação + allowlist + log, nativo (sem shell), menor privilégio, TDD, docs vivas, i18n, GSD, checklist de fase. |
+| [design-system.md](./core/design-system.md) | Tokens HSL, tipografia, componentes base, gráficos e gauges. |
+| [next-steps.md](./core/next-steps.md) | Roadmap por fases, o que foi feito em cada sessão, backlog. |
+| [ai-advisor.md](./core/ai-advisor.md) | Conselheiro local (achados de hardware, BIOS e temperatura), context pack sem dados pessoais, assistente no app (Claude/ChatGPT/Gemini, chave no Cofre do Windows, busca só em fontes confiáveis) com playbook de segurança, ações validadas, MCP só leitura via `--mcp`. |
 
-## boost/ — PC Boost
-
-| Documento | Descrição |
-|-----------|-----------|
-| [tweaks.md](./boost/tweaks.md) | Catálogo de tweaks (registro, serviços, SPI, energia), efeitos visuais em níveis (data-driven), backup/revert, elevação, purge de RAM, testes. |
-| [routines.md](./boost/routines.md) | Iniciar com o Windows (tarefa de logon), limpeza agendada, RAM ao abrir jogo (detecção Steam/exe), bandeja, settings validados, testes. |
-| [dashboard.md](./boost/dashboard.md) | Painel (KPIs: pontuação por hardware, pontos de restauração, bytes para limpar, RAM), monitor em tempo real (PDH/NVML), Meu PC (SMBIOS, DXGI, IOCTLs, TPM, Secure Boot), regras de recomendação. |
-
-## cleanup/ — Limpeza
+## Funcionalidades
 
 | Documento | Descrição |
-|-----------|-----------|
-| [catalog.md](./cleanup/catalog.md) | Catálogo com caminhos reais, prévia, `ConfirmToken`, execução nativa (junction-safe), histórico, o que ficou fora e por quê. |
+| --- | --- |
+| [boost/dashboard.md](./boost/dashboard.md) | Painel (pontuação por hardware, pontos de restauração, limpeza, RAM), monitor em tempo real, Meu PC (CPU, memória, GPU, monitores, discos, WinSAT), **BIOS/firmware** visível pelo Windows, sensores externos, recomendação por hardware. |
+| [boost/tweaks.md](./boost/tweaks.md) | Catálogo de ajustes (registro, serviços, SPI, energia, DirectX), presets, efeitos visuais em 4 níveis, backup/revert, elevação, limpeza de RAM, **inicialização e processos**, o que foi avaliado e recusado. |
+| [boost/routines.md](./boost/routines.md) | Iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja, configurações validadas. |
+| [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
+| [disk/analyzer.md](./disk/analyzer.md) | Varredura, treemap, filtros (`*.mp4 >1gb >6m`), mostrar na pasta, Lixeira com guarda, essenciais grandes. |
+| [network/network.md](./network/network.md) | Monitor (gateway/DNS/jogos), speedtest + bufferbloat, ping Steam, MTR/Ping/TCPing, DNS Optimizer com aplicar/restaurar. |
 
-## references/ — Material de referência
-
-| Documento | Descrição |
-|-----------|-----------|
-| [spacesniffer.md](./references/spacesniffer.md) | Spec funcional do analisador de disco extraída do manual/release notes do SpaceSniffer 2.1 (clean-room; licença proíbe engenharia reversa). |
-| [exitlag.md](./references/exitlag.md) | Spec por tela do ExitLag 5.23 (prints de 2026-10-14): o que replicar, como medir, o que fica fora de escopo, fontes de dados gratuitas. |
-| [binary-analysis.md](./references/binary-analysis.md) | Análise estática dos binários do ExitLag (`D:\ExitLag`, Qt 6 + driver NDIS/nfapi) e do SpaceSniffer: imports, strings, chaves de registro dos tweaks, método de limpeza de RAM, resolvers DNS. |
-| [legacy-bat-scripts.md](./references/legacy-bat-scripts.md) | Inventário dos scripts `Limpador Diario/Mensal 2026.bat` → catálogo de categorias de limpeza e tweaks, lições e bugs. |
-| [windows-services-research.md](./references/windows-services-research.md) | Pesquisa com fontes (Galdino Tech, winutil, Microsoft, benchmarks): o que cada serviço faz, padrão do Win11, efeitos colaterais, ganho real para jogos, mitos (Prefetch, Nagle, RAM cleaners, VBS/HVCI). Base das decisões de preset. |
-| [speccy-cpuz.md](./references/speccy-cpuz.md) | Análise estática do CPU-Z 3.01 e Speccy 1.34: os dois carregam o driver de kernel `cpuz.sys`; tabela funcionalidade × mecanismo × o que fazemos sem driver; licença; o que não copiar. |
-| [galdino-optimizer.md](./references/galdino-optimizer.md) | Extração do story do Galdino Optimizer (2026-10-14): painel com KPIs, pontuação de otimização, pontos de restauração, monitor em tempo real, ações recomendadas, Meu PC — com a API nativa de cada item e o que fica fora (temperatura de CPU exige driver). |
-
-## security/ — Segurança
+## release/ e security/
 
 | Documento | Descrição |
-|-----------|-----------|
-| [kaspersky-false-positive.md](./security/kaspersky-false-positive.md) | Por que o Kaspersky flagra os scripts, verdicts prováveis, como confirmar, mitigação nos scripts e no app novo (assinatura, nativo, submissão). |
+| --- | --- |
+| [release/distribution-and-trust.md](./release/distribution-and-trust.md) | Assinatura de código e SmartScreen/Smart App Control, Tauri (signCommand, updater), Store e winget, falso positivo de antivírus, teste em máquina limpa, checklist até a v1, **estado atual e como instalar em outro PC**. |
+| [security/kernel-driver-options.md](./security/kernel-driver-options.md) | Sensores de CPU sem driver próprio: v1 lê HWiNFO/LibreHardwareMonitor (feito), v2 PawnIO opt-in, v3 driver KMDF só leitura; WinRing0 proibido. |
+| [security/kaspersky-false-positive.md](./security/kaspersky-false-positive.md) | Por que antivírus marcaram os scripts antigos e como o app evita os mesmos padrões. |
+
+## references/ — Pesquisa
+
+| Documento | Descrição |
+| --- | --- |
+| [windows-services-research.md](./references/windows-services-research.md) | Serviços do Windows com fontes: o que fazem, padrão do Windows 11, efeitos colaterais, ganho real em jogos, mitos (Prefetch, Nagle, "limpadores de RAM", VBS/HVCI). Base dos presets. |
+| [legacy-bat-scripts.md](./references/legacy-bat-scripts.md) | Inventário dos scripts `.bat` antigos que viraram o catálogo de limpeza, com lições e bugs. |
+
+Demais notas de pesquisa ficam em `references/` para uso interno da equipe e não acompanham o produto.
+
+## Fora de `Docs/`
+
+[README](../README.md) (visão do produto e desenvolvimento) · [SECURITY](../SECURITY.md) (modelo de ameaças e como reportar) · [LICENSE](../LICENSE) · [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md) · `.planning/` (GSD, local, fora do git).

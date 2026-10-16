@@ -1,6 +1,6 @@
 # Painel, Meu PC e Monitor
 
-**Última revisão:** 2026-10-15 · Código: `crates/core/src/hardware.rs`, `monitor.rs`, `restore.rs`, `recommend.rs`; shell `src-tauri/src/lib.rs` (`Dashboard`); UI `src/pages/dashboard.tsx`, `src/components/ui/kpi-card.tsx`, `live-line.tsx` · Origem da ideia: [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
+**Última revisão:** 2026-10-16 · Código: `crates/core/src/hardware.rs`, `monitor.rs`, `firmware.rs`, `sensors.rs`, `restore.rs`, `recommend.rs`; shell `src-tauri/src/lib.rs` (`Dashboard`); UI `src/pages/dashboard.tsx`, `src/components/ui/kpi-card.tsx`, `live-line.tsx` · Origem da ideia: [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
 
 ## Painel (rota inicial)
 
@@ -11,7 +11,7 @@
 | **Arquivos para limpar** | `cleanup::preview` das categorias `default_on` (só medição) | **Limpeza** → rota Limpeza |
 | **Memória RAM** | último `monitor:tick` | **Limpar memória** (purge, admin) |
 
-**Ações recomendadas:** `score.pending` (até 6) com categoria e Aplicar; "Ver todas" → Boost. **Monitor em tempo real:** card com abas CPU/GPU/RAM/Disco/Rede, gauge + linha de 60 s + chips (clock, núcleos, temp. GPU, temp. CPU "exige driver", disco MB/s, rede ↓↑, RAM, GPU).
+**Ações recomendadas:** `score.pending` (até 6) com categoria e Aplicar; "Ver todas" → Boost. **Monitor em tempo real:** card com abas CPU/GPU/RAM/Disco/Rede, gauge + linha de 60 s + chips (clock, núcleos, temp. GPU, potência + temp. da CPU quando há sensor externo, disco MB/s, rede ↓↑, RAM, GPU).
 
 ## Recomendação por hardware (`recommend.rs`)
 
@@ -32,7 +32,7 @@ O motivo aparece como badge no card do Boost. Evidência: [../references/windows
 
 ## Monitor (`monitor.rs`)
 
-PDH por nome em inglês (`PdhAddEnglishCounterW`): `\Processor Information(_Total)\% Processor Utility` (fallback `% Processor Time`), `\GPU Engine(*)\Utilization Percentage` (soma por `engtype`, maior = GPU %, como o Gerenciador de Tarefas), `\GPU Adapter Memory(*)\Dedicated Usage`, `\PhysicalDisk(_Total)\% Disk Time` e `Disk Bytes/sec`. Clock: `CallNtPowerInformation(ProcessorInformation)` (máx. `CurrentMhz`). Rede: delta de `GetIfTable2` (interfaces up, sem loopback). Temp. GPU: NVML (`nvml.dll`, user-mode, só NVIDIA; AMD/Intel = backlog ADLX/IGCL). **Temp. de CPU não existe sem driver de kernel** (MSR) — mostrado como "—" com o motivo. Thread única no shell, 1 amostra/s, refcount por página (`monitor_start/stop`).
+PDH por nome em inglês (`PdhAddEnglishCounterW`): `\Processor Information(_Total)\% Processor Utility` (fallback `% Processor Time`), `\GPU Engine(*)\Utilization Percentage` (soma por `engtype`, maior = GPU %, como o Gerenciador de Tarefas), `\GPU Adapter Memory(*)\Dedicated Usage`, `\PhysicalDisk(_Total)\% Disk Time` e `Disk Bytes/sec`. Clock: `CallNtPowerInformation(ProcessorInformation)` (máx. `CurrentMhz`). Rede: delta de `GetIfTable2` (interfaces up, sem loopback). Temp. GPU: NVML (`nvml.dll`, user-mode, só NVIDIA; AMD/Intel = backlog ADLX/IGCL). **Temp. de CPU:** sem driver nosso. `sensors.rs` lê o que o usuário já roda — HWiNFO (memória compartilhada `Global\HWiNFO_SENS_SM2`, layout validado por assinatura `HWiS` + `VirtualQuery`, parser testado com blob sintético) ou LibreHardwareMonitor (WMI `root\LibreHardwareMonitor`, classe `Sensor`) — e escolhe "CPU Package"/"Tctl/Tdie"/"Core Max". Consultado a cada 5 amostras (WMI é caro); sem ferramenta aberta, o chip diz como ligar. Decisão completa: [../security/kernel-driver-options.md](../security/kernel-driver-options.md). Thread única no shell, 1 amostra/s, refcount por página (`monitor_start/stop`).
 
 ## Meu PC (`hardware.rs`)
 
@@ -69,9 +69,23 @@ Tudo sem admin.
 | Clock efetivo (turbo) | PDH `Processor Frequency` × `% Processor Performance` ÷ 100 (fallback `CallNtPowerInformation`) |
 | Relatório | `report_save`: `Documentos\G2 Boost\g2boost-<stamp>.json` + `.txt` (perfil, WinSAT, estado dos tweaks), abre no Explorer |
 
-**Não fazemos (exigem driver de kernel, como o `cpuz.sys` dos dois apps):** temperatura de CPU, VID/multiplicador/bus, voltagens e ventoinhas (Super I/O), tabela SPD/XMP e timings reais de RAM, registradores de chipset. Bench próprio de CPU e S.M.A.R.T. (elevado) = backlog.
+### BIOS / firmware (`firmware.rs`, card "Placa-mãe e BIOS")
+
+| Configuração | Como o Windows revela |
+|---|---|
+| Modo de boot UEFI × legado (CSM) | `GetFirmwareType` |
+| Secure Boot, TPM | registro / `Tbsi_GetDeviceInfo` (já no perfil) |
+| Virtualização (VT-x/AMD-V) | `IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED)` **ou** hypervisor presente (CPUID.1:ECX[31]) — com Hyper-V/VBS o Windows vira convidado, o flag e o bit VMX do CPUID leem falso; a UI mostra "ligada (Hyper-V/VBS ativo)" |
+| Resizable BAR | tamanho da janela BAR1 pela NVML (`nvmlDeviceGetBAR1MemoryInfo`): 256 MB = desligado, ≈ VRAM = ligado (só NVIDIA por ora) |
+| RAM no XMP/EXPO | configurada ≥ nominal do part number em todos os pentes |
+| Idade da BIOS | data SMBIOS tipo 0 (`MM/DD/YYYY`) |
+| Inicialização rápida, hibernação | `HiberbootEnabled`, `HibernateEnabled` |
+
+Viram achados do conselheiro (`legacy_boot`, `rebar_off`, `bios_old`). **Não visíveis pelo Windows:** C-states, limites de potência, curvas de ventoinha, overclock — a UI diz isso. Na máquina do dono: UEFI, Secure Boot, TPM 2.0, VBS ativo, ReBAR **desligado** (256 MB numa RTX 3050), XMP ok, BIOS F10 de 3,4 anos.
+
+**Não fazemos sem sensor externo (exigem driver de kernel, como o `cpuz.sys` de CPU-Z/Speccy):** VID/multiplicador/bus, tabela SPD/XMP e timings reais de RAM, registradores de chipset; temperatura/ventoinhas/tensões só via HWiNFO/LHM abertos. Bench próprio de CPU e S.M.A.R.T. (elevado) = backlog.
 
 ## Testes
-`hardware`: parser SMBIOS com blob sintético (tipos 1/2/3), perfil ao vivo (núcleos, RAM, discos com disco do sistema, GPU). `monitor`: duas amostras em faixa (CPU/GPU/disco 0–100, clock > 0). `restore`: parse de `CreationTime`, status sem admin, `create` recusa sem admin. `recommend`: regras com perfis fictícios (SSD desktop, HD notebook com Game Pass/Outlook) e cálculo de score. `tasksched`: Compatibility Appraiser legível ("… Exp" no 24H2+).
+`hardware`: parser SMBIOS com blob sintético (tipos 1/2/3), perfil ao vivo (núcleos, RAM, discos com disco do sistema, GPU). `monitor`: duas amostras em faixa (CPU/GPU/disco 0–100, clock > 0). `restore`: parse de `CreationTime`, status sem admin, `create` recusa sem admin. `recommend`: regras com perfis fictícios (SSD desktop, HD notebook com Game Pass/Outlook, Windows 10 × 11) e cálculo de score. `firmware`: datas SMBIOS, leitura ao vivo sem admin. `sensors`: parser HWiNFO com blob sintético e escolha da temperatura. `tasksched`: Compatibility Appraiser legível ("… Exp" no 24H2+).
 
 **Não verificado pelo agente:** criar ponto de restauração (admin), Boost agora com admin, NVML em máquina AMD/Intel (deve ficar `None`).

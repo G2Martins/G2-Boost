@@ -1,6 +1,6 @@
 # PC Boost — tweaks, efeitos visuais, serviços, RAM
 
-**Última revisão:** 2026-10-14 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
+**Última revisão:** 2026-10-16 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
 
 ## Modelo
 
@@ -59,6 +59,21 @@ A UI calcula o preset ativo comparando o estado real (tweaks "indisponíveis" s�
 **Fora, de propósito:** `Psched\NonBestEffortLimit` (fica em `Policies` — gatilho do Kaspersky, efeito desprezível), `MSMQ\TCPNoDelay` (cargo cult, só MSMQ), Prefetch (ver `legacy-bat-scripts.md`), Windows Update/Defender/Spooler.
 
 Serviços: `WSearch` é "automático (início atrasado)"; o revert restaura o tipo de início gravado, mas não a flag de atraso (`ChangeServiceConfig2W` fica para quando alguém sentir falta). Serviço ausente na máquina (ex.: Xbox em LTSC) é ignorado; se nenhum existir, o card mostra "Indisponível".
+
+### Adicionado em 2026-10-16
+
+| id | O que faz | Preset |
+|---|---|---|
+| `windowed_optimizations` | Flag `SwapEffectUpgradeEnable=1` dentro de `HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings` (a opção "Otimizações para jogos em janela" de Configurações › Tela › Gráficos): DX10/11 em janela/sem borda usam flip model → menos latência, VRR/Auto HDR. Edita **só essa chave** da string (`dx_set`/`dx_get`, testados) e preserva Auto HDR/VRR; backup = string inteira. Recomendado só no Windows 11 (`windows10` como motivo no 10). | Padrão, Alto |
+
+**Avaliados e deixados de fora** (vídeos/stories de otimização): HPET/`useplatformclock` via bcdedit (shell + efeito controverso, piora em CPUs modernas), resolução de timer global (`timeBeginPeriod` afeta o sistema todo; Windows 11 já isola por processo), prioridade por IFEO para exes de jogo (é o padrão que antivírus marcam como persistência/injeção), "limpeza de RAM" contínua de working set (piora; só purge da standby sob demanda), desligar mitigações de CPU (segurança).
+
+## Inicialização e processos (`startup.rs`, `procs.rs` — aba "Inicialização")
+
+- **Lista:** `HKCU\…\Run`, `HKLM\…\Run`, `HKLM\WOW6432Node\…\Run`, pastas Inicializar do usuário e comum. Estado lido de `…\Explorer\StartupApproved\{Run,Run32,StartupFolder}` exatamente como o Gerenciador de Tarefas (1º byte par = ligado; ímpar = desligado + FILETIME).
+- **Desligar/ligar** grava só o flag `StartupApproved` (12 bytes): a entrada Run e o atalho ficam onde estavam; religar restaura. Item precisa existir na lista ao vivo (caller hostil); HKLM/pasta comum exigem admin (`needs_admin`); **Segurança do Windows (`SecurityHealth`) é protegida** — recusada no core (`protected_item`), cadeado na UI.
+- **Processos:** `EnumProcesses` + `QueryFullProcessImageNameW` + `GetProcessTimes` em duas amostras (1 s) → agrupado por exe (contagem, RAM = soma do working set, CPU % da capacidade total), `system` = vive sob `C:\Windows`. Só leitura: o G2 Boost **não mata processo**; a IA e a UI apontam para fechar o app ou tirá-lo da inicialização.
+- Testes: flags de `StartupApproved` iguais ao Gerenciador de Tarefas, round-trip real em HKCU com entrada descartável, item desconhecido recusado, proteção; processos agrupam a família do próprio teste.
 
 ## Efeitos visuais (`visualfx.rs`)
 

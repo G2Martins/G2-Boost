@@ -28,10 +28,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "Grovic Data",
     "shortDescription": "G2 Boost",
-    "longDescription": "Disk analyzer, Windows cleaner, network tools and game performance tweaks.",
+    "longDescription": "Hardware diagnostics, Windows cleanup, disk analyzer, network tools and reversible game-performance tweaks.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,10 +43,20 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["PortugueseBR", "English"],
+        "languages": [
+          "PortugueseBR",
+          "English"
+        ],
         "displayLanguageSelector": true,
         "installMode": "currentUser"
       }
+    },
+    "copyright": "© 2026 Grovic Data. Todos os direitos reservados.",
+    "category": "Utility",
+    "licenseFile": "../LICENSE",
+    "resources": {
+      "../LICENSE": "LICENSE.txt",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
     }
   }
 }
