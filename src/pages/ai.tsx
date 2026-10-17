@@ -172,7 +172,7 @@ export function AiPage() {
           ...prior.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text })),
           { role: "user", text: q },
         ];
-        answer = await askStateless(provider, models[provider], system, turns);
+        answer = await askStateless(provider, models[provider], system, turns, setStreaming);
       }
       setMessages((m) => [...m, { role: "assistant", text: answer.text, answer }]);
     } catch (e) {

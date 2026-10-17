@@ -240,7 +240,37 @@ export class ClaudeChat {
   }
 }
 
-/* ---------------- OpenAI (Responses API, REST) ---------------- */
+/* ---------------- SSE helper ---------------- */
+
+/** Read a Server-Sent-Events body, calling `onData` with each `data:` payload. */
+async function readSse(res: Response, onData: (data: string) => void): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("no_stream");
+  const dec = new TextDecoder();
+  let buf = "";
+  const drain = () => {
+    let i = buf.indexOf("\n\n");
+    while (i >= 0) {
+      const event = buf.slice(0, i);
+      buf = buf.slice(i + 2);
+      for (const line of event.split("\n")) {
+        const s = line.trimStart();
+        if (s.startsWith("data:")) onData(s.slice(5).trim());
+      }
+      i = buf.indexOf("\n\n");
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    drain();
+  }
+  buf += "\n\n";
+  drain();
+}
+
+/* ---------------- OpenAI (Responses API, REST + SSE) ---------------- */
 
 type OpenAIOutput = {
   type: string;
@@ -251,19 +281,8 @@ type OpenAIOutput = {
   }[];
 };
 
-async function askOpenAI(model: string, system: string, turns: Turn[]): Promise<Answer> {
-  const res = await tauriFetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await key("openai")}` },
-    body: JSON.stringify({
-      model,
-      instructions: system,
-      input: turns.map((t) => ({ role: t.role, content: t.text })),
-      tools: [{ type: "web_search", filters: { allowed_domains: TRUSTED_DOMAINS } }],
-    }),
-  });
-  const body = (await res.json()) as { output?: OpenAIOutput[]; error?: { message?: string } };
-  if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+/** Extract text + citations from a (complete) Responses body. */
+function openAiAnswer(body: { output?: OpenAIOutput[] }): Answer {
   const text: string[] = [];
   const sources: Source[] = [];
   for (const item of body.output ?? []) {
@@ -280,9 +299,61 @@ async function askOpenAI(model: string, system: string, turns: Turn[]): Promise<
   return { text: clean, sources: dedupe(sources), actions };
 }
 
-/* ---------------- Gemini (generateContent, REST) ---------------- */
+async function askOpenAI(
+  model: string,
+  system: string,
+  turns: Turn[],
+  onText: (s: string) => void,
+): Promise<Answer> {
+  const res = await tauriFetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await key("openai")}` },
+    body: JSON.stringify({
+      model,
+      instructions: system,
+      input: turns.map((t) => ({ role: t.role, content: t.text })),
+      tools: [{ type: "web_search", filters: { allowed_domains: TRUSTED_DOMAINS } }],
+      stream: true,
+    }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+  }
+  let shown = "";
+  let finalBody: { output?: OpenAIOutput[] } | null = null;
+  await readSse(res, (data) => {
+    if (data === "[DONE]") return;
+    let ev: {
+      type?: string;
+      delta?: unknown;
+      response?: { output?: OpenAIOutput[] };
+      message?: string;
+    };
+    try {
+      ev = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (ev.type === "response.output_text.delta" && typeof ev.delta === "string") {
+      shown += ev.delta;
+      // Hide the actions block while it streams in.
+      onText(shown.replace(/```g2boost-actions[\s\S]*$/, "").trimEnd());
+    } else if (
+      (ev.type === "response.completed" || ev.type === "response.incomplete") &&
+      ev.response
+    ) {
+      finalBody = ev.response;
+    } else if (ev.type === "error") {
+      throw new Error(ev.message ?? "stream_error");
+    }
+  });
+  return finalBody ? openAiAnswer(finalBody) : { ...extractActions(shown), sources: [] };
+}
 
-type GeminiResponse = {
+/* ---------------- Gemini (streamGenerateContent, SSE) ---------------- */
+
+type GeminiChunk = {
   candidates?: {
     content?: { parts?: { text?: string }[] };
     groundingMetadata?: { groundingChunks?: { web?: { uri?: string; title?: string } }[] };
@@ -290,10 +361,15 @@ type GeminiResponse = {
   error?: { message?: string };
 };
 
-async function askGemini(model: string, system: string, turns: Turn[]): Promise<Answer> {
+async function askGemini(
+  model: string,
+  system: string,
+  turns: Turn[],
+  onText: (s: string) => void,
+): Promise<Answer> {
   if (!/^[a-z0-9.-]+$/i.test(model)) throw new Error("invalid_model");
   const res = await tauriFetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": await key("gemini") },
@@ -307,24 +383,43 @@ async function askGemini(model: string, system: string, turns: Turn[]): Promise<
       }),
     },
   );
-  const body = (await res.json()) as GeminiResponse;
-  if (!res.ok) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
-  const cand = body.candidates?.[0];
-  const text = (cand?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as GeminiChunk | null;
+    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+  }
+  let shown = "";
+  const grounding: { web?: { uri?: string; title?: string } }[] = [];
+  await readSse(res, (data) => {
+    let chunk: GeminiChunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      return;
+    }
+    const cand = chunk.candidates?.[0];
+    for (const part of cand?.content?.parts ?? []) {
+      if (part.text) shown += part.text;
+    }
+    for (const g of cand?.groundingMetadata?.groundingChunks ?? []) grounding.push(g);
+    onText(shown.replace(/```g2boost-actions[\s\S]*$/, "").trimEnd());
+  });
   // Gemini has no domain allowlist: grounding links are shown as returned.
-  const sources = (cand?.groundingMetadata?.groundingChunks ?? [])
+  const sources = grounding
     .map((g) => ({ url: g.web?.uri ?? "", title: g.web?.title ?? g.web?.uri ?? "" }))
     .filter((s) => s.url);
-  const { text: clean, actions } = extractActions(text);
+  const { text: clean, actions } = extractActions(shown);
   return { text: clean, sources: dedupe(sources), actions };
 }
 
-/** Stateless providers get the whole visible transcript each time. */
+/** Stateless providers get the whole visible transcript each time; text streams via `onText`. */
 export async function askStateless(
   provider: Exclude<Provider, "anthropic">,
   model: string,
   system: string,
   turns: Turn[],
+  onText: (s: string) => void,
 ): Promise<Answer> {
-  return provider === "openai" ? askOpenAI(model, system, turns) : askGemini(model, system, turns);
+  return provider === "openai"
+    ? askOpenAI(model, system, turns, onText)
+    : askGemini(model, system, turns, onText);
 }

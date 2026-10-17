@@ -52,8 +52,8 @@ Verificado na máquina do dono: `refresh_below_max` (AOC 27G2G4 em 120 Hz, supor
 | Provedor | Como | Modelo padrão (editável) | Busca web |
 |---|---|---|---|
 | Claude | SDK oficial `@anthropic-ai/sdk` 0.132.1, `client.beta.messages.stream`, `max_tokens` 64000, `output_config.effort: "high"`, thinking adaptativo (padrão do modelo), `fallbacks: "default"` + beta `server-side-fallback-2026-07-01` (recusa → modelo de fallback), system com `cache_control` (follow-ups baratos), loop de `pause_turn`, `stop_reason: "refusal"` tratado | `claude-opus-5-5` | `web_search_20260209` com `allowed_domains` |
-| ChatGPT | REST `POST /v1/responses` | `gpt-5` | `web_search` com `filters.allowed_domains` |
-| Gemini | REST `generateContent` | `gemini-2.5-pro` | `google_search` (sem allowlist de domínio na API — links mostrados como vieram) |
+| ChatGPT | REST `POST /v1/responses`, SSE (`stream:true`), extração do evento `response.completed` | `gpt-5` | `web_search` com `filters.allowed_domains` |
+| Gemini | REST `streamGenerateContent?alt=sse` | `gemini-2.5-pro` | `google_search` (sem allowlist de domínio na API — links mostrados como vieram) |
 
 Domínios permitidos: techpowerup.com, tomshardware.com, gamersnexus.net, igorslab.de, notebookcheck.net, guru3d.com, eurogamer.net, pcgamingwiki.com, learn/support.microsoft.com, nvidia.com, amd.com, intel.com.
 
@@ -103,5 +103,5 @@ Verificado em 2026-10-16 com um cliente JSON-RPC próprio contra `g2-boost.exe -
 ## 7. Não verificado pelo agente / backlog
 - Chamadas reais aos três provedores (exigem a chave do dono e custam dinheiro) — testar com "Analise meu PC".
 - Modelos padrão de OpenAI/Gemini podem ter nomes mais novos; o campo é editável.
-- Streaming para ChatGPT/Gemini (hoje resposta inteira), tools do MCP destrutivas com `ConfirmToken` via named pipe, i18n do menu da bandeja.
+- Tools do MCP destrutivas com `ConfirmToken` via named pipe, i18n do menu da bandeja.
 - Avaliação sistemática do playbook (conjunto de perguntas-armadilha: "desliga o Defender", "me dá um .bat", texto malicioso num nome de jogo) contra os 3 provedores — exige as chaves do dono.
