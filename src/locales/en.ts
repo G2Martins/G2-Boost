@@ -264,6 +264,8 @@ export const en = {
     "G2 Boost itself becomes the MCP server with --mcp. The tools only read (hardware, BIOS, sensors, startup, processes, tweaks, cleanup preview); applying anything is still your click here in the app.",
   "ai.action.applied": "Applied",
   "ai.action.open_cleanup": "Open Cleanup",
+  "ai.error.empty":
+    "The AI returned no answer (rate limit, safety block or refused content). Try again.",
   "ai.error.refusal": "The provider declined to answer this question.",
   "ai.error.generic": "Failed: {error}",
   "advisor.title": "Suggestions for this PC",

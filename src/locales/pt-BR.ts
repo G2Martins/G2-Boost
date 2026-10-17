@@ -262,6 +262,8 @@ export const ptBR = {
     "O próprio G2 Boost vira o servidor MCP com --mcp. As ferramentas só leem (hardware, BIOS, sensores, inicialização, processos, ajustes, prévia de limpeza); aplicar qualquer coisa continua sendo um clique seu aqui no app.",
   "ai.action.applied": "Aplicado",
   "ai.action.open_cleanup": "Abrir Limpeza",
+  "ai.error.empty":
+    "A IA não retornou resposta (limite de uso, bloqueio de segurança ou conteúdo recusado). Tente de novo.",
   "ai.error.refusal": "O provedor recusou responder a esta pergunta.",
   "ai.error.generic": "Falhou: {error}",
   "advisor.title": "Sugestões para este PC",

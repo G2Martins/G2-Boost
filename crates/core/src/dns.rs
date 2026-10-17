@@ -351,14 +351,25 @@ pub fn apply(guid: &str, primary: Ipv4Addr, secondary: Option<Ipv4Addr>) -> Resu
     Ok(())
 }
 
-/// Put back what was there before G2 Boost touched it (automatic/DHCP when no backup).
+/// Put back exactly what was recorded before G2 Boost first changed this adapter. With no
+/// recorded value there is nothing to restore (never guess DHCP — that would drop hand-set DNS).
 pub fn restore(guid: &str) -> Result<(), DnsError> {
     if !system::is_elevated() {
         return Err(DnsError::NeedsAdmin);
     }
     let g = adapter_guid(guid)?;
     let mut b = load_backup();
-    let prev = b.previous.remove(guid).unwrap_or_default();
+    let Some(prev) = b.previous.remove(guid) else {
+        return Err(DnsError::UnknownAdapter);
+    };
+    // The backup file is user-writable (rule zero): validate every address before the admin API.
+    // Empty string = the adapter was on automatic/DHCP originally, which is a valid thing to restore.
+    for ip in prev.split([',', ' ']).filter(|s| !s.is_empty()) {
+        let a: Ipv4Addr = ip.parse().map_err(|_| DnsError::InvalidAddress)?;
+        if a.is_unspecified() || a.is_broadcast() || a.is_multicast() || a.is_loopback() {
+            return Err(DnsError::InvalidAddress);
+        }
+    }
     set_name_servers(&g, &prev)?;
     save_backup(&b)?;
     crate::cleanup::flush_dns_cache();

@@ -423,6 +423,18 @@ pub(crate) fn recyclable(p: &Path, windows_dir: &Path, profile: &Path) -> bool {
     !(drive_root || program_files || roots.contains(&l))
 }
 
+/// `canonicalize` returns an extended-length prefix; the guard and the shell want the plain path.
+pub(crate) fn strip_verbatim(p: &Path) -> PathBuf {
+    let s = p.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{rest}"))
+    } else if let Some(rest) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(rest)
+    } else {
+        p.to_path_buf()
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct RecycleOutcome {
     pub recycled: u32,
@@ -469,12 +481,21 @@ pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome
     let profile = crate::cleanup::env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
     let mut paths = Vec::with_capacity(sel.len());
     for ids in &sel {
-        let p = path_of(root, ids).ok_or(RecycleError::NotFound)?;
-        let md = fs::symlink_metadata(&p).map_err(|_| RecycleError::NotFound)?;
-        if ids.is_empty() || is_reparse(&md) || !recyclable(&p, &win, &profile) {
+        if ids.is_empty() {
             return Err(RecycleError::Protected);
         }
-        paths.push(p);
+        let p = path_of(root, ids).ok_or(RecycleError::NotFound)?;
+        let md = fs::symlink_metadata(&p).map_err(|_| RecycleError::NotFound)?;
+        if is_reparse(&md) {
+            return Err(RecycleError::Protected);
+        }
+        // Resolve the real target (any reparse point on the path, `/` separators, trailing dots)
+        // before the lexical guard, and recycle that resolved path.
+        let real = strip_verbatim(&fs::canonicalize(&p).map_err(|_| RecycleError::NotFound)?);
+        if !recyclable(&real, &win, &profile) {
+            return Err(RecycleError::Protected);
+        }
+        paths.push(real);
     }
     let t0 = Instant::now();
     // Double-NUL-terminated list.
@@ -661,6 +682,17 @@ mod tests {
         ] {
             assert!(!recyclable(Path::new(no), win, prof), "{no}");
         }
+    }
+
+    #[test]
+    fn verbatim_prefix_is_stripped() {
+        assert_eq!(strip_verbatim(Path::new(r"\\?\C:\Users\me\a.txt")), PathBuf::from(r"C:\Users\me\a.txt"));
+        assert_eq!(strip_verbatim(Path::new(r"\\?\UNC\srv\share\x")), PathBuf::from(r"\\srv\share\x"));
+        assert_eq!(strip_verbatim(Path::new(r"D:\x")), PathBuf::from(r"D:\x"));
+        // A forward-slash spelling of System32 resolves to the real path, which the guard blocks.
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let real = strip_verbatim(&fs::canonicalize(format!("{}/System32", win.replace('\\', "/"))).unwrap());
+        assert!(!recyclable(&real, Path::new(&win), Path::new(r"C:\Users\me")), "{real:?}");
     }
 
     #[test]

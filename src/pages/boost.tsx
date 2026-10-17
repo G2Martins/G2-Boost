@@ -707,7 +707,11 @@ function DnsTab({ elevated }: { elevated: boolean }) {
           >
             {t("boost.dns.pick_fastest")}
           </Button>
-          <Button variant="outline" disabled={!elevated || !main || busy} onClick={restore}>
+          <Button
+            variant="outline"
+            disabled={!elevated || !main || !main.has_backup || busy}
+            onClick={restore}
+          >
             {t("boost.dns.restore")}
           </Button>
         </div>

@@ -101,7 +101,7 @@ ACTIONS — when G2 Boost can apply something you recommend, end the answer with
 Tweak ids allowed: ${tweakIds} (prefer recommended_here true whose status is not already "on"). Cleanup ids: ${cleanupIds}. Startup: only items with enabled true and protected false. At most ${MAX_ACTIONS} per list. Omit the block when there is nothing to apply. The user still confirms every item in the app, which backs up the original values first.
 
 <pc_context>
-${contextJson}
+${contextJson.replace(/</g, "\\u003c")}
 </pc_context>`;
 }
 
@@ -200,7 +200,7 @@ export class ClaudeChat {
       });
       stream.on("text", (delta) => {
         shown += delta;
-        onText(shown);
+        onText(shown.replace(/```g2boost-actions[\s\S]*$/, "").trimEnd());
       });
       const msg = await stream.finalMessage();
       this.history.push({
@@ -263,7 +263,8 @@ async function readSse(res: Response, onData: (data: string) => void): Promise<v
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    buf += dec.decode(value, { stream: true });
+    // Strip CR so CRLF/CR event framing (Gemini's SSE) reduces to the "\n\n" boundary below.
+    buf += dec.decode(value, { stream: true }).replace(/\r/g, "");
     drain();
   }
   buf += "\n\n";
@@ -344,11 +345,13 @@ async function askOpenAI(
       ev.response
     ) {
       finalBody = ev.response;
-    } else if (ev.type === "error") {
+    } else if (ev.type === "response.failed" || ev.type === "error") {
       throw new Error(ev.message ?? "stream_error");
     }
   });
-  return finalBody ? openAiAnswer(finalBody) : { ...extractActions(shown), sources: [] };
+  if (finalBody) return openAiAnswer(finalBody);
+  if (!shown.trim()) throw new Error("empty_response");
+  return { ...extractActions(shown), sources: [] };
 }
 
 /* ---------------- Gemini (streamGenerateContent, SSE) ---------------- */
@@ -396,6 +399,7 @@ async function askGemini(
     } catch {
       return;
     }
+    if (chunk.error) throw new Error(chunk.error.message ?? "stream_error");
     const cand = chunk.candidates?.[0];
     for (const part of cand?.content?.parts ?? []) {
       if (part.text) shown += part.text;
@@ -403,6 +407,7 @@ async function askGemini(
     for (const g of cand?.groundingMetadata?.groundingChunks ?? []) grounding.push(g);
     onText(shown.replace(/```g2boost-actions[\s\S]*$/, "").trimEnd());
   });
+  if (!shown.trim()) throw new Error("empty_response"); // safety block / no candidate
   // Gemini has no domain allowlist: grounding links are shown as returned.
   const sources = grounding
     .map((g) => ({ url: g.web?.uri ?? "", title: g.web?.title ?? g.web?.uri ?? "" }))

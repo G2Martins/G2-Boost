@@ -537,6 +537,13 @@ pub fn apply(id: &str, on: bool) -> Result<TweakState, BoostError> {
     if let Kind::VisualFx = t.kind {
         return if on { apply_visual_fx(Level::Balanced) } else { revert_visual_fx() };
     }
+    // The DirectX settings string is shared with Auto HDR / VRR; edit only this tweak's own key,
+    // both on and off, instead of capturing/replaying the whole value.
+    if let Kind::DxFlag(key) = t.kind {
+        dx_write(key, on.then_some("1"))?;
+        visualfx::broadcast_setting_change();
+        return Ok(detect(t));
+    }
     if on {
         ensure_backup(t)?;
         apply_on(t)?;

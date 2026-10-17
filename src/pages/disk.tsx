@@ -75,6 +75,8 @@ export function DiskPage() {
     setSummary(null);
     setView(null);
     setTop([]);
+    setFolderPick(null);
+    setFolderMsg(null);
     setProgress({ files: 0, dirs: 0, bytes: 0, errors: 0, current: root });
     try {
       await backend.diskScanStart(root.endsWith("\\") ? root : `${root}\\`);
@@ -132,6 +134,7 @@ export function DiskPage() {
         (o.failed ? ` ${t("disk.recycle.failed", { count: o.failed })}` : ""),
     );
     setVersion((v) => v + 1);
+    setFolderPick(null);
     await loadRoot();
   };
   const jump = async (i: number) => {

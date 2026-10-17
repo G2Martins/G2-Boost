@@ -182,7 +182,9 @@ export function AiPage() {
           ? t("ai.error.refusal")
           : msg === "no_key"
             ? t("ai.key.missing")
-            : t("ai.error.generic", { error: msg });
+            : msg === "empty_response"
+              ? t("ai.error.empty")
+              : t("ai.error.generic", { error: msg });
       setMessages((m) => [...m, { role: "assistant", text: "", error: text }]);
       claude.current = null; // start clean after a failed Claude turn (history stays append-only)
     } finally {
