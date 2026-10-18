@@ -9,9 +9,9 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, context, dns, firmware, procs, secrets, sensors, startup, steam};
+use g2boost_core::{advisor, context, dns, firmware, procs, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
-use g2boost_core::disk::{self, BigFile, Node, NodeView, ScanProgress, ScanSummary};
+use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
 use g2boost_core::monitor::Monitor;
 use g2boost_core::network::{self, Hop, LatencyStats, Probe};
@@ -369,20 +369,16 @@ async fn advisor_report(state: State<'_, Dashboard>) -> Result<advisor::Report, 
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn steam_games() -> Vec<steam::Game> {
-    tauri::async_runtime::spawn_blocking(steam::installed).await.unwrap_or_default()
-}
-
 /// The exact JSON the assistant will send (shown to the user before sending).
 #[tauri::command]
-async fn ai_context() -> Result<serde_json::Value, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+async fn ai_context(state: State<'_, Dashboard>) -> Result<serde_json::Value, String> {
+    let cached = state.profile.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || {
         let sample = Monitor::new().map(|mut m| {
             std::thread::sleep(Duration::from_millis(800));
             m.sample()
         });
-        context::build(sample)
+        context::build_with(&cached.unwrap_or_else(hardware::profile), sample)
     })
     .await
     .map_err(|e| e.to_string())
@@ -626,13 +622,6 @@ fn disk_tree(state: State<'_, DiskState>, ids: Vec<u32>, depth: u8, max_children
     disk::view(&tree, &ids, depth.min(4), (max_children as usize).clamp(1, 400))
 }
 
-#[tauri::command]
-fn disk_top_files(state: State<'_, DiskState>, n: u32) -> Vec<BigFile> {
-    let Some(tree) = state.tree.lock().unwrap().clone() else {
-        return Vec::new();
-    };
-    disk::top_files(&tree, (n as usize).clamp(1, 500))
-}
 
 /// Filtered file list (`*.mp4 >1gb >6m`), largest first.
 #[tauri::command]
@@ -809,15 +798,12 @@ async fn dns_rank(samples: u32) -> Vec<dns::RankEntry> {
     tauri::async_runtime::spawn_blocking(move || dns::rank(samples)).await.unwrap_or_default()
 }
 
-/// Apply a catalog provider (never an arbitrary string from the UI) to one adapter. Admin.
+/// Apply a catalog provider to one adapter (admin); the core validates the provider id.
 #[tauri::command]
 async fn dns_apply(guid: String, provider: String) -> Result<(), String> {
-    let (_, _, p, s) = *dns::PROVIDERS.iter().find(|(id, ..)| *id == provider).ok_or("unknown_provider")?;
-    tauri::async_runtime::spawn_blocking(move || {
-        dns::apply(&guid, Ipv4Addr::from(p), Some(Ipv4Addr::from(s))).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || dns::apply(&guid, &provider).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -853,11 +839,6 @@ async fn firmware_info(state: State<'_, Dashboard>) -> Result<firmware::Firmware
     tauri::async_runtime::spawn_blocking(move || firmware::read(&cached.unwrap_or_else(hardware::profile)))
         .await
         .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn sensors_read() -> Option<sensors::External> {
-    tauri::async_runtime::spawn_blocking(sensors::read).await.ok().flatten()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -954,7 +935,6 @@ pub fn run() {
             winsat_start,
             report_save,
             advisor_report,
-            steam_games,
             ai_context,
             ai_key_status,
             ai_key_set,
@@ -964,7 +944,6 @@ pub fn run() {
             disk_scan_cancel,
             disk_summary,
             disk_tree,
-            disk_top_files,
             disk_search,
             disk_essentials,
             disk_reveal,
@@ -979,8 +958,7 @@ pub fn run() {
             startup_list,
             startup_set,
             procs_top,
-            firmware_info,
-            sensors_read
+            firmware_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

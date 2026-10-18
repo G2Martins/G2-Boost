@@ -1,6 +1,6 @@
 # IA no app + MCP local + conselheiro local (Fase 9)
 
-**Última revisão:** 2026-10-16 · Status: **implementado** (v1.1: playbook de segurança, ações de inicialização, firmware/sensores no contexto, MCP no próprio exe). Código: `crates/core/src/advisor.rs`, `context.rs`, `firmware.rs`, `sensors.rs`, `startup.rs`, `procs.rs`, `steam.rs`, `secrets.rs`; `crates/mcp/src/lib.rs`; shell `src-tauri/src/lib.rs` (`advisor_report`, `ai_context`, `ai_key_*`, `--mcp`); UI `src/lib/ai.ts`, `src/pages/ai.tsx`, `src/components/safe-markdown.tsx`, `src/components/advisor-card.tsx`; teste `tests/ai.test.ts`.
+**Última revisão:** 2026-10-18 · Status: **implementado** (v1.1: playbook de segurança, ações de inicialização, firmware/sensores no contexto, MCP no próprio exe). Código: `crates/core/src/advisor.rs`, `context.rs`, `firmware.rs`, `sensors.rs`, `startup.rs`, `procs.rs`, `steam.rs`, `secrets.rs`; `crates/mcp/src/lib.rs`; shell `src-tauri/src/lib.rs` (`advisor_report`, `ai_context`, `ai_key_*`, `--mcp`); UI `src/lib/ai.ts`, `src/pages/ai.tsx`, `src/components/safe-markdown.tsx`, `src/components/advisor-card.tsx`; teste `tests/ai.test.ts`.
 
 Pedido do dono (2026-10-14/15): IA (Claude, Gemini, ChatGPT) dentro do G2 Boost entendendo a situação do Windows, recomendando ações com prós e contras, analisando temperaturas, sugerindo upgrades, estimando FPS e buscando em fontes confiáveis.
 
@@ -53,7 +53,7 @@ Verificado na máquina do dono: `refresh_below_max` (AOC 27G2G4 em 120 Hz, supor
 |---|---|---|---|
 | Claude | SDK oficial `@anthropic-ai/sdk` 0.132.1, `client.beta.messages.stream`, `max_tokens` 64000, `output_config.effort: "high"`, thinking adaptativo (padrão do modelo), `fallbacks: "default"` + beta `server-side-fallback-2026-07-01` (recusa → modelo de fallback), system com `cache_control` (follow-ups baratos), loop de `pause_turn`, `stop_reason: "refusal"` tratado | `claude-opus-5-5` | `web_search_20260209` com `allowed_domains` |
 | ChatGPT | REST `POST /v1/responses`, SSE (`stream:true`), extração do evento `response.completed` | `gpt-5` | `web_search` com `filters.allowed_domains` |
-| Gemini | REST `streamGenerateContent?alt=sse` | `gemini-2.5-pro` | `google_search` (sem allowlist de domínio na API — links mostrados como vieram) |
+| Gemini | REST `streamGenerateContent?alt=sse` | `gemini-2.5-pro` | `google_search` (a API não aceita allowlist de domínio: a resposta pode usar qualquer site; as **fontes exibidas** são pós-filtradas pelos `TRUSTED_DOMAINS` — `isTrustedSource`, pelo host ou, nos links de redirect do Google, pelo título) |
 
 Domínios permitidos: techpowerup.com, tomshardware.com, gamersnexus.net, igorslab.de, notebookcheck.net, guru3d.com, eurogamer.net, pcgamingwiki.com, learn/support.microsoft.com, nvidia.com, amd.com, intel.com.
 
@@ -72,7 +72,11 @@ Histórico: Claude guarda o histórico nativo e append-only (o turno do assisten
 
 ### Chaves e segurança
 - **BYOK**, chave no **Gerenciador de Credenciais do Windows** (`CredWriteW`, alvo `G2 Boost/ai/<provedor>`, protegido por DPAPI da conta). Nunca em `settings.json`/localStorage. Validação no core (provedor da allowlist; chave ASCII visível ≤ 512).
-- A chave vai para o webview **só no momento da pergunta** (`ai_key_get`) porque o SDK roda no TS. Camadas que limitam o estrago de um XSS hipotético: (1) React só renderiza texto — `SafeMarkdown` nunca injeta HTML do modelo; (2) CSP sem script remoto; (3) todo HTTP sai pelo `tauri-plugin-http` com **allowlist de hosts** nas capabilities (`api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` + os já existentes) — a chave não consegue ser enviada para outro host.
+- A chave vai para o webview **só no momento da pergunta** (`ai_key_get`) porque o SDK roda no TS. Camadas que limitam o estrago de um XSS hipotético: (1) React só renderiza texto — `SafeMarkdown` nunca injeta HTML do modelo; (2) CSP sem script remoto; (3) todo HTTP sai pelo `tauri-plugin-http` com **allowlist de hosts** nas capabilities (`api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` + os já existentes) — a chave não consegue ser enviada para outro host. Desde 2026-10-18 a allowlist é por **caminho** (`/v1/messages`, `/v1/responses`, `/v1beta/models/*`, `GetSDRConfig/v1/`), não `/*`.
+- **Risco residual aceito:** `ai_key_get` entrega a chave a qualquer chamada IPC do webview (o Tauri não distingue quem chama dentro da mesma janela). Um XSS que rodasse no webview leria a chave — mas só conseguiria usá-la contra os caminhos acima (camada 3). Tirar a chave do webview exige mover o cliente HTTP dos três provedores para o Rust (backlog, junto com o streaming).
+- **Cancelamento:** cada pergunta tem `AbortController` (troca de provedor/modelo/contexto e desmontagem da página cancelam) + timeout de 5 min (`AbortSignal.timeout`); resposta atrasada nunca cai num histórico que não é dela. Blocos de texto do Claude separados por busca web viram parágrafos (`\n\n`).
+- **Limiares térmicos:** fonte única em `advisor::THERMAL` (CPU 88/95 °C, GPU 83/90 °C), enviada no pacote como `thermal_limits_c`; o playbook do app e as instruções do MCP mandam usar esses números.
+- **Perfil para IA = allowlist** (`context::redacted_profile`, campo a campo): campo novo no `Profile` não vaza até ser listado.
 - Links das respostas abrem no navegador do sistema, só `https`, com o domínio visível ao lado.
 - Custo é do usuário (BYOK); a UI informa o tamanho do contexto enviado.
 

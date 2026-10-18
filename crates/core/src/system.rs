@@ -24,8 +24,8 @@ pub fn running_processes() -> HashSet<String> {
     running_process_paths().into_iter().filter_map(|p| p.rsplit('\\').next().map(|n| n.to_ascii_lowercase())).collect()
 }
 
-/// Full image paths of running processes we are allowed to query.
-pub fn running_process_paths() -> Vec<String> {
+/// Every process id (the buffer grows until the list fits; a full buffer may be truncated).
+pub fn pids() -> Vec<u32> {
     let mut pids = vec![0u32; 1024];
     let mut needed = 0u32;
     loop {
@@ -39,8 +39,14 @@ pub fn running_process_paths() -> Vec<String> {
         }
         pids.resize(pids.len() * 2, 0);
     }
+    pids.truncate((needed / 4) as usize);
+    pids
+}
+
+/// Full image paths of running processes we are allowed to query.
+pub fn running_process_paths() -> Vec<String> {
     let mut out = Vec::new();
-    for &pid in &pids[..(needed / 4) as usize] {
+    for pid in pids() {
         if pid == 0 {
             continue;
         }

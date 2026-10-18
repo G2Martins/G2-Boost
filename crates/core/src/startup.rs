@@ -58,9 +58,19 @@ pub struct StartupItem {
     pub protected: bool,
 }
 
-/// Turning these off hides threat notifications — out of scope for an optimizer.
+/// Security software (Windows Security tray + common third-party antivirus), matched lowercase on
+/// the Run value name or command. Turning these off hides threat notifications or the AV's own
+/// UI — out of scope for an optimizer, whoever asks (UI or AI).
+const SECURITY_MARKERS: &[&str] = &[
+    "securityhealth", "windows defender", "msascuil", "kaspersky", r"\avp.exe", "avpui.exe", "avast", r"\avg\",
+    "avgui.exe", "bitdefender", "bdagent", r"\eset\", "egui.exe", "norton", "mcafee", "malwarebytes", "mbam", "sophos",
+    "trend micro", "f-secure", "webroot", "avira", "comodo", "zonealarm", "panda security", "emsisoft", "drweb",
+    "dr.web", "g data",
+];
+
 fn is_protected(name: &str, command: &str) -> bool {
-    name.eq_ignore_ascii_case("SecurityHealth") || command.to_ascii_lowercase().contains("securityhealthsystray.exe")
+    let (n, c) = (name.to_ascii_lowercase(), command.to_ascii_lowercase());
+    SECURITY_MARKERS.iter().any(|m| n.contains(m) || c.contains(m))
 }
 
 /// Task Manager's encoding: first byte even (0x02/0x06) = enabled, odd (0x03/0x07) = disabled.
@@ -200,6 +210,10 @@ mod tests {
         assert!(!Location::UserRun.needs_admin() && Location::MachineRun.needs_admin());
         assert!(is_protected("SecurityHealth", "x") && is_protected("Y", r"%windir%\system32\SecurityHealthSystray.exe"));
         assert!(!is_protected("Discord", r"C:\x\Update.exe"));
+        assert!(is_protected("AVP.KES", r"C:\Program Files (x86)\Kaspersky Lab\KES\avpui.exe"));
+        assert!(is_protected("Avast", r"C:\Program Files\Avast Software\Avast\AvastUI.exe /nogui"));
+        assert!(is_protected("x", r"C:\Program Files\AVG\Antivirus\AVGUI.exe"));
+        assert!(!is_protected("Steam", r"C:\Program Files (x86)\Steam\steam.exe -silent"), "no false positive");
     }
 
     /// Round-trips a throwaway HKCU Run entry through disable/enable and removes it.

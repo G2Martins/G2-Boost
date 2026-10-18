@@ -264,6 +264,8 @@ export const ptBR = {
   "ai.action.open_cleanup": "Abrir Limpeza",
   "ai.error.empty":
     "A IA não retornou resposta (limite de uso, bloqueio de segurança ou conteúdo recusado). Tente de novo.",
+  "ai.error.timeout":
+    "A resposta demorou demais (mais de 5 minutos) e foi cancelada. Tente de novo ou pergunte algo mais curto.",
   "ai.error.refusal": "O provedor recusou responder a esta pergunta.",
   "ai.error.generic": "Falhou: {error}",
   "advisor.title": "Sugestões para este PC",
@@ -754,6 +756,8 @@ export const ptBR = {
   "boost.error.needs_admin": "Precisa de administrador.",
   "boost.error.cancelled": "Elevação cancelada.",
   "boost.error.generic": "Falhou: {error}",
+  "boost.error.unsupported_windows":
+    "Esta versão do Windows não permite trocar o DNS por aqui (requer Windows 10 2004 ou mais novo).",
   "boost.ram.freed": "{freed} liberados",
   "boost.ram.freed_none": "Nada a liberar agora",
   "boost.ram.title": "Limpeza de RAM",
@@ -787,6 +791,8 @@ export const ptBR = {
   "boost.dns.measuring": "Medindo…",
   "boost.dns.timeout": "sem resposta",
   "boost.dns.no_adapter": "Nenhum adaptador conectado.",
+  "boost.dns.adapter_pick": "Adaptador",
+  "boost.dns.routed": "usado pela internet",
   "network.monitor.gateway": "Roteador",
   "network.tools.tcping_hint":
     "Formato host:porta (padrão 443). Mede o handshake TCP — funciona onde o ping (ICMP) é bloqueado, como em servidores de jogo.",

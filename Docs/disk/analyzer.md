@@ -1,6 +1,6 @@
 # Analisador de disco
 
-**Última revisão:** 2026-10-16 · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
+**Última revisão:** 2026-10-18 · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
 
 ## Varredura
 
@@ -41,6 +41,8 @@ No shell, a árvore é retirada do estado durante a operação (os outros comand
 Itens conhecidos relativos à raiz varrida — `pagefile.sys`, `hiberfil.sys`, `swapfile.sys`, `Windows\WinSxS`, `Windows.old`, `$Recycle.Bin`, `System Volume Information`, `Windows\SoftwareDistribution\Download`, `Windows\Installer`, `ProgramData\Package Cache` — com tamanho (0 = sem permissão para medir) e explicação i18n do que é e do **jeito seguro** de reduzir (desligar hibernação nas Opções de energia, limpeza de componentes, Windows Update cache, desinstalar o programa dono…). Nada aqui apaga; são ponteiros.
 
 ## Testes
+
+**Sem `ConfirmToken` (decisão 2026-10-18):** no cleanup o token existe porque o MCP pode pedir prévia mas nunca mintar o token. Aqui não há caminho MCP, e o mesmo webview que confirmaria também emitiria o token — seria cerimônia. A guarda real: o recycle recebe **ids do scan em memória** (não caminhos), cada um é resolvido com `canonicalize` (junções/symlinks no meio do caminho) e passa por `recyclable` (SafePath). Teste `recycle_refuses_paths_through_a_junction` troca uma pasta por junção para `%SystemRoot%` depois do scan e prova a recusa.
 
 Sandbox em pasta temporária: tamanhos, ordenação, recorte com "outros", maiores arquivos, cancelamento, raiz inválida; sintaxe do filtro; busca + caminho por `ids` + remoção com totais; guarda de reciclagem (permitidos × bloqueados, incluindo UNC e `..`); recusa da raiz e de `ids` inexistentes; essenciais por caminho relativo. `recycle_live` (ignorado, rodar à mão) leva dois arquivos descartáveis para a Lixeira de verdade — verificado em 2026-10-16.
 

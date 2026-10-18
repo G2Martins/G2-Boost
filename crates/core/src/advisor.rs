@@ -15,6 +15,18 @@ use crate::system;
 use crate::winsat::WinSat;
 use crate::wmi;
 
+/// Temperature limits under load (°C). The single source: the advisor findings use them, and the
+/// context pack hands them to the in-app AI and the MCP client (`thermal_limits_c`).
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct Thermal {
+    pub cpu_warn: f64,
+    pub cpu_critical: f64,
+    pub gpu_warn: u32,
+    pub gpu_critical: u32,
+}
+
+pub const THERMAL: Thermal = Thermal { cpu_warn: 88.0, cpu_critical: 95.0, gpu_warn: 83, gpu_critical: 90 };
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
@@ -277,9 +289,9 @@ pub fn analyze(p: &Profile, e: &Env) -> Report {
     if let Some(s) = &e.sample
         && let Some(t) = s.gpu_temp_c
     {
-        if t >= 90 {
+        if t >= THERMAL.gpu_critical {
             f.push(finding("gpu_hot", Severity::Critical, Kind::Temperature, &[("temp", t.to_string())]));
-        } else if t >= 83 {
+        } else if t >= THERMAL.gpu_warn {
             f.push(finding("gpu_hot", Severity::Warn, Kind::Temperature, &[("temp", t.to_string())]));
         }
     }
@@ -296,9 +308,9 @@ pub fn analyze(p: &Profile, e: &Env) -> Report {
     }
 
     if let Some(t) = e.cpu_temp_c {
-        if t >= 95.0 {
+        if t >= THERMAL.cpu_critical {
             f.push(finding("cpu_hot", Severity::Critical, Kind::Temperature, &[("temp", format!("{t:.0}"))]));
-        } else if t >= 88.0 {
+        } else if t >= THERMAL.cpu_warn {
             f.push(finding("cpu_hot", Severity::Warn, Kind::Temperature, &[("temp", format!("{t:.0}"))]));
         }
     }

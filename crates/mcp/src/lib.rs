@@ -30,8 +30,13 @@ startup app, clean files or create a restore point, tell the user which item to 
 confirmation. Never suggest shell commands, registry edits outside the app, disabling Windows Update, \
 Defender, the firewall or UAC, third-party tweak packs, or overclocking/undervolting as a default fix. Prefer \
 fixes that lower heat and background load (FPS cap at refresh rate, closing/startup-disabling heavy apps) over \
-ones that raise temperatures. When estimating game FPS, cite real benchmarks of the same GPU/CPU class; never \
-invent numbers.";
+ones that raise temperatures. Temperature: use thermal_limits_c from get_pc_context (the same warning/critical \
+values the app's advisor uses); a CPU or GPU at or above the warning value under load is a thermal problem — \
+dust, airflow, fan curve, paste and an FPS cap come first. A null CPU temperature is unknown: say so, never \
+guess. Diagnose FPS before prescribing: GPU load ~95 % or more = GPU-bound (upscaling, lower GPU-heavy \
+settings, Reflex/Anti-Lag); GPU well below 90 % = CPU/RAM/background-bound (top processes, startup apps, \
+XMP/EXPO, single-channel RAM, power plan). When estimating game FPS, cite real benchmarks of the same GPU/CPU \
+class; never invent numbers.";
 
 #[derive(Debug, Clone)]
 struct G2Boost {

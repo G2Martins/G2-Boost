@@ -1,22 +1,27 @@
 //! DNS Optimizer: rank public resolvers by measured response time (plain UDP queries, no
 //! admin), show each adapter's current DNS, apply a resolver pair per adapter with
 //! `SetInterfaceDnsSettings` (admin) and restore exactly what was there before (backup JSON).
-//! Never `netsh`/`ipconfig`. Only IPv4 literals are accepted: the UI cannot inject strings.
+//! Never `netsh`/`ipconfig`. Only catalog providers can be applied (validated here, in the core,
+//! so every caller — UI, MCP, routines — goes through the same allowlist).
+//! The `*InterfaceDnsSettings` APIs exist only on Windows 10 2004+: they are resolved at runtime,
+//! so the app still starts on older builds and DNS changes report `unsupported_windows`.
 
 use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, ERROR_SUCCESS};
 use windows::Win32::NetworkManagement::IpHelper::{
-    DNS_INTERFACE_SETTINGS, DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER, FreeInterfaceDnsSettings,
-    GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses,
-    GetInterfaceDnsSettings, IF_TYPE_SOFTWARE_LOOPBACK, IP_ADAPTER_ADDRESSES_LH, SetInterfaceDnsSettings,
+    DNS_INTERFACE_SETTINGS, DNS_INTERFACE_SETTINGS_VERSION1, DNS_SETTING_NAMESERVER, GAA_FLAG_INCLUDE_GATEWAYS,
+    GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses, GetBestInterface, IF_TYPE_SOFTWARE_LOOPBACK,
+    IP_ADAPTER_ADDRESSES_LH,
 };
 use windows::Win32::NetworkManagement::Ndis::IfOperStatusUp;
 use windows::Win32::Networking::WinSock::{AF_INET, AF_UNSPEC, SOCKADDR_IN, SOCKET_ADDRESS};
-use windows::core::{GUID, PWSTR};
+use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+use windows::core::{GUID, PCWSTR, PWSTR};
 
 use crate::registry::{self, wide};
 use crate::system;
@@ -46,6 +51,10 @@ pub enum DnsError {
     UnknownAdapter,
     #[error("invalid_address")]
     InvalidAddress,
+    #[error("unknown_provider")]
+    UnknownProvider,
+    #[error("unsupported_windows")]
+    Unsupported,
     #[error("win32 {0}")]
     Win32(u32),
     #[error("io: {0}")]
@@ -160,6 +169,8 @@ pub struct Adapter {
     /// Which provider the current servers belong to, if any.
     pub provider: Option<&'static str>,
     pub link_mbps: u64,
+    /// The interface Windows routes internet traffic through (`GetBestInterface` to a public IP).
+    pub primary: bool,
 }
 
 fn sockaddr_v4(sa: &SOCKET_ADDRESS) -> Option<Ipv4Addr> {
@@ -193,16 +204,54 @@ fn parse_list(s: &str) -> Vec<Ipv4Addr> {
     s.split([',', ' ', ';']).filter_map(|x| x.trim().parse().ok()).collect()
 }
 
-/// Static servers configured on the interface (`NameServer`), empty when automatic.
+type FnGetDns = unsafe extern "system" fn(GUID, *mut DNS_INTERFACE_SETTINGS) -> u32;
+type FnSetDns = unsafe extern "system" fn(GUID, *const DNS_INTERFACE_SETTINGS) -> u32;
+type FnFreeDns = unsafe extern "system" fn(*mut DNS_INTERFACE_SETTINGS);
+/// What `GetProcAddress` hands back (`FARPROC`).
+type Farproc = unsafe extern "system" fn() -> isize;
+
+/// `Get/Set/FreeInterfaceDnsSettings` (iphlpapi, Windows 10 2004+), resolved once.
+struct DnsApi {
+    get: FnGetDns,
+    set: FnSetDns,
+    free: FnFreeDns,
+}
+
+static DNS_API: OnceLock<Option<DnsApi>> = OnceLock::new();
+
+fn dns_api() -> Option<&'static DnsApi> {
+    DNS_API
+        .get_or_init(|| {
+            let lib = wide("iphlpapi.dll");
+            // SAFETY: system library; the symbols have the documented signatures above.
+            unsafe {
+                let h = LoadLibraryW(PCWSTR(lib.as_ptr())).ok()?;
+                let get = GetProcAddress(h, windows::core::s!("GetInterfaceDnsSettings"))?;
+                let set = GetProcAddress(h, windows::core::s!("SetInterfaceDnsSettings"))?;
+                let free = GetProcAddress(h, windows::core::s!("FreeInterfaceDnsSettings"))?;
+                Some(DnsApi {
+                    get: std::mem::transmute::<Farproc, FnGetDns>(get),
+                    set: std::mem::transmute::<Farproc, FnSetDns>(set),
+                    free: std::mem::transmute::<Farproc, FnFreeDns>(free),
+                })
+            }
+        })
+        .as_ref()
+}
+
+/// Static servers configured on the interface (`NameServer`), empty when automatic or unsupported.
 fn static_servers(guid: &GUID) -> Vec<Ipv4Addr> {
+    let Some(api) = dns_api() else {
+        return Vec::new();
+    };
     let mut s = DNS_INTERFACE_SETTINGS { Version: DNS_INTERFACE_SETTINGS_VERSION1, ..Default::default() };
-    // SAFETY: the API allocates the strings; FreeInterfaceDnsSettings releases them.
+    // SAFETY: the API allocates the strings; its own free function releases them.
     unsafe {
-        if GetInterfaceDnsSettings(*guid, &mut s) != ERROR_SUCCESS {
+        if (api.get)(*guid, &mut s) != ERROR_SUCCESS.0 {
             return Vec::new();
         }
         let list = parse_list(&pwstr(s.NameServer));
-        FreeInterfaceDnsSettings(&mut s);
+        (api.free)(&mut s);
         list
     }
 }
@@ -212,8 +261,18 @@ pub fn provider_of(servers: &[Ipv4Addr]) -> Option<&'static str> {
     PROVIDERS.iter().find(|(_, _, p, s)| Ipv4Addr::from(*p) == *first || Ipv4Addr::from(*s) == *first).map(|(id, ..)| *id)
 }
 
-/// Connected, non-loopback adapters with their DNS and default gateway.
+/// Interface index of the route to the internet (what multi-NIC/VPN machines actually use).
+fn best_if_index() -> Option<u32> {
+    let mut idx = 0u32;
+    // 8.8.8.8 in network byte order; only the routing table is consulted, nothing is sent.
+    let dest = u32::from_ne_bytes([8, 8, 8, 8]);
+    // SAFETY: plain out-parameter.
+    (unsafe { GetBestInterface(dest, &mut idx) } == ERROR_SUCCESS.0).then_some(idx)
+}
+
+/// Connected, non-loopback adapters with their DNS and default gateway; the routed one first.
 pub fn adapters() -> Vec<Adapter> {
+    let best = best_if_index();
     let flags = GAA_FLAG_INCLUDE_GATEWAYS | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST;
     let mut size = 16 * 1024u32;
     let mut buf: Vec<u64>;
@@ -259,7 +318,9 @@ pub fn adapters() -> Vec<Adapter> {
                 continue;
             }
             let static_dns = parse_guid(&guid_str).map(|g| static_servers(&g)).unwrap_or_default();
+            let primary = best.is_some_and(|b| b == a.Anonymous1.Anonymous.IfIndex);
             out.push(Adapter {
+                primary,
                 provider: provider_of(&dns),
                 guid: guid_str,
                 name: pwstr(a.FriendlyName),
@@ -271,8 +332,8 @@ pub fn adapters() -> Vec<Adapter> {
             });
         }
     }
-    // Adapters with a default gateway first (the one that actually carries traffic).
-    out.sort_by_key(|a| a.gateway.is_none());
+    // The routed interface first, then anything with a default gateway.
+    out.sort_by_key(|a| (!a.primary, a.gateway.is_none()));
     out
 }
 
@@ -301,6 +362,7 @@ fn save_backup(b: &Backup) -> Result<(), DnsError> {
 }
 
 fn set_name_servers(guid: &GUID, servers: &str) -> Result<(), DnsError> {
+    let api = dns_api().ok_or(DnsError::Unsupported)?;
     let mut w = wide(servers);
     let s = DNS_INTERFACE_SETTINGS {
         Version: DNS_INTERFACE_SETTINGS_VERSION1,
@@ -309,8 +371,8 @@ fn set_name_servers(guid: &GUID, servers: &str) -> Result<(), DnsError> {
         ..Default::default()
     };
     // SAFETY: settings struct and string buffer outlive the call.
-    let rc = unsafe { SetInterfaceDnsSettings(*guid, &s) };
-    match rc.0 {
+    let rc = unsafe { (api.set)(*guid, &s) };
+    match rc {
         0 => Ok(()),
         5 => Err(DnsError::NeedsAdmin),
         code => Err(DnsError::Win32(code)),
@@ -325,16 +387,15 @@ fn adapter_guid(guid: &str) -> Result<GUID, DnsError> {
     parse_guid(guid).ok_or(DnsError::UnknownAdapter)
 }
 
-/// Point `guid` at `primary`/`secondary` (admin). The previous static setting is saved once.
-pub fn apply(guid: &str, primary: Ipv4Addr, secondary: Option<Ipv4Addr>) -> Result<(), DnsError> {
+/// Point `guid` at a catalog provider (admin). Never an arbitrary address: the provider id is
+/// looked up in [`PROVIDERS`] here. The previous static setting is saved once.
+pub fn apply(guid: &str, provider: &str) -> Result<(), DnsError> {
+    let &(_, _, p, s) = PROVIDERS.iter().find(|(id, ..)| *id == provider).ok_or(DnsError::UnknownProvider)?;
+    let (primary, secondary) = (Ipv4Addr::from(p), Ipv4Addr::from(s));
     if !system::is_elevated() {
         return Err(DnsError::NeedsAdmin);
     }
-    for ip in std::iter::once(primary).chain(secondary) {
-        if ip.is_unspecified() || ip.is_broadcast() || ip.is_multicast() || ip.is_loopback() {
-            return Err(DnsError::InvalidAddress);
-        }
-    }
+    dns_api().ok_or(DnsError::Unsupported)?;
     let g = adapter_guid(guid)?;
     let mut b = load_backup();
     if !b.previous.contains_key(guid) {
@@ -342,11 +403,7 @@ pub fn apply(guid: &str, primary: Ipv4Addr, secondary: Option<Ipv4Addr>) -> Resu
         b.previous.insert(guid.to_string(), prev);
         save_backup(&b)?;
     }
-    let list = match secondary {
-        Some(s) => format!("{primary},{s}"),
-        None => primary.to_string(),
-    };
-    set_name_servers(&g, &list)?;
+    set_name_servers(&g, &format!("{primary},{secondary}"))?;
     crate::cleanup::flush_dns_cache();
     Ok(())
 }
@@ -412,8 +469,11 @@ mod tests {
         assert!(a.iter().all(|x| x.guid.starts_with('{')));
         // Network-dependent; tolerate offline CI by only asserting the type.
         let _ = query_ms(Ipv4Addr::new(1, 1, 1, 1), "google.com", Duration::from_millis(1500));
+        assert!(a[0].primary || a.iter().all(|x| !x.primary), "routed adapter sorts first");
+        assert!(dns_api().is_some(), "Windows 10 2004+ dev box exposes the DNS settings API");
+        assert!(matches!(apply(&a[0].guid, "8.8.8.8"), Err(DnsError::UnknownProvider)), "raw IPs are not providers");
         if !system::is_elevated() {
-            assert!(matches!(apply(&a[0].guid, Ipv4Addr::new(1, 1, 1, 1), None), Err(DnsError::NeedsAdmin)));
+            assert!(matches!(apply(&a[0].guid, "cloudflare"), Err(DnsError::NeedsAdmin)));
         }
         assert!(matches!(adapter_guid("{00000000-0000-0000-0000-000000000000}"), Err(DnsError::UnknownAdapter)));
     }

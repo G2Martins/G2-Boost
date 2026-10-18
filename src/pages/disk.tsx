@@ -53,7 +53,6 @@ export function DiskPage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<NodeView | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
-  const [top, setTop] = useState<BigFile[]>([]);
   const [folderPick, setFolderPick] = useState<Pick[] | null>(null);
   const [folderMsg, setFolderMsg] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -67,14 +66,12 @@ export function DiskPage() {
       setView(v);
       setCrumbs([{ ids: [], name: v.name }]);
     }
-    setTop((await backend.diskTopFiles(50)) ?? []);
   }, []);
 
   const startScan = useCallback(async (root: string) => {
     setError(null);
     setSummary(null);
     setView(null);
-    setTop([]);
     setFolderPick(null);
     setFolderMsg(null);
     setProgress({ files: 0, dirs: 0, bytes: 0, errors: 0, current: root });
@@ -312,7 +309,6 @@ export function DiskPage() {
               <FilesTab
                 hasScan={summary !== null}
                 version={version}
-                fallback={top}
                 onRecycled={refreshAfterRecycle}
               />
             </PageBody>
@@ -490,12 +486,10 @@ const FILTER_EXAMPLES = [">1gb", "*.mp4 *.mkv", "*.iso *.zip", ">6m >500mb", "*.
 function FilesTab({
   hasScan,
   version,
-  fallback,
   onRecycled,
 }: {
   hasScan: boolean;
   version: number;
-  fallback: BigFile[];
   onRecycled: (o: RecycleOutcome) => Promise<void>;
 }) {
   const { t, locale } = useI18n();
@@ -516,7 +510,8 @@ function FilesTab({
     return () => clearTimeout(id);
   }, [query, hasScan, version]);
 
-  const files = res?.files ?? fallback;
+  // An empty query is the plain "largest files" list (one walk, no separate top-files call).
+  const files = res?.files ?? [];
   const picks = Object.values(picked);
   const keyOf = (f: BigFile) => f.ids.join("/");
   const toggle = (f: BigFile) =>

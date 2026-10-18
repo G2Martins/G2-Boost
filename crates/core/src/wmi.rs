@@ -2,6 +2,7 @@
 //! points and the last WinSAT assessment. Values come back as a flat, typed map per row.
 
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use windows::Win32::System::Com::{
@@ -14,8 +15,7 @@ use windows::Win32::System::Variant::{
     VT_UI4, VT_UI8, VariantClear,
 };
 use windows::Win32::System::Wmi::{
-    IWbemClassObject, IWbemLocator, WBEM_FLAG_FORWARD_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_GENERIC_FLAG_TYPE, WBEM_INFINITE,
-    WbemLocator,
+    IWbemClassObject, IWbemLocator, WBEM_FLAG_FORWARD_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_GENERIC_FLAG_TYPE, WbemLocator,
 };
 use windows::core::{BSTR, PCWSTR};
 
@@ -95,6 +95,14 @@ fn variant_value(v: &VARIANT) -> WmiValue {
 
 /// `SELECT <fields> FROM <class>` in `namespace` (e.g. `ROOT\CIMV2`). Only `fields` are read.
 pub fn query(namespace: &str, wql: &str, fields: &[&str]) -> Result<Vec<Row>, String> {
+    query_timeout(namespace, wql, fields, Duration::from_secs(15))
+}
+
+/// Same, but the whole enumeration gives up after `timeout`: third-party providers (e.g.
+/// LibreHardwareMonitor) can hang, and `WBEM_INFINITE` would hang the caller with them.
+/// Rows read before the deadline are returned.
+pub fn query_timeout(namespace: &str, wql: &str, fields: &[&str], timeout: Duration) -> Result<Vec<Row>, String> {
+    let deadline = Instant::now() + timeout;
     let _com = Com::init().map_err(|e| e.to_string())?;
     // SAFETY: standard WMI client sequence; COM objects are released on drop.
     unsafe {
@@ -111,7 +119,9 @@ pub fn query(namespace: &str, wql: &str, fields: &[&str]) -> Result<Vec<Row>, St
         loop {
             let mut objs: [Option<IWbemClassObject>; 1] = [None];
             let mut returned = 0u32;
-            if rows.Next(WBEM_INFINITE, &mut objs, &mut returned).is_err() || returned == 0 {
+            let left = deadline.saturating_duration_since(Instant::now()).as_millis().min(i32::MAX as u128) as i32;
+            // WBEM_S_TIMEDOUT is a success code with nothing returned: stop there.
+            if left == 0 || rows.Next(left, &mut objs, &mut returned).is_err() || returned == 0 {
                 break;
             }
             let Some(obj) = objs[0].take() else {

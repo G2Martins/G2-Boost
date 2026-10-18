@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 use std::mem::size_of;
 use std::ptr::null_mut;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use windows::Win32::Foundation::ERROR_SUCCESS;
@@ -117,6 +117,8 @@ pub struct Monitor {
     last_net: Option<(Instant, u64, u64)>,
     primed: bool,
     ext_tick: u32,
+    /// Sensor reads are skipped until this tick after a slow one (hung provider).
+    ext_skip_until: u32,
     cpu_temp: Option<f64>,
 }
 
@@ -146,6 +148,7 @@ impl Monitor {
             last_net: None,
             primed: false,
             ext_tick: 0,
+            ext_skip_until: 0,
             cpu_temp: None,
         };
         // Rate counters need two collections; prime now so the first real sample is meaningful.
@@ -219,8 +222,13 @@ impl Monitor {
         let gpu_mem_bytes = values(&self.gpu_mem).iter().map(|(_, v)| *v as u64).sum();
         let mem = system::memory_status();
         let nv = nvml::get();
-        if self.ext_tick.is_multiple_of(5) {
+        if self.ext_tick.is_multiple_of(5) && self.ext_tick >= self.ext_skip_until {
+            let t0 = Instant::now();
             self.cpu_temp = crate::sensors::read().and_then(|x| x.cpu_temp_c);
+            // A slow provider (hung LHM) is retried once a minute instead of stalling every 5 s.
+            if t0.elapsed() > Duration::from_millis(800) {
+                self.ext_skip_until = self.ext_tick.wrapping_add(60);
+            }
         }
         self.ext_tick = self.ext_tick.wrapping_add(1);
 

@@ -34,7 +34,11 @@ pub struct Recommendation {
 }
 
 pub fn facts() -> Facts {
-    let p = hardware::profile();
+    facts_for(&hardware::profile())
+}
+
+/// Same, from a profile the caller already has (the profile is the slow part: SMBIOS, DXGI, IOCTLs).
+pub fn facts_for(p: &hardware::Profile) -> Facts {
     let packages = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).map(|l| l.join("Packages"));
     let game_pass = packages
         .as_ref()

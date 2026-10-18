@@ -141,7 +141,14 @@ fn read_hwinfo() -> Option<Vec<Reading>> {
 /* ---------------- LibreHardwareMonitor WMI ---------------- */
 
 fn read_lhm() -> Option<Vec<Reading>> {
-    let rows = wmi::query(r"ROOT\LibreHardwareMonitor", "SELECT Name, SensorType, Value, Parent FROM Sensor", &["Name", "SensorType", "Value", "Parent"]).ok()?;
+    // Bounded: a hung LHM must not hang the 1 s monitor nor the MCP server.
+    let rows = wmi::query_timeout(
+        r"ROOT\LibreHardwareMonitor",
+        "SELECT Name, SensorType, Value, Parent FROM Sensor",
+        &["Name", "SensorType", "Value", "Parent"],
+        std::time::Duration::from_millis(1500),
+    )
+    .ok()?;
     if rows.is_empty() {
         return None;
     }

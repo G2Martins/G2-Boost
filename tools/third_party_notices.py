@@ -42,7 +42,9 @@ def rust_packages():
         "cargo", "tree", "-p", "g2-boost", "-e", "normal", "--target", "x86_64-pc-windows-msvc",
         "--prefix", "none", "--format", "{p}|{l}",
     ]
-    lines = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+    # cargo prints UTF-8; the console code page (cp1252) would choke on paths like "Programação".
+    out = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
+    lines = out.stdout.splitlines()
     registry = glob.glob(os.path.join(cargo_home(), "registry", "src", "index.crates.io-*"))
     pkgs = {}
     for line in lines:

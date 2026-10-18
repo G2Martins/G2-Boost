@@ -279,13 +279,19 @@ pub fn parse_filter(q: &str) -> Filter {
 
 impl Filter {
     pub fn matches(&self, name: &str, size: u64, mtime: u64, now: u64) -> bool {
-        let lower = name.to_ascii_lowercase();
         let age = now.saturating_sub(mtime);
-        (self.exts.is_empty() || lower.rsplit_once('.').is_some_and(|(_, e)| self.exts.iter().any(|x| x == e)))
-            && size >= self.min_bytes
+        let numeric = size >= self.min_bytes
             && self.max_bytes.is_none_or(|m| size <= m)
             && self.older_than_s.is_none_or(|s| mtime > 0 && age >= s)
-            && self.newer_than_s.is_none_or(|s| mtime > 0 && age <= s)
+            && self.newer_than_s.is_none_or(|s| mtime > 0 && age <= s);
+        if !numeric {
+            return false;
+        }
+        if self.exts.is_empty() && self.contains.is_empty() {
+            return true; // no name terms: skip the lowercase copy (the walk visits every file)
+        }
+        let lower = name.to_ascii_lowercase();
+        (self.exts.is_empty() || lower.rsplit_once('.').is_some_and(|(_, e)| self.exts.iter().any(|x| x == e)))
             && self.contains.iter().all(|c| lower.contains(c.as_str()))
     }
 }
@@ -301,6 +307,7 @@ pub struct SearchResult {
 /// Files under `root` matching `f`: totals for all of them, the largest `n` listed (min-heap, one pass).
 pub fn search(root: &Node, f: &Filter, now: u64, n: usize) -> SearchResult {
     struct Acc<'a> {
+        root: &'a Node,
         f: &'a Filter,
         now: u64,
         n: usize,
@@ -308,16 +315,17 @@ pub fn search(root: &Node, f: &Filter, now: u64, n: usize) -> SearchResult {
         matched: u64,
         bytes: u64,
     }
-    fn rec(node: &Node, prefix: &str, ids: &mut Vec<u32>, acc: &mut Acc) {
+    fn rec(node: &Node, ids: &mut Vec<u32>, acc: &mut Acc) {
         for (i, c) in node.children.iter().enumerate() {
             ids.push(i as u32);
             if c.is_dir {
-                rec(c, &format!("{prefix}\\{}", c.name), ids, acc);
+                rec(c, ids, acc);
             } else if acc.f.matches(&c.name, c.size, c.mtime, acc.now) {
                 acc.matched += 1;
                 acc.bytes += c.size;
                 if acc.heap.len() < acc.n || acc.heap.peek().is_some_and(|r| r.0.size < c.size) {
-                    let path = format!("{prefix}\\{}", c.name);
+                    // Path built from the ids only for files that enter the top-n, not for every dir walked.
+                    let path = path_of(acc.root, ids).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
                     acc.heap.push(std::cmp::Reverse(BigFile { size: c.size, path, mtime: c.mtime, ids: ids.clone() }));
                     if acc.heap.len() > acc.n {
                         acc.heap.pop();
@@ -327,16 +335,11 @@ pub fn search(root: &Node, f: &Filter, now: u64, n: usize) -> SearchResult {
             ids.pop();
         }
     }
-    let mut acc = Acc { f, now, n, heap: BinaryHeap::with_capacity(n + 1), matched: 0, bytes: 0 };
-    rec(root, &root.name, &mut Vec::new(), &mut acc);
+    let mut acc = Acc { root, f, now, n, heap: BinaryHeap::with_capacity(n + 1), matched: 0, bytes: 0 };
+    rec(root, &mut Vec::new(), &mut acc);
     let mut files: Vec<BigFile> = acc.heap.into_iter().map(|r| r.0).collect();
     files.sort_by_key(|a| std::cmp::Reverse(a.size));
     SearchResult { files, matched: acc.matched, matched_bytes: acc.bytes }
-}
-
-/// Largest `n` files anywhere under `root`.
-pub fn top_files(root: &Node, n: usize) -> Vec<BigFile> {
-    search(root, &Filter::default(), 0, n).files
 }
 
 /// Absolute path of the node at `ids` (the root node's name is the scanned path).
@@ -606,7 +609,7 @@ mod tests {
         assert_eq!(v.others_size, 100);
         assert_eq!(v.children[0].children[0].name, "deep");
         assert_eq!(v.children[0].children[0].ids, vec![0, 0]);
-        let top = top_files(&tree, 2);
+        let top = search(&tree, &Filter::default(), 0, 2).files;
         assert_eq!(top.len(), 2);
         assert!(top[0].path.ends_with("a\\deep\\two.bin"));
         assert_eq!(top[1].size, 3000);
@@ -703,6 +706,29 @@ mod tests {
         assert_eq!(recycle(&mut tree, &[vec![]]).unwrap_err(), RecycleError::Protected);
         assert_eq!(recycle(&mut tree, &[vec![42]]).unwrap_err(), RecycleError::NotFound);
         assert_eq!(recycle(&mut tree, &[]).unwrap_err(), RecycleError::NotFound);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Security: the folder is swapped for a junction to `%SystemRoot%` after the scan (TOCTOU).
+    /// The stale node `a\System32` must resolve through the junction and be refused — never recycled.
+    #[test]
+    fn recycle_refuses_paths_through_a_junction() {
+        let dir = std::env::temp_dir().join(format!("g2boost-scan-{}-junction", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(r"a\System32")).unwrap();
+        fs::write(dir.join(r"a\System32\x.bin"), [0u8; 10]).unwrap();
+        let p = ScanProgress::default();
+        let (mut tree, _) = scan(&dir, &p, &AtomicBool::new(false)).unwrap();
+        assert_eq!(tree.children[0].name, "a");
+        fs::remove_dir_all(dir.join("a")).unwrap();
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        crate::cleanup::tests::make_junction(&dir.join("a"), Path::new(&win));
+        // Intermediate junction: `a\System32` itself is a real directory, only its parent is a link.
+        assert_eq!(recycle(&mut tree, &[vec![0, 0]]).unwrap_err(), RecycleError::Protected);
+        // The junction itself is a reparse point: refused before anything is resolved.
+        assert_eq!(recycle(&mut tree, &[vec![0]]).unwrap_err(), RecycleError::Protected);
+        assert!(Path::new(&win).join("System32").exists(), "nothing behind the junction was touched");
+        fs::remove_dir(dir.join("a")).unwrap(); // removes the junction only
         let _ = fs::remove_dir_all(&dir);
     }
 

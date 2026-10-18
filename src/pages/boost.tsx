@@ -28,6 +28,7 @@ import {
   CardTitle,
   HelpHint,
   Switch,
+  selectClass,
   Tabs,
   TabsContent,
   TabsList,
@@ -645,6 +646,8 @@ function DnsTab({ elevated }: { elevated: boolean }) {
   const [rank, setRank] = useState<DnsRankEntry[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Multi-NIC / VPN: the user picks; default = the routed adapter (sorted first by the core).
+  const [picked, setPicked] = useState<string | null>(null);
 
   const measure = useCallback(async () => {
     setBusy(true);
@@ -657,7 +660,7 @@ function DnsTab({ elevated }: { elevated: boolean }) {
     void measure();
   }, [measure]);
 
-  const main = adapters?.[0] ?? null;
+  const main = adapters?.find((a) => a.guid === picked) ?? adapters?.[0] ?? null;
   const fastest = rank?.find((r) => r.median_ms !== null) ?? null;
 
   const apply = async (provider: string) => {
@@ -709,12 +712,28 @@ function DnsTab({ elevated }: { elevated: boolean }) {
           </Button>
           <Button
             variant="outline"
-            disabled={!elevated || !main || !main.has_backup || busy}
+            disabled={!elevated || !main?.has_backup || busy}
             onClick={restore}
           >
             {t("boost.dns.restore")}
           </Button>
         </div>
+        {adapters && adapters.length > 1 ? (
+          <label className="flex w-full items-center gap-2 text-xs text-muted-foreground">
+            {t("boost.dns.adapter_pick")}
+            <select
+              value={main?.guid ?? ""}
+              onChange={(e) => setPicked(e.target.value)}
+              className={selectClass}
+            >
+              {adapters.map((a) => (
+                <option key={a.guid} value={a.guid}>
+                  {a.primary ? `${a.name} · ${t("boost.dns.routed")}` : a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <p className="w-full text-xs text-muted-foreground">
           {main
             ? t("boost.dns.adapter", {

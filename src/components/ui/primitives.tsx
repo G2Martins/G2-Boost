@@ -35,6 +35,10 @@ export function Button({
   );
 }
 
+/** Native `<select>` styled like the inputs (keyboard + screen readers for free). */
+export const selectClass =
+  "h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring disabled:opacity-50";
+
 /* ---------- Card ---------- */
 export function Card({ className, ...props }: ComponentProps<"section">) {
   return <section className={cn("panel p-5", className)} {...props} />;

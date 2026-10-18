@@ -1,6 +1,6 @@
 # PC Boost — tweaks, efeitos visuais, serviços, RAM
 
-**Última revisão:** 2026-10-16 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
+**Última revisão:** 2026-10-18 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
 
 ## Modelo
 
@@ -71,7 +71,7 @@ Serviços: `WSearch` é "automático (início atrasado)"; o revert restaura o ti
 ## Inicialização e processos (`startup.rs`, `procs.rs` — aba "Inicialização")
 
 - **Lista:** `HKCU\…\Run`, `HKLM\…\Run`, `HKLM\WOW6432Node\…\Run`, pastas Inicializar do usuário e comum. Estado lido de `…\Explorer\StartupApproved\{Run,Run32,StartupFolder}` exatamente como o Gerenciador de Tarefas (1º byte par = ligado; ímpar = desligado + FILETIME).
-- **Desligar/ligar** grava só o flag `StartupApproved` (12 bytes): a entrada Run e o atalho ficam onde estavam; religar restaura. Item precisa existir na lista ao vivo (caller hostil); HKLM/pasta comum exigem admin (`needs_admin`); **Segurança do Windows (`SecurityHealth`) é protegida** — recusada no core (`protected_item`), cadeado na UI.
+- **Desligar/ligar** grava só o flag `StartupApproved` (12 bytes): a entrada Run e o atalho ficam onde estavam; religar restaura. Item precisa existir na lista ao vivo (caller hostil); HKLM/pasta comum exigem admin (`needs_admin`); **software de segurança é protegido** — Segurança do Windows (`SecurityHealth`) e antivírus de terceiros comuns (Kaspersky, Avast, AVG, Bitdefender, ESET, Norton, McAfee, Malwarebytes, Sophos, Trend Micro, Avira…; `startup::SECURITY_MARKERS`, casado no nome ou no comando) — recusado no core (`protected_item`), cadeado na UI. Vale para a IA também.
 - **Processos:** `EnumProcesses` + `QueryFullProcessImageNameW` + `GetProcessTimes` em duas amostras (1 s) → agrupado por exe (contagem, RAM = soma do working set, CPU % da capacidade total), `system` = vive sob `C:\Windows`. Só leitura: o G2 Boost **não mata processo**; a IA e a UI apontam para fechar o app ou tirá-lo da inicialização.
 - Testes: flags de `StartupApproved` iguais ao Gerenciador de Tarefas, round-trip real em HKCU com entrada descartável, item desconhecido recusado, proteção; processos agrupam a família do próprio teste.
 

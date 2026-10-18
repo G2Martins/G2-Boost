@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use windows::Win32::Foundation::{CloseHandle, FILETIME};
-use windows::Win32::System::ProcessStatus::{EnumProcesses, K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::Threading::{
     GetProcessTimes, OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
@@ -39,15 +39,9 @@ fn ft(f: FILETIME) -> u64 {
 }
 
 fn snapshot() -> HashMap<u32, Snap> {
-    let mut pids = vec![0u32; 2048];
-    let mut needed = 0u32;
-    // SAFETY: buffer of pids.len()*4 bytes.
-    if unsafe { EnumProcesses(pids.as_mut_ptr(), (pids.len() * 4) as u32, &mut needed) }.is_err() {
-        return HashMap::new();
-    }
     let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_ascii_lowercase();
     let mut out = HashMap::new();
-    for &pid in &pids[..(needed / 4) as usize] {
+    for pid in crate::system::pids() {
         if pid == 0 {
             continue;
         }

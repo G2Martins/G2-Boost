@@ -266,6 +266,8 @@ export const en = {
   "ai.action.open_cleanup": "Open Cleanup",
   "ai.error.empty":
     "The AI returned no answer (rate limit, safety block or refused content). Try again.",
+  "ai.error.timeout":
+    "The answer took too long (over 5 minutes) and was cancelled. Try again or ask something shorter.",
   "ai.error.refusal": "The provider declined to answer this question.",
   "ai.error.generic": "Failed: {error}",
   "advisor.title": "Suggestions for this PC",
@@ -757,6 +759,8 @@ export const en = {
   "boost.error.needs_admin": "Needs administrator.",
   "boost.error.cancelled": "Elevation cancelled.",
   "boost.error.generic": "Failed: {error}",
+  "boost.error.unsupported_windows":
+    "This Windows version can't change DNS from here (needs Windows 10 2004 or newer).",
   "boost.ram.freed": "{freed} freed",
   "boost.ram.freed_none": "Nothing to free right now",
   "boost.ram.title": "RAM cleaner",
@@ -790,6 +794,8 @@ export const en = {
   "boost.dns.measuring": "Measuring…",
   "boost.dns.timeout": "no reply",
   "boost.dns.no_adapter": "No connected adapter.",
+  "boost.dns.adapter_pick": "Adapter",
+  "boost.dns.routed": "carries internet traffic",
   "network.monitor.gateway": "Router",
   "network.tools.tcping_hint":
     "Format host:port (default 443). Times the TCP handshake — works where ping (ICMP) is blocked, like game servers.",

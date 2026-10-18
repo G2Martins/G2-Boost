@@ -86,7 +86,9 @@ pub fn installed() -> Vec<Game> {
         }
     }
     games.sort_by_key(|g| std::cmp::Reverse(g.size_bytes));
-    games.dedup_by_key(|g| g.appid);
+    // Same appid in two libraries (copied/moved install): keep the largest, wherever it sorts.
+    let mut seen = std::collections::HashSet::new();
+    games.retain(|g| seen.insert(g.appid));
     games
 }
 

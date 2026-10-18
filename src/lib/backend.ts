@@ -288,8 +288,6 @@ export type GamingClass = {
   likely_bottleneck: "cpu" | "gpu" | null;
 };
 export type AdvisorReport = { findings: Finding[]; gaming: GamingClass };
-export type SteamGame = { appid: number; name: string; size_bytes: number; library: string };
-
 export type DnsAdapter = {
   guid: string;
   name: string;
@@ -299,6 +297,8 @@ export type DnsAdapter = {
   static_dns: string[];
   provider: string | null;
   link_mbps: number;
+  /** The interface Windows routes internet traffic through. */
+  primary: boolean;
   has_backup: boolean;
 };
 export type DnsRankEntry = {
@@ -347,19 +347,6 @@ export type Firmware = {
   fast_startup: boolean | null;
   hibernation: boolean | null;
 };
-export type SensorReading = {
-  sensor: string;
-  label: string;
-  kind: "temperature" | "voltage" | "fan" | "power" | "clock" | "other";
-  value: number;
-  unit: string;
-};
-export type ExternalSensors = {
-  source: "hwinfo" | "libre_hardware_monitor";
-  cpu_temp_c: number | null;
-  readings: SensorReading[];
-};
-
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -391,7 +378,6 @@ export const backend = {
   diskSummary: () => call<ScanSummary | null>("disk_summary"),
   diskTree: (ids: number[], depth = 2, maxChildren = 80) =>
     call<NodeView | null>("disk_tree", { ids, depth, maxChildren }),
-  diskTopFiles: (n = 50) => call<BigFile[]>("disk_top_files", { n }),
   diskSearch: (query: string, n = 200) => call<DiskSearch>("disk_search", { query, n }),
   diskEssentials: () => call<Essential[]>("disk_essentials"),
   diskReveal: (ids: number[]) => callOrThrow<void>("disk_reveal", { ids }),
@@ -429,7 +415,6 @@ export const backend = {
   winsatStart: () => callOrThrow<void>("winsat_start"),
   reportSave: () => callOrThrow<string>("report_save"),
   advisorReport: () => call<AdvisorReport>("advisor_report"),
-  steamGames: () => call<SteamGame[]>("steam_games"),
   aiContext: () => callOrThrow<unknown>("ai_context"),
   aiKeyStatus: () => call<Record<string, boolean>>("ai_key_status"),
   aiKeySet: (provider: string, key: string) => callOrThrow<void>("ai_key_set", { provider, key }),
@@ -449,7 +434,6 @@ export const backend = {
     callOrThrow<StartupItem>("startup_set", { location, name, enabled }),
   procsTop: () => call<ProcGroup[]>("procs_top"),
   firmwareInfo: () => call<Firmware>("firmware_info"),
-  sensorsRead: () => call<ExternalSensors>("sensors_read"),
   traceHost: (host: string, maxHops: number, probes: number, timeoutMs: number) =>
     callOrThrow<Hop[]>("trace_host", { host, maxHops, probes, timeoutMs }),
 

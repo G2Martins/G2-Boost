@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
-import { Badge, Card, CardTitle, MetricRow, Switch } from "@/components/ui/primitives";
+import { Badge, Card, CardTitle, MetricRow, Switch, selectClass } from "@/components/ui/primitives";
 import { CLEANUP_CATALOG, cleanupName } from "@/data/catalogs";
 import {
   type AppInfo,
@@ -35,9 +35,6 @@ function scheduleFor(mode: Mode, prev: Schedule): Schedule {
       return { mode, weekday: prev.mode === "weekly" ? prev.weekday : 0, hour };
   }
 }
-
-const selectClass =
-  "h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-ring disabled:opacity-50";
 
 export function SettingsPage() {
   const { t, locale, setLocale } = useI18n();

@@ -16,6 +16,7 @@ export function useErrorText() {
       if (msg === "protected_item") return t("boost.startup.protected");
       if (msg === "protected_path") return t("disk.recycle.protected");
       if (msg === "scan_running") return t("disk.recycle.scan_running");
+      if (msg === "unsupported_windows") return t("boost.error.unsupported_windows");
       return t("boost.error.generic", { error: msg });
     },
     [t],

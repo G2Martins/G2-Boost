@@ -338,7 +338,9 @@ function LatencyChart({ samples, targets }: { samples: Sample[]; targets: Target
         />
       ))}
       {samples.map((s, i) => {
-        const lost = s.rtt.some((v) => v === null);
+        // Same target as the health stats (the primary internet host): a router that ignores
+        // ICMP would otherwise paint "loss" forever.
+        const lost = s.rtt[0] === null;
         return (
           <rect
             key={s.t}

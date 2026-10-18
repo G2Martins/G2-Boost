@@ -9,11 +9,10 @@
     {
       "identifier": "http:default",
       "allow": [
-        { "url": "https://api.steampowered.com/*" },
-        { "url": "https://speed.cloudflare.com/*" },
-        { "url": "https://api.anthropic.com/*" },
-        { "url": "https://api.openai.com/*" },
-        { "url": "https://generativelanguage.googleapis.com/*" }
+        { "url": "https://api.steampowered.com/ISteamApps/GetSDRConfig/v1/" },
+        { "url": "https://api.anthropic.com/v1/messages" },
+        { "url": "https://api.openai.com/v1/responses" },
+        { "url": "https://generativelanguage.googleapis.com/v1beta/models/*" }
       ]
     }
   ]

@@ -21,6 +21,7 @@ import {
   askStateless,
   ClaudeChat,
   DEFAULT_MODELS,
+  isTimeout,
   PROVIDERS,
   type Provider,
   systemPrompt,
@@ -74,9 +75,18 @@ export function AiPage() {
   const [streaming, setStreaming] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const claude = useRef<ClaudeChat | null>(null);
+  // The request in flight: aborted on unmount and on provider/model/context switch, so a late
+  // answer never lands in a transcript it no longer belongs to.
+  const inflight = useRef<AbortController | null>(null);
+  const cancel = useCallback(() => {
+    inflight.current?.abort();
+    inflight.current = null;
+  }, []);
+  useEffect(() => cancel, [cancel]);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const loadContext = useCallback(async () => {
+    cancel();
     setContextBusy(true);
     try {
       const c = await backend.aiContext();
@@ -88,7 +98,7 @@ export function AiPage() {
     }
     claude.current = null;
     setMessages([]);
-  }, [errorText]);
+  }, [errorText, cancel]);
 
   useEffect(() => {
     backend.aiKeyStatus().then((k) => k && setKeys(k));
@@ -101,6 +111,7 @@ export function AiPage() {
   }, [messages, streaming]);
 
   const switchProvider = (p: Provider) => {
+    cancel();
     setProvider(p);
     writeLs(LS_PROVIDER, p);
     setKeyDraft("");
@@ -162,32 +173,46 @@ export function AiPage() {
     const prior = messages;
     setMessages([...prior, { role: "user", text: q }]);
     const system = systemPrompt(locale, context);
+    const ctrl = new AbortController();
+    inflight.current = ctrl;
     try {
       let answer: Answer;
       if (provider === "anthropic") {
         if (!claude.current) claude.current = new ClaudeChat(models.anthropic, system);
-        answer = await claude.current.ask(q, setStreaming);
+        answer = await claude.current.ask(q, setStreaming, ctrl.signal);
       } else {
         const turns: Turn[] = [
           ...prior.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text })),
           { role: "user", text: q },
         ];
-        answer = await askStateless(provider, models[provider], system, turns, setStreaming);
+        answer = await askStateless(
+          provider,
+          models[provider],
+          system,
+          turns,
+          setStreaming,
+          ctrl.signal,
+        );
       }
-      setMessages((m) => [...m, { role: "assistant", text: answer.text, answer }]);
+      if (!ctrl.signal.aborted)
+        setMessages((m) => [...m, { role: "assistant", text: answer.text, answer }]);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const text =
-        msg === "refusal"
-          ? t("ai.error.refusal")
-          : msg === "no_key"
-            ? t("ai.key.missing")
-            : msg === "empty_response"
-              ? t("ai.error.empty")
-              : t("ai.error.generic", { error: msg });
-      setMessages((m) => [...m, { role: "assistant", text: "", error: text }]);
+      if (!ctrl.signal.aborted) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const text = isTimeout(e)
+          ? t("ai.error.timeout")
+          : msg === "refusal"
+            ? t("ai.error.refusal")
+            : msg === "no_key"
+              ? t("ai.key.missing")
+              : msg === "empty_response"
+                ? t("ai.error.empty")
+                : t("ai.error.generic", { error: msg });
+        setMessages((m) => [...m, { role: "assistant", text: "", error: text }]);
+      }
       claude.current = null; // start clean after a failed Claude turn (history stays append-only)
     } finally {
+      if (inflight.current === ctrl) inflight.current = null;
       setBusy(false);
       setStreaming("");
     }
@@ -242,6 +267,8 @@ export function AiPage() {
                 value={models[provider]}
                 onChange={(e) => {
                   const v = e.target.value.trim();
+                  cancel();
+                  claude.current = null; // the next Claude turn uses the new model
                   setModels((m) => ({ ...m, [provider]: v }));
                   writeLs(lsModel(provider), v);
                   claude.current = null;

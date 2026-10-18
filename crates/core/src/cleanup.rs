@@ -590,7 +590,7 @@ pub fn record_run(r: &RunRecord) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::ffi::c_void;
     use std::io::Write;
@@ -605,7 +605,7 @@ mod tests {
     const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
 
     /// A real NTFS junction `link` → `target` (no privilege needed, unlike symlinks).
-    fn make_junction(link: &Path, target: &Path) {
+    pub(crate) fn make_junction(link: &Path, target: &Path) {
         fs::create_dir_all(link).unwrap();
         let subst: Vec<u16> = format!(r"\??\{}", target.display()).encode_utf16().collect();
         let print: Vec<u16> = target.to_string_lossy().encode_utf16().collect();
