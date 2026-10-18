@@ -15,6 +15,7 @@ pub mod hardware;
 pub mod monitor;
 pub mod network;
 pub mod nvml;
+pub mod power;
 pub mod procs;
 pub mod recommend;
 pub mod registry;

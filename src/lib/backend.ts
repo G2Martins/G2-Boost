@@ -347,6 +347,42 @@ export type Firmware = {
   fast_startup: boolean | null;
   hibernation: boolean | null;
 };
+export type PowerPlan = { guid: string; name: string; active: boolean; builtin: boolean };
+export type PowerPlans = { plans: PowerPlan[]; has_battery: boolean };
+export type PowerSettingId =
+  | "display_off"
+  | "sleep_after"
+  | "hibernate_after"
+  | "wake_timers"
+  | "disk_off"
+  | "usb_suspend"
+  | "pcie_aspm"
+  | "cpu_min"
+  | "cpu_max"
+  | "cpu_boost"
+  | "core_parking_min";
+export type PowerKind =
+  | { type: "seconds" }
+  | { type: "percent" }
+  | { type: "choice"; values: number[] };
+export type PowerSetting = {
+  id: PowerSettingId;
+  kind: PowerKind;
+  ac: number | null;
+  dc: number | null;
+};
+export type ProcInfo = {
+  pid: number;
+  name: string;
+  path: string;
+  ram_bytes: number;
+  cpu_pct: number;
+  /** Creation time as a decimal string (sent back with the pid to act on this exact process). */
+  created: string;
+  system: boolean;
+  protected: "system" | "security" | "service" | "self" | null;
+};
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -433,6 +469,20 @@ export const backend = {
   startupSet: (location: StartupLocation, name: string, enabled: boolean) =>
     callOrThrow<StartupItem>("startup_set", { location, name, enabled }),
   procsTop: () => call<ProcGroup[]>("procs_top"),
+  powerPlans: () => call<PowerPlans>("power_plans"),
+  powerActivate: (guid: string) => callOrThrow<void>("power_activate", { guid }),
+  powerCreateMax: () => callOrThrow<string>("power_create_max"),
+  powerDuplicate: (guid: string, name: string) =>
+    callOrThrow<string>("power_duplicate", { guid, name }),
+  powerRename: (guid: string, name: string) => callOrThrow<void>("power_rename", { guid, name }),
+  powerDelete: (guid: string) => callOrThrow<void>("power_delete", { guid }),
+  powerSettings: (guid: string) => call<PowerSetting[]>("power_settings", { guid }),
+  powerWrite: (guid: string, id: PowerSettingId, ac: number | null, dc: number | null) =>
+    callOrThrow<PowerSetting>("power_write", { guid, id, ac, dc }),
+  procsList: () => call<ProcInfo[]>("procs_list"),
+  procsEnd: (pid: number, created: string) => callOrThrow<void>("procs_end", { pid, created }),
+  procsReveal: (pid: number, created: string) =>
+    callOrThrow<void>("procs_reveal", { pid, created }),
   firmwareInfo: () => call<Firmware>("firmware_info"),
   traceHost: (host: string, maxHops: number, probes: number, timeoutMs: number) =>
     callOrThrow<Hop[]>("trace_host", { host, maxHops, probes, timeoutMs }),

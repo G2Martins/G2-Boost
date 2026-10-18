@@ -15,7 +15,7 @@ import { reducedMotion } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 
 /* ---------- Button ---------- */
-type ButtonVariant = "primary" | "secondary" | "ghost" | "outline";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "outline" | "danger";
 export function Button({
   variant = "secondary",
   size = "md",
@@ -34,6 +34,8 @@ export function Button({
           "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18),0_0_0_1px_hsl(var(--primary)/0.5)] hover:brightness-110",
         variant === "secondary" &&
           "bg-foreground/[0.07] text-foreground hover:bg-foreground/[0.11]",
+        variant === "danger" &&
+          "bg-destructive text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.16)] hover:brightness-110",
         variant === "outline" &&
           "border border-border-strong bg-transparent text-foreground hover:bg-foreground/[0.05]",
         variant === "ghost" &&

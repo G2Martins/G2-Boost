@@ -69,8 +69,13 @@ const SECURITY_MARKERS: &[&str] = &[
 ];
 
 fn is_protected(name: &str, command: &str) -> bool {
-    let (n, c) = (name.to_ascii_lowercase(), command.to_ascii_lowercase());
-    SECURITY_MARKERS.iter().any(|m| n.contains(m) || c.contains(m))
+    is_security_software(name) || is_security_software(command)
+}
+
+/// Name, command line or path that belongs to security software (also used by the process list).
+pub(crate) fn is_security_software(text: &str) -> bool {
+    let t = text.to_ascii_lowercase();
+    SECURITY_MARKERS.iter().any(|m| t.contains(m))
 }
 
 /// Task Manager's encoding: first byte even (0x02/0x06) = enabled, odd (0x03/0x07) = disabled.

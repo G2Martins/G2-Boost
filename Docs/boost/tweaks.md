@@ -2,6 +2,8 @@
 
 **Última revisão:** 2026-10-18 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
 
+> Planos de energia e Gerenciador de tarefas (abas Energia e Processos) → [power-processes.md](power-processes.md).
+
 ## Modelo
 
 - Cada tweak é **dado** (lista de valores de registro, nomes de serviço, parâmetros `SystemParametersInfo`, esquema de energia). O core expõe `detect` / `apply` / `revert`; a UI só mostra estado e chama.

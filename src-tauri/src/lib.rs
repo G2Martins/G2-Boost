@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, context, dns, firmware, procs, secrets, startup};
+use g2boost_core::{advisor, context, dns, firmware, power, procs, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -828,6 +828,99 @@ async fn startup_set(location: startup::Location, name: String, enabled: bool) -
         .map_err(|e| e.to_string())?
 }
 
+/* ---------------- power plans ---------------- */
+
+#[tauri::command]
+async fn power_plans() -> power::Plans {
+    tauri::async_runtime::spawn_blocking(power::plans).await.unwrap_or(power::Plans { plans: vec![], has_battery: false })
+}
+
+#[tauri::command]
+async fn power_activate(guid: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || power::set_active(&guid).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn power_create_max() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| power::create_max_performance().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn power_duplicate(guid: String, name: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || power::duplicate(&guid, &name).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn power_rename(guid: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || power::rename(&guid, &name).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn power_delete(guid: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || power::delete(&guid).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn power_settings(guid: String) -> Result<Vec<power::SettingValue>, String> {
+    tauri::async_runtime::spawn_blocking(move || power::settings(&guid).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn power_write(guid: String, id: String, ac: Option<u32>, dc: Option<u32>) -> Result<power::SettingValue, String> {
+    tauri::async_runtime::spawn_blocking(move || power::write(&guid, &id, ac, dc).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/* ---------------- task manager ---------------- */
+
+#[derive(Default)]
+struct ProcSampler(Mutex<procs::Sampler>);
+
+/// Per-process list; CPU % is the delta since the previous call (the UI polls every 2 s).
+#[tauri::command]
+fn procs_list(state: State<'_, ProcSampler>) -> Vec<procs::ProcInfo> {
+    state.0.lock().unwrap().sample()
+}
+
+/// `created` comes back as the decimal string the list sent (u64 does not fit a JS number).
+fn parse_created(created: &str) -> Result<u64, String> {
+    created.parse().map_err(|_| "process_gone".to_string())
+}
+
+/// End the exact process the user confirmed (pid + creation time); the core refuses protected ones.
+#[tauri::command]
+async fn procs_end(pid: u32, created: String) -> Result<(), String> {
+    let created = parse_created(&created)?;
+    tauri::async_runtime::spawn_blocking(move || procs::end(pid, created).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Explorer on the process image (the path is resolved here from pid + creation time).
+#[tauri::command]
+async fn procs_reveal(pid: u32, created: String) -> Result<(), String> {
+    let created = parse_created(&created)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = procs::path_of(pid, created).map_err(|e| e.to_string())?;
+        disk::reveal(std::path::Path::new(&path)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 async fn procs_top() -> Vec<procs::ProcGroup> {
     tauri::async_runtime::spawn_blocking(|| procs::top(Duration::from_millis(1000), 15)).await.unwrap_or_default()
@@ -855,6 +948,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .manage(DiskState::default())
+        .manage(ProcSampler::default())
         .manage(TokenStore::default())
         .manage(Dashboard::default())
         .manage(Routines {
@@ -958,7 +1052,18 @@ pub fn run() {
             startup_list,
             startup_set,
             procs_top,
-            firmware_info
+            firmware_info,
+            power_plans,
+            power_activate,
+            power_create_max,
+            power_duplicate,
+            power_rename,
+            power_delete,
+            power_settings,
+            power_write,
+            procs_list,
+            procs_end,
+            procs_reveal
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

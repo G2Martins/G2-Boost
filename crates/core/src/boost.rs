@@ -943,7 +943,7 @@ fn svc_start(name: &str) -> Result<(), BoostError> {
 const ULTIMATE: GUID = GUID::from_u128(0xe9a42b02_d5df_448d_aa00_03f14749eb61);
 const BALANCED: GUID = GUID::from_u128(0x381b4222_f694_41f0_9685_ff5bb260df2e);
 
-fn take_local_guid(p: *mut GUID) -> Option<GUID> {
+pub(crate) fn take_local_guid(p: *mut GUID) -> Option<GUID> {
     if p.is_null() {
         return None;
     }
@@ -982,7 +982,7 @@ fn set_active_scheme(g: &GUID) -> Result<(), BoostError> {
     check(unsafe { PowerSetActiveScheme(None, Some(g)) })
 }
 
-fn enumerate_schemes() -> Vec<GUID> {
+pub(crate) fn enumerate_schemes() -> Vec<GUID> {
     let mut out = Vec::new();
     for i in 0.. {
         let mut g = GUID::zeroed();
@@ -998,7 +998,7 @@ fn enumerate_schemes() -> Vec<GUID> {
 }
 
 /// A visible scheme named like the hidden "Ultimate Performance" template, duplicated if missing.
-fn ensure_ultimate_scheme() -> Result<GUID, BoostError> {
+pub(crate) fn ensure_ultimate_scheme() -> Result<GUID, BoostError> {
     let name = friendly_name(&ULTIMATE);
     if let Some(g) = enumerate_schemes().into_iter().find(|g| friendly_name(g) == name) {
         return Ok(g);
