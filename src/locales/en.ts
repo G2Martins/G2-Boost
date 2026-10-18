@@ -273,6 +273,23 @@ export const en = {
     "The answer took too long (over 5 minutes) and was cancelled. Try again or ask something shorter.",
   "ai.error.refusal": "The provider declined to answer this question.",
   "ai.error.generic": "Failed: {error}",
+  "console.cmd.winget":
+    "Search, list updates and install apps with winget (installing asks for confirmation)",
+  "console.col.available": "available",
+  "console.note.winget_upgrades": "{n} update(s) available. To update: winget atualizar <id>",
+  "console.note.winget_done": "Done: {id} ({message})",
+  "console.note.winget_failed": "winget did not finish {id}: {message} (code {code})",
+  "console.err.winget_missing": "winget is not installed (App Installer from the Microsoft Store).",
+  "console.err.winget_id": "Invalid package id. Use the id from a search, like Valve.Steam.",
+  "console.err.winget_not_found": "No package with that exact id in the winget catalog.",
+  "console.err.winget_timeout": "winget took too long and was stopped.",
+  "console.err.confirm": "Confirmation expired or invalid. Run the command again.",
+  "console.winget.confirm_install": "Install {name} {version} ({id}) with winget?",
+  "console.winget.confirm_upgrade": "Update {name} ({id}) with winget?",
+  "console.winget.confirm_note":
+    "Silent install from the official winget source. The app's installer may ask for administrator rights.",
+  "console.winget.install": "Install",
+  "console.winget.upgrade": "Update",
   "network.tab.devices": "Devices",
   "devices.title": "Devices on the network",
   "devices.help":

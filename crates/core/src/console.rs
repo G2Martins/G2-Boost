@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::{apps, devices, disk, dns, hardware, network, power, procs, sensors, settings, startup, system, winevents};
+use crate::cleanup::TokenStore;
+use crate::{apps, devices, disk, dns, hardware, network, power, procs, sensors, settings, startup, system, winevents, winget};
 
 const MAX_LINE: usize = 512;
 
@@ -38,6 +39,11 @@ pub const COMMANDS: &[Command] = &[
     Command { name: "pc", aliases: &["hardware", "specs"], usage: "pc" },
     Command { name: "sensores", aliases: &["temps", "sensors"], usage: "sensores" },
     Command { name: "inicializacao", aliases: &["inicialização", "startup"], usage: "inicializacao" },
+    Command {
+        name: "winget",
+        aliases: &["pacotes"],
+        usage: "winget buscar <termo> | atualizacoes | instalar <id> | atualizar <id>",
+    },
     Command { name: "abrir", aliases: &["open", "ir"], usage: "abrir <tela>" },
     Command { name: "limpar", aliases: &["clear", "cls"], usage: "limpar" },
 ];
@@ -71,6 +77,8 @@ pub enum Block {
     /// Column ids are i18n keys (`console.col.<id>`); cells are data.
     Table { columns: Vec<&'static str>, rows: Vec<Vec<String>> },
     Note(Msg),
+    /// A change waiting for the user's click: `console_confirm(token, action, id)` runs it.
+    Confirm { action: &'static str, id: String, name: String, version: String, token: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -190,6 +198,7 @@ pub fn run(line: &str) -> Reply {
     match cmd.name {
         "ajuda" => Reply::effect(cmd.name, Effect::Help),
         "limpar" => Reply::effect(cmd.name, Effect::Clear),
+        "winget" => winget_cmd(cmd.name, args),
         "abrir" => {
             let Some(w) = args.first().map(|s| s.to_lowercase()) else {
                 return usage();
@@ -389,6 +398,100 @@ fn adapters(command: &'static str) -> Reply {
         })
         .collect();
     Reply::ok(command, vec![Block::Table { columns: vec!["adapter", "primary", "gateway", "dns", "provider", "mbps"], rows }])
+}
+
+/// Install/upgrade confirmations: single-use, 2 minutes, bound to the action and the exact id.
+fn tokens() -> &'static TokenStore {
+    static T: std::sync::OnceLock<TokenStore> = std::sync::OnceLock::new();
+    T.get_or_init(TokenStore::default)
+}
+
+fn winget_error(command: &'static str, e: &winget::WingetError) -> Reply {
+    let key = match e {
+        winget::WingetError::Unavailable => "err.winget_missing",
+        winget::WingetError::InvalidId => "err.winget_id",
+        winget::WingetError::InvalidQuery => "err.filter",
+        winget::WingetError::NotFound => "err.winget_not_found",
+        winget::WingetError::Timeout => "err.winget_timeout",
+        winget::WingetError::Io(_) => "err.network",
+    };
+    Reply::err(Some(command), msg(key, &[]))
+}
+
+fn winget_cmd(command: &'static str, args: &[String]) -> Reply {
+    let usage = || Reply::err(Some(command), msg("err.usage", &[("usage", COMMANDS.iter().find(|c| c.name == command).map_or("", |c| c.usage).to_string())]));
+    let sub = args.first().map(|s| s.to_lowercase()).unwrap_or_default();
+    match sub.as_str() {
+        "buscar" | "search" | "procurar" => {
+            let q = args[1..].join(" ");
+            match winget::search(&q) {
+                Ok(list) => Reply::ok(
+                    command,
+                    vec![Block::Table {
+                        columns: vec!["app", "id", "version"],
+                        rows: list.into_iter().map(|p| vec![p.name, p.id, p.version]).collect(),
+                    }],
+                ),
+                Err(e) => winget_error(command, &e),
+            }
+        }
+        "atualizacoes" | "atualizações" | "upgrades" | "updates" => match winget::upgrades() {
+            Ok(list) => {
+                let n = list.len();
+                Reply::ok(
+                    command,
+                    vec![
+                        Block::Table {
+                            columns: vec!["app", "id", "version", "available"],
+                            rows: list.into_iter().map(|p| vec![p.name, p.id, p.version, p.available.unwrap_or_default()]).collect(),
+                        },
+                        Block::Note(msg("note.winget_upgrades", &[("n", n.to_string())])),
+                    ],
+                )
+            }
+            Err(e) => winget_error(command, &e),
+        },
+        "instalar" | "install" | "atualizar" | "upgrade" => {
+            let Some(id) = args.get(1) else {
+                return usage();
+            };
+            let action = if matches!(sub.as_str(), "instalar" | "install") { "install" } else { "upgrade" };
+            match winget::exact(id) {
+                Ok(p) => {
+                    let token = tokens().issue(vec![format!("winget:{action}:{}", p.id)]).token;
+                    Reply::ok(command, vec![Block::Confirm { action, id: p.id, name: p.name, version: p.version, token }])
+                }
+                Err(e) => winget_error(command, &e),
+            }
+        }
+        _ => usage(),
+    }
+}
+
+/// The user clicked "Install"/"Update" on a confirmation block: run it once.
+pub fn confirm(token: u64, action: &str, id: &str) -> Reply {
+    const C: &str = "winget";
+    let action = match action {
+        "install" => "install",
+        "upgrade" => "upgrade",
+        _ => return Reply::err(Some(C), msg("err.confirm", &[])),
+    };
+    if !winget::valid_id(id) || !tokens().consume(token, &[format!("winget:{action}:{id}")]) {
+        return Reply::err(Some(C), msg("err.confirm", &[]));
+    }
+    match winget::install(id, action == "upgrade") {
+        Ok(o) => {
+            let key = if o.ok { "note.winget_done" } else { "note.winget_failed" };
+            Reply {
+                ok: o.ok,
+                command: Some(C),
+                blocks: vec![Block::Note(msg(key, &[("id", id.to_string()), ("code", format!("{:#x}", o.code)), ("message", o.message)]))],
+                effect: None,
+                error: None,
+            }
+        }
+        Err(e) => winget_error(C, &e),
+    }
 }
 
 fn lan(command: &'static str) -> Reply {
@@ -617,6 +720,14 @@ mod tests {
         assert_eq!(run("abrir regedit").error.map(|m| m.key), Some("err.screen"));
         assert_eq!(run("abrir Limpeza").effect, Some(Effect::Navigate { route: "cleanup" }));
         assert_eq!(run("cls").effect, Some(Effect::Clear));
+        assert_eq!(run("winget").error.map(|m| m.key), Some("err.usage"));
+        assert_eq!(run("winget instalar a;b").error.map(|m| m.key), Some("err.winget_id"));
+        assert_eq!(run("winget buscar --force").error.map(|m| m.key), Some("err.filter"));
+        // A token is bound to the action and the id, used once.
+        let t = tokens().issue(vec!["winget:install:Valve.Steam".into()]).token;
+        assert_eq!(confirm(t, "upgrade", "Valve.Steam").error.map(|m| m.key), Some("err.confirm"), "other action");
+        assert_eq!(confirm(t, "install", "a;b").error.map(|m| m.key), Some("err.confirm"), "bad id");
+        assert_eq!(confirm(t + 2, "install", "Valve.Steam").error.map(|m| m.key), Some("err.confirm"), "unknown token");
         assert!(!valid_host("a b") && !valid_host("x/y") && valid_host("speed.cloudflare.com"));
     }
 

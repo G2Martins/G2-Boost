@@ -478,6 +478,12 @@ fn console_commands() -> &'static [console::Command] {
     console::COMMANDS
 }
 
+/// The user confirmed a console change (winget install/upgrade): the core checks the token.
+#[tauri::command]
+async fn console_confirm(token: u64, action: String, id: String) -> Result<console::Reply, String> {
+    tauri::async_runtime::spawn_blocking(move || console::confirm(token, &action, &id)).await.map_err(|e| e.to_string())
+}
+
 /// Run one Console G2 line (native, read-only; the core parses and validates it).
 #[tauri::command]
 async fn console_run(line: String) -> Result<console::Reply, String> {
@@ -1349,6 +1355,7 @@ pub fn run() {
             claude_disconnect,
             console_commands,
             console_run,
+            console_confirm,
             devices_scan,
             devices_ports,
             devices_known

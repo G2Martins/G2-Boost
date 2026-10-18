@@ -1,6 +1,6 @@
 # Console G2
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/console.rs` (parser + comandos), `disk::usage` (pasta com prazo), `winevents.rs` (erros); shell `src-tauri/src/lib.rs` (`console_commands`, `console_run`); UI `src/pages/console.tsx` (rota **Console**), `src/lib/luli.tsx` (`askOnce`), `src/lib/ai.ts` (`console` no bloco).
+**Última revisão:** 2026-10-18 · Código: `crates/core/src/console.rs`, `winget.rs` (parser + comandos), `disk::usage` (pasta com prazo), `winevents.rs` (erros); shell `src-tauri/src/lib.rs` (`console_commands`, `console_run`); UI `src/pages/console.tsx` (rota **Console**), `src/lib/luli.tsx` (`askOnce`), `src/lib/ai.ts` (`console` no bloco).
 
 Pedido do dono (2026-10-18): um terminal dentro do G2 Boost para executar comandos, com a IA sugerindo o que rodar (o apelo do Homebrew e do Rune). Decisão: **Console G2 nativo**, não um shell. Ideias de Rune (blocos por comando, sugestões da IA clicáveis) usadas como conceito; o código do Rune é proprietário e não foi copiado. O `homebrew` da pasta de referências é só um tap que instala o Rune; o análogo no Windows é o winget (ver Pendente).
 
@@ -39,17 +39,25 @@ Pedido do dono (2026-10-18): um terminal dentro do G2 Boost para executar comand
 
 Blocos com borda por estado (rodando, ok, erro), duração, repetir, copiar (TSV). Tab completa, ↑↓ histórico (100 linhas no `localStorage`, só no PC), Ctrl+L limpa. Os blocos ficam numa store de módulo: sair da tela não perde nada e um comando lento termina mesmo fora dela.
 
-## Pendente: winget (decisão do dono)
+## winget (2026-10-18)
 
-Plano era `winget buscar/atualizacoes/instalar/atualizar` pela **API COM** (`Microsoft.Management.Deployment`), com prévia + token de uso único antes de instalar. Bindings gerados com `windows-bindgen` a partir do `.winmd` do App Installer e CLSIDs conferidos no AppxManifest. Bloqueios encontrados em 2026-10-18:
+`winget buscar <termo>`, `winget atualizacoes`, `winget instalar <id>`, `winget atualizar <id>` (`crates/core/src/winget.rs`).
 
-1. Ativação fora do processo: `0x80073D54` (APPMODEL_ERROR_NO_PACKAGE). O proxy/stub das interfaces só é resolvido para processos com identidade de pacote.
-2. Ativação dentro do processo com a DLL do App Installer: `LoadLibrary` negado (`0x80070005`) para código em `WindowsApps` vindo de um exe sem pacote.
-3. O caminho oficial para apps sem pacote é a DLL cliente do NuGet `Microsoft.WindowsPackageManager.ComInterop` 1.29.380 (MIT, assinada pela Microsoft, 130 KB), distribuída junto do app. Carregar binário baixado precisa de aprovação do dono antes de testar.
+- **Como:** o `winget.exe` oficial (alias do App Installer em `%LOCALAPPDATA%\Microsoft\WindowsApps`) chamado direto, sem shell, com argumentos fixos (`--source winget --accept-source-agreements --disable-interactivity`), sem janela, stdin fechado, saída limitada a 4 MB, prazo (busca 90 s, instalação 45 min) e kill. Exceção registrada em [global-rules §1.3](./global-rules.md).
+- **Leitura da saída:** tabela alinhada pelo cabeçalho, traduzida, em UTF-8 (o OEM fica de reserva). Cada linha é decodificada antes e cortada nas colunas do cabeçalho contadas em caracteres (cortar por byte desalinha "Versão"). O spinner reescreve a linha com `\r` e só o que ficou visível conta. O rodapé "N atualizações disponíveis." sai porque o id não é válido.
+- **Instalar/atualizar:** o console mostra a prévia (`winget search --id X --exact`) num bloco de confirmação com token de uso único (2 min, amarrado à ação e ao id). O clique chama `console_confirm`, que roda `install|upgrade --id X --exact --silent --accept-package-agreements` e registra o resultado em `winget-log.json`. O instalador do app pode pedir administrador.
+- **Verificado na máquina do dono:** busca (Valve.Steam), pacote exato, id inexistente, lista de atualizações (Claude, GitHub CLI, .NET Desktop Runtime 8, Terminal). Instalação real fica para o dono confirmar no console.
 
-4. **Testado com aprovação do dono (2026-10-18):** a DLL cliente (SHA-256 fixado, carregada ao lado do exe) cria o objeto, mas a primeira chamada falha igual: `IPackageManager` ({B375E3B9-F2E0-5C93-87A7-B67497F7E593}) não tem proxy fora do pacote. O App Installer registra os proxies só como `windows.activatableClass.proxyStub` do próprio pacote. A DLL do NuGet só ativa (`CoCreateInstance` ou ativação manual por RPC) e não traz proxies.
+### Por que não a API COM (histórico do teste)
 
-Caminhos que sobram: dar identidade de pacote ao G2 Boost (pacote esparso MSIX com local externo; precisa de certificado de assinatura, junto com a release), embutir o motor do winget dentro do processo (DLL de vários MB, executa instaladores dentro do G2 Boost) ou chamar o `winget.exe` oficial com argumentos fixos (sem shell, saída em texto). O trabalho (bindings, `winget.rs` validando ids e consultas, ferramenta de geração, versão com a DLL) está guardado fora do repositório até a decisão.
+1. Ativação fora do processo: `0x80073D54` (APPMODEL_ERROR_NO_PACKAGE). O proxy de `IPackageManager` ({B375E3B9-F2E0-5C93-87A7-B67497F7E593}) só existe como `windows.activatableClass.proxyStub` dentro do pacote do App Installer.
+2. A DLL do App Installer não carrega dentro do processo: `LoadLibrary` em `WindowsApps` dá acesso negado para exe sem pacote.
+3. A DLL cliente do NuGet `Microsoft.WindowsPackageManager.ComInterop` 1.29.380 (MIT, assinada pela MS, testada com o SHA-256 fixado) cria o objeto, mas falha igual na primeira chamada. Ela só ativa e não traz proxy.
+4. **Pacote esparso MSIX** (dar identidade ao exe):
+   - Este Windows (26200) recusa o publisher "sem assinatura" (`OID.2.25.311729368913984317654407730594956997722=1`) no manifesto do exe: "O fornecedor msix deve ser válido". O exe nem abre.
+   - Com `CN=GrovicData`, o exe abre normal sem o pacote registrado.
+   - O pacote assinado foi gerado com `makeappx` e `signtool` (NuGet SDK BuildTools em `D:\dev\sdk-buildtools`, certificado de teste no repositório do usuário).
+   - Registrar exige confiar no certificado: o passo foi barrado pela proteção do agente e aguarda o dono. Com a assinatura de release, o mesmo caminho vale sem certificado de teste.
 
 ## Testes
 

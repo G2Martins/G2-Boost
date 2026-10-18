@@ -270,6 +270,24 @@ export const ptBR = {
     "A resposta demorou demais (mais de 5 minutos) e foi cancelada. Tente de novo ou pergunte algo mais curto.",
   "ai.error.refusal": "O provedor recusou responder a esta pergunta.",
   "ai.error.generic": "Falhou: {error}",
+  "console.cmd.winget":
+    "Buscar, ver atualizações e instalar apps pelo winget (instalar pede confirmação)",
+  "console.col.available": "disponível",
+  "console.note.winget_upgrades":
+    "{n} atualização(ões) disponível(is). Para atualizar: winget atualizar <id>",
+  "console.note.winget_done": "Pronto: {id} ({message})",
+  "console.note.winget_failed": "O winget não concluiu {id}: {message} (código {code})",
+  "console.err.winget_missing": "O winget não está instalado (App Installer da Microsoft Store).",
+  "console.err.winget_id": "Id de pacote inválido. Use o id da busca, como Valve.Steam.",
+  "console.err.winget_not_found": "Nenhum pacote com esse id exato no catálogo do winget.",
+  "console.err.winget_timeout": "O winget demorou demais e foi interrompido.",
+  "console.err.confirm": "Confirmação expirada ou inválida. Rode o comando de novo.",
+  "console.winget.confirm_install": "Instalar {name} {version} ({id}) pelo winget?",
+  "console.winget.confirm_upgrade": "Atualizar {name} ({id}) pelo winget?",
+  "console.winget.confirm_note":
+    "Instalação silenciosa da fonte oficial do winget. O instalador do app pode pedir permissão de administrador.",
+  "console.winget.install": "Instalar",
+  "console.winget.upgrade": "Atualizar",
   "network.tab.devices": "Dispositivos",
   "devices.title": "Dispositivos na rede",
   "devices.help":

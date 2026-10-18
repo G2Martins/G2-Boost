@@ -47,7 +47,15 @@ export type ConsoleCommand = { name: string; aliases: string[]; usage: string };
 export type ConsoleMsg = { key: string; params: Record<string, string> };
 export type ConsoleBlock =
   | { kind: "table"; columns: string[]; rows: string[][] }
-  | ({ kind: "note" } & ConsoleMsg);
+  | ({ kind: "note" } & ConsoleMsg)
+  | {
+      kind: "confirm";
+      action: "install" | "upgrade";
+      id: string;
+      name: string;
+      version: string;
+      token: number;
+    };
 export type ConsoleReply = {
   ok: boolean;
   command: string | null;
@@ -520,6 +528,8 @@ export const backend = {
   devicesPorts: (ip: string) => callOrThrow<OpenPort[]>("devices_ports", { ip }),
   devicesKnown: (mac: string, known: boolean) => callOrThrow<void>("devices_known", { mac, known }),
   consoleRun: (line: string) => callOrThrow<ConsoleReply>("console_run", { line }),
+  consoleConfirm: (token: number, action: string, id: string) =>
+    callOrThrow<ConsoleReply>("console_confirm", { token, action, id }),
   claudeConnect: (client: ClaudeClient) =>
     callOrThrow<ClaudeTarget[]>("claude_connect", { client }),
   claudeDisconnect: (client: ClaudeClient) =>

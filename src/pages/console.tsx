@@ -6,7 +6,13 @@ import type { Route } from "@/components/shell/app-shell";
 import { PageBody, PageHeader } from "@/components/shell/page-header";
 import { Card } from "@/components/ui/primitives";
 import { type Answer, isTimeout } from "@/lib/ai";
-import { backend, type ConsoleCommand, type ConsoleReply, inTauri } from "@/lib/backend";
+import {
+  backend,
+  type ConsoleBlock,
+  type ConsoleCommand,
+  type ConsoleReply,
+  inTauri,
+} from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { useLuli } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
@@ -69,7 +75,9 @@ function tableText(r: ConsoleReply): string {
     .map((b) =>
       b.kind === "table"
         ? [b.columns.join("\t"), ...b.rows.map((row) => row.join("\t"))].join("\n")
-        : `${b.key} ${JSON.stringify(b.params)}`,
+        : b.kind === "confirm"
+          ? `${b.action} ${b.id} ${b.version}`
+          : `${b.key} ${JSON.stringify(b.params)}`,
     )
     .join("\n\n");
 }
@@ -415,6 +423,9 @@ function EntryView({
           b.kind === "table" ? (
             // biome-ignore lint/suspicious/noArrayIndexKey: blocks never reorder
             <ConsoleTable key={i} columns={b.columns} rows={b.rows} />
+          ) : b.kind === "confirm" ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: blocks never reorder
+            <ConfirmBlock key={i} block={b} />
           ) : (
             // biome-ignore lint/suspicious/noArrayIndexKey: blocks never reorder
             <p key={i} className="text-muted-foreground">
@@ -456,6 +467,65 @@ function EntryView({
         ) : null}
       </div>
     </section>
+  );
+}
+
+/** A change waiting for the user's click; the core runs it once with its token. */
+function ConfirmBlock({ block: b }: { block: Extract<ConsoleBlock, { kind: "confirm" }> }) {
+  const { t } = useI18n();
+  const [state, setState] = useState<"ask" | "running" | "done">("ask");
+  const go = async () => {
+    setState("running");
+    const id = nextId++;
+    const line = `winget ${b.action === "install" ? "instalar" : "atualizar"} ${b.id}`;
+    const t0 = performance.now();
+    update((l) => [...l, { id, line, kind: "cmd", status: "running" }]);
+    try {
+      const reply = await backend.consoleConfirm(b.token, b.action, b.id);
+      patchEntry(id, {
+        status: reply.ok ? "ok" : "error",
+        ms: Math.round(performance.now() - t0),
+        reply,
+      });
+    } catch (e) {
+      patchEntry(id, { status: "error", error: String(e instanceof Error ? e.message : e) });
+    }
+    setState("done");
+  };
+  return (
+    <div className="max-w-xl rounded-md border border-primary/40 bg-primary/5 p-3 font-sans">
+      <p className="text-[13px]">
+        {t(
+          b.action === "install"
+            ? "console.winget.confirm_install"
+            : "console.winget.confirm_upgrade",
+          {
+            name: b.name,
+            version: b.version,
+            id: b.id,
+          },
+        )}
+      </p>
+      <p className="mt-1 text-[11px] text-muted-foreground">{t("console.winget.confirm_note")}</p>
+      {state === "ask" ? (
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={go}
+            className="press rounded-md bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
+          >
+            {b.action === "install" ? t("console.winget.install") : t("console.winget.upgrade")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setState("done")}
+            className="press rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+          >
+            {t("common.cancel")}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 # Regras globais de engenharia — G2 Boost
 
-**Última revisão:** 2026-10-14
+**Última revisão:** 2026-10-18
 
 Fonte única. Resumo em [../../CLAUDE.md §4](../../CLAUDE.md). Herda o espírito do Valerium Portal (cliente hostil, defesa em profundidade, TDD, docs vivas, GSD) adaptado a um app desktop que **apaga arquivos e mexe em registro com privilégio de administrador** — o dano possível é no PC do usuário, não num banco multi-tenant.
 
@@ -20,6 +20,8 @@ Entradas não confiáveis: UI (webview), servidor MCP (um LLM pode ser induzido 
 
 ### 1.3 Nativo, não shell
 Proibido `Command::new("cmd"|"powershell"|"reg"|"net"|"sc"|"wevtutil"|"ipconfig")`. Motivos: (a) é o padrão de LOLBin que antivírus pontuam (ver [kaspersky-false-positive.md](../security/kaspersky-false-positive.md)); (b) injeção de argumento; (c) sem controle de erro. Equivalentes: `DeleteFileW`/`RemoveDirectoryW`/`IFileOperation`, `RegSetValueExW`, `OpenService/ControlService`, `DnsFlushResolverCache`, `SetInterfaceDnsSettings`, `IcmpSendEcho2Ex`, `NtSetSystemInformation`, `DismApi`. Exceção precisa de justificativa escrita no doc da feature.
+
+**Exceção registrada (2026-10-18): `winget.exe`** do App Installer, chamado direto (sem shell) só com verbos fixos (`search`, `upgrade`, `install`), id/termo validados antes de virar argumento (nunca começa com `-`), `CREATE_NO_WINDOW`, prazo e kill, instalar/atualizar só depois de confirmação humana, com log em `winget-log.json`. Motivo: a API COM do winget não funciona em exe sem identidade de pacote (testado, ver [console.md](./console.md)).
 
 ### 1.4 Privilégio
 Scan, treemap, rede e speedtest rodam **sem** admin. Limpeza de pastas do sistema, tweaks `HKLM`, DNS e purge de memória pedem elevação por manifesto/UAC (helper elevado ou app elevado — decidir em [architecture.md](./architecture.md)). Nunca auto-relançar via PowerShell `-Verb RunAs`.
