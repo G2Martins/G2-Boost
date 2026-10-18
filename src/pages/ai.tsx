@@ -539,6 +539,11 @@ function AnswerExtras({ answer, latest }: { answer: Answer; latest: boolean }) {
           <p className="mt-2 text-[10px] text-muted-foreground">{t("ai.actions.note")}</p>
         </div>
       ) : null}
+      {answer.model ? (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          {t("ai.fallback_model", { model: answer.model })}
+        </p>
+      ) : null}
       {answer.actions.todo.length > 0 ? (
         <div className="mt-3 rounded-md border border-border bg-background/50 p-3">
           <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

@@ -270,6 +270,9 @@ export const ptBR = {
     "A resposta demorou demais (mais de 5 minutos) e foi cancelada. Tente de novo ou pergunte algo mais curto.",
   "ai.error.refusal": "O provedor recusou responder a esta pergunta.",
   "ai.error.generic": "Falhou: {error}",
+  "ai.error.busy":
+    "O provedor está sobrecarregado agora (comum na camada grátis do Gemini). Tentei de novo e com outros modelos grátis; espere alguns minutos e pergunte de novo.",
+  "ai.fallback_model": "Respondido pelo {model}: o modelo escolhido estava sobrecarregado.",
   "console.cmd.winget":
     "Buscar, ver atualizações e instalar apps pelo winget (instalar pede confirmação)",
   "console.col.available": "disponível",

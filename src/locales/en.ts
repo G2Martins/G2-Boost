@@ -273,6 +273,9 @@ export const en = {
     "The answer took too long (over 5 minutes) and was cancelled. Try again or ask something shorter.",
   "ai.error.refusal": "The provider declined to answer this question.",
   "ai.error.generic": "Failed: {error}",
+  "ai.error.busy":
+    "The provider is overloaded right now (common on Gemini's free tier). I retried, also with other free models; wait a few minutes and ask again.",
+  "ai.fallback_model": "Answered by {model}: the chosen model was overloaded.",
   "console.cmd.winget":
     "Search, list updates and install apps with winget (installing asks for confirmation)",
   "console.col.available": "available",

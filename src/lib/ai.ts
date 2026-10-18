@@ -69,7 +69,81 @@ export type Actions = {
   /** Console G2 lines to offer as one-click runs (re-validated by the console in Rust). */
   console: string[];
 };
-export type Answer = { text: string; sources: Source[]; actions: Actions };
+export type Answer = {
+  text: string;
+  sources: Source[];
+  actions: Actions;
+  /** Set when another model answered because the chosen one was overloaded. */
+  model?: string;
+};
+
+/* ---------------- overload: retry, then (Gemini) another free model ---------------- */
+
+/** A provider answered with an HTTP error before streaming started. */
+export class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** Overloaded or rate-limited: worth a retry (Gemini's free tier answers 503 at peaks). */
+export function isBusy(e: unknown): boolean {
+  return e instanceof HttpError && [429, 500, 502, 503, 504].includes(e.status);
+}
+
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(t);
+      reject(signal.reason);
+    });
+  });
+}
+
+/** Run `call`, retrying busy errors after each delay (nothing has streamed yet when they happen). */
+export async function withRetry<T>(
+  call: () => Promise<T>,
+  signal?: AbortSignal,
+  delays: number[] = [1500, 4000],
+): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await call();
+    } catch (e) {
+      const d = delays[i];
+      if (!isBusy(e) || d === undefined || signal?.aborted) throw e;
+      await wait(d, signal);
+    }
+  }
+}
+
+/** Free-tier Gemini models tried in order when the chosen one stays overloaded. */
+export const GEMINI_FALLBACKS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+
+/** The chosen model first, then the other free ones; `busy` when all of them stay overloaded. */
+export async function withFallback(
+  model: string,
+  fallbacks: string[],
+  call: (model: string) => Promise<Answer>,
+  signal?: AbortSignal,
+  delays?: number[],
+): Promise<Answer> {
+  const chain = [model, ...fallbacks.filter((m) => m !== model)];
+  for (const m of chain) {
+    try {
+      const a = await withRetry(() => call(m), signal, delays);
+      return m === model ? a : { ...a, model: m };
+    } catch (e) {
+      if (!isBusy(e)) throw e;
+    }
+  }
+  throw new Error("busy");
+}
 export type Turn = { role: "user" | "assistant"; text: string };
 
 /** Beta tweaks (HVCI off lowers security) are never offered as one-click buttons. */
@@ -446,7 +520,7 @@ async function askOpenAI(
   });
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+    throw new HttpError(res.status, err?.error?.message ?? `HTTP ${res.status}`);
   }
   let shown = "";
   let finalBody: { output?: OpenAIOutput[] } | null = null;
@@ -517,7 +591,7 @@ async function askGemini(
   );
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as GeminiChunk | null;
-    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+    throw new HttpError(res.status, err?.error?.message ?? `HTTP ${res.status}`);
   }
   let shown = "";
   const grounding: { web?: { uri?: string; title?: string } }[] = [];
@@ -595,7 +669,7 @@ async function askNvidia(
       detail?: string;
       error?: { message?: string };
     } | null;
-    throw new Error(err?.error?.message ?? err?.detail ?? `HTTP ${res.status}`);
+    throw new HttpError(res.status, err?.error?.message ?? err?.detail ?? `HTTP ${res.status}`);
   }
   let shown = "";
   await readSse(res, (data) => {
@@ -628,8 +702,14 @@ export async function askStateless(
   onText: (s: string) => void,
   signal?: AbortSignal,
 ): Promise<Answer> {
-  if (provider === "nvidia") return askNvidia(model, system, turns, onText, signal);
-  return provider === "openai"
-    ? askOpenAI(model, system, turns, web, onText, signal)
-    : askGemini(model, system, turns, web, onText, signal);
+  if (provider === "nvidia")
+    return withRetry(() => askNvidia(model, system, turns, onText, signal), signal);
+  if (provider === "openai")
+    return withRetry(() => askOpenAI(model, system, turns, web, onText, signal), signal);
+  return withFallback(
+    model,
+    GEMINI_FALLBACKS,
+    (m) => askGemini(m, system, turns, web, onText, signal),
+    signal,
+  );
 }

@@ -21,6 +21,7 @@ import {
   askStateless,
   ClaudeChat,
   DEFAULT_MODELS,
+  isBusy,
   isTimeout,
   PROVIDER_WEB,
   PROVIDERS,
@@ -284,7 +285,9 @@ function useLuliState() {
                 ? t("ai.key.missing")
                 : msg === "empty_response"
                   ? t("ai.error.empty")
-                  : t("ai.error.generic", { error: msg });
+                  : msg === "busy" || isBusy(e)
+                    ? t("ai.error.busy")
+                    : t("ai.error.generic", { error: msg });
           setMessages((m) => [...m, { role: "assistant", text: "", error: text }]);
         }
         claude.current = null; // start clean after a failed Claude turn (history stays append-only)

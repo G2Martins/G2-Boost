@@ -5,7 +5,7 @@ import { SafeMarkdown } from "@/components/safe-markdown";
 import type { Route } from "@/components/shell/app-shell";
 import { PageBody, PageHeader } from "@/components/shell/page-header";
 import { Card } from "@/components/ui/primitives";
-import { type Answer, isTimeout } from "@/lib/ai";
+import { type Answer, isBusy, isTimeout } from "@/lib/ai";
 import {
   backend,
   type ConsoleBlock,
@@ -189,7 +189,9 @@ export function ConsolePage() {
             ? t("ai.key.missing")
             : isTimeout(e)
               ? t("ai.error.timeout")
-              : t("ai.error.generic", { error: m }),
+              : m === "busy" || isBusy(e)
+                ? t("ai.error.busy")
+                : t("ai.error.generic", { error: m }),
       });
     }
   };

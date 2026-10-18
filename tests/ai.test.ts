@@ -1,6 +1,17 @@
 // Model output is untrusted: only catalog ids (no beta tweaks), capped, deduped.
 import { expect, test } from "bun:test";
-import { extractActions, MAX_ACTIONS, MAX_FOLLOWUPS, MAX_TODO, systemPrompt, undash } from "../src/lib/ai";
+import {
+  type Answer,
+  extractActions,
+  HttpError,
+  MAX_ACTIONS,
+  MAX_FOLLOWUPS,
+  MAX_TODO,
+  systemPrompt,
+  undash,
+  withFallback,
+  withRetry,
+} from "../src/lib/ai";
 
 const block = (o: unknown) => `Texto\n\`\`\`g2boost-actions\n${JSON.stringify(o)}\n\`\`\``;
 
@@ -86,4 +97,60 @@ test("providers without web search never get a permission request", () => {
   const p = systemPrompt("pt-BR", "{}", { noWeb: true, web: true });
   expect(p).toContain("not available with this provider");
   expect(p).not.toContain("Web search is ON");
+});
+
+test("busy providers are retried, then Gemini falls back to the next free model", async () => {
+  let calls = 0;
+  const ok = await withRetry(
+    async () => {
+      calls++;
+      if (calls < 3) throw new HttpError(503, "high demand");
+      return "fine";
+    },
+    undefined,
+    [0, 0],
+  );
+  expect(ok).toBe("fine");
+  expect(calls).toBe(3);
+  // Not busy (bad key): no retry.
+  let bad = 0;
+  await expect(
+    withRetry(
+      async () => {
+        bad++;
+        throw new HttpError(400, "bad key");
+      },
+      undefined,
+      [0, 0],
+    ),
+  ).rejects.toThrow("bad key");
+  expect(bad).toBe(1);
+
+  const answer = (text: string): Answer => ({ text, sources: [], actions: extractActions("").actions });
+  const tried: string[] = [];
+  const a = await withFallback(
+    "m1",
+    ["m1", "m2", "m3"],
+    async (m) => {
+      tried.push(m);
+      if (m === "m1") throw new HttpError(503, "busy");
+      return answer(`from ${m}`);
+    },
+    undefined,
+    [0],
+  );
+  expect(a.text).toBe("from m2");
+  expect(a.model).toBe("m2");
+  expect(tried).toEqual(["m1", "m1", "m2"]);
+  await expect(
+    withFallback(
+      "x",
+      ["y"],
+      async () => {
+        throw new HttpError(429, "quota");
+      },
+      undefined,
+      [],
+    ),
+  ).rejects.toThrow("busy");
 });
