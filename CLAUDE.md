@@ -137,6 +137,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Release (assinatura, SmartScreen, instalar em outro PC)** → [Docs/release/distribution-and-trust.md](Docs/release/distribution-and-trust.md) · **Driver/sensores** → [Docs/security/kernel-driver-options.md](Docs/security/kernel-driver-options.md)
 - **Disco** → [Docs/disk/analyzer.md](Docs/disk/analyzer.md) · **Rede/DNS** → [Docs/network/network.md](Docs/network/network.md) · **IA/MCP** → [Docs/core/ai-advisor.md](Docs/core/ai-advisor.md)
 
+- **Base de conhecimento da Luli** (vai no prompt de toda conversa) → [knowledge/README.md](knowledge/README.md)
 - **Arquitetura + decisão de stack** → [Docs/core/architecture.md](Docs/core/architecture.md)
 - **Regras de engenharia (completo)** → [Docs/core/global-rules.md](Docs/core/global-rules.md)
 - **Design system** → [Docs/core/design-system.md](Docs/core/design-system.md)

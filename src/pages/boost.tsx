@@ -22,6 +22,7 @@ import { PowerTab } from "@/components/boost/power-tab";
 import { ProcsTab } from "@/components/boost/procs-tab";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
+import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Badge,
@@ -101,6 +102,10 @@ export function BoostPage() {
     <PageHeaderWithTabs>
       <TabsContent value="tweaks">
         <PageBody className="px-0 pb-0">
+          <LuliCard
+            findings={["hvci_on", "cpu_hot", "gpu_hot", "refresh_below_max"]}
+            asks={[{ label: "luli.ask.boost.worth" }, { label: "luli.ask.boost.hurt" }]}
+          />
           <TweaksTab elevated={elevated} />
         </PageBody>
       </TabsContent>

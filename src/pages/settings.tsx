@@ -1,4 +1,4 @@
-import { CalendarClock, Gamepad2, Power, ShieldCheck } from "lucide-react";
+import { CalendarClock, Gamepad2, Globe, Power, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
@@ -22,6 +22,7 @@ import {
   type Settings,
 } from "@/lib/backend";
 import { type Locale, useI18n } from "@/lib/i18n";
+import { useLuli } from "@/lib/luli";
 import { cn } from "@/lib/utils";
 
 const MODES = ["off", "at_logon", "every_hours", "daily", "weekly"] as const;
@@ -67,6 +68,7 @@ export function SettingsPage() {
     };
   }, []);
 
+  const luli = useLuli();
   const save = useCallback(
     async (patch: Partial<Settings>) => {
       if (!settings) return;
@@ -98,7 +100,7 @@ export function SettingsPage() {
       <PageBody>
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           <Card className="animate-rise">
             <CardTitle
               help={t("settings.autostart.hint")}
@@ -157,6 +159,26 @@ export function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               {t("settings.restore_before_preset.body")}
             </p>
+          </Card>
+          <Card className="animate-rise" style={rise(3)}>
+            <CardTitle
+              help={t("settings.ai_web.hint")}
+              right={
+                <Switch
+                  checked={!!settings?.ai_web_always}
+                  disabled={!settings}
+                  onCheckedChange={(v) => {
+                    luli.setWebAlways(v);
+                    void save({ ai_web_always: v });
+                  }}
+                  aria-label={t("settings.ai_web")}
+                />
+              }
+            >
+              <Globe className="size-4" />
+              {t("settings.ai_web")}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">{t("settings.ai_web.body")}</p>
           </Card>
         </div>
 

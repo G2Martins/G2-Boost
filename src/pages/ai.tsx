@@ -1,143 +1,67 @@
 import {
   Bot,
   ChevronDown,
+  CircleCheck,
+  Globe,
   KeyRound,
+  ListTodo,
   Lock,
+  MessageSquarePlus,
   RefreshCw,
   Send,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Wrench,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
+import { LuliMark } from "@/components/luli-card";
 import { ExternalLink, SafeMarkdown } from "@/components/safe-markdown";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, HelpHint } from "@/components/ui/primitives";
 import { cleanupName, TWEAKS, tweakName } from "@/data/catalogs";
-import {
-  type Answer,
-  askStateless,
-  ClaudeChat,
-  DEFAULT_MODELS,
-  isTimeout,
-  PROVIDERS,
-  type Provider,
-  systemPrompt,
-  TRUSTED_DOMAINS,
-  type Turn,
-} from "@/lib/ai";
+import { type Answer, isTrustedSource, PROVIDERS } from "@/lib/ai";
 import { backend, inTauri, type StartupItem } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
+import { useLuli } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
-type Message = { role: "user" | "assistant"; text: string; answer?: Answer; error?: string };
-
-const LS_PROVIDER = "g2boost.ai.provider";
-const lsModel = (p: Provider) => `g2boost.ai.model.${p}`;
-function readLs(k: string): string | null {
-  try {
-    return localStorage.getItem(k);
-  } catch {
-    return null;
-  }
-}
-function writeLs(k: string, v: string) {
-  try {
-    localStorage.setItem(k, v);
-  } catch {
-    /* storage unavailable */
-  }
-}
-
 export function AiPage() {
-  const { t, locale } = useI18n();
-  const errorText = useErrorText();
-  const [provider, setProvider] = useState<Provider>(() => {
-    const v = readLs(LS_PROVIDER);
-    return v && (PROVIDERS as string[]).includes(v) ? (v as Provider) : "anthropic";
-  });
-  const [models, setModels] = useState<Record<Provider, string>>(() => ({
-    anthropic: readLs(lsModel("anthropic")) || DEFAULT_MODELS.anthropic,
-    openai: readLs(lsModel("openai")) || DEFAULT_MODELS.openai,
-    gemini: readLs(lsModel("gemini")) || DEFAULT_MODELS.gemini,
-  }));
-  const [keys, setKeys] = useState<Record<string, boolean>>({});
+  const { t } = useI18n();
+  const luli = useLuli();
+  const {
+    provider,
+    models,
+    keys,
+    context,
+    contextBusy,
+    messages,
+    busy,
+    streaming,
+    note,
+    draft,
+    setDraft,
+    ask,
+    web,
+    webAlways,
+    webHere,
+    setWebHere,
+    fetchContext,
+  } = luli;
   const [keyDraft, setKeyDraft] = useState("");
-  const [context, setContext] = useState<string | null>(null);
-  const [contextBusy, setContextBusy] = useState(false);
   const [showContext, setShowContext] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [streaming, setStreaming] = useState("");
-  const [note, setNote] = useState<string | null>(null);
-  const claude = useRef<ClaudeChat | null>(null);
-  // The request in flight: aborted on unmount and on provider/model/context switch, so a late
-  // answer never lands in a transcript it no longer belongs to.
-  const inflight = useRef<AbortController | null>(null);
-  const cancel = useCallback(() => {
-    inflight.current?.abort();
-    inflight.current = null;
-  }, []);
-  useEffect(() => cancel, [cancel]);
   const endRef = useRef<HTMLDivElement | null>(null);
 
-  const loadContext = useCallback(async () => {
-    cancel();
-    setContextBusy(true);
-    try {
-      const c = await backend.aiContext();
-      setContext(JSON.stringify(c));
-    } catch (e) {
-      setNote(errorText(e));
-    } finally {
-      setContextBusy(false);
-    }
-    claude.current = null;
-    setMessages([]);
-  }, [errorText, cancel]);
+  useEffect(() => {
+    if (!context) void fetchContext();
+  }, [context, fetchContext]);
 
   useEffect(() => {
-    backend.aiKeyStatus().then((k) => k && setKeys(k));
-    if (inTauri) void loadContext();
-  }, [loadContext]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever the transcript grows
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // An empty chat keeps the page at the top (header and keys visible).
+    if (messages.length > 0 || streaming)
+      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, streaming]);
-
-  const switchProvider = (p: Provider) => {
-    cancel();
-    setProvider(p);
-    writeLs(LS_PROVIDER, p);
-    setKeyDraft("");
-    setNote(null);
-    claude.current = null;
-    setMessages([]);
-  };
-
-  const saveKey = async () => {
-    setNote(null);
-    try {
-      await backend.aiKeySet(provider, keyDraft);
-      setKeyDraft("");
-      setKeys((k) => ({ ...k, [provider]: true }));
-      setNote(t("ai.key.saved"));
-    } catch (e) {
-      setNote(
-        e instanceof Error && e.message === "invalid_key" ? t("ai.key.invalid") : errorText(e),
-      );
-    }
-  };
-
-  const deleteKey = async () => {
-    await backend.aiKeyDelete(provider).catch(() => undefined);
-    setKeys((k) => ({ ...k, [provider]: false }));
-  };
 
   const games = useMemo(() => {
     if (!context) return [] as string[];
@@ -156,69 +80,13 @@ export function AiPage() {
     t("ai.quick.analyze"),
     t("ai.quick.upgrade"),
     t("ai.quick.temps"),
+    t("ai.quick.errors"),
     ...games.map((g) => t("ai.quick.fps", { game: g })),
   ];
 
-  const send = async (question: string) => {
-    const q = question.trim();
-    if (!q || busy || !context) return;
-    if (!keys[provider]) {
-      setNote(t("ai.key.missing"));
-      return;
-    }
-    setNote(null);
-    setDraft("");
-    setBusy(true);
-    setStreaming("");
-    const prior = messages;
-    setMessages([...prior, { role: "user", text: q }]);
-    const system = systemPrompt(locale, context);
-    const ctrl = new AbortController();
-    inflight.current = ctrl;
-    try {
-      let answer: Answer;
-      if (provider === "anthropic") {
-        if (!claude.current) claude.current = new ClaudeChat(models.anthropic, system);
-        answer = await claude.current.ask(q, setStreaming, ctrl.signal);
-      } else {
-        const turns: Turn[] = [
-          ...prior.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.text })),
-          { role: "user", text: q },
-        ];
-        answer = await askStateless(
-          provider,
-          models[provider],
-          system,
-          turns,
-          setStreaming,
-          ctrl.signal,
-        );
-      }
-      if (!ctrl.signal.aborted)
-        setMessages((m) => [...m, { role: "assistant", text: answer.text, answer }]);
-    } catch (e) {
-      if (!ctrl.signal.aborted) {
-        const msg = e instanceof Error ? e.message : String(e);
-        const text = isTimeout(e)
-          ? t("ai.error.timeout")
-          : msg === "refusal"
-            ? t("ai.error.refusal")
-            : msg === "no_key"
-              ? t("ai.key.missing")
-              : msg === "empty_response"
-                ? t("ai.error.empty")
-                : t("ai.error.generic", { error: msg });
-        setMessages((m) => [...m, { role: "assistant", text: "", error: text }]);
-      }
-      claude.current = null; // start clean after a failed Claude turn (history stays append-only)
-    } finally {
-      if (inflight.current === ctrl) inflight.current = null;
-      setBusy(false);
-      setStreaming("");
-    }
-  };
-
   const contextKb = context ? (new TextEncoder().encode(context).length / 1024).toFixed(1) : "—";
+  const last = messages[messages.length - 1];
+  const askWeb = !busy && !web && last?.role === "assistant" && last.answer?.actions.needWeb;
 
   return (
     <>
@@ -237,7 +105,10 @@ export function AiPage() {
                   <button
                     key={p}
                     type="button"
-                    onClick={() => switchProvider(p)}
+                    onClick={() => {
+                      setKeyDraft("");
+                      luli.switchProvider(p);
+                    }}
                     className={cn(
                       "rounded-md px-2 py-2 font-display text-[12px] font-semibold tracking-wide transition-colors",
                       provider === p
@@ -265,14 +136,7 @@ export function AiPage() {
               <input
                 id="ai-model"
                 value={models[provider]}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  cancel();
-                  claude.current = null; // the next Claude turn uses the new model
-                  setModels((m) => ({ ...m, [provider]: v }));
-                  writeLs(lsModel(provider), v);
-                  claude.current = null;
-                }}
+                onChange={(e) => luli.setModel(provider, e.target.value.trim())}
                 spellCheck={false}
                 maxLength={64}
                 className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-xs outline-none focus:border-ring"
@@ -303,7 +167,9 @@ export function AiPage() {
                     size="sm"
                     variant="outline"
                     disabled={!keyDraft.trim() || !inTauri}
-                    onClick={saveKey}
+                    onClick={async () => {
+                      if (await luli.saveKey(keyDraft)) setKeyDraft("");
+                    }}
                   >
                     {t("ai.key.save")}
                   </Button>
@@ -311,7 +177,7 @@ export function AiPage() {
                 {keys[provider] ? (
                   <button
                     type="button"
-                    onClick={deleteKey}
+                    onClick={luli.deleteKey}
                     className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="size-3" />
@@ -330,7 +196,7 @@ export function AiPage() {
                     size="sm"
                     variant="ghost"
                     disabled={contextBusy || !inTauri}
-                    onClick={loadContext}
+                    onClick={luli.reloadContext}
                     aria-label={t("ai.context.refresh")}
                   >
                     <RefreshCw className={cn("size-4", contextBusy && "animate-spin")} />
@@ -361,18 +227,28 @@ export function AiPage() {
                   {JSON.stringify(JSON.parse(context), null, 2)}
                 </pre>
               ) : null}
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                {t("ai.sources", { list: TRUSTED_DOMAINS.slice(0, 6).join(", ") })}
-              </p>
+              <p className="mt-3 text-[11px] text-muted-foreground">{t("ai.knowledge")}</p>
             </Card>
 
             <McpCard />
           </div>
 
-          {/* ---------------- console ---------------- */}
+          {/* ---------------- conversation ---------------- */}
           <Card className="animate-rise flex min-h-[560px] flex-col" style={rise(2)}>
-            <CardTitle>
-              <Sparkles className="size-4 text-primary" />
+            <CardTitle
+              right={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={messages.length === 0 && !busy}
+                  onClick={luli.newConversation}
+                >
+                  <MessageSquarePlus className="size-4" />
+                  {t("ai.new_chat")}
+                </Button>
+              }
+            >
+              <LuliMark className="size-6" />
               {t("ai.console")}
               <span className="ml-2 font-mono text-[11px] font-normal text-muted-foreground">
                 {models[provider]}
@@ -389,10 +265,15 @@ export function AiPage() {
               {messages.map((m, i) =>
                 m.role === "user" ? (
                   // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
-                  <div key={i} className="flex justify-end">
+                  <div key={i} className="flex flex-col items-end gap-1">
                     <p className="max-w-[80%] rounded-lg rounded-br-sm bg-card-hover px-3.5 py-2 text-sm">
                       {m.text}
                     </p>
+                    {m.sent ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {t("ai.page_data_sent")}
+                      </span>
+                    ) : null}
                   </div>
                 ) : (
                   // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
@@ -402,7 +283,9 @@ export function AiPage() {
                     ) : (
                       <SafeMarkdown text={m.text} />
                     )}
-                    {m.answer ? <AnswerExtras answer={m.answer} /> : null}
+                    {m.answer ? (
+                      <AnswerExtras answer={m.answer} latest={i === messages.length - 1} />
+                    ) : null}
                   </div>
                 ),
               )}
@@ -411,7 +294,9 @@ export function AiPage() {
                   {streaming ? (
                     <SafeMarkdown text={streaming} />
                   ) : (
-                    <p className="text-sm text-muted-foreground">{t("ai.thinking")}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {web ? t("ai.thinking.web") : t("ai.thinking")}
+                    </p>
                   )}
                   <span
                     className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle"
@@ -419,27 +304,39 @@ export function AiPage() {
                   />
                 </div>
               ) : null}
+              {askWeb ? (
+                <div className="animate-rise rounded-md border border-primary/35 bg-primary/5 p-3">
+                  <p className="flex items-center gap-2 text-sm">
+                    <Globe className="size-4 text-primary" />
+                    {t("ai.web.ask")}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" variant="primary" onClick={() => luli.allowWeb("here")}>
+                      {t("ai.web.allow_here")}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => luli.allowWeb("always")}>
+                      {t("ai.web.allow_always")}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div ref={endRef} />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {quick.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  disabled={busy || !context}
-                  onClick={() => send(q)}
-                  className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-40"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
+            {messages.length === 0 ? (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {quick.map((q) => (
+                  <Chip key={q} disabled={busy} onClick={() => ask(q)}>
+                    {q}
+                  </Chip>
+                ))}
+              </div>
+            ) : null}
             <form
               className="mt-3 flex gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
-                void send(draft);
+                void ask(draft);
               }}
             >
               <textarea
@@ -448,7 +345,7 @@ export function AiPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    void send(draft);
+                    void ask(draft);
                   }
                 }}
                 rows={2}
@@ -456,12 +353,29 @@ export function AiPage() {
                 placeholder={t("ai.input.placeholder")}
                 className="min-w-0 flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring"
               />
-              <Button type="submit" variant="primary" disabled={busy || !draft.trim() || !context}>
+              <Button type="submit" variant="primary" disabled={busy || !draft.trim()}>
                 <Send className="size-4" />
                 {t("ai.send")}
               </Button>
             </form>
-            <p className="mt-2 text-[10px] text-muted-foreground">{t("ai.footer")}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={webAlways}
+                onClick={() => setWebHere(!webHere)}
+                aria-pressed={web}
+                className={cn(
+                  "press flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                  web
+                    ? "border-primary/45 bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Globe className="size-3.5" />
+                {webAlways ? t("ai.web.always") : web ? t("ai.web.on") : t("ai.web.off")}
+              </button>
+              <p className="text-[10px] text-muted-foreground">{t("ai.footer")}</p>
+            </div>
           </Card>
         </div>
       </PageBody>
@@ -469,9 +383,31 @@ export function AiPage() {
   );
 }
 
-function AnswerExtras({ answer }: { answer: Answer }) {
+function Chip({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="press rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+function AnswerExtras({ answer, latest }: { answer: Answer; latest: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();
+  const luli = useLuli();
   const [done, setDone] = useState<Record<string, string>>({});
   const apply = async (id: string) => {
     try {
@@ -501,8 +437,13 @@ function AnswerExtras({ answer }: { answer: Answer }) {
       setDone((d) => ({ ...d, [k]: errorText(e) }));
     }
   };
+  const [checked, setChecked] = useState<Set<number>>(new Set());
   const hasActions =
     answer.actions.tweaks.length > 0 || answer.actions.cleanup.length > 0 || startup.length > 0;
+  // Benchmark/vendor sources first.
+  const sources = [...answer.sources].sort(
+    (a, b) => Number(isTrustedSource(b)) - Number(isTrustedSource(a)),
+  );
   return (
     <>
       {hasActions ? (
@@ -573,18 +514,67 @@ function AnswerExtras({ answer }: { answer: Answer }) {
           <p className="mt-2 text-[10px] text-muted-foreground">{t("ai.actions.note")}</p>
         </div>
       ) : null}
-      {answer.sources.length > 0 ? (
+      {answer.actions.todo.length > 0 ? (
+        <div className="mt-3 rounded-md border border-border bg-background/50 p-3">
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <ListTodo className="size-3.5" />
+            {t("ai.todo")}
+          </p>
+          <ul className="space-y-1">
+            {answer.actions.todo.map((item, i) => (
+              <li key={item}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setChecked((s) => {
+                      const n = new Set(s);
+                      if (n.has(i)) n.delete(i);
+                      else n.add(i);
+                      return n;
+                    })
+                  }
+                  aria-pressed={checked.has(i)}
+                  className="flex w-full items-start gap-2 text-left text-sm"
+                >
+                  <CircleCheck
+                    className={cn(
+                      "mt-0.5 size-4 shrink-0 transition-colors",
+                      checked.has(i) ? "text-success" : "text-muted-foreground/50",
+                    )}
+                  />
+                  <span className={cn(checked.has(i) && "text-muted-foreground line-through")}>
+                    {item}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {sources.length > 0 ? (
         <div className="mt-3">
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {t("ai.sources.title")}
           </p>
           <ul className="space-y-0.5 text-xs">
-            {answer.sources.slice(0, 8).map((s) => (
-              <li key={s.url}>
+            {sources.slice(0, 8).map((s) => (
+              <li key={s.url} className="flex items-center gap-2">
                 <ExternalLink url={s.url} label={s.title} />
+                {isTrustedSource(s) ? (
+                  <Badge tone="neutral">{t("ai.sources.trusted")}</Badge>
+                ) : null}
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+      {latest && answer.actions.followups.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {answer.actions.followups.map((q) => (
+            <Chip key={q} disabled={luli.busy} onClick={() => luli.ask(q)}>
+              {q}
+            </Chip>
+          ))}
         </div>
       ) : null}
     </>

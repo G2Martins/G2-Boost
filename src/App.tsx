@@ -6,6 +6,7 @@ import { Button, TooltipProvider } from "@/components/ui/primitives";
 import { backend, inTauri } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider, useI18n } from "@/lib/i18n";
+import { LuliProvider } from "@/lib/luli";
 import { emitDrop, onNavigate, openOrphans } from "@/lib/nav";
 import { AiPage } from "@/pages/ai";
 import { AppsPage } from "@/pages/apps";
@@ -118,27 +119,29 @@ export default function App() {
   const Page = PAGES[route];
   return (
     <I18nProvider>
-      <TooltipProvider>
-        <AppShell route={route} onNavigate={setRoute} version={version} elevated={elevated}>
-          {removed ? (
-            <RemovedBanner
-              name={removed}
-              onOpen={() => {
-                setRemoved(null);
-                openOrphans();
-                setRoute("apps");
-              }}
-              onClose={() => setRemoved(null)}
-            />
-          ) : null}
-          {ready ? (
-            // Only the content area enters (200 ms, 4 px); the shell stays still.
-            <div key={route} className="route-enter min-h-full">
-              <Page />
-            </div>
-          ) : null}
-        </AppShell>
-      </TooltipProvider>
+      <LuliProvider>
+        <TooltipProvider>
+          <AppShell route={route} onNavigate={setRoute} version={version} elevated={elevated}>
+            {removed ? (
+              <RemovedBanner
+                name={removed}
+                onOpen={() => {
+                  setRemoved(null);
+                  openOrphans();
+                  setRoute("apps");
+                }}
+                onClose={() => setRemoved(null)}
+              />
+            ) : null}
+            {ready ? (
+              // Only the content area enters (200 ms, 4 px); the shell stays still.
+              <div key={route} className="route-enter min-h-full">
+                <Page />
+              </div>
+            ) : null}
+          </AppShell>
+        </TooltipProvider>
+      </LuliProvider>
     </I18nProvider>
   );
 }

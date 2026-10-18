@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
+import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Badge,
@@ -41,6 +42,7 @@ import {
   type UndoRecord,
 } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
+import { sizeText, usePageData } from "@/lib/luli";
 import { APPS_REMOVED, onDrop, onOpenOrphans, takeDrop, takeOpenOrphans } from "@/lib/nav";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -88,6 +90,12 @@ export function AppsPage() {
           </TabsList>
           <TabsContent value="installed">
             <PageBody className="px-0 pb-0">
+              <LuliCard
+                asks={[
+                  { label: "luli.ask.apps.remove", data: ["apps"] },
+                  { label: "luli.ask.apps.heavy", data: ["apps"] },
+                ]}
+              />
               <InstalledTab drop={drop} onDropHandled={() => setDrop(null)} />
             </PageBody>
           </TabsContent>
@@ -223,6 +231,19 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
       setMsg(appsError(e, t, errorText));
     }
   };
+
+  const luliData = useMemo(() => {
+    if (!apps) return null;
+    const rows = [...apps]
+      .sort((a, b) => (b.size_bytes ?? 0) - (a.size_bytes ?? 0))
+      .slice(0, 80)
+      .map(
+        (a) =>
+          `- ${a.name} | ${a.publisher || "?"} | ${a.size_bytes ? sizeText(a.size_bytes) : "size ?"} | installed ${a.install_date ?? "?"}${a.hive === "store" ? " | Store" : ""}${a.protected ? ` | protected (${a.protected})` : ""}`,
+      );
+    return [`Installed apps (${apps.length}), largest first:`, ...rows].join("\n");
+  }, [apps]);
+  usePageData("apps", luliData);
 
   return (
     <>

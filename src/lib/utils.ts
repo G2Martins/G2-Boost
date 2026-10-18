@@ -22,6 +22,11 @@ export function formatBytes(bytes: number, locale: string, digits = 1): string {
   return `${n} ${UNITS[i]}`;
 }
 
+/** `C:\Users\<name>\…` → `%USERPROFILE%\…`: the user name never leaves the PC. */
+export function redactPaths(s: string): string {
+  return s.replace(/[A-Za-z]:\\Users\\[^\\\r\n"|]+/gi, "%USERPROFILE%");
+}
+
 export function formatMs(ms: number, locale: string): string {
   if (!Number.isFinite(ms)) return "—";
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: ms < 10 ? 1 : 0 }).format(ms)} ms`;

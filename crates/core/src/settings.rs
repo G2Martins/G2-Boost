@@ -36,6 +36,8 @@ pub struct Settings {
     pub restore_before_preset: bool,
     /// App names (as in the installed list) the user protected from the uninstaller.
     pub protected_apps: Vec<String>,
+    /// Luli may search the web in every conversation (off = she asks per conversation).
+    pub ai_web_always: bool,
 }
 
 impl Default for Settings {
@@ -52,6 +54,7 @@ impl Default for Settings {
             game_ram_clean: false,
             game_exes: Vec::new(),
             protected_apps: Vec::new(),
+            ai_web_always: false,
         }
     }
 }
@@ -126,6 +129,7 @@ mod tests {
             schedule: Schedule::EveryHours { hours: 0 },
             routine_categories: vec!["temp_user".into(), "nope".into(), "temp_user".into(), "../x".into()],
             game_ram_clean: true,
+            ai_web_always: false,
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),

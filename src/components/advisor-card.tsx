@@ -1,31 +1,27 @@
-import { Bot, Lightbulb, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { RefreshCw, Sparkle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LuliMark, SEVERITY_DOT, useAskLuli } from "@/components/luli-card";
 import { Badge, Button, Card, CardTitle } from "@/components/ui/primitives";
-import { type AdvisorReport, backend, inTauri } from "@/lib/backend";
+import { inTauri } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
-import { navigate } from "@/lib/nav";
+import { useLuli } from "@/lib/luli";
 import { cn } from "@/lib/utils";
 
-const SEVERITY_DOT = {
-  info: "bg-chart-1",
-  warn: "bg-warning",
-  critical: "bg-destructive",
-} as const;
-
-/** Local advisor (no AI): upgrades, free fixes, temperatures, security, gaming tier. */
+/** Luli's local findings (rules, no AI call): upgrades, free fixes, temperatures, security, gaming tier. */
 export function AdvisorCard({ style }: { style?: React.CSSProperties }) {
   const { t } = useI18n();
-  const [report, setReport] = useState<AdvisorReport | null>(null);
+  const { report, loadReport } = useLuli();
+  const askLuli = useAskLuli();
   const [busy, setBusy] = useState(false);
-  const load = useCallback(async () => {
+  const load = async (force: boolean) => {
     setBusy(true);
-    const r = await backend.advisorReport();
-    if (r) setReport(r);
+    await loadReport(force);
     setBusy(false);
-  }, []);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once on mount (cached in the Luli session)
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(false);
+  }, []);
 
   const g = report?.gaming;
   return (
@@ -38,19 +34,23 @@ export function AdvisorCard({ style }: { style?: React.CSSProperties }) {
               variant="ghost"
               size="sm"
               disabled={busy || !inTauri}
-              onClick={load}
+              onClick={() => load(true)}
               aria-label={t("mypc.refresh")}
             >
               <RefreshCw className={cn("size-4", busy && "animate-spin")} />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("ai")}>
-              <Bot className="size-4" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => askLuli({ label: "ai.quick.analyze" })}
+            >
+              <Sparkle className="size-4" />
               {t("advisor.ask_ai")}
             </Button>
           </span>
         }
       >
-        <Lightbulb className="size-4" />
+        <LuliMark className="size-6" />
         {t("advisor.title")}
       </CardTitle>
       {g?.tier ? (

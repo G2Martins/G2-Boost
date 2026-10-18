@@ -135,6 +135,7 @@ export type Settings = {
   game_ram_clean: boolean;
   game_exes: string[];
   restore_before_preset: boolean;
+  ai_web_always: boolean;
 };
 
 export type Gpu = {

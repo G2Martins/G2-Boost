@@ -1,6 +1,12 @@
 // Formatting helpers shown on every page (locale-aware, never NaN on bad input).
 import { expect, test } from "bun:test";
-import { formatBytes, formatMbps, formatMs } from "../src/lib/utils";
+import { formatBytes, formatMbps, formatMs, redactPaths } from "../src/lib/utils";
+
+test("redactPaths hides the profile folder name, any drive, any case", () => {
+  expect(redactPaths("C:\\Users\\Maria Silva\\AppData\\Local\\x")).toBe("%USERPROFILE%\\AppData\\Local\\x");
+  expect(redactPaths("d:\\users\\joao")).toBe("%USERPROFILE%");
+  expect(redactPaths("C:\\Program Files\\Steam")).toBe("C:\\Program Files\\Steam");
+});
 
 test("formatBytes picks the unit and the locale separator", () => {
   expect(formatBytes(0, "pt-BR")).toBe("0 B");

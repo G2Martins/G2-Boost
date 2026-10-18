@@ -1,5 +1,6 @@
 import { Activity, Gamepad2, Loader2, Play, Power, Route, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
 import {
@@ -19,6 +20,7 @@ import {
 import { backend, type Hop, inTauri, type PingReport } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
+import { usePageData } from "@/lib/luli";
 import {
   activityVerdicts,
   type Phase,
@@ -47,6 +49,12 @@ export function NetworkPage() {
           </TabsList>
           <TabsContent value="monitor">
             <PageBody className="px-0 pb-0">
+              <LuliCard
+                asks={[
+                  { label: "luli.ask.network.games", data: ["network.monitor", "network.speed"] },
+                  { label: "luli.ask.network.ping", data: ["network.monitor", "network.speed"] },
+                ]}
+              />
               <Monitor />
             </PageBody>
           </TabsContent>
@@ -161,6 +169,18 @@ function Monitor() {
   }, [on, targets]);
 
   const primary = useMemo(() => statsOf(samples.map((s) => s.rtt[0] ?? null)), [samples]);
+  const luliData = useMemo(() => {
+    if (samples.length < 5) return null;
+    const ms = (v: number | null) => (v === null ? "?" : `${v.toFixed(1)} ms`);
+    return [
+      `Network monitor, last ${samples.length} s (one ICMP echo per second per target):`,
+      ...targets.map((tg, i) => {
+        const s = statsOf(samples.map((x) => x.rtt[i] ?? null));
+        return `- ${tg.id} (${tg.host}): avg ${ms(s.avg)}, min ${ms(s.min)}, max ${ms(s.max)}, jitter ${ms(s.jitter)}, loss ${s.loss.toFixed(1)}%, spikes ${s.spikes}`;
+      }),
+    ].join("\n");
+  }, [samples, targets]);
+  usePageData("network.monitor", luliData);
   const enough = samples.length >= 10;
   const stable = enough && primary.loss <= 5 && (primary.jitter ?? 0) <= 15 && primary.spikes === 0;
   const fmt = (v: number | null) => (v === null ? "—" : formatMs(v, locale));
@@ -365,6 +385,14 @@ function Scanner() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const running = progress !== null && progress.phase !== "done";
+  // ISP, IP and city stay out: only the measurements go to Luli.
+  usePageData(
+    "network.speed",
+    result
+      ? `Speed test (Cloudflare): idle latency ${result.latencyMs.toFixed(0)} ms, jitter ${result.jitterMs.toFixed(1)} ms, download ${result.downloadMbps.toFixed(0)} Mbps, upload ${result.uploadMbps.toFixed(0)} Mbps, latency while downloading ${result.loadedDownMs.toFixed(0)} ms, while uploading ${result.loadedUpMs.toFixed(0)} ms, bufferbloat grade ${result.grade}.`
+      : null,
+    true,
+  );
 
   const start = useCallback(async () => {
     const ctrl = new AbortController();

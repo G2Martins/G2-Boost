@@ -1,6 +1,6 @@
 // Model output is untrusted: only catalog ids (no beta tweaks), capped, deduped.
 import { expect, test } from "bun:test";
-import { extractActions, MAX_ACTIONS, systemPrompt } from "../src/lib/ai";
+import { extractActions, MAX_ACTIONS, MAX_FOLLOWUPS, MAX_TODO, systemPrompt, undash } from "../src/lib/ai";
 
 const block = (o: unknown) => `Texto\n\`\`\`g2boost-actions\n${JSON.stringify(o)}\n\`\`\``;
 
@@ -22,7 +22,14 @@ test("drops unknown, beta, duplicate and over-limit ids", () => {
 });
 
 test("malformed or missing block gives no actions", () => {
-  expect(extractActions("```g2boost-actions\n{nope\n```").actions).toEqual({ tweaks: [], cleanup: [], startup: [] });
+  expect(extractActions("```g2boost-actions\n{nope\n```").actions).toEqual({
+    tweaks: [],
+    cleanup: [],
+    startup: [],
+    todo: [],
+    followups: [],
+    needWeb: false,
+  });
   expect(extractActions("só texto").text).toBe("só texto");
 });
 
@@ -32,4 +39,37 @@ test("prompt embeds the context and never offers beta tweaks as actions", () => 
   const allowed = p.split("Tweak ids allowed:")[1]?.split("\n")[0] ?? "";
   expect(allowed).toContain("game_mode");
   expect(allowed).not.toContain("hvci_off");
+});
+
+test("to-dos and follow-ups are bounded single lines; need_web only when strictly true", () => {
+  const { actions } = extractActions(
+    block({
+      todo: ["Ligar o XMP na BIOS", "linha\ncom quebra", "", "x".repeat(300), "a", "b", "c", "d", "e"],
+      followups: ["Qual upgrade?", "Qual upgrade?", 7, "Outra?", "Mais uma?", "Sobrando?"],
+      need_web: "true",
+    }),
+  );
+  expect(actions.todo[0]).toBe("Ligar o XMP na BIOS");
+  expect(actions.todo).not.toContain("linha\ncom quebra");
+  expect(actions.todo.length).toBe(MAX_TODO);
+  expect(actions.followups).toEqual(["Qual upgrade?", "Outra?", "Mais uma?"].slice(0, MAX_FOLLOWUPS));
+  expect(actions.needWeb).toBe(false);
+  expect(extractActions(block({ need_web: true })).actions.needWeb).toBe(true);
+});
+
+test("dash punctuation between words becomes a comma; ranges and empty cells stay", () => {
+  expect(undash("Liga o XMP — ganho grátis")).toBe("Liga o XMP, ganho grátis");
+  expect(undash("cabo – sempre")).toBe("cabo, sempre");
+  expect(undash("60 – 80 FPS")).toBe("60 – 80 FPS");
+  expect(undash("| — |")).toBe("| — |");
+  expect(extractActions("A — B").text).toBe("A, B");
+});
+
+test("prompt: Luli, knowledge embedded, web on/off wording", () => {
+  const off = systemPrompt("pt-BR", "{}", { knowledge: "<doc>KB</doc>" });
+  expect(off).toContain("You are Luli");
+  expect(off).toContain("\\u003cdoc>KB\\u003c/doc>");
+  expect(off).toContain("Web search is OFF");
+  expect(off).toContain('"need_web": true');
+  expect(systemPrompt("en", "{}", { web: true })).toContain("Web search is ON");
 });

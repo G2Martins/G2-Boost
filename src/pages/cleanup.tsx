@@ -1,6 +1,7 @@
 import { Eye, History, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Badge,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
+import { sizeText, usePageData } from "@/lib/luli";
 import { cn, formatBytes } from "@/lib/utils";
 
 const RISK_KEY: Record<Risk, I18nKey> = {
@@ -120,6 +122,21 @@ export function CleanupPage() {
 
   const busy = phase === "previewing" || phase === "running";
 
+  const luliData = useMemo(() => {
+    const rows = Object.values(preview)
+      .filter((p) => p.measurable && !p.missing && p.bytes > 0)
+      .sort((a, b) => b.bytes - a.bytes);
+    if (rows.length === 0) return null;
+    return [
+      "Cleanup preview measured now (category id: size):",
+      ...rows.map(
+        (p) =>
+          `- ${p.id}: ${sizeText(p.bytes)}, ${p.files} files${p.needs_admin ? ", needs admin" : ""}${p.blocked_by.length ? `, in use by ${p.blocked_by.join(", ")}` : ""}`,
+      ),
+    ].join("\n");
+  }, [preview]);
+  usePageData("cleanup", luliData);
+
   return (
     <>
       <PageHeader
@@ -139,6 +156,13 @@ export function CleanupPage() {
         }
       />
       <PageBody>
+        <LuliCard
+          findings={["system_disk_full"]}
+          asks={[
+            { label: "luli.ask.cleanup.worth", data: ["cleanup"] },
+            { label: "luli.ask.cleanup.often" },
+          ]}
+        />
         <Card className="animate-rise flex flex-wrap items-center gap-4 py-4">
           <span className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-wide">
             {t("cleanup.selected_total", {

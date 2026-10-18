@@ -10,9 +10,10 @@ import {
   Square,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FILE_CLASSES, Treemap } from "@/components/disk/treemap";
 import { useErrorText } from "@/components/elevate-button";
+import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Button,
@@ -38,6 +39,7 @@ import {
 } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
+import { sizeText, usePageData } from "@/lib/luli";
 import { cn, formatBytes } from "@/lib/utils";
 
 type Crumb = { ids: number[]; name: string };
@@ -148,6 +150,22 @@ export function DiskPage() {
     ? (boot.startTab as string)
     : "treemap";
 
+  const luliData = useMemo(() => {
+    if (!summary || !view || summary.cancelled) return null;
+    const drive = drives.find((d) => summary.root.toUpperCase().startsWith(d.letter.toUpperCase()));
+    const where = crumbs.map((c) => c.name).join(" > ") || summary.root;
+    const rows = view.children.slice(0, 25).map((c) => {
+      const date = c.mtime ? new Date(c.mtime * 1000).toISOString().slice(0, 10) : "?";
+      return `- ${c.is_dir ? "folder" : "file"} ${c.name}: ${sizeText(c.size)}${c.is_dir ? `, ${c.files} files` : ""}, modified ${date}`;
+    });
+    return [
+      `Disk scan of ${summary.root}: ${sizeText(summary.bytes)} in ${summary.files} files and ${summary.dirs} folders${drive ? `; drive free ${sizeText(drive.free_bytes)} of ${sizeText(drive.total_bytes)}` : ""}.`,
+      `Folder on screen: ${where} (${sizeText(view.size)}). Largest items:`,
+      ...rows,
+    ].join("\n");
+  }, [summary, view, crumbs, drives]);
+  usePageData("disk", luliData);
+
   return (
     <PageHeader
       title={t("disk.title")}
@@ -186,6 +204,19 @@ export function DiskPage() {
                 current={current}
                 progress={progress}
                 summary={summary}
+              />
+              <LuliCard
+                style={rise(1)}
+                findings={[
+                  "system_disk_full",
+                  "hdd_system",
+                  "sata_system_with_nvme",
+                  "winsat_disk_weakest",
+                ]}
+                asks={[
+                  { label: "luli.ask.disk.safe", data: ["disk"] },
+                  { label: "luli.ask.disk.why", data: ["disk"] },
+                ]}
               />
               {error ? (
                 <Card className="border-destructive/40 text-destructive">

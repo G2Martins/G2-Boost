@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { AdvisorCard } from "@/components/advisor-card";
 import { useErrorText } from "@/components/elevate-button";
+import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -80,6 +81,26 @@ export function DashboardPage() {
           </TabsContent>
           <TabsContent value="mypc">
             <PageBody className="px-0 pb-0">
+              <LuliCard
+                findings={[
+                  "xmp_off",
+                  "single_channel",
+                  "ram_low",
+                  "vram_low",
+                  "rebar_off",
+                  "gpu_driver_old",
+                  "bios_old",
+                  "legacy_boot",
+                  "secure_boot_off",
+                  "tpm_missing",
+                  "hdd_system",
+                ]}
+                asks={[
+                  { label: "ai.quick.upgrade" },
+                  { label: "luli.ask.mypc.bios" },
+                  { label: "ai.quick.errors" },
+                ]}
+              />
               <MyPc elevated={info?.elevated ?? false} />
             </PageBody>
           </TabsContent>
