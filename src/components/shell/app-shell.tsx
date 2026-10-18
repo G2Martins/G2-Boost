@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ShieldHalf,
   Sparkles,
+  SquareTerminal,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { type I18nKey, useI18n } from "@/lib/i18n";
@@ -22,6 +23,7 @@ export type Route =
   | "apps"
   | "network"
   | "boost"
+  | "console"
   | "ai"
   | "settings";
 
@@ -32,6 +34,7 @@ const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
+  { route: "console", icon: SquareTerminal, label: "nav.console" },
   { route: "ai", icon: Bot, label: "nav.ai" },
 ];
 

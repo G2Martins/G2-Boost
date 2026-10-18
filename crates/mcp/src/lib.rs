@@ -8,9 +8,6 @@
 //! Register: `claude mcp add g2boost -- "C:\path\to\G2 Boost.exe" --mcp` (the app binary
 //! serves MCP when started with `--mcp`; `g2boost-mcp.exe` is the same server for dev).
 
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use g2boost_core::{
@@ -92,67 +89,13 @@ struct DiskArgs {
 
 /// Measure a folder with a deadline; sizes, largest folders/files and explained system folders.
 fn disk_usage(a: DiskArgs) -> Value {
-    let default_root = std::env::var("SystemDrive").map(|d| format!("{d}\\")).unwrap_or_else(|_| "C:\\".into());
-    let root = PathBuf::from(a.path.unwrap_or(default_root));
-    let secs = a.max_seconds.unwrap_or(40).clamp(5, 110);
-    let cancel = Arc::new(AtomicBool::new(false));
-    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
-    let timer = {
-        let cancel = cancel.clone();
-        std::thread::spawn(move || {
-            if done_rx.recv_timeout(Duration::from_secs(secs)).is_err() {
-                cancel.store(true, Ordering::Relaxed);
-            }
-        })
-    };
-    let progress = disk::ScanProgress::default();
-    let result = disk::scan(&root, &progress, &cancel);
-    let _ = done_tx.send(());
-    let _ = timer.join();
-    let (node, summary) = match result {
-        Ok(r) => r,
-        Err(e) => return json!({ "error": e.to_string() }),
-    };
-    let now = g2boost_core::registry::now_unix();
-    let mut tree = serde_json::to_value(disk::view(&node, &[], 2, 25)).unwrap_or(Value::Null);
-    redact_tree(&mut tree, false);
-    let files: Vec<Value> = disk::search(&node, &disk::parse_filter(">100mb"), now, 25)
-        .files
-        .iter()
-        .map(|f| json!({ "path": winevents::redact_here(&f.path), "size": f.size, "mtime": f.mtime }))
-        .collect();
-    let essentials: Vec<Value> = disk::essentials(&node)
-        .iter()
-        .map(|e| json!({ "id": e.id, "path": winevents::redact_here(&e.path), "size": e.size }))
-        .collect();
-    json!({
-        "summary": summary,
-        "note": if summary.cancelled { "stopped at the time limit: sizes are partial (lower bounds)" } else { "complete" },
-        "tree": tree,
-        "largest_files": files,
-        "essentials": essentials,
-        "how_to_act": "Deleting is done by the user in G2 Boost: Analisador de disco (Recycle Bin) or Limpeza (preview first).",
-    })
-}
-
-/// The profile folder under `Users` carries the account name: hide it in the tree.
-fn redact_tree(v: &mut Value, parent_is_users: bool) {
-    let user = std::env::var("USERNAME").unwrap_or_default();
-    let Some(obj) = v.as_object_mut() else {
-        return;
-    };
-    let is_users = obj.get("name").and_then(Value::as_str).is_some_and(|n| n.eq_ignore_ascii_case("users"));
-    if parent_is_users
-        && let Some(Value::String(n)) = obj.get_mut("name")
-        && !user.is_empty()
-        && n.eq_ignore_ascii_case(&user)
-    {
-        *n = "%USERNAME%".into();
-    }
-    if let Some(Value::Array(children)) = obj.get_mut("children") {
-        for c in children {
-            redact_tree(c, is_users);
-        }
+    match disk::usage(a.path.as_deref(), a.max_seconds.unwrap_or(40)) {
+        Err(e) => json!({ "error": e.to_string() }),
+        Ok(u) => json!({
+            "note": if u.summary.cancelled { "stopped at the time limit: sizes are partial (lower bounds)" } else { "complete" },
+            "usage": u,
+            "how_to_act": "Deleting is done by the user in G2 Boost: Analisador de disco (Recycle Bin) or Limpeza (preview first).",
+        }),
     }
 }
 
@@ -395,18 +338,5 @@ mod tests {
             assert!(name.contains(id), "{name} vs {id}");
             assert!(text.starts_with("# "));
         }
-    }
-
-    #[test]
-    fn profile_folder_is_hidden_in_the_tree() {
-        let user = std::env::var("USERNAME").unwrap_or_else(|_| "x".into());
-        let mut v = json!({ "name": "C:", "children": [
-            { "name": "Users", "children": [ { "name": user, "children": [] }, { "name": "Public", "children": [] } ] },
-            { "name": user, "children": [] }
-        ]});
-        redact_tree(&mut v, false);
-        assert_eq!(v["children"][0]["children"][0]["name"], "%USERNAME%");
-        assert_eq!(v["children"][0]["children"][1]["name"], "Public");
-        assert_eq!(v["children"][1]["name"], user.as_str(), "only under Users");
     }
 }

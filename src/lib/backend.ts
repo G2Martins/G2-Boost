@@ -5,6 +5,19 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 /** True inside the Tauri webview; false in a plain browser (`bun run dev`). */
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+export type ConsoleCommand = { name: string; aliases: string[]; usage: string };
+export type ConsoleMsg = { key: string; params: Record<string, string> };
+export type ConsoleBlock =
+  | { kind: "table"; columns: string[]; rows: string[][] }
+  | ({ kind: "note" } & ConsoleMsg);
+export type ConsoleReply = {
+  ok: boolean;
+  command: string | null;
+  blocks: ConsoleBlock[];
+  effect: { kind: "help" } | { kind: "clear" } | { kind: "navigate"; route: string } | null;
+  error: ConsoleMsg | null;
+};
+
 export type ClaudeClient = "desktop" | "code";
 export type ClaudeTarget = {
   client: ClaudeClient;
@@ -464,6 +477,8 @@ async function callOrThrow<T>(cmd: string, args?: Record<string, unknown>): Prom
 export const backend = {
   appInfo: () => call<AppInfo>("app_info"),
   claudeTargets: () => call<ClaudeTarget[]>("claude_targets"),
+  consoleCommands: () => call<ConsoleCommand[]>("console_commands"),
+  consoleRun: (line: string) => callOrThrow<ConsoleReply>("console_run", { line }),
   claudeConnect: (client: ClaudeClient) =>
     callOrThrow<ClaudeTarget[]>("claude_connect", { client }),
   claudeDisconnect: (client: ClaudeClient) =>

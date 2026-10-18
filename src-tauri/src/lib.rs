@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, claude_connect, context, dns, firmware, power, procs, registry, secrets, startup};
+use g2boost_core::{advisor, apps, claude_connect, console, context, dns, firmware, power, procs, registry, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -28,7 +28,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "boost", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "boost", "console", "ai", "settings"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -450,6 +450,18 @@ async fn claude_disconnect(client: claude_connect::Client) -> Result<Vec<claude_
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
+}
+
+/// The Console G2 command list (names, aliases, usage) for help and completion.
+#[tauri::command]
+fn console_commands() -> &'static [console::Command] {
+    console::COMMANDS
+}
+
+/// Run one Console G2 line (native, read-only; the core parses and validates it).
+#[tauri::command]
+async fn console_run(line: String) -> Result<console::Reply, String> {
+    tauri::async_runtime::spawn_blocking(move || console::run(&line)).await.map_err(|e| e.to_string())
 }
 
 /// Settings come from the UI, get sanitized in the core, and only then replace the live copy.
@@ -1314,7 +1326,9 @@ pub fn run() {
             apps_icon,
             claude_targets,
             claude_connect,
-            claude_disconnect
+            claude_disconnect,
+            console_commands,
+            console_run
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

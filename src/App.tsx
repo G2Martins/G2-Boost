@@ -12,6 +12,7 @@ import { AiPage } from "@/pages/ai";
 import { AppsPage } from "@/pages/apps";
 import { BoostPage } from "@/pages/boost";
 import { CleanupPage } from "@/pages/cleanup";
+import { ConsolePage } from "@/pages/console";
 import { DashboardPage } from "@/pages/dashboard";
 import { DiskPage } from "@/pages/disk";
 import { NetworkPage } from "@/pages/network";
@@ -24,6 +25,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   apps: AppsPage,
   network: NetworkPage,
   boost: BoostPage,
+  console: ConsolePage,
   ai: AiPage,
   settings: SettingsPage,
 };

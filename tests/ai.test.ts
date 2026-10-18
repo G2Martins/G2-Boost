@@ -29,6 +29,7 @@ test("malformed or missing block gives no actions", () => {
     todo: [],
     followups: [],
     needWeb: false,
+    console: [],
   });
   expect(extractActions("só texto").text).toBe("só texto");
 });
@@ -72,4 +73,11 @@ test("prompt: Luli, knowledge embedded, web on/off wording", () => {
   expect(off).toContain("Web search is OFF");
   expect(off).toContain('"need_web": true');
   expect(systemPrompt("en", "{}", { web: true })).toContain("Web search is ON");
+});
+
+test("console suggestions: bounded lines, only described when asked from the console", () => {
+  const { actions } = extractActions(block({ console: ["ping 1.1.1.1", "erros 7", "x\ny", 3, "a", "b", "c", "d"] }));
+  expect(actions.console).toEqual(["ping 1.1.1.1", "erros 7", "a", "b", "c"]);
+  expect(systemPrompt("pt-BR", "{}")).not.toContain("CONSOLE:");
+  expect(systemPrompt("pt-BR", "{}", { console: ["ping <host>"] })).toContain("ping <host>");
 });

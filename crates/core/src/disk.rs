@@ -580,6 +580,66 @@ pub fn reveal(p: &Path) -> Result<(), RecycleError> {
     }
 }
 
+/* ---------------- usage report (MCP, console) ---------------- */
+
+/// A folder measured with a deadline, ready to leave the app: the profile folder under `Users`
+/// is `%USERNAME%` and paths have the profile, computer and account names redacted.
+#[derive(Debug, Clone, Serialize)]
+pub struct Usage {
+    pub summary: ScanSummary,
+    /// Two levels, 25 per level.
+    pub tree: Option<NodeView>,
+    /// Files over 100 MB, largest first (25).
+    pub largest_files: Vec<BigFile>,
+    pub essentials: Vec<Essential>,
+}
+
+/// Scan `root` (default: the system drive) for at most `max_secs` (clamped 5..=110).
+pub fn usage(root: Option<&str>, max_secs: u64) -> Result<Usage, ScanError> {
+    let default_root = std::env::var("SystemDrive").map(|d| format!("{d}\\")).unwrap_or_else(|_| "C:\\".into());
+    let root = PathBuf::from(root.map(str::to_string).unwrap_or(default_root));
+    let secs = max_secs.clamp(5, 110);
+    let cancel = std::sync::Arc::new(AtomicBool::new(false));
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let timer = {
+        let cancel = cancel.clone();
+        std::thread::spawn(move || {
+            if done_rx.recv_timeout(std::time::Duration::from_secs(secs)).is_err() {
+                cancel.store(true, Ordering::Relaxed);
+            }
+        })
+    };
+    let progress = ScanProgress::default();
+    let result = scan(&root, &progress, &cancel);
+    let _ = done_tx.send(());
+    let _ = timer.join();
+    let (node, summary) = result?;
+    let mut tree = view(&node, &[], 2, 25);
+    if let Some(t) = tree.as_mut() {
+        redact_view(t, false, &std::env::var("USERNAME").unwrap_or_default());
+    }
+    let mut largest_files = search(&node, &parse_filter(">100mb"), crate::registry::now_unix(), 25).files;
+    for f in &mut largest_files {
+        f.path = crate::winevents::redact_here(&f.path);
+    }
+    let mut essentials = essentials(&node);
+    for e in &mut essentials {
+        e.path = crate::winevents::redact_here(&e.path);
+    }
+    Ok(Usage { summary, tree, largest_files, essentials })
+}
+
+/// The profile folder under `Users` carries the account name: hide it.
+fn redact_view(v: &mut NodeView, parent_is_users: bool, user: &str) {
+    if parent_is_users && !user.is_empty() && v.name.eq_ignore_ascii_case(user) {
+        v.name = "%USERNAME%".into();
+    }
+    let is_users = v.name.eq_ignore_ascii_case("users");
+    for c in &mut v.children {
+        redact_view(c, is_users, user);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -765,5 +825,28 @@ mod tests {
         assert!(sum.cancelled);
         assert_eq!(tree.children.len(), 0);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn profile_folder_is_hidden_in_the_usage_tree() {
+        let leaf = |name: &str| NodeView {
+            name: name.into(),
+            size: 1,
+            is_dir: true,
+            files: 0,
+            mtime: 0,
+            ids: Vec::new(),
+            children: Vec::new(),
+            others_size: 0,
+            others_count: 0,
+        };
+        let mut users = leaf("Users");
+        users.children = vec![leaf("Maria"), leaf("Public")];
+        let mut root = leaf("C:");
+        root.children = vec![users, leaf("Maria")];
+        redact_view(&mut root, false, "maria");
+        assert_eq!(root.children[0].children[0].name, "%USERNAME%");
+        assert_eq!(root.children[0].children[1].name, "Public");
+        assert_eq!(root.children[1].name, "Maria", "only under Users");
     }
 }

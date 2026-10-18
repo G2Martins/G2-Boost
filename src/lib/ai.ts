@@ -53,6 +53,8 @@ export type Actions = {
   followups: string[];
   /** The model wants web search, which is off in this conversation. */
   needWeb: boolean;
+  /** Console G2 lines to offer as one-click runs (re-validated by the console in Rust). */
+  console: string[];
 };
 export type Answer = { text: string; sources: Source[]; actions: Actions };
 export type Turn = { role: "user" | "assistant"; text: string };
@@ -63,6 +65,7 @@ export const AI_TWEAKS = TWEAKS.filter((t) => !t.beta);
 export const MAX_ACTIONS = 6;
 export const MAX_TODO = 5;
 export const MAX_FOLLOWUPS = 3;
+export const MAX_CONSOLE = 5;
 
 /** Dash punctuation between words → comma (style rule; ranges like "60 – 80" and a lone "—" cell stay). */
 export function undash(s: string): string {
@@ -76,6 +79,7 @@ const EMPTY: Actions = {
   todo: [],
   followups: [],
   needWeb: false,
+  console: [],
 };
 
 export type PromptOptions = {
@@ -83,6 +87,8 @@ export type PromptOptions = {
   knowledge?: string;
   /** Web search allowed in this conversation. */
   web?: boolean;
+  /** Asked from the Console G2: its command usages, so answers can suggest runnable lines. */
+  console?: string[];
 };
 
 export function systemPrompt(
@@ -139,7 +145,13 @@ Tweak ids allowed: ${tweakIds} (prefer recommended_here true whose status is not
 todo: up to ${MAX_TODO} concrete steps the user does outside G2 Boost (BIOS setting, driver from the vendor, physical cleaning, a Windows Settings path), one short sentence each, never a command.
 followups: up to ${MAX_FOLLOWUPS} short questions the user could ask you next about this PC, written as the user would ask them, in ${lang}.
 Use empty lists when there is nothing. The user still confirms every item in the app, which backs up the original values first.
-
+${
+  opts.console
+    ? `
+CONSOLE: the user asked from G2 Boost's Console, a command line of the app's own native read-only diagnostics (not a shell). Its commands: ${opts.console.join("; ")}. When running some of them would help (to measure, check or find something), add "console": ["<exact command line>"] to the block, up to ${MAX_CONSOLE}; the user runs each with a click and can ask you about the output. Never suggest cmd, PowerShell or any other shell.
+`
+    : ""
+}
 <knowledge>
 ${(opts.knowledge ?? "").replace(/</g, "\\u003c")}
 </knowledge>
@@ -182,6 +194,7 @@ export function extractActions(text: string): { text: string; actions: Actions }
         todo: pick(raw.todo, line(240), MAX_TODO).map((x) => undash(x.trim())),
         followups: pick(raw.followups, line(160), MAX_FOLLOWUPS).map((x) => undash(x.trim())),
         needWeb: raw.need_web === true,
+        console: pick(raw.console, line(200), MAX_CONSOLE).map((x) => x.trim()),
       },
     };
   } catch {

@@ -6,6 +6,7 @@ const ROUTES = [
   ["nav.apps", "apps.title"],
   ["nav.network", "network.title"],
   ["nav.boost", "boost.title"],
+  ["nav.console", "console.title"],
   ["nav.ai", "ai.title"],
   ["nav.settings", "settings.title"],
   ["nav.dashboard", "dash.title"],

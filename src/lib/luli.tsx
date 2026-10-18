@@ -292,6 +292,46 @@ function useLuliState() {
     [keys, provider, context, fetchContext, webAlways, webHere, messages, locale, models, t],
   );
 
+  /**
+   * One question outside the conversation (the Console G2 asks this way): same provider, key,
+   * context and knowledge, web per the global setting, the answer streams through `onText`.
+   */
+  const askOnce = useCallback(
+    async (
+      question: string,
+      opts: {
+        sent?: string;
+        console?: string[];
+        onText?: (s: string) => void;
+        signal?: AbortSignal;
+      } = {},
+    ): Promise<Answer> => {
+      if (!keys[provider]) throw new Error("no_key");
+      const ctx = context ?? (await fetchContext());
+      if (!ctx) throw new Error("no_context");
+      const sent = opts.sent ?? question.trim().slice(0, 4000);
+      const web = webAlways;
+      const system = systemPrompt(locale, ctx, {
+        knowledge: KNOWLEDGE,
+        web,
+        console: opts.console,
+      });
+      const onText = opts.onText ?? (() => undefined);
+      return provider === "anthropic"
+        ? new ClaudeChat(models.anthropic).ask(sent, system, web, onText, opts.signal)
+        : askStateless(
+            provider,
+            models[provider],
+            system,
+            [{ role: "user", text: sent }],
+            web,
+            onText,
+            opts.signal,
+          );
+    },
+    [keys, provider, context, fetchContext, webAlways, locale, models],
+  );
+
   /** The last answer asked for the web: allow it (here or always) and ask the same question again. */
   const allowWeb = useCallback(
     async (scope: "here" | "always") => {
@@ -329,6 +369,7 @@ function useLuliState() {
     draft,
     setDraft,
     ask,
+    askOnce,
     newConversation,
     web: webAlways || webHere,
     webAlways,
