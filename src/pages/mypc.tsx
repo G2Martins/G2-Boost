@@ -12,7 +12,14 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { rise } from "@/components/shell/page-header";
-import { Badge, Button, Card, CardTitle, MetricRow } from "@/components/ui/primitives";
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  LoadingScope,
+  MetricRow,
+} from "@/components/ui/primitives";
 import { backend, type Firmware, inTauri, type Profile, type WinSat } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
@@ -89,7 +96,7 @@ export function MyPc({ elevated }: { elevated: boolean }) {
             : "unknown";
 
   return (
-    <>
+    <LoadingScope loading={inTauri && !profile}>
       <div className="flex flex-wrap items-center gap-2">
         {msg ? <p className="animate-rise text-xs text-foreground/90">{msg}</p> : null}
         <div className="ml-auto flex gap-2">
@@ -162,7 +169,7 @@ export function MyPc({ elevated }: { elevated: boolean }) {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {cpu.caches.map((c) => (
-                  <Badge key={`${c.level}-${c.kind}`} className="bg-card-hover text-foreground/90">
+                  <Badge key={`${c.level}-${c.kind}`} tone="neutral">
                     L{c.level} {t(`mypc.cache.${c.kind}` as const)} · {c.count} ×{" "}
                     {formatBytes(c.size_bytes, locale, 0)}
                   </Badge>
@@ -226,12 +233,8 @@ export function MyPc({ elevated }: { elevated: boolean }) {
                         <span className="num font-semibold">
                           {formatBytes(m.size_bytes, locale, 0)}
                         </span>
-                        <Badge className="bg-card-hover text-muted-foreground">{m.kind}</Badge>
-                        {m.form_factor ? (
-                          <Badge className="bg-card-hover text-muted-foreground">
-                            {m.form_factor}
-                          </Badge>
-                        ) : null}
+                        <Badge tone="neutral">{m.kind}</Badge>
+                        {m.form_factor ? <Badge tone="neutral">{m.form_factor}</Badge> : null}
                         <span className="num text-muted-foreground">
                           {m.configured_mts || m.speed_mts} MT/s
                         </span>
@@ -264,16 +267,10 @@ export function MyPc({ elevated }: { elevated: boolean }) {
               <div key={g.name} className="py-2">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-semibold">{g.name}</span>
-                  <Badge className="bg-card-hover text-muted-foreground">
-                    {formatBytes(g.vram_bytes, locale, 0)}
-                  </Badge>
-                  {g.pcie ? (
-                    <Badge className="bg-card-hover text-muted-foreground">{g.pcie}</Badge>
-                  ) : null}
+                  <Badge tone="neutral">{formatBytes(g.vram_bytes, locale, 0)}</Badge>
+                  {g.pcie ? <Badge tone="neutral">{g.pcie}</Badge> : null}
                   {g.power_limit_w ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("mypc.tdp", { w: g.power_limit_w })}
-                    </Badge>
+                    <Badge tone="neutral">{t("mypc.tdp", { w: g.power_limit_w })}</Badge>
                   ) : null}
                 </div>
                 <p className="num mt-1 text-xs text-muted-foreground">
@@ -445,9 +442,7 @@ export function MyPc({ elevated }: { elevated: boolean }) {
                   <span className="min-w-0 flex-1 truncate font-medium" title={d.model}>
                     {d.model}
                   </span>
-                  <Badge className="bg-card-hover text-muted-foreground">
-                    {t(`mypc.bus.${d.bus}` as const)}
-                  </Badge>
+                  <Badge tone="neutral">{t(`mypc.bus.${d.bus}` as const)}</Badge>
                   <Badge
                     className={cn(
                       d.ssd === true
@@ -463,9 +458,7 @@ export function MyPc({ elevated }: { elevated: boolean }) {
                         ? t("mypc.hdd")
                         : t("mypc.media_unknown")}
                   </Badge>
-                  {d.system ? (
-                    <Badge className="bg-primary/15 text-primary">{t("mypc.system_disk")}</Badge>
-                  ) : null}
+                  {d.system ? <Badge tone="accent">{t("mypc.system_disk")}</Badge> : null}
                   <span className="num text-xs text-muted-foreground">
                     {formatBytes(d.size_bytes, locale, 0)}
                   </span>
@@ -494,6 +487,6 @@ export function MyPc({ elevated }: { elevated: boolean }) {
           </div>
         </Card>
       </div>
-    </>
+    </LoadingScope>
   );
 }

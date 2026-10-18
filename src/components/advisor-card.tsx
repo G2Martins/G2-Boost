@@ -78,9 +78,7 @@ export function AdvisorCard({ style }: { style?: React.CSSProperties }) {
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
                 {t(`advisor.${f.id}.title` as I18nKey, f.params)}
-                <Badge className="bg-card-hover text-muted-foreground">
-                  {t(`advisor.kind.${f.kind}` as const)}
-                </Badge>
+                <Badge tone="neutral">{t(`advisor.kind.${f.kind}` as const)}</Badge>
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                 {t(`advisor.${f.id}.body` as I18nKey, f.params)}

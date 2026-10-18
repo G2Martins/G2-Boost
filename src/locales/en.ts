@@ -3,9 +3,10 @@ import type { ptBR } from "./pt-BR";
 /** Must mirror pt-BR key for key — `satisfies` makes tsc fail on a missing or extra key. */
 export const en = {
   "app.name": "G2 Boost",
-  "app.on": "G2 Boost on",
-  "app.search": "Search",
-  "app.notifications": "Notifications",
+  "app.elevated": "Administrator",
+  "app.standard": "Standard user",
+  "app.standard.hint":
+    "System tweaks need elevation: use the Elevate button on the tweak's screen.",
   "app.version": "v{version}",
 
   "nav.dashboard": "Dashboard",
@@ -356,7 +357,6 @@ export const en = {
   "nav.network": "Network analyzer",
   "nav.boost": "PC Boost",
   "nav.settings": "Settings",
-  "nav.help": "Help",
 
   "common.soon": "Coming soon",
   "common.cancel": "Cancel",

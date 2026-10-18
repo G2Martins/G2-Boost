@@ -243,7 +243,9 @@ function Overview({ elevated }: { elevated: boolean }) {
         <KpiCard
           icon={GaugeIcon}
           label={t("dash.kpi.score")}
-          value={score ? `${score.percent}%` : "—"}
+          value="—"
+          count={inTauri ? (score?.percent ?? null) : undefined}
+          format={(n) => `${Math.round(n)}%`}
           tone={tone}
           caption={
             score
@@ -265,7 +267,7 @@ function Overview({ elevated }: { elevated: boolean }) {
           <div className="h-1.5 w-full overflow-hidden rounded bg-border/60">
             <div
               className={cn(
-                "h-full rounded transition-all duration-700",
+                "h-full rounded transition-[width] duration-700 ease-out-expo",
                 tone === "success"
                   ? "bg-success"
                   : tone === "warning"
@@ -284,7 +286,8 @@ function Overview({ elevated }: { elevated: boolean }) {
         <KpiCard
           icon={RotateCcw}
           label={t("dash.kpi.restore")}
-          value={restore ? String(restore.count) : "—"}
+          value="—"
+          count={inTauri ? (restore?.count ?? null) : undefined}
           caption={
             <>
               {protection}
@@ -309,7 +312,9 @@ function Overview({ elevated }: { elevated: boolean }) {
         <KpiCard
           icon={Sparkles}
           label={t("dash.kpi.cleanup")}
-          value={cleanupBytes === null ? "—" : formatBytes(cleanupBytes, locale)}
+          value="—"
+          count={inTauri ? cleanupBytes : undefined}
+          format={(n) => formatBytes(n, locale)}
           caption={t("dash.kpi.cleanup.caption", { count: DEFAULT_CLEANUP.length })}
           action={{ label: t("dash.kpi.cleanup.action"), onClick: () => navigate("cleanup") }}
           className="animate-rise"
@@ -318,7 +323,9 @@ function Overview({ elevated }: { elevated: boolean }) {
         <KpiCard
           icon={MemoryStick}
           label={t("dash.kpi.ram")}
-          value={ramPct === null ? "—" : `${ramPct}%`}
+          value="—"
+          count={inTauri ? ramPct : undefined}
+          format={(n) => `${Math.round(n)}%`}
           tone={ramPct !== null && ramPct > 85 ? "danger" : "neutral"}
           caption={
             last
@@ -342,7 +349,7 @@ function Overview({ elevated }: { elevated: boolean }) {
           <div className="h-1.5 w-full overflow-hidden rounded bg-border/60">
             <div
               className={cn(
-                "h-full rounded bg-chart-1 transition-all duration-700",
+                "h-full rounded bg-chart-1 transition-[width] duration-700 ease-out-expo",
                 ramPct !== null && ramPct > 85 && "bg-destructive",
               )}
               style={{ width: `${ramPct ?? 0}%` }}
@@ -381,14 +388,8 @@ function Overview({ elevated }: { elevated: boolean }) {
               return (
                 <li key={id} className="flex items-center gap-3 py-2.5 text-sm">
                   <span className="font-medium">{t(tweakName(id))}</span>
-                  <Badge className="bg-card-hover text-muted-foreground">
-                    {t(categoryKey(categoryOf(id)))}
-                  </Badge>
-                  {tw?.admin ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("common.admin_required")}
-                    </Badge>
-                  ) : null}
+                  <Badge tone="neutral">{t(categoryKey(categoryOf(id)))}</Badge>
+                  {tw?.admin ? <Badge tone="neutral">{t("common.admin_required")}</Badge> : null}
                   <Button
                     variant="outline"
                     size="sm"
@@ -482,9 +483,9 @@ function MonitorCard({
                 type="button"
                 onClick={() => setMetric(m.id)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-display text-[11px] font-semibold uppercase tracking-wider transition-colors",
+                  "press flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors duration-200 ease-out-expo",
                   metric === m.id
-                    ? "border-ring bg-card-hover text-foreground"
+                    ? "border-border-strong bg-foreground/[0.08] text-foreground"
                     : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -509,6 +510,7 @@ function MonitorCard({
           max={isRate ? 125 : 100}
           label={t(`dash.monitor.${metric}` as const)}
           valueText={valueText}
+          format={last ? (n) => (isRate ? `${n.toFixed(1)} MB/s` : `${Math.round(n)}%`) : undefined}
           tone="download"
         />
         <div className="min-w-0">

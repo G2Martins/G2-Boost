@@ -517,11 +517,7 @@ function AnswerExtras({ answer }: { answer: Answer }) {
               return (
                 <li key={id} className="flex flex-wrap items-center gap-2 text-sm">
                   <span>{t(tweakName(id))}</span>
-                  {tw?.admin ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("common.admin_required")}
-                    </Badge>
-                  ) : null}
+                  {tw?.admin ? <Badge tone="neutral">{t("common.admin_required")}</Badge> : null}
                   {done[id] ? (
                     <span className="ml-auto text-xs text-muted-foreground">{done[id]}</span>
                   ) : (
@@ -543,9 +539,7 @@ function AnswerExtras({ answer }: { answer: Answer }) {
                 <li key={k} className="flex flex-wrap items-center gap-2 text-sm">
                   <span>{t("ai.action.startup", { name: it.name })}</span>
                   {it.needs_admin ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("common.admin_required")}
-                    </Badge>
+                    <Badge tone="neutral">{t("common.admin_required")}</Badge>
                   ) : null}
                   {done[k] ? (
                     <span className="ml-auto text-xs text-muted-foreground">{done[k]}</span>

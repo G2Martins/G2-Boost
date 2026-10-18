@@ -1,64 +1,63 @@
-# Design system — "cara de ExitLag", convenções do Valerium
+# Design system — grafite quente, um accent, motion curto
 
-**Última revisão:** 2026-10-14 (noite) · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/Docs/core/design-system.md` e `packages/ui/src/globals.css` (mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente).
+**Última revisão:** 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
 
-Referência visual: prints do ExitLag 5.23 em 2026-10-14 — escuro, cards de cantos suaves, abas sublinhadas, gauges em arco, toggles verdes, botão primário vermelho, `?` de ajuda ao lado de cada título. Aplicar com a skill `frontend-design`; evitar cara genérica de IA.
+Direção: app de diagnóstico, não "gaming dashboard" genérico. Neutros quentes (grafite, texto cor de papel), **um** accent ("brasa", herdado da marca), status com parcimônia. Cards são **poços** — mais escuros que a página, com um filete de luz de 1px no topo: no hover eles clareiam (vêm à tona), nunca "flutuam". Aplicar com a skill `frontend-design`.
 
-## 1. Paleta — tokens canônicos (HSL, sem `hsl()`, como no Valerium)
+## 1. Paleta — tokens canônicos (HSL, sem `hsl()`)
 
-Consumir via Tailwind (`bg-background`, `bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`…) ou `hsl(var(--token) / alpha)`. **Nunca** hex literal num componente. Dark-only na v1 (como o ExitLag); se vier tema claro, só muda o bloco `:root` — por isso a disciplina de token já.
-
-| Token | Valor | Uso |
-|---|---|---|
-| `--background` | `228 14% 7%` | fundo da janela |
-| `--surface` | `223 14% 10%` | sidebar / topbar / banner de seção |
-| `--card` | `225 13% 12%` | cards |
-| `--card-hover` | `222 14% 15%` | hover de card/linha |
-| `--border` | `225 13% 18%` | bordas, divisores, trilho de aba |
-| `--foreground` | `220 15% 92%` | texto |
-| `--muted-foreground` | `222 8% 58%` | rótulos secundários, eixos |
-| `--primary` | `356 78% 55%` | ação principal (Iniciar, Limpar, Aplicar), item ativo da sidebar |
-| `--success` | `165 73% 46%` | "Estável", toggle ligado, check |
-| `--warning` | `39 87% 62%` | atenção |
-| `--destructive` | `358 100% 68%` | perda de pacote, erro, delete permanente |
-| `--ring` | `165 73% 46%` | focus ring (borda verde do item selecionado, como no ExitLag) |
-| `--radius` | `0.5rem` | raio padrão (cards 8px; botões 6px via `rounded-md`) |
-
-Gráficos (grayscale no Valerium; aqui com 2 acentos porque as séries têm identidade — Google/Cloudflare):
+Consumir via Tailwind (`bg-background`, `text-muted-foreground`, `border-border-strong`, `bg-primary`…) ou `hsl(var(--token) / alpha)`. **Nunca** hex literal num componente (canvas lê o token via `getComputedStyle`). Dark-only na v1.
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--chart-1` | `258 90% 66%` | série 1 (roxo) |
-| `--chart-2` | `37 92% 55%` | série 2 (laranja) |
-| `--chart-3` | `142 71% 45%` | disponibilidade |
-| `--chart-grid-stroke` / `--chart-axis-text` | `225 13% 18%` / `222 8% 58%` | grid + eixos |
-| `--gauge-download-start/end` | `262 83% 58%` → `280 70% 45%` | gauge de download |
-| `--gauge-upload-start/end` | `330 75% 55%` → `350 70% 45%` | gauge de upload |
+| `--background` | `30 6% 6.5%` | página (com `.carbon`) |
+| `--surface` | `30 6% 8.5%` | sidebar / topbar / banner / modal |
+| `--card` | `30 7% 4.5%` | preenchimento sólido equivalente ao poço (o `.panel` usa preto 42% translúcido) |
+| `--card-hover` | `30 6% 9.5%` | poço no hover (clareia) |
+| `--border` / `--border-strong` | `30 6% 15%` / `30 6% 22%` | hairline / hairline em hover e controles |
+| `--foreground` | `38 22% 91%` | texto (papel) |
+| `--muted-foreground` | `32 7% 58%` | rótulos, eixos |
+| `--primary` | `12 86% 56%` | **o** accent: CTA principal, marcador da sidebar, aba ativa, seleção, foco, fio de marca, série principal |
+| `--success` / `--warning` / `--destructive` | `148 40% 52%` / `38 82% 60%` / `352 72% 63%` | só status (chip tingido, indicador, texto de erro) |
+| `--ring` | `12 86% 62%` | focus ring |
+
+Séries: `--chart-1` = accent, `--chart-2` = neutro claro quente, `--chart-3` = aço — legíveis pela luminância, não só pelo matiz. Gauges: download = gradiente do accent, upload = neutro. Treemap: `--class-*` categóricas dessaturadas.
+
+**Chip tingido** (`<Badge tone>`): fundo 12% + texto + anel interno 25% da mesma cor (`neutral | accent | success | warning | danger`). Nada de `className` de cor solta em Badge.
+
+**Toggle ligado** é monocromático (trilho claro, botão escuro): com muitos toggles na tela, o accent viraria ruído.
 
 ## 2. Tipografia
-ExitLag usa Ubuntu. Aqui (skill `frontend-design`: nada de Inter/Roboto): **Chakra Petch** (`font-display` — títulos, abas, botões, valores grandes; quadrada, cara de console), **Manrope** variável (`font-sans` — corpo), **JetBrains Mono** (`font-mono` + classe `.num` com `tabular-nums` — ms, MB, IPs). Tudo empacotado via `@fontsource` (offline; CSP não libera Google Fonts). Escala: título de página 22px/600 · título de card 15px/600 · corpo 13px · rótulo 12px · valor de métrica 13px/600.
+**Chakra Petch** (`font-display`) só em títulos de página/card e números grandes (KPI, gauge). Rótulos e botões em **Manrope** (`font-sans`), caixa normal — nada de "11px uppercase espaçado" em todo card (era o que dava cara de template gamer). Eyebrows de seção pequenos (10px uppercase) só onde agrupam dados. **JetBrains Mono** + `.num` (`tabular-nums`) para ms, MB, IPs. Tudo via `@fontsource` (offline).
 
-## 3. Gráficos — convenção obrigatória
-Recharts envolto em `<ChartContainer>` + `ChartConfig` (portar `chart.tsx` do `packages/ui` do Valerium — Recharts v3, mesmos hurdles de tipos). Cores só por `--chart-*`. Gauge e treemap são canvas/SVG próprios (não existem no Recharts), mas também lêem tokens via `getComputedStyle`.
+## 3. Superfície
+- `.panel`: poço translúcido + `--shadow-card` (filete de luz no topo + anel de 1px).
+- `.panel-hover` (cards interativos): no hover o fundo clareia, `::before` sobe um gradiente do accent de baixo e `::after` cresce um fio de 1px do centro (550 ms). Filhos ficam acima dos pseudo-elementos (`isolation`).
+- `.halo`: brilho radial que segue o ponteiro (KPIs). Um único listener em `App.tsx` escreve `--mx/--my`; a intensidade é `@property --halo` (animável) num `background-image` — convive com o `.panel-hover`.
+- `.rule-accent`: fio de marca (segmento accent curto em repouso, cresce no hover do card pai).
+- `.grain` global no shell (feTurbulence a 2%, sem rede) e `.carbon` (grade 28 px) na página.
+- `.press`: tudo clicável que não é `Button` desce 1px ao pressionar (nav, abas, segmentados).
 
-## 4. Estrutura — onde a UI vive
-- `src/components/ui/primitives.tsx` — Button, Card/CardTitle, HelpHint (Radix Tooltip), Tabs (Radix, sublinhadas), Switch (Radix), StatusPill, Badge, MetricRow, EmptyState; `gauge.tsx` — arco 270° SVG com gradiente por token. Reusar antes de criar.
-- `src/components/<dominio>/` — `disk/`, `cleanup/`, `network/`, `boost/`, `shell/` (como `apps/dashboard/src/components/<dominio>` no Valerium).
-- Toda rota com **skeleton de loading** (padrão Valerium).
-- Biblioteca de apoio: `G:. Projetos. Grovic Data\Grovic-Components` — `directory.md` (blueprint), `design-ref/` (40+ marcas: linear, raycast, nvidia, cursor, posthog… inspiração de layout/microinteração, não copiar pixel), `ValeriumDesktop/` (Tauri 2 de referência), `ValeriumPro/`. Consultar antes de inventar componente.
+## 4. Motion
+Tokens: `--motion-fast` 200 ms · `--motion-base` 350 ms · `--motion-slow` 550 ms · `--ease-out-expo` `cubic-bezier(.16,1,.3,1)` (utilitário `ease-out-expo`).
 
-## 5. Componentes base (shadcn + custom)
-- `AppShell`: sidebar fina de ícones (56px, item ativo com fundo `primary/15` e ícone `primary`) + topbar (toggle "ON", sino, busca) + versão no rodapé.
-- `PageHeader` com banner `surface` sutil + `Tabs` sublinhadas (ativo = `foreground`, trilho `border`).
-- `Card` com `HelpHint` (`?` + tooltip i18n).
-- `StatusPill` (`Estável` em `success/15`) e `MetricRow` (rótulo `muted-foreground` · valor `foreground` · check `success`).
-- `Gauge` (arco 270°, gradiente por token, valor central + unidade).
-- `ToggleCard` (ícone, título, badge Beta, descrição, link "Não recomendado se…", switch `success`).
-- `TreemapCanvas` (render próprio; cores por classe de arquivo via tokens `--class-*`; tooltip com caminho/tamanho/datas).
-- `LatencyChart` (linha + marcadores de disponibilidade/perda na base) · `RamBar` (usado/livre) · `DnsRankRow` (posição, provedor, IPs, badge Atual/Mais rápido, resposta média, botão).
+| Peça | Como |
+|---|---|
+| Entrada de rota | `.route-enter` no wrapper com `key={route}` (só o conteúdo, não o shell): 200 ms, 4 px, **sem fill-mode** |
+| Lista de cards | `className="animate-rise" style={rise(i)}` → `--i`; atraso `min(i,8) × 60 ms`, 550 ms; `translate` (não `transform`, não briga com hover) |
+| Números | `<CountUp value format>` / `KpiCard count+format` / `Gauge format`: rAF, ease-out cúbico, 600 ms; o 1º valor conta a partir de 0, os seguintes a partir do que está na tela; `null` = skeleton (nunca um 0 provisório) |
+| Gráficos | linhas com `pathLength=1` + `.draw-line` (desenha em 700 ms, +260 ms) quando há dados; área sob a 1ª série com `.fade-late` (+520 ms) |
+| Loading | `<Skeleton>` (shimmer 2,5 s; cor de repouso dentro dos stops do gradiente) e `<LoadingScope loading>` (todo `MetricRow` dentro vira skeleton) — toda rota tem skeleton |
+| Modal | `<Modal>` sobre `<dialog>` nativo (foco preso, Esc, página inerte): abre 300 ms, fecha 200 ms, fundo com blur 4 px |
+
+**Segurança das animações:** o estado de repouso é sempre o visível — `opacity: 0` só dentro de `@keyframes`. Tudo que se move vive em `@media (prefers-reduced-motion: no-preference)`; em `reduce` nada desloca, desenha ou brilha (cor ainda muda no hover). O único `fill-mode` é o `backwards` do stagger (segura o 1º quadro só durante o atraso, ≤ 480 ms).
+
+## 5. Estrutura — onde a UI vive
+- `src/components/ui/primitives.tsx` — Button, Card/CardTitle, HelpHint, Tabs, Switch, StatusPill, Badge (tons), Skeleton, LoadingScope, MetricRow, Modal, EmptyState, `selectClass`; `count-up.tsx` — `useCountUp`/`CountUp`/`reducedMotion`; `gauge.tsx`, `live-line.tsx`, `kpi-card.tsx`. Reusar antes de criar.
+- `AppShell`: sidebar de ícones (ativo = fundo neutro + marcador accent à esquerda) + topbar fina com a marca e o chip de elevação real (`AppInfo.elevated`). Sem busca/sino de enfeite.
+- `PageHeader`: banner `surface` com brilho do accent a 12% + abas sublinhadas (ativa = borda accent).
 
 ## 6. Regras
-- Texturas: `.carbon` (grade 28 px a 2,5 %) no fundo, `.grain` (SVG feTurbulence a 3,5 %) no banner, `.banner` (radial vermelho a 18 % no canto). Animações: `animate-rise` + `rise(i)` para revelação escalonada; `animate-pulse-dot` no status ON.
-- Estado perigoso = confirmação inline no card (sem `alert`); botão destrutivo `destructive` só depois da prévia.
-- Toda string via i18n; ícones Lucide; `prefers-reduced-motion` respeitado nas animações de gauge/treemap.
-- Antes de criar UI: (1) shadcn? (2) `Grovic-Components`? (3) inspiração `design-ref`/web — e re-amarrar nos tokens §1.
+- Estado perigoso = confirmação (inline no card ou `<Modal>`); botão destrutivo só depois da prévia.
+- Toda string via i18n; ícones Lucide.
+- Antes de criar UI: (1) primitiva existente? (2) `Grovic-Components`? (3) inspiração `design-ref` — e re-amarrar nos tokens §1.

@@ -25,9 +25,10 @@ function classOf(name: string): string {
 
 type Rect = { x0: number; y0: number; x1: number; y1: number; node: NodeView; depth: number };
 
-function token(name: string, fallback: string) {
+/** Canvas needs concrete colours: read the CSS token (always defined in index.css). */
+function token(name: string) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v ? `hsl(${v})` : fallback;
+  return v ? `hsl(${v})` : "gray";
 }
 
 /**
@@ -90,15 +91,15 @@ export function Treemap({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, size.w, size.h);
     const colors = {
-      dir1: token("--card-hover", "#20232a"),
-      dir2: token("--surface", "#15171c"),
-      border: token("--border", "#272a33"),
-      text: token("--foreground", "#e8eaee"),
-      muted: token("--muted-foreground", "#8b909c"),
+      dir1: token("--card-hover"),
+      dir2: token("--surface"),
+      border: token("--border"),
+      text: token("--foreground"),
+      muted: token("--muted-foreground"),
       cls: Object.fromEntries(
         ["video", "audio", "image", "archive", "code", "binary", "document", "other"].map((c) => [
           c,
-          token(`--class-${c}`, "#444"),
+          token(`--class-${c}`),
         ]),
       ) as Record<string, string>,
     };

@@ -3,7 +3,15 @@ import { useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
-import { Badge, Card, CardTitle, MetricRow, Switch, selectClass } from "@/components/ui/primitives";
+import {
+  Badge,
+  Card,
+  CardTitle,
+  LoadingScope,
+  MetricRow,
+  Switch,
+  selectClass,
+} from "@/components/ui/primitives";
 import { CLEANUP_CATALOG, cleanupName } from "@/data/catalogs";
 import {
   type AppInfo,
@@ -85,7 +93,7 @@ export function SettingsPage() {
   const sched = settings?.schedule ?? { mode: "off" as const };
 
   return (
-    <>
+    <LoadingScope loading={inTauri && !settings}>
       <PageHeader title={t("settings.title")} subtitle={t("settings.subtitle")} />
       <PageBody>
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
@@ -261,16 +269,8 @@ export function SettingsPage() {
                     aria-label={t(cleanupName(c.id))}
                   />
                   <span className={cn(!on && "text-muted-foreground")}>{t(cleanupName(c.id))}</span>
-                  {c.admin ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("common.admin_required")}
-                    </Badge>
-                  ) : null}
-                  {c.risk === "high" ? (
-                    <Badge className="bg-destructive/12 text-destructive">
-                      {t("cleanup.risk.high")}
-                    </Badge>
-                  ) : null}
+                  {c.admin ? <Badge tone="neutral">{t("common.admin_required")}</Badge> : null}
+                  {c.risk === "high" ? <Badge tone="danger">{t("cleanup.risk.high")}</Badge> : null}
                 </li>
               );
             })}
@@ -357,6 +357,6 @@ export function SettingsPage() {
           </Card>
         </div>
       </PageBody>
-    </>
+    </LoadingScope>
   );
 }

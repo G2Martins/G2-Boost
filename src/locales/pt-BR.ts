@@ -1,9 +1,9 @@
 /** Dicionário padrão. `en.ts` precisa ter exatamente as mesmas chaves (o tsc garante). */
 export const ptBR = {
   "app.name": "G2 Boost",
-  "app.on": "G2 Boost ativo",
-  "app.search": "Procurar",
-  "app.notifications": "Notificações",
+  "app.elevated": "Administrador",
+  "app.standard": "Usuário padrão",
+  "app.standard.hint": "Ajustes de sistema pedem elevação: use o botão Elevar na tela do ajuste.",
   "app.version": "v{version}",
 
   "nav.dashboard": "Painel",
@@ -353,7 +353,6 @@ export const ptBR = {
   "nav.network": "Analisador de rede",
   "nav.boost": "PC Boost",
   "nav.settings": "Configurações",
-  "nav.help": "Ajuda",
 
   "common.soon": "Em breve",
   "common.cancel": "Cancelar",

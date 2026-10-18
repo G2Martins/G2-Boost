@@ -1,16 +1,21 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/primitives";
+import { CountUp } from "@/components/ui/count-up";
+import { Button, Skeleton } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 /**
  * Dashboard KPI: icon + big number + caption + one call-to-action.
  * `tone` colours the value (score, pressure) with tokens, never literal colours.
+ * Numeric KPIs pass `count` + `format`: the number tweens in and a skeleton holds its place
+ * while `count` is null. Text KPIs keep using `value`.
  */
 export function KpiCard({
   icon: Icon,
   label,
   value,
+  count,
+  format,
   caption,
   tone = "neutral",
   action,
@@ -20,7 +25,9 @@ export function KpiCard({
 }: {
   icon: LucideIcon;
   label: string;
-  value: string;
+  value?: string;
+  count?: number | null;
+  format?: (n: number) => string;
   caption?: ReactNode;
   tone?: "neutral" | "success" | "warning" | "danger";
   action?: { label: ReactNode; onClick: () => void; disabled?: boolean; primary?: boolean };
@@ -29,11 +36,12 @@ export function KpiCard({
   style?: React.CSSProperties;
 }) {
   return (
-    <section className={cn("panel panel-hover flex flex-col gap-3 p-5", className)} style={style}>
-      <header className="flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary/12 text-primary">
-          <Icon className="size-4" strokeWidth={2} />
-        </span>
+    <section
+      className={cn("panel panel-hover halo flex flex-col gap-3 p-5", className)}
+      style={style}
+    >
+      <header className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+        <Icon className="size-4 text-primary" strokeWidth={2} />
         {label}
       </header>
       <div
@@ -44,8 +52,15 @@ export function KpiCard({
           tone === "danger" && "text-destructive",
         )}
       >
-        {value}
+        {count === undefined ? (
+          value
+        ) : count === null ? (
+          <Skeleton className="h-[34px] w-28" />
+        ) : (
+          <CountUp value={count} format={format ?? ((n) => String(Math.round(n)))} />
+        )}
       </div>
+      <div className="rule-accent" aria-hidden />
       {caption ? <p className="text-xs leading-relaxed text-muted-foreground">{caption}</p> : null}
       {children}
       {action ? (

@@ -27,6 +27,7 @@ import {
   Card,
   CardTitle,
   HelpHint,
+  Skeleton,
   Switch,
   selectClass,
   Tabs,
@@ -301,6 +302,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
             tw={tw}
             index={i}
             state={states?.[tw.id]}
+            loading={inTauri && states === null}
             elevated={elevated}
             busy={busy === tw.id || run !== null}
             error={errors[tw.id]}
@@ -317,6 +319,7 @@ function TweakCard({
   tw,
   index,
   state,
+  loading,
   elevated,
   busy,
   error,
@@ -326,6 +329,7 @@ function TweakCard({
   tw: Tweak;
   index: number;
   state?: TweakState;
+  loading: boolean;
   elevated: boolean;
   busy: boolean;
   error?: string;
@@ -354,9 +358,7 @@ function TweakCard({
       <div>
         <h3 className="flex flex-wrap items-center gap-2 font-display text-[14px] font-semibold tracking-wide">
           {t(tweakName(tw.id))}
-          {tw.beta ? (
-            <Badge className="bg-chart-1/20 text-chart-1">{t("common.beta")}</Badge>
-          ) : null}
+          {tw.beta ? <Badge tone="accent">{t("common.beta")}</Badge> : null}
         </h3>
         <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
           {t(tweakDesc(tw.id))}
@@ -372,18 +374,16 @@ function TweakCard({
               disabled={busy}
               onClick={() => onToggle(true, lv)}
               className={cn(
-                "rounded-md border px-2.5 py-1.5 font-display text-[11px] font-semibold uppercase tracking-wider transition-colors disabled:opacity-50",
+                "press rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors duration-200 ease-out-expo disabled:opacity-50",
                 state.level === lv
-                  ? "border-ring bg-card-hover text-foreground"
+                  ? "border-border-strong bg-foreground/[0.08] text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground",
               )}
             >
               {t(`boost.fx.level.${lv}` as const)}
             </button>
           ))}
-          {state.level === null ? (
-            <Badge className="bg-warning/15 text-warning">{t("boost.fx.custom")}</Badge>
-          ) : null}
+          {state.level === null ? <Badge tone="warning">{t("boost.fx.custom")}</Badge> : null}
           {state.has_backup ? (
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => onToggle(false)}>
               {t("boost.fx.revert")}
@@ -422,48 +422,38 @@ function TweakCard({
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
       <div className="mt-auto flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+        {loading ? (
+          <>
+            <Skeleton className="h-4 w-14" />
+            <Skeleton className="h-4 w-20" />
+          </>
+        ) : null}
         {state ? (
           <Badge
-            className={cn(
-              state.status === "on" && "bg-success/15 text-success",
-              state.status === "off" && "bg-card-hover text-muted-foreground",
-              state.status === "partial" && "bg-warning/15 text-warning",
-              state.status === "unavailable" && "bg-card-hover text-muted-foreground",
-            )}
+            tone={
+              state.status === "on" ? "success" : state.status === "partial" ? "warning" : "neutral"
+            }
           >
             {t(`boost.state.${state.status}` as const)}
           </Badge>
         ) : null}
-        {state ? (
-          <Badge className="bg-card-hover text-muted-foreground">
-            {t(categoryKey(state.category))}
-          </Badge>
-        ) : null}
+        {state ? <Badge tone="neutral">{t(categoryKey(state.category))}</Badge> : null}
         {rec && !rec.recommended && rec.reason ? (
           <Badge
-            className="bg-warning/15 text-warning"
+            tone="warning"
             title={t("boost.not_recommended_here", { reason: t(reasonKey(rec.reason)) })}
           >
             {t(reasonKey(rec.reason))}
           </Badge>
         ) : null}
-        {tw.admin ? (
-          <Badge className="bg-card-hover text-muted-foreground">
-            {t("common.admin_required")}
-          </Badge>
-        ) : null}
-        {tw.reboot ? (
-          <Badge className="bg-card-hover text-muted-foreground">{t("boost.state.reboot")}</Badge>
-        ) : null}
+        {tw.admin ? <Badge tone="neutral">{t("common.admin_required")}</Badge> : null}
+        {tw.reboot ? <Badge tone="neutral">{t("boost.state.reboot")}</Badge> : null}
         {state?.has_backup ? (
-          <Badge className="bg-chart-1/15 text-chart-1" title={t("boost.state.backup.hint")}>
+          <Badge tone="success" title={t("boost.state.backup.hint")}>
             {t("boost.state.backup")}
           </Badge>
         ) : state?.status === "on" ? (
-          <Badge
-            className="bg-card-hover text-muted-foreground"
-            title={t("boost.state.no_backup.hint")}
-          >
+          <Badge tone="neutral" title={t("boost.state.no_backup.hint")}>
             {t("boost.state.no_backup")}
           </Badge>
         ) : null}
@@ -747,6 +737,15 @@ function DnsTab({ elevated }: { elevated: boolean }) {
         </p>
         {msg ? <p className="w-full text-xs text-foreground/90">{msg}</p> : null}
       </Card>
+      {rank === null && inTauri
+        ? [0, 1, 2, 3].map((k) => (
+            <Card key={k} className="flex items-center gap-4 py-4">
+              <Skeleton className="size-9" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="ml-auto h-4 w-20" />
+            </Card>
+          ))
+        : null}
       {(rank ?? []).map((r, i) => {
         const current = main?.provider === r.id;
         const isFastest = fastest?.id === r.id;
@@ -763,12 +762,8 @@ function DnsTab({ elevated }: { elevated: boolean }) {
             <span className="num text-xs text-muted-foreground">
               {r.primary} / {r.secondary}
             </span>
-            {current ? (
-              <Badge className="bg-success/15 text-success">{t("boost.dns.current")}</Badge>
-            ) : null}
-            {isFastest ? (
-              <Badge className="bg-chart-1/15 text-chart-1">{t("boost.dns.fastest")}</Badge>
-            ) : null}
+            {current ? <Badge tone="success">{t("boost.dns.current")}</Badge> : null}
+            {isFastest ? <Badge tone="accent">{t("boost.dns.fastest")}</Badge> : null}
             <span className="ml-auto text-xs text-muted-foreground">{t("boost.dns.avg")}</span>
             <span className="num w-20 text-right text-xs font-semibold">
               {r.median_ms === null ? t("boost.dns.timeout") : `${r.median_ms.toFixed(1)} ms`}
@@ -836,7 +831,7 @@ function StartupTab({ elevated }: { elevated: boolean }) {
           <HelpHint text={t("boost.startup.help")} />
         </span>
         {items ? (
-          <Badge className="bg-card-hover text-muted-foreground">
+          <Badge tone="neutral">
             {t("boost.startup.count", { on: enabled, total: items.length })}
           </Badge>
         ) : null}
@@ -863,6 +858,17 @@ function StartupTab({ elevated }: { elevated: boolean }) {
             </p>
           ) : null}
           <ul className="divide-y divide-border">
+            {items === null && inTauri
+              ? [0, 1, 2, 3, 4].map((k) => (
+                  <li key={k} className="flex items-center gap-3 py-3">
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-3.5 w-40" />
+                      <Skeleton className="h-3 w-64" />
+                    </div>
+                    <Skeleton className="h-6 w-11 rounded-full" />
+                  </li>
+                ))
+              : null}
             {(items ?? []).map((it) => {
               const locked = it.protected || (it.needs_admin && !elevated);
               return (
@@ -881,14 +887,12 @@ function StartupTab({ elevated }: { elevated: boolean }) {
                     </p>
                   </div>
                   {it.protected ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
+                    <Badge tone="neutral">
                       <Lock className="mr-1 size-3" />
                       {t("boost.startup.security")}
                     </Badge>
                   ) : it.needs_admin && !elevated ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("common.admin_required")}
-                    </Badge>
+                    <Badge tone="neutral">{t("common.admin_required")}</Badge>
                   ) : null}
                   <Switch
                     checked={it.enabled}
@@ -908,6 +912,14 @@ function StartupTab({ elevated }: { elevated: boolean }) {
             <HelpHint text={t("boost.procs.help")} />
           </CardTitle>
           <ul className="space-y-2">
+            {procs === null && inTauri
+              ? [0, 1, 2, 3, 4, 5].map((k) => (
+                  <li key={k} className="space-y-1.5 py-1">
+                    <Skeleton className="h-3.5 w-full" />
+                    <Skeleton className="h-1 w-2/3" />
+                  </li>
+                ))
+              : null}
             {(procs ?? []).map((p) => (
               <li key={p.name} className="text-sm">
                 <div className="flex items-center gap-2">
@@ -915,11 +927,7 @@ function StartupTab({ elevated }: { elevated: boolean }) {
                   {p.count > 1 ? (
                     <span className="num text-[11px] text-muted-foreground">×{p.count}</span>
                   ) : null}
-                  {p.system ? (
-                    <Badge className="bg-card-hover text-muted-foreground">
-                      {t("boost.procs.system")}
-                    </Badge>
-                  ) : null}
+                  {p.system ? <Badge tone="neutral">{t("boost.procs.system")}</Badge> : null}
                   <span className="num ml-auto text-xs text-muted-foreground">
                     {p.cpu_pct.toFixed(1)}%
                   </span>

@@ -1,14 +1,13 @@
 import {
-  Bell,
   Bot,
-  CircleHelp,
   Gauge,
   HardDrive,
   LayoutDashboard,
   type LucideIcon,
   Radar,
-  Search,
   Settings,
+  ShieldCheck,
+  ShieldHalf,
   Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -30,16 +29,19 @@ export function AppShell({
   route,
   onNavigate,
   version,
+  elevated,
   children,
 }: {
   route: Route;
   onNavigate: (r: Route) => void;
   version: string;
+  /** null until the app info arrives. */
+  elevated: boolean | null;
   children: ReactNode;
 }) {
   const { t } = useI18n();
   return (
-    <div className="carbon relative flex h-full">
+    <div className="carbon grain relative flex h-full">
       <aside className="flex w-16 shrink-0 flex-col items-center border-r border-border bg-surface py-3">
         <button
           type="button"
@@ -66,12 +68,6 @@ export function AppShell({
             label={t("nav.settings")}
             onClick={() => onNavigate("settings")}
           />
-          <NavButton
-            active={false}
-            icon={CircleHelp}
-            label={t("nav.help")}
-            onClick={() => undefined}
-          />
         </nav>
         <span className="num pb-1 text-[10px] text-muted-foreground">
           {t("app.version", { version })}
@@ -79,33 +75,28 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-surface/80 px-5 backdrop-blur">
-          <div className="flex items-center gap-2.5">
+        <header className="flex h-11 shrink-0 items-center gap-4 border-b border-border bg-surface/80 px-5 backdrop-blur">
+          <span className="font-display text-[12px] font-semibold tracking-[0.18em] text-muted-foreground">
+            G2 BOOST
+          </span>
+          {elevated === null ? null : (
             <span
-              className="relative inline-flex size-2.5 rounded-full bg-success animate-pulse-dot"
-              aria-hidden
-            />
-            <span className="font-display text-[13px] font-semibold tracking-wide">
-              {t("app.on")}
-            </span>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            <button
-              type="button"
-              aria-label={t("app.notifications")}
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
+              title={elevated ? undefined : t("app.standard.hint")}
+              className={cn(
+                "ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold ring-1 ring-inset",
+                elevated
+                  ? "bg-success/10 text-success ring-success/20"
+                  : "bg-foreground/[0.05] text-muted-foreground ring-foreground/10",
+              )}
             >
-              <Bell className="size-4.5" />
-            </button>
-            <label className="flex h-9 w-72 items-center gap-2 rounded-md border border-border bg-background px-3 text-muted-foreground focus-within:border-muted-foreground">
-              <Search className="size-4" />
-              <input
-                type="search"
-                placeholder={t("app.search")}
-                className="w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
-              />
-            </label>
-          </div>
+              {elevated ? (
+                <ShieldCheck className="size-3.5" />
+              ) : (
+                <ShieldHalf className="size-3.5" />
+              )}
+              {elevated ? t("app.elevated") : t("app.standard")}
+            </span>
+          )}
         </header>
         <main className="relative min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
@@ -132,10 +123,10 @@ function NavButton({
       aria-current={active ? "page" : undefined}
       title={label}
       className={cn(
-        "relative flex size-11 items-center justify-center rounded-lg transition-colors",
+        "press relative flex size-11 items-center justify-center rounded-lg transition-colors duration-200 ease-out-expo",
         active
-          ? "bg-primary/15 text-primary"
-          : "text-muted-foreground hover:bg-card-hover hover:text-foreground",
+          ? "bg-foreground/[0.08] text-foreground"
+          : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground",
       )}
     >
       {active ? (

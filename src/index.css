@@ -5,38 +5,63 @@
 @import "@fontsource-variable/manrope/index.css";
 @import "@fontsource/jetbrains-mono/500.css";
 
-/* Tokens canônicos (HSL triplets) — Docs/core/design-system.md. Zero hex nos componentes. */
+/*
+ * Tokens canônicos (HSL triplets) — Docs/core/design-system.md. Zero hex nos componentes.
+ * Paleta: grafite quente (neutros hue 30, texto cor de papel) + UM accent "brasa".
+ * Status (success/warning/destructive) só em chips tingidos e indicadores, nunca decorativo.
+ */
 :root {
-  --background: 228 14% 7%;
-  --surface: 223 14% 10%;
-  --card: 225 13% 12%;
-  --card-hover: 222 14% 15%;
-  --border: 225 13% 18%;
-  --foreground: 220 15% 92%;
-  --muted-foreground: 222 8% 58%;
-  --primary: 356 78% 55%;
-  --primary-foreground: 0 0% 100%;
-  --success: 165 73% 46%;
-  --warning: 39 87% 62%;
-  --destructive: 358 100% 68%;
-  --ring: 165 73% 46%;
-  --chart-1: 258 90% 66%;
-  --chart-2: 37 92% 55%;
-  --chart-3: 142 71% 45%;
-  --gauge-download-start: 262 83% 58%;
-  --gauge-download-end: 280 70% 45%;
-  --gauge-upload-start: 330 75% 55%;
-  --gauge-upload-end: 350 70% 45%;
-  --class-video: 262 70% 52%;
-  --class-audio: 190 70% 42%;
-  --class-image: 150 55% 40%;
-  --class-archive: 30 80% 50%;
-  --class-code: 210 70% 55%;
-  --class-binary: 356 60% 48%;
-  --class-document: 45 70% 50%;
-  --class-other: 222 10% 40%;
+  --background: 30 6% 6.5%;
+  --surface: 30 6% 8.5%;
+  /* Card = poço: mais escuro que a página (afunda), não mais claro (flutua). */
+  --card: 30 7% 4.5%;
+  --card-hover: 30 6% 9.5%;
+  --border: 30 6% 15%;
+  --border-strong: 30 6% 22%;
+  --foreground: 38 22% 91%;
+  --muted-foreground: 32 7% 58%;
+  --primary: 12 86% 56%;
+  --primary-foreground: 30 30% 98%;
+  --success: 148 40% 52%;
+  --warning: 38 82% 60%;
+  --destructive: 352 72% 63%;
+  --ring: 12 86% 62%;
+  /* Séries: accent + dois neutros de luminância distinta (legível sem depender de matiz). */
+  --chart-1: 12 86% 58%;
+  --chart-2: 36 24% 74%;
+  --chart-3: 200 16% 56%;
+  --gauge-download-start: 12 86% 60%;
+  --gauge-download-end: 2 74% 46%;
+  --gauge-upload-start: 36 22% 78%;
+  --gauge-upload-end: 30 8% 46%;
+  /* Classes do treemap: categóricas, dessaturadas para conviver com o grafite. */
+  --class-video: 10 56% 50%;
+  --class-audio: 190 34% 45%;
+  --class-image: 146 30% 43%;
+  --class-archive: 36 58% 50%;
+  --class-code: 212 34% 53%;
+  --class-binary: 350 38% 48%;
+  --class-document: 48 42% 52%;
+  --class-other: 30 6% 34%;
   --radius: 0.5rem;
+
+  /* Motion: orçamento pequeno. Entradas usam ease-out-expo; nada passa de 550 ms. */
+  --motion-fast: 200ms;
+  --motion-base: 350ms;
+  --motion-slow: 550ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Superfície: anel de 1px embutido + filete de luz no topo (o card recua). */
+  --shadow-card: inset 0 1px 0 hsl(var(--foreground) / 0.045), 0 0 0 1px hsl(0 0% 0% / 0.28);
+  --shadow-card-hover: inset 0 1px 0 hsl(var(--foreground) / 0.07), 0 0 0 1px hsl(0 0% 0% / 0.34);
   color-scheme: dark;
+}
+
+/* Intensidade do halo, animável (custom property registrada). */
+@property --halo {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
 }
 
 @theme inline {
@@ -45,6 +70,7 @@
   --color-card: hsl(var(--card));
   --color-card-hover: hsl(var(--card-hover));
   --color-border: hsl(var(--border));
+  --color-border-strong: hsl(var(--border-strong));
   --color-foreground: hsl(var(--foreground));
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-primary: hsl(var(--primary));
@@ -57,22 +83,50 @@
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
   --radius-card: var(--radius);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --ease-out-expo: var(--ease-out-expo);
   --font-display: "Chakra Petch", "Segoe UI Variable", system-ui, sans-serif;
   --font-sans: "Manrope Variable", "Segoe UI Variable", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, monospace;
-  --animate-rise: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
   --animate-sweep: sweep 2.4s linear infinite;
 }
 
+/*
+ * Keyframes. SEGURANÇA: o estado de repouso é sempre o visível — opacity:0 só existe DENTRO
+ * dos keyframes. Se a animação não rodar, o conteúdo aparece normal.
+ * `translate` (propriedade própria) em vez de `transform`: não briga com hover/press.
+ */
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    translate: 0 10px;
+  }
+}
+@keyframes route-enter {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+/* Linha que se desenha: o path usa pathLength="1" e stroke-dasharray 1. */
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    background-position: -50% 0;
   }
 }
 @keyframes pulse-dot {
@@ -111,7 +165,7 @@
     background: hsl(var(--primary) / 0.35);
   }
   *:focus-visible {
-    outline: 2px solid hsl(var(--ring) / 0.8);
+    outline: 2px solid hsl(var(--ring) / 0.85);
     outline-offset: 2px;
   }
   ::-webkit-scrollbar {
@@ -129,37 +183,234 @@
 }
 
 @layer components {
-  /* grão de carbono: textura sutil, sem imagem externa */
+  /* Grade de carbono: textura da página, sem imagem externa. */
   .carbon {
     background-color: hsl(var(--background));
     background-image:
-      linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+      linear-gradient(hsl(var(--foreground) / 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.022) 1px, transparent 1px);
     background-size: 28px 28px;
   }
+  /* Grão 2% (feTurbulence inline, custo zero de rede). Global no shell. */
   .grain::after {
     content: "";
     position: absolute;
     inset: 0;
+    z-index: 50;
     pointer-events: none;
-    opacity: 0.035;
+    opacity: 0.02;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
+
+  /* Card = poço translúcido sobre a página, filete de 1px no topo. */
   .panel {
-    @apply rounded-card border border-border bg-card;
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.04),
-      0 1px 2px hsl(0 0% 0% / 0.4);
+    @apply rounded-card border;
+    border-color: hsl(var(--border));
+    background-color: hsl(0 0% 0% / 0.42);
+    box-shadow: var(--shadow-card);
   }
+
+  /*
+   * Card interativo: no hover ele CLAREIA (vem à tona), não levanta. Gradiente sobe de baixo
+   * (::before) e um fio de 1px cresce do centro (::after). Filhos ficam acima dos pseudo.
+   */
   .panel-hover {
-    @apply transition-colors duration-200 hover:bg-card-hover;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    transition:
+      background-color var(--motion-fast) var(--ease-out-expo),
+      border-color var(--motion-fast) var(--ease-out-expo),
+      box-shadow var(--motion-fast) var(--ease-out-expo);
   }
+  .panel-hover::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(to top, hsl(var(--primary) / 0.08), transparent 45%);
+    opacity: 0;
+    translate: 0 14px;
+    transition:
+      opacity 300ms var(--ease-out-expo),
+      translate 300ms var(--ease-out-expo);
+    pointer-events: none;
+  }
+  .panel-hover::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.9), transparent);
+    scale: 0 1;
+    transition: scale var(--motion-slow) var(--ease-out-expo);
+    pointer-events: none;
+  }
+  .panel-hover:hover {
+    background-color: hsl(var(--card-hover) / 0.55);
+    border-color: hsl(var(--border-strong));
+    box-shadow: var(--shadow-card-hover);
+  }
+  .panel-hover:hover::before {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .panel-hover:hover::after {
+    scale: 1 1;
+  }
+
+  /* Halo que segue o ponteiro: o JS (App) só escreve --mx/--my; sem JS = halo centrado.
+     Camada de background (não pseudo-elemento): convive com o ::before/::after do .panel-hover. */
+  .halo {
+    background-image: radial-gradient(
+      260px circle at var(--mx, 50%) var(--my, 50%),
+      hsl(var(--primary) / calc(0.11 * var(--halo))),
+      transparent 62%
+    );
+    transition:
+      --halo 220ms var(--ease-out-expo),
+      background-color var(--motion-fast) var(--ease-out-expo),
+      border-color var(--motion-fast) var(--ease-out-expo),
+      box-shadow var(--motion-fast) var(--ease-out-expo);
+  }
+  .halo:hover {
+    --halo: 1;
+  }
+
+  /* Pressionar: desce 1px (tudo que é clicável e não é Button). */
+  .press {
+    transition: translate 120ms var(--ease-out-expo);
+  }
+  .press:active {
+    translate: 0 1px;
+  }
+
+  /* Fio de marca: segmento accent curto em repouso, cresce no hover do card pai. */
+  .rule-accent {
+    height: 1px;
+    background-image:
+      linear-gradient(
+        90deg,
+        hsl(var(--primary) / 0.5),
+        hsl(var(--primary) / 0.2) 40%,
+        transparent 92%
+      ),
+      linear-gradient(90deg, hsl(var(--border-strong)), hsl(var(--border)) 50%, transparent);
+    background-repeat: no-repeat;
+    background-size:
+      18% 1px,
+      100% 1px;
+    transition: background-size var(--motion-slow) var(--ease-out-expo);
+  }
+  .panel-hover:hover .rule-accent {
+    background-size:
+      42% 1px,
+      100% 1px;
+  }
+
+  /* Skeleton: a cor de repouso vive DENTRO dos stops (tailwind-merge não a descarta). */
+  .skeleton {
+    border-radius: calc(var(--radius) - 2px);
+    background-image: linear-gradient(
+      100deg,
+      hsl(var(--foreground) / 0.05) 30%,
+      hsl(var(--foreground) / 0.1) 50%,
+      hsl(var(--foreground) / 0.05) 70%
+    );
+    background-size: 200% 100%;
+    background-position: 150% 0;
+  }
+
+  /* Modal sobre <dialog> nativo: abre 300 ms, fecha 200 ms (assimétrico), fundo desfocado. */
+  .modal {
+    margin: auto;
+    max-width: min(560px, calc(100vw - 48px));
+    border: 1px solid hsl(var(--border-strong));
+    border-radius: calc(var(--radius) + 4px);
+    background: hsl(var(--surface));
+    color: hsl(var(--foreground));
+    box-shadow:
+      var(--shadow-card-hover),
+      0 24px 64px -16px hsl(0 0% 0% / 0.7);
+    padding: 0;
+  }
+  .modal::backdrop {
+    background: hsl(30 10% 2% / 0.6);
+    backdrop-filter: blur(4px);
+  }
+
   .banner {
     background:
-      radial-gradient(60% 120% at 85% 0%, hsl(var(--primary) / 0.18), transparent 60%),
+      radial-gradient(60% 120% at 85% 0%, hsl(var(--primary) / 0.12), transparent 60%),
       linear-gradient(180deg, hsl(var(--surface)), hsl(var(--background)));
   }
   .num {
     @apply font-mono tabular-nums;
+  }
+}
+
+/* Movimento só para quem não pediu menos movimento. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Entrada com stagger: `style={rise(i)}` escreve --i. `backwards` segura o 1º quadro só
+     durante o atraso do stagger (≤ 480 ms); a entrada de rota não usa fill. */
+  .animate-rise {
+    animation: rise var(--motion-slow) var(--ease-out-expo) backwards;
+    animation-delay: calc(min(var(--i, 0), 8) * 60ms);
+  }
+  .route-enter {
+    animation: route-enter var(--motion-fast) var(--ease-out-expo);
+  }
+  .draw-line {
+    stroke-dasharray: 1;
+    animation: draw 700ms var(--ease-out-expo) 260ms backwards;
+  }
+  .fade-late {
+    animation: fade-in var(--motion-slow) var(--ease-out-expo) 520ms backwards;
+  }
+  .skeleton {
+    animation: shimmer 2.5s linear infinite;
+  }
+  .modal[open] {
+    animation: rise 300ms var(--ease-out-expo);
+  }
+  .modal[open]::backdrop {
+    animation: fade-in 300ms var(--ease-out-expo);
+  }
+  .modal[data-closing] {
+    animation: fade-out-down 200ms ease-in forwards;
+  }
+  .modal[data-closing]::backdrop {
+    animation: fade-out 200ms ease-in forwards;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fade-out-down {
+  to {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Cor não é movimento: hover ainda clareia, mas nada se desloca nem desenha. */
+  .panel-hover::before,
+  .panel-hover::after {
+    display: none;
+  }
+  .halo:hover {
+    --halo: 0;
+  }
+  .press:active {
+    translate: none;
+  }
+  .rule-accent {
+    transition: none;
+  }
+  .draw-line {
+    stroke-dasharray: none;
   }
 }

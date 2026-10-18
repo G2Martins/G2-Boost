@@ -182,10 +182,10 @@ function Monitor() {
           <Badge className="bg-card-hover text-foreground">
             {t("network.monitor.targets.internet")}
           </Badge>
-          <Badge className="bg-card-hover text-muted-foreground" title={t("common.soon")}>
+          <Badge tone="neutral" title={t("common.soon")}>
             {t("network.monitor.targets.gateway")}
           </Badge>
-          <Badge className="bg-card-hover text-muted-foreground" title={t("common.soon")}>
+          <Badge tone="neutral" title={t("common.soon")}>
             {t("network.monitor.targets.aws")}
           </Badge>
         </div>
@@ -261,11 +261,11 @@ function Monitor() {
             </span>
             <span className="ml-auto flex items-center gap-4">
               <span className="flex items-center gap-1.5">
-                <span className="h-2 w-3 bg-chart-3" />
+                <span className="h-2 w-3 bg-success" />
                 {t("network.monitor.legend.availability")}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2 w-3 bg-chart-2" />
+                <span className="h-2 w-3 bg-destructive" />
                 {t("network.monitor.legend.loss")}
               </span>
             </span>
@@ -348,7 +348,7 @@ function LatencyChart({ samples, targets }: { samples: Sample[]; targets: Target
             y={H - padB + 8}
             width={6}
             height={6}
-            fill={lost ? "hsl(var(--chart-2))" : "hsl(var(--chart-3))"}
+            fill={lost ? "hsl(var(--destructive))" : "hsl(var(--success) / 0.7)"}
           />
         );
       })}
@@ -441,6 +441,7 @@ function Scanner() {
               max={Math.max(100, niceMax(down))}
               label={t("network.download")}
               valueText={formatMbps(down, locale)}
+              format={(n) => formatMbps(n, locale)}
               tone="download"
             />
           </div>
@@ -460,6 +461,7 @@ function Scanner() {
               max={Math.max(100, niceMax(up))}
               label={t("network.upload")}
               valueText={formatMbps(up, locale)}
+              format={(n) => formatMbps(n, locale)}
               tone="upload"
             />
           </div>

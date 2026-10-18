@@ -1,15 +1,18 @@
 import { useId } from "react";
+import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 
 /**
- * 270° arc gauge (ExitLag-style) with a gradient stroke and a needle.
- * `value`/`max` drive both the arc fill and the needle; colors come from tokens.
+ * 270° arc gauge with a gradient stroke and a needle. `value`/`max` drive both the arc fill and
+ * the needle; colors come from tokens. The arc draws itself in once (CSS `draw-line`); pass
+ * `format` to tween the caption number with the value (otherwise `valueText` is shown as is).
  */
 export function Gauge({
   value,
   max,
   label,
   valueText,
+  format,
   tone,
   className,
 }: {
@@ -17,6 +20,7 @@ export function Gauge({
   max: number;
   label: string;
   valueText: string;
+  format?: (n: number) => string;
   tone: "download" | "upload";
   className?: string;
 }) {
@@ -70,11 +74,13 @@ export function Gauge({
         {ratio > 0.005 ? (
           <path
             d={arc(startAngle, needleAngle)}
+            pathLength={1}
+            className="draw-line"
             fill="none"
             stroke={`url(#${id})`}
             strokeWidth={stroke}
             strokeLinecap="round"
-            style={{ transition: "d 0.4s ease-out" }}
+            style={{ transition: "d 0.4s var(--ease-out-expo)" }}
           />
         ) : null}
         <line
@@ -85,7 +91,7 @@ export function Gauge({
           stroke="hsl(var(--foreground) / 0.85)"
           strokeWidth={4}
           strokeLinecap="round"
-          style={{ transition: "all 0.4s ease-out" }}
+          style={{ transition: "all 0.4s var(--ease-out-expo)" }}
         />
         <circle
           cx={cx}
@@ -97,7 +103,9 @@ export function Gauge({
         />
       </svg>
       <figcaption className="-mt-10 text-center">
-        <div className="num font-display text-2xl font-semibold">{valueText}</div>
+        <div className="num font-display text-2xl font-semibold">
+          {format ? <CountUp value={value} format={format} /> : valueText}
+        </div>
         <div className="text-xs text-muted-foreground">{label}</div>
       </figcaption>
     </figure>

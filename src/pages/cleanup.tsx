@@ -38,11 +38,10 @@ const RISK_KEY: Record<Risk, I18nKey> = {
   medium: "cleanup.risk.medium",
   high: "cleanup.risk.high",
 };
-const RISK_CLASS: Record<Risk, string> = {
-  low: "bg-success/12 text-success",
-  medium: "bg-warning/12 text-warning",
-  high: "bg-destructive/12 text-destructive",
-};
+const RISK_TONE = { low: "success", medium: "warning", high: "danger" } as const satisfies Record<
+  Risk,
+  string
+>;
 
 type Phase = "idle" | "previewing" | "confirm" | "running";
 
@@ -207,9 +206,7 @@ export function CleanupPage() {
                         : t("cleanup.preview.not_measurable")}
                     </span>
                     {p?.needs_admin && !elevated ? (
-                      <Badge className="bg-warning/15 text-warning">
-                        {t("cleanup.needs_admin")}
-                      </Badge>
+                      <Badge tone="warning">{t("cleanup.needs_admin")}</Badge>
                     ) : null}
                   </li>
                 );
@@ -273,13 +270,10 @@ export function CleanupPage() {
                     <h3 className="font-display text-[14px] font-semibold tracking-wide">
                       {t(cleanupName(c.id))}
                     </h3>
-                    <Badge className={RISK_CLASS[c.risk]}>{t(RISK_KEY[c.risk])}</Badge>
+                    <Badge tone={RISK_TONE[c.risk]}>{t(RISK_KEY[c.risk])}</Badge>
                     {c.admin ? (
                       <Badge
-                        className={cn(
-                          "bg-card-hover text-muted-foreground",
-                          p?.needs_admin && "bg-warning/15 text-warning",
-                        )}
+                        tone={p?.needs_admin ? "warning" : "neutral"}
                         title={t("common.admin_required")}
                       >
                         <ShieldAlert className="mr-1 inline size-3" />
@@ -357,7 +351,7 @@ export function CleanupPage() {
                     <span className="num text-muted-foreground">
                       {new Date(r.at * 1000).toLocaleString(locale)}
                     </span>
-                    <Badge className="bg-card-hover text-muted-foreground">
+                    <Badge tone="neutral">
                       {t(`cleanup.trigger.${triggerKey(r.trigger)}` as const)}
                     </Badge>
                     <span className="num ml-auto font-semibold">

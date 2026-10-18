@@ -1,8 +1,17 @@
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { CircleHelp } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import { CircleHelp, X } from "lucide-react";
+import {
+  type ComponentProps,
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
+import { reducedMotion } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 
 /* ---------- Button ---------- */
@@ -17,17 +26,18 @@ export function Button({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-md font-display font-semibold tracking-wide transition-all duration-150 disabled:pointer-events-none disabled:opacity-40",
+        "press inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-[background-color,border-color,color,filter,translate] duration-200 ease-out-expo disabled:pointer-events-none disabled:opacity-40",
         size === "sm" && "h-8 px-3 text-xs",
         size === "md" && "h-10 px-4 text-[13px]",
         size === "lg" && "h-11 px-5 text-sm",
         variant === "primary" &&
-          "bg-primary text-primary-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.4),0_6px_18px_-6px_hsl(var(--primary)/0.7)] hover:brightness-110 active:scale-[0.98]",
-        variant === "secondary" && "bg-card-hover text-foreground hover:bg-border",
+          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18),0_0_0_1px_hsl(var(--primary)/0.5)] hover:brightness-110",
+        variant === "secondary" &&
+          "bg-foreground/[0.07] text-foreground hover:bg-foreground/[0.11]",
         variant === "outline" &&
-          "border border-border bg-transparent text-foreground hover:bg-card-hover",
+          "border border-border-strong bg-transparent text-foreground hover:bg-foreground/[0.05]",
         variant === "ghost" &&
-          "bg-transparent text-muted-foreground hover:bg-card-hover hover:text-foreground",
+          "bg-transparent text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
         className,
       )}
       {...props}
@@ -111,7 +121,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "-mb-px rounded-t-md border-b-2 border-transparent px-4 py-2.5 font-display text-[13px] font-semibold tracking-wide text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-card data-[state=active]:text-foreground",
+        "press -mb-px rounded-t-md border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors duration-200 ease-out-expo hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-black/30 data-[state=active]:text-foreground",
         className,
       )}
       {...props}
@@ -124,12 +134,12 @@ export function Switch({ className, ...props }: ComponentProps<typeof SwitchPrim
   return (
     <SwitchPrimitive.Root
       className={cn(
-        "relative h-6 w-11 shrink-0 rounded-full border border-border bg-background transition-colors data-[state=checked]:border-success data-[state=checked]:bg-success/90 disabled:opacity-40",
+        "relative h-6 w-11 shrink-0 rounded-full border border-border-strong bg-background transition-colors duration-200 ease-out-expo data-[state=checked]:border-foreground/80 data-[state=checked]:bg-foreground/85 disabled:opacity-40",
         className,
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb className="block size-5 translate-x-0.5 rounded-full bg-foreground shadow transition-transform data-[state=checked]:translate-x-[22px] data-[state=checked]:bg-background" />
+      <SwitchPrimitive.Thumb className="block size-5 translate-x-0.5 rounded-full bg-foreground shadow transition-transform duration-200 ease-out-expo data-[state=checked]:translate-x-[22px] data-[state=checked]:bg-background" />
     </SwitchPrimitive.Root>
   );
 }
@@ -160,20 +170,32 @@ export function StatusPill({
   );
 }
 
+/** Tinted chip: 12% fill + text + 1px inset ring of the same tone (status used sparingly). */
+const BADGE_TONE = {
+  neutral: "bg-foreground/[0.06] text-muted-foreground ring-foreground/10",
+  accent: "bg-primary/12 text-primary ring-primary/25",
+  success: "bg-success/12 text-success ring-success/25",
+  warning: "bg-warning/12 text-warning ring-warning/25",
+  danger: "bg-destructive/12 text-destructive ring-destructive/25",
+} as const;
+
 export function Badge({
   children,
   className,
   title,
+  tone,
 }: {
   children: ReactNode;
   className?: string;
   title?: string;
+  tone?: keyof typeof BADGE_TONE;
 }) {
   return (
     <span
       title={title}
       className={cn(
-        "rounded px-1.5 py-0.5 font-display text-[10px] font-semibold uppercase tracking-wider",
+        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
+        tone && ["ring-1 ring-inset", BADGE_TONE[tone]],
         className,
       )}
     >
@@ -182,14 +204,103 @@ export function Badge({
   );
 }
 
+/* ---------- Skeleton (shimmer; static under reduced motion) ---------- */
+export function Skeleton({ className }: { className?: string }) {
+  return <span aria-hidden className={cn("skeleton block h-4 w-full", className)} />;
+}
+
+/* ---------- Modal (native <dialog>: focus trap, Esc and inert page for free) ---------- */
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  closeLabel,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  closeLabel: string;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) {
+      d.removeAttribute("data-closing");
+      d.showModal();
+      return;
+    }
+    if (!open && d.open) {
+      // Exit is shorter than entry (200 vs 300 ms); close for real when it ends.
+      const done = () => {
+        d.removeAttribute("data-closing");
+        d.close();
+      };
+      if (reducedMotion()) return done();
+      d.setAttribute("data-closing", "");
+      const timer = window.setTimeout(done, 240);
+      return () => window.clearTimeout(timer);
+    }
+  }, [open]);
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the click only catches the backdrop; the keyboard closes with Esc (onCancel) or the X button
+    <dialog
+      ref={ref}
+      className="modal"
+      aria-labelledby={titleId}
+      onCancel={(e) => {
+        e.preventDefault(); // Esc: let the owner animate the close
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === ref.current) onClose(); // click on the backdrop
+      }}
+    >
+      <div className="flex flex-col gap-4 p-5">
+        <header className="flex items-start justify-between gap-4">
+          <h2 id={titleId} className="font-display text-[16px] font-semibold tracking-wide">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={closeLabel}
+            className="press -m-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </header>
+        <div className="text-[13px] leading-relaxed">{children}</div>
+        {footer ? <footer className="flex justify-end gap-2">{footer}</footer> : null}
+      </div>
+    </dialog>
+  );
+}
+
+/* ---------- Loading scope: every MetricRow inside shows a skeleton while loading ---------- */
+const Loading = createContext(false);
+export function LoadingScope({ loading, children }: { loading: boolean; children: ReactNode }) {
+  return <Loading.Provider value={loading}>{children}</Loading.Provider>;
+}
+
 /* ---------- Metric row (label · value · check) ---------- */
 export function MetricRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+  const loading = useContext(Loading);
   return (
     <div className="flex items-center justify-between py-2.5">
       <span className="text-muted-foreground">{label}</span>
       <span className="flex items-center gap-2">
-        <span className="num font-semibold">{value}</span>
-        {ok === undefined ? null : (
+        {loading ? (
+          <Skeleton className="h-3.5 w-24" />
+        ) : (
+          <span className="num font-semibold">{value}</span>
+        )}
+        {ok === undefined || loading ? null : (
           <span
             aria-hidden
             className={cn(
