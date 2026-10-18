@@ -34,6 +34,8 @@ pub struct Settings {
     pub game_exes: Vec<String>,
     /// Create a System Restore point before applying a preset (when elevated).
     pub restore_before_preset: bool,
+    /// App names (as in the installed list) the user protected from the uninstaller.
+    pub protected_apps: Vec<String>,
 }
 
 impl Default for Settings {
@@ -49,6 +51,7 @@ impl Default for Settings {
                 .collect(),
             game_ram_clean: false,
             game_exes: Vec::new(),
+            protected_apps: Vec::new(),
         }
     }
 }
@@ -72,6 +75,14 @@ pub fn sanitize(mut s: Settings) -> Settings {
                 && seen.insert(e.clone())
         })
         .take(MAX_EXES)
+        .collect();
+    let mut seen = std::collections::HashSet::new();
+    s.protected_apps = s
+        .protected_apps
+        .iter()
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty() && n.chars().count() <= 200 && !n.chars().any(char::is_control) && seen.insert(n.to_lowercase()))
+        .take(300)
         .collect();
     s.schedule = match s.schedule {
         Schedule::EveryHours { hours } => Schedule::EveryHours { hours: hours.clamp(1, 168) },
@@ -115,6 +126,7 @@ mod tests {
             schedule: Schedule::EveryHours { hours: 0 },
             routine_categories: vec!["temp_user".into(), "nope".into(), "temp_user".into(), "../x".into()],
             game_ram_clean: true,
+            protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
                 "C:\\evil\\game.exe".into(),
@@ -127,6 +139,7 @@ mod tests {
         assert_eq!(s.routine_categories, vec!["temp_user".to_string()]);
         assert_eq!(s.game_exes, vec!["cs2.exe".to_string(), "a.exe".to_string()]);
         assert_eq!(s.schedule, Schedule::EveryHours { hours: 1 });
+        assert_eq!(s.protected_apps, vec!["Discord".to_string()]);
         assert_eq!(
             sanitize(Settings { schedule: Schedule::Weekly { weekday: 9, hour: 99 }, ..Default::default() }).schedule,
             Schedule::Weekly { weekday: 6, hour: 23 }

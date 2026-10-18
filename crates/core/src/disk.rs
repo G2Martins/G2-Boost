@@ -469,9 +469,6 @@ fn remove(n: &mut Node, ids: &[u32]) -> Option<Node> {
 /// Send the selected nodes to the Recycle Bin. The user picked them in the treemap and confirmed
 /// in the app; Windows itself asks before anything too big for the Bin is deleted for good.
 pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome, RecycleError> {
-    use windows::Win32::UI::Shell::{FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
-    use windows::core::PCWSTR;
-
     // Drop entries nested inside another selected entry; deepest/last first keeps ids valid while removing.
     let mut sel: Vec<Vec<u32>> = selection.to_vec();
     sel.sort();
@@ -501,22 +498,7 @@ pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome
         paths.push(real);
     }
     let t0 = Instant::now();
-    // Double-NUL-terminated list.
-    let mut from: Vec<u16> = Vec::new();
-    for p in &paths {
-        use std::os::windows::ffi::OsStrExt;
-        from.extend(p.as_os_str().encode_wide());
-        from.push(0);
-    }
-    from.push(0);
-    let mut op = SHFILEOPSTRUCTW {
-        wFunc: FO_DELETE,
-        pFrom: PCWSTR(from.as_ptr()),
-        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMATION.0 | FOF_WANTNUKEWARNING.0) as u16,
-        ..Default::default()
-    };
-    // SAFETY: `from` outlives the call; the struct is fully initialised.
-    let rc = unsafe { SHFileOperationW(&mut op) };
+    let (rc, aborted) = shell_recycle(&paths);
     // Whatever is gone now was recycled (some items may be in use or the user cancelled).
     let mut out = RecycleOutcome { recycled: 0, bytes: 0, failed: 0 };
     let mut order: Vec<(usize, &Vec<u32>)> = sel.iter().enumerate().collect();
@@ -545,10 +527,37 @@ pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome
             }],
         });
     }
-    if rc != 0 && out.recycled == 0 && !op.fAnyOperationsAborted.as_bool() {
+    if rc != 0 && out.recycled == 0 && !aborted {
         return Err(RecycleError::Shell(rc));
     }
     Ok(out)
+}
+
+/// One shell operation sending `paths` (validated by the caller) to the Recycle Bin. Windows asks
+/// itself before deleting for good anything too big for the Bin. Returns (code, user aborted).
+pub(crate) fn shell_recycle(paths: &[PathBuf]) -> (i32, bool) {
+    use windows::Win32::UI::Shell::{FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
+    use windows::core::PCWSTR;
+    if paths.is_empty() {
+        return (0, false);
+    }
+    // Double-NUL-terminated list.
+    let mut from: Vec<u16> = Vec::new();
+    for p in paths {
+        use std::os::windows::ffi::OsStrExt;
+        from.extend(p.as_os_str().encode_wide());
+        from.push(0);
+    }
+    from.push(0);
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: PCWSTR(from.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMATION.0 | FOF_WANTNUKEWARNING.0) as u16,
+        ..Default::default()
+    };
+    // SAFETY: `from` outlives the call; the struct is fully initialised.
+    let rc = unsafe { SHFileOperationW(&mut op) };
+    (rc, op.fAnyOperationsAborted.as_bool())
 }
 
 /// Open Explorer with the item selected (shell API, no `explorer.exe` spawn).

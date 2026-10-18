@@ -383,6 +383,48 @@ export type ProcInfo = {
   protected: "system" | "security" | "service" | "self" | null;
 };
 
+export type AppEntry = {
+  id: string;
+  hive: "machine" | "machine32" | "user" | "store";
+  key: string;
+  name: string;
+  publisher: string;
+  version: string;
+  install_location: string | null;
+  exe: string | null;
+  size_bytes: number | null;
+  install_date: string | null;
+  uninstall: string;
+  msi: boolean;
+  needs_admin: boolean;
+  protected: "runtime" | "self" | "user" | "security" | null;
+};
+export type Leftover = {
+  id: number;
+  kind: "folder" | "file" | "shortcut" | "registry" | "service";
+  path: string;
+  bytes: number;
+  confidence: "low" | "medium" | "high";
+  reason:
+    | "install_folder"
+    | "package_data"
+    | "shortcut_target"
+    | "name_match"
+    | "publisher_folder"
+    | "crash_dump"
+    | "service_binary_gone";
+  needs_admin: boolean;
+};
+export type LeftoverOutcome = {
+  recycled: number;
+  bytes: number;
+  registry: number;
+  services: number;
+  failed: number;
+  needs_admin: number;
+};
+export type OrphanApp = { app: AppEntry; count: number; bytes: number };
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -480,6 +522,18 @@ export const backend = {
   powerWrite: (guid: string, id: PowerSettingId, ac: number | null, dc: number | null) =>
     callOrThrow<PowerSetting>("power_write", { guid, id, ac, dc }),
   procsList: () => call<ProcInfo[]>("procs_list"),
+  appsList: () => call<AppEntry[]>("apps_list"),
+  appsOrphans: () => call<OrphanApp[]>("apps_orphans"),
+  appsLeftovers: (id: string) => call<Leftover[]>("apps_leftovers", { id }),
+  appsConfirm: (ids: number[]) => callOrThrow<ConfirmToken>("apps_confirm", { ids }),
+  appsRemove: (token: number, ids: number[]) =>
+    callOrThrow<LeftoverOutcome>("apps_remove", { token, ids }),
+  appsUninstall: (id: string) => callOrThrow<void>("apps_uninstall", { id }),
+  appsInstalled: async (id: string) => (await call<boolean>("apps_installed", { id })) ?? false,
+  appsResolve: async (path: string) =>
+    (await call<string | null>("apps_resolve", { path })) ?? null,
+  appsProtect: (id: string, protect: boolean) =>
+    callOrThrow<Settings>("apps_protect", { id, protect }),
   procsEnd: (pid: number, created: string) => callOrThrow<void>("procs_end", { pid, created }),
   procsReveal: (pid: number, created: string) =>
     callOrThrow<void>("procs_reveal", { pid, created }),

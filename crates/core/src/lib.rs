@@ -5,6 +5,7 @@
 //! `cmd`/`powershell`/`reg`/`net`/`sc` spawning anywhere in this crate.
 
 pub mod advisor;
+pub mod apps;
 pub mod boost;
 pub mod cleanup;
 pub mod context;

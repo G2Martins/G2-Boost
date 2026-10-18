@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, WIN32_ERROR};
 use windows::Win32::System::Registry::{
-    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_BINARY, REG_DWORD, REG_EXPAND_SZ,
-    REG_OPTION_NON_VOLATILE, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegCreateKeyExW, RegDeleteValueW,
-    RegEnumKeyExW, RegEnumValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+    HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, KEY_WRITE, REG_BINARY, REG_DWORD,
+    REG_EXPAND_SZ, REG_OPTION_NON_VOLATILE, REG_SAM_FLAGS, REG_SZ, REG_VALUE_TYPE, RegCloseKey, RegCreateKeyExW,
+    RegDeleteTreeW, RegDeleteValueW, RegEnumKeyExW, RegEnumValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -227,6 +227,80 @@ pub fn value_names(root: Root, path: &str) -> Result<Vec<String>, RegError> {
     Ok(out)
 }
 
+/* ---------------- whole trees (uninstall leftovers) ---------------- */
+
+/// One value with its raw type and bytes (any type round-trips, not only the tweak types).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TreeValue {
+    pub name: String,
+    pub kind: u32,
+    pub data: Vec<u8>,
+}
+
+/// A key's values and subkeys, recursively — the backup written before a tree is deleted.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Tree {
+    pub values: Vec<TreeValue>,
+    pub keys: Vec<(String, Tree)>,
+}
+
+pub fn export_tree(root: Root, path: &str) -> Result<Tree, RegError> {
+    export_depth(root, path, 0)
+}
+
+fn export_depth(root: Root, path: &str, depth: u32) -> Result<Tree, RegError> {
+    if depth > 32 {
+        return Err(RegError::Win32(1010)); // ERROR_BADKEY: absurdly deep, refuse to back up
+    }
+    let Some(key) = open(root, path, KEY_READ)? else {
+        return Ok(Tree::default());
+    };
+    let mut values = Vec::new();
+    let mut name = vec![0u16; 16_384];
+    let mut data = vec![0u8; 4096];
+    let mut i = 0u32;
+    loop {
+        let mut nlen = name.len() as u32;
+        let mut dlen = data.len() as u32;
+        let mut ty = 0u32;
+        // SAFETY: name/data buffers of the sizes passed; the call updates both lengths.
+        let e = unsafe {
+            RegEnumValueW(key.0, i, Some(PWSTR(name.as_mut_ptr())), &mut nlen, None, Some(&mut ty), Some(data.as_mut_ptr()), Some(&mut dlen))
+        };
+        if e == WIN32_ERROR(ERROR_NO_MORE_ITEMS) {
+            break;
+        }
+        if e == WIN32_ERROR(234) {
+            data.resize(dlen as usize + 2, 0); // ERROR_MORE_DATA: retry the same index
+            continue;
+        }
+        check(e)?;
+        values.push(TreeValue { name: String::from_utf16_lossy(&name[..nlen as usize]), kind: ty, data: data[..dlen as usize].to_vec() });
+        i += 1;
+    }
+    let mut keys = Vec::new();
+    for k in subkeys(root, path)? {
+        let t = export_depth(root, &format!(r"{path}\{k}"), depth + 1)?;
+        keys.push((k, t));
+    }
+    Ok(Tree { values, keys })
+}
+
+/// Delete `path` with everything below it. Already gone = Ok.
+pub fn delete_tree(root: Root, path: &str) -> Result<(), RegError> {
+    let (parent, leaf) = path.rsplit_once('\\').ok_or(RegError::Win32(87))?;
+    let Some(key) = open(root, parent, REG_SAM_FLAGS(KEY_READ.0 | KEY_WRITE.0 | 0x0001_0000))? else {
+        return Ok(());
+    };
+    let w = wide(leaf);
+    // SAFETY: parent opened with DELETE + read/write; leaf is a NUL-terminated name.
+    let e = unsafe { RegDeleteTreeW(key.0, PCWSTR(w.as_ptr())) };
+    if e == ERROR_FILE_NOT_FOUND {
+        return Ok(());
+    }
+    check(e)
+}
+
 /* ---------------- backups ---------------- */
 
 /// One original value captured before a tweak changed it. `path` is a registry
@@ -315,6 +389,24 @@ pub(crate) mod tests {
         write(Root::Hkcu, r"Software\G2 Boost\Test\missing", "x", &Value::Absent).unwrap();
         assert_eq!(read(Root::Hkcu, r"Software\G2 Boost\Test\missing", "x").unwrap(), Value::Absent);
         assert!(subkeys(Root::Hkcu, r"Software\G2 Boost\Test").unwrap().iter().any(|k| k == "registry"));
+    }
+
+    /// Whole-tree backup then delete (uninstall leftovers), on a throwaway HKCU key.
+    #[test]
+    fn tree_export_then_delete() {
+        let base = r"Software\G2 Boost\Test\tree";
+        write(Root::Hkcu, &format!(r"{base}\sub"), "s", &Value::Str("x".into())).unwrap();
+        write(Root::Hkcu, base, "d", &Value::Dword(7)).unwrap();
+        let t = export_tree(Root::Hkcu, base).unwrap();
+        assert_eq!(t.values.len(), 1);
+        assert_eq!((t.values[0].name.as_str(), t.values[0].kind, t.values[0].data.as_slice()), ("d", 4, &7u32.to_le_bytes()[..]));
+        assert_eq!(t.keys.len(), 1);
+        assert_eq!(t.keys[0].0, "sub");
+        delete_tree(Root::Hkcu, base).unwrap();
+        assert_eq!(read(Root::Hkcu, base, "d").unwrap(), Value::Absent);
+        assert!(subkeys(Root::Hkcu, base).unwrap().is_empty());
+        delete_tree(Root::Hkcu, base).unwrap(); // already gone = Ok
+        assert!(delete_tree(Root::Hkcu, "NoBackslash").is_err());
     }
 
     #[test]

@@ -4,6 +4,7 @@ import {
   HardDrive,
   LayoutDashboard,
   type LucideIcon,
+  PackageX,
   Radar,
   Settings,
   ShieldCheck,
@@ -14,12 +15,21 @@ import type { ReactNode } from "react";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export type Route = "dashboard" | "disk" | "cleanup" | "network" | "boost" | "ai" | "settings";
+export type Route =
+  | "dashboard"
+  | "disk"
+  | "cleanup"
+  | "apps"
+  | "network"
+  | "boost"
+  | "ai"
+  | "settings";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
   { route: "disk", icon: HardDrive, label: "nav.disk" },
   { route: "cleanup", icon: Sparkles, label: "nav.cleanup" },
+  { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
   { route: "ai", icon: Bot, label: "nav.ai" },

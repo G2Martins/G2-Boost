@@ -1,11 +1,13 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useState } from "react";
 import { AppShell, type Route } from "@/components/shell/app-shell";
 import { TooltipProvider } from "@/components/ui/primitives";
-import { backend } from "@/lib/backend";
+import { backend, inTauri } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider } from "@/lib/i18n";
-import { onNavigate } from "@/lib/nav";
+import { emitDrop, onNavigate } from "@/lib/nav";
 import { AiPage } from "@/pages/ai";
+import { AppsPage } from "@/pages/apps";
 import { BoostPage } from "@/pages/boost";
 import { CleanupPage } from "@/pages/cleanup";
 import { DashboardPage } from "@/pages/dashboard";
@@ -17,6 +19,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   dashboard: DashboardPage,
   disk: DiskPage,
   cleanup: CleanupPage,
+  apps: AppsPage,
   network: NetworkPage,
   boost: BoostPage,
   ai: AiPage,
@@ -55,6 +58,20 @@ export default function App() {
       setReady(true);
     });
     return onNavigate(setRoute);
+  }, []);
+  useEffect(() => {
+    if (!inTauri) return;
+    // An .exe/.lnk dropped anywhere on the window → the uninstaller finds its app.
+    const off = getCurrentWebview().onDragDropEvent((e) => {
+      if (e.payload.type !== "drop") return;
+      const path = e.payload.paths[0];
+      if (!path) return;
+      emitDrop(path);
+      setRoute("apps");
+    });
+    return () => {
+      void off.then((f) => f());
+    };
   }, []);
   const Page = PAGES[route];
   return (

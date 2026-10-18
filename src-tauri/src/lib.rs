@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, context, dns, firmware, power, procs, secrets, startup};
+use g2boost_core::{advisor, apps, context, dns, firmware, power, procs, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -28,7 +28,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "network", "boost", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "boost", "ai", "settings"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -884,6 +884,153 @@ async fn power_write(guid: String, id: String, ac: Option<u32>, dc: Option<u32>)
         .map_err(|e| e.to_string())?
 }
 
+/* ---------------- uninstaller (apps + leftovers) ---------------- */
+
+/// The installed list, the orphan sweep and the leftovers waiting for confirmation. The UI only
+/// ever sends ids back; every app and path it acts on comes from here.
+#[derive(Default)]
+struct AppsState {
+    apps: Mutex<Vec<apps::App>>,
+    orphans: Mutex<Vec<apps::App>>,
+    pending: Mutex<Option<apps::Pending>>,
+}
+
+impl AppsState {
+    /// Installed list, then the orphan sweep, then the app whose leftovers are pending (it may
+    /// have just been uninstalled and dropped from a refreshed list).
+    fn find(&self, id: &str) -> Option<apps::App> {
+        let hit = self.apps.lock().unwrap().iter().find(|a| a.id == id).cloned();
+        hit.or_else(|| self.orphans.lock().unwrap().iter().find(|a| a.id == id).cloned())
+            .or_else(|| self.pending.lock().unwrap().as_ref().filter(|p| p.app.id == id).map(|p| p.app.clone()))
+    }
+}
+
+#[tauri::command]
+async fn apps_list(state: State<'_, AppsState>, r: State<'_, Routines>) -> Result<Vec<apps::App>, String> {
+    let protected = r.settings.lock().unwrap().protected_apps.clone();
+    let list = tauri::async_runtime::spawn_blocking(move || {
+        let l = apps::list(&protected);
+        apps::remember(&l);
+        l
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    *state.apps.lock().unwrap() = list.clone();
+    Ok(list)
+}
+
+#[derive(serde::Serialize)]
+struct OrphanView {
+    app: apps::App,
+    count: usize,
+    bytes: u64,
+}
+
+/// Apps seen before that are gone now, with what they left (only those that left something).
+#[tauri::command]
+async fn apps_orphans(state: State<'_, AppsState>) -> Result<Vec<OrphanView>, String> {
+    let current = state.apps.lock().unwrap().clone();
+    let views = tauri::async_runtime::spawn_blocking(move || {
+        apps::orphans(&current)
+            .into_iter()
+            .filter_map(|a| {
+                let l = apps::leftovers(&a);
+                (!l.is_empty()).then(|| OrphanView { count: l.len(), bytes: l.iter().map(|x| x.bytes).sum(), app: a })
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    *state.orphans.lock().unwrap() = views.iter().map(|v| v.app.clone()).collect();
+    Ok(views)
+}
+
+/// Leftovers of one app; kept server-side until the user confirms (or picks another app).
+#[tauri::command]
+async fn apps_leftovers(state: State<'_, AppsState>, id: String) -> Result<Vec<apps::Leftover>, String> {
+    let app = state.find(&id).ok_or("unknown_app")?;
+    let probe = app.clone();
+    let items = tauri::async_runtime::spawn_blocking(move || apps::leftovers(&probe)).await.map_err(|e| e.to_string())?;
+    *state.pending.lock().unwrap() = Some(apps::Pending { app, items: items.clone() });
+    Ok(items)
+}
+
+fn leftover_token_ids(app_id: &str, ids: &[u32]) -> Vec<String> {
+    let mut v: Vec<String> = ids.iter().map(|i| format!("leftover:{app_id}:{i}")).collect();
+    v.sort();
+    v
+}
+
+/// Issued after the human confirms the leftover list in the UI.
+#[tauri::command]
+fn apps_confirm(state: State<'_, AppsState>, tokens: State<'_, TokenStore>, ids: Vec<u32>) -> Result<ConfirmToken, String> {
+    let pending = state.pending.lock().unwrap();
+    let p = pending.as_ref().ok_or("unknown_app")?;
+    if ids.is_empty() || ids.iter().any(|i| !p.items.iter().any(|l| l.id == *i)) {
+        return Err("unknown_item".into());
+    }
+    Ok(tokens.issue(leftover_token_ids(&p.app.id, &ids)))
+}
+
+#[tauri::command]
+async fn apps_remove(state: State<'_, AppsState>, tokens: State<'_, TokenStore>, token: u64, ids: Vec<u32>) -> Result<apps::RemoveOutcome, String> {
+    let (app, items) = {
+        let pending = state.pending.lock().unwrap();
+        let p = pending.as_ref().ok_or("unknown_app")?;
+        if !tokens.consume(token, &leftover_token_ids(&p.app.id, &ids)) {
+            return Err("bad_token".into());
+        }
+        (p.app.clone(), apps::pick(p, &ids))
+    };
+    let out = tauri::async_runtime::spawn_blocking(move || {
+        let out = apps::remove(&app, &items)?;
+        if apps::leftovers(&app).is_empty() {
+            apps::forget(&app.id); // nothing left: drop it from the orphan sweep
+        }
+        Ok::<_, apps::AppsError>(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    *state.pending.lock().unwrap() = None;
+    Ok(out)
+}
+
+/// Start the app's own uninstaller (validated in the core; visible; its UAC if any).
+#[tauri::command]
+async fn apps_uninstall(state: State<'_, AppsState>, id: String) -> Result<(), String> {
+    let app = state.apps.lock().unwrap().iter().find(|a| a.id == id).cloned().ok_or("unknown_app")?;
+    tauri::async_runtime::spawn_blocking(move || apps::uninstall(&app).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn apps_installed(state: State<'_, AppsState>, id: String) -> bool {
+    state.find(&id).is_some_and(|a| apps::installed(&a))
+}
+
+/// A dropped `.exe`/`.lnk` → the id of the app it belongs to.
+#[tauri::command]
+async fn apps_resolve(state: State<'_, AppsState>, path: String) -> Result<Option<String>, String> {
+    let list = state.apps.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || apps::resolve_drop(&path, &list)).await.map_err(|e| e.to_string())
+}
+
+/// Add/remove an installed app (by id) to the user's protected list.
+#[tauri::command]
+fn apps_protect(state: State<'_, AppsState>, r: State<'_, Routines>, id: String, protect: bool) -> Result<Settings, String> {
+    let name = state.apps.lock().unwrap().iter().find(|a| a.id == id).map(|a| a.name.clone()).ok_or("unknown_app")?;
+    let mut s = r.settings.lock().unwrap().clone();
+    s.protected_apps.retain(|n| !n.eq_ignore_ascii_case(&name));
+    if protect {
+        s.protected_apps.push(name);
+    }
+    let saved = settings::save(&s).map_err(|e| e.to_string())?;
+    *r.settings.lock().unwrap() = saved.clone();
+    Ok(saved)
+}
+
 /* ---------------- task manager ---------------- */
 
 #[derive(Default)]
@@ -949,6 +1096,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .manage(DiskState::default())
         .manage(ProcSampler::default())
+        .manage(AppsState::default())
         .manage(TokenStore::default())
         .manage(Dashboard::default())
         .manage(Routines {
@@ -1063,7 +1211,16 @@ pub fn run() {
             power_write,
             procs_list,
             procs_end,
-            procs_reveal
+            procs_reveal,
+            apps_list,
+            apps_orphans,
+            apps_leftovers,
+            apps_confirm,
+            apps_remove,
+            apps_uninstall,
+            apps_installed,
+            apps_resolve,
+            apps_protect
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

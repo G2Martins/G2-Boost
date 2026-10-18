@@ -249,7 +249,7 @@ pub struct Tally {
 }
 
 /// Sum files under `dir` (recursive), never crossing reparse points.
-fn measure_dir(dir: &Path, t: &mut Tally) {
+pub(crate) fn measure_dir(dir: &Path, t: &mut Tally) {
     let Ok(rd) = fs::read_dir(dir) else {
         return;
     };
@@ -438,7 +438,10 @@ impl TokenStore {
     pub fn issue(&self, ids: Vec<String>) -> ConfirmToken {
         let mut h = std::collections::hash_map::RandomState::new().build_hasher();
         h.write_u128(Instant::now().elapsed().as_nanos() ^ (ids.len() as u128));
-        let token = ConfirmToken { token: h.finish() | 1, ids, issued: Instant::now() };
+        // 53 bits: the token round-trips through JavaScript, whose numbers are exact only up to
+        // 2^53 (a 64-bit value came back rounded and never matched). Still unguessable for a
+        // one-shot, 2-minute token bound to the exact ids.
+        let token = ConfirmToken { token: (h.finish() & ((1u64 << 53) - 1)) | 1, ids, issued: Instant::now() };
         let mut guard = self.tokens.lock().unwrap();
         guard.retain(|t| t.issued.elapsed() < TOKEN_TTL);
         guard.push(token.clone());
@@ -742,6 +745,11 @@ pub(crate) mod tests {
         assert!(!store.consume(t.token ^ 1, &ids), "wrong token");
         assert!(store.consume(t.token, &ids));
         assert!(!store.consume(t.token, &ids), "already used");
+        for _ in 0..64 {
+            let t = store.issue(vec!["x".into()]);
+            assert!(t.token < (1u64 << 53), "exact as a JS number");
+            assert_eq!(t.token as f64 as u64, t.token, "survives the f64 round trip");
+        }
     }
 
     #[test]

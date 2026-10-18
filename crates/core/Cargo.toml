@@ -54,4 +54,7 @@ features = [
   "Win32_Graphics_Gdi",
   "Win32_Security_Credentials",
   "Win32_Networking_WinSock",
+  "ApplicationModel",
+  "Management_Deployment",
+  "Foundation_Collections",
 ]

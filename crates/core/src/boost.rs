@@ -29,7 +29,7 @@ use windows::Win32::System::Services::{
     SC_MANAGER_CONNECT, SC_STATUS_PROCESS_INFO, SERVICE_AUTO_START, SERVICE_CHANGE_CONFIG,
     SERVICE_CONTROL_STOP, SERVICE_DEMAND_START, SERVICE_DISABLED, SERVICE_ERROR, SERVICE_NO_CHANGE,
     SERVICE_QUERY_CONFIG, SERVICE_QUERY_STATUS, SERVICE_RUNNING, SERVICE_START, SERVICE_START_TYPE,
-    SERVICE_STATUS, SERVICE_STATUS_PROCESS, SERVICE_STOP, StartServiceW,
+    SERVICE_STATUS, SERVICE_STATUS_PROCESS, SERVICE_STOP, StartServiceW, DeleteService,
 };
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::UI::Shell::{SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, ShellExecuteExW};
@@ -883,6 +883,34 @@ pub fn svc_query(name: &str) -> Result<Option<(u32, bool)>, BoostError> {
     // SAFETY: filled by the call above.
     let state = unsafe { std::ptr::read_unaligned(status.as_ptr().cast::<SERVICE_STATUS_PROCESS>()).dwCurrentState };
     Ok(Some((start, state == SERVICE_RUNNING)))
+}
+
+/// Delete a leftover service whose program no longer exists (admin). Re-checked here: a service
+/// whose binary is still on disk is never deleted.
+pub(crate) fn delete_orphan_service(name: &str) -> Result<(), BoostError> {
+    const DELETE: u32 = 0x0001_0000;
+    let scm = open_scm()?;
+    let Some(h) = open_svc(&scm, name, SERVICE_QUERY_CONFIG | SERVICE_STOP | DELETE)? else {
+        return Ok(());
+    };
+    let mut needed = 0u32;
+    // SAFETY: size probe, then a buffer of `needed` bytes (8-byte aligned) for the config.
+    let _ = unsafe { QueryServiceConfigW(h.0, None, 0, &mut needed) };
+    let mut buf = vec![0u64; (needed as usize).div_ceil(8) + 1];
+    unsafe { QueryServiceConfigW(h.0, Some(buf.as_mut_ptr().cast::<QUERY_SERVICE_CONFIGW>()), needed, &mut needed) }
+        .map_err(map_win)?;
+    // SAFETY: filled by the call above; the string lives inside `buf`.
+    let image = unsafe { (*buf.as_ptr().cast::<QUERY_SERVICE_CONFIGW>()).lpBinaryPathName.to_string() }.unwrap_or_default();
+    let exe = crate::apps::service_exe(&image);
+    if exe.is_empty() || std::path::Path::new(&exe).exists() {
+        return Err(BoostError::Win32("service binary still present".into()));
+    }
+    let mut st = SERVICE_STATUS::default();
+    // SAFETY: valid handle; stopping a service whose program is gone usually fails — ignored.
+    unsafe {
+        let _ = ControlService(h.0, SERVICE_CONTROL_STOP, &mut st);
+        DeleteService(h.0).map_err(map_win)
+    }
 }
 
 fn svc_set_start(name: &str, start: u32) -> Result<(), BoostError> {
