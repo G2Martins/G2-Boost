@@ -57,6 +57,7 @@ features = [
   "ApplicationModel",
   "Win32_Graphics_Imaging",
   "Wdk_Graphics_Direct3D",
+  "Win32_System_EventLog",
   "Win32_System_Com_StructuredStorage",
   "Management_Deployment",
   "Foundation_Collections",

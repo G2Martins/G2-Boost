@@ -258,11 +258,6 @@ export const en = {
   "ai.action.startup": "Remove from startup: {name}",
   "ai.action.startup_off": "Turn off",
   "ai.action.startup_done": "No longer starts with Windows (turn it back on in PC Boost › Startup)",
-  "ai.mcp.title": "Use with Claude Desktop / Claude Code",
-  "ai.mcp.hint":
-    "MCP (Model Context Protocol): the Claude on your machine reads this PC's diagnostics straight from G2 Boost. Read-only: nothing is changed through it.",
-  "ai.mcp.body":
-    "G2 Boost itself becomes the MCP server with the mcp option. The tools only read (hardware, BIOS, sensors, startup, processes, tweaks, cleanup preview); applying anything is still your click here in the app.",
   "ai.action.applied": "Applied",
   "ai.action.open_cleanup": "Open Cleanup",
   "ai.error.empty":
@@ -271,6 +266,38 @@ export const en = {
     "The answer took too long (over 5 minutes) and was cancelled. Try again or ask something shorter.",
   "ai.error.refusal": "The provider declined to answer this question.",
   "ai.error.generic": "Failed: {error}",
+  "claude.title": "Connect to Claude",
+  "claude.hint":
+    "Through Claude Desktop, Cowork or Claude Code, usage counts against your plan (Pro or Max), with no per-token charge. The chat inside G2 Boost still uses an API key: Anthropic does not allow third-party apps to use the plan login.",
+  "claude.body":
+    "Links G2 Boost to the Claude on your computer. Claude can then read this PC (hardware, Windows errors, disk usage, apps, power and Luli's knowledge base) and investigate with you. Read-only: changing anything is still your click here.",
+  "claude.client.desktop": "Claude Desktop and Cowork",
+  "claude.client.code": "Claude Code",
+  "claude.state.on": "Connected",
+  "claude.state.off": "Not connected",
+  "claude.state.elsewhere": "Points to another install",
+  "claude.state.missing": "Not found on this PC",
+  "claude.connect": "Connect",
+  "claude.repoint": "Update path",
+  "claude.remove": "Remove",
+  "claude.confirm.connect": "Connect G2 Boost to {client}?",
+  "claude.confirm.remove": "Remove G2 Boost from {client}?",
+  "claude.confirm.body":
+    "Only the g2boost entry is added or removed; the rest of the file stays the same. A copy of the file goes to G2 Boost's claude-backups folder first.",
+  "claude.confirm.after.desktop":
+    "Afterwards, quit Claude Desktop from the tray (Quit) and open it again.",
+  "claude.confirm.after.code":
+    "Applies to new Claude Code sessions. If one is open now, close it first so it does not rewrite the file.",
+  "claude.done.desktop": "Done. Quit and reopen Claude Desktop to see G2 Boost.",
+  "claude.done.code": "Done. Start a new Claude Code session.",
+  "claude.removed": "Removed.",
+  "claude.missing": "This Claude app was not found on this PC.",
+  "claude.error.unreadable":
+    "The config file is not in a format I understand, so I left it alone. Check the file or use the manual setup.",
+  "claude.try":
+    'Then ask Claude: "Use G2 Boost to investigate my PC: Windows errors, disk and performance".',
+  "claude.manual": "Manual setup",
+  "claude.copy": "Copy",
   "ai.quick.errors": "Is there any Windows error or problem I should fix?",
   "ai.thinking.web": "Analyzing (may search the web)…",
   "ai.knowledge":

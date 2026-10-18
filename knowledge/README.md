@@ -16,3 +16,5 @@ Tudo nesta pasta (menos este README) entra no prompt da Luli, a assistente do G2
 ## Como é carregada
 
 `src/lib/knowledge.ts` junta os `.md` em ordem de nome (Vite `import.meta.glob`, embutido no build) e o prompt os coloca em `<knowledge>`. Arquivos começam com número para fixar a ordem.
+
+O MCP (`G2 Boost.exe --mcp`) serve os mesmos arquivos pela tool `get_knowledge`, para o Claude Desktop, Cowork e Claude Code. Arquivo novo aqui precisa entrar na lista `KNOWLEDGE` de `crates/mcp/src/lib.rs` (um teste falha se esquecer).

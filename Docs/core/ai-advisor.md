@@ -93,9 +93,28 @@ Histórico: Claude guarda o histórico nativo e append-only (o turno do assisten
 
 ## 5. MCP local (`crates/mcp` como biblioteca; servido por `G2 Boost.exe --mcp`)
 
-`rmcp` 3.5 (SDK oficial Rust), transporte stdio, **13 tools só de leitura**: `get_pc_context` (comece aqui), `get_hardware_profile`, `get_firmware`, `get_live_metrics`, `get_sensors`, `get_startup_items`, `get_top_processes`, `get_advisor_report`, `get_tweaks`, `get_cleanup_preview`, `get_cleanup_history`, `get_winsat`, `get_steam_games`. Instruções do servidor = mesmas regras de segurança e temperatura do playbook (sem comandos, sem desligar proteções, preferir reduzir calor/carga, FPS só com benchmark citado). Sem dependência C nova.
+`rmcp` 3.5 (SDK oficial Rust), transporte stdio, **18 tools só de leitura**: `get_pc_context` (comece aqui), `get_hardware_profile`, `get_firmware`, `get_live_metrics`, `get_sensors`, `get_startup_items`, `get_top_processes`, `get_advisor_report`, `get_tweaks`, `get_cleanup_preview`, `get_cleanup_history`, `get_winsat`, `get_steam_games` e, desde a Fase 19 (2026-10-18):
 
-**Um binário só:** o app, quando iniciado com `--mcp`, roda `g2boost_mcp::serve()` no runtime do Tauri e não abre janela (exe GUI recebe os pipes do cliente normalmente). Evita sidecar (que exigiria o binário pré-compilado para `cargo test`/clippy e uma segunda assinatura). `g2boost-mcp.exe` continua existindo para desenvolvimento. A página Assistente IA mostra o comando com o caminho real do exe.
+| Tool | O que faz |
+|---|---|
+| `get_knowledge(topic?)` | A mesma base `knowledge/*.md` da Luli (`include_str!`; teste garante que todo arquivo da pasta está servido). Sem tópico = lista. |
+| `get_windows_errors(days?)` | `winevents::summary`: System + Application, níveis crítico/erro (+ Display 4101 de aviso), até 30 dias, agrupado por origem + id, contagem, mais recente, `hint` (`hardware_whea`, `unexpected_shutdown`, `bugcheck`, `disk`, `gpu_driver_timeout`, `service_failed`, `driver_load_failed`, `app_crash`, `app_hang`, `restore_points_lost`, `dcom_noise`) e a mensagem mais nova em uma linha (300 chars) com caminho do perfil, nome do PC e `\usuário` trocados. Nome de usuário solto **não** é trocado de propósito (conta "Windows" estragaria "Windows Update"). API `wevtapi` (`EvtQuery`/`EvtRender`/`EvtFormatMessage`), sem `wevtutil`, sem admin. |
+| `get_disk_usage(path?, max_seconds?)` | Varredura com prazo (5 a 110 s, padrão 40; parcial avisado), 2 níveis de pastas (25 por nível), arquivos > 100 MB, essenciais explicados. Pasta do perfil sob `Users` vira `%USERNAME%`; caminhos redigidos. UNC/relativo recusados pelo `disk::scan`. |
+| `get_installed_apps` | Lista de Configurações › Apps (desktop + Store) com tamanho, data e proteção. |
+| `get_power_plans` | Planos (nome, ativo, nativo), bateria e os ajustes principais do plano ativo. |
+
+O pacote de contexto (app e `get_pc_context`) ganhou `windows_errors`: os 12 grupos mais frequentes dos últimos 7 dias, sem o ruído DCOM.
+
+Instruções do servidor: ler `get_knowledge` antes de aconselhar; para investigar o PC inteiro combinar `get_pc_context` + `get_windows_errors` + `get_disk_usage` e relatar problemas mesmo sem botão no app (causa + caminho pelo Windows ou site do fabricante); mesmas regras de segurança e temperatura do playbook. Sem dependência C nova (`preserve_order` do serde_json puxa só `indexmap`).
+
+### 5.1 Conectar ao Claude (`claude_connect.rs`, card na página Luli)
+
+- **Claude Desktop (inclui Cowork):** `%APPDATA%\Claude\claude_desktop_config.json` e, na instalação da Microsoft Store/MSIX, `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json` (caminho não documentado oficialmente; relatado em issues e confirmado na máquina do dono). Entrada `{"command": "<exe>", "args": ["--mcp"]}`; arquivo criado se a pasta do app existe. Precisa sair do Desktop pela bandeja e abrir de novo. Se o Cowork usa servidores locais desse arquivo não está documentado: o card diz "Claude Desktop e Cowork" e a orientação é testar.
+- **Claude Code:** `mcpServers` no topo de `%USERPROFILE%\.claude.json` (escopo usuário), entrada no formato do `claude mcp add-json` (`type: stdio`). A Anthropic documenta só o CLI; editar o arquivo funciona, mas uma sessão aberta pode regravá-lo, então a confirmação pede para fechar antes. O comando `claude mcp add --scope user` fica em "Configurar à mão".
+- **Segurança:** arquivo alheio = entrada hostil. Parse estrito (objeto JSON; BOM e arquivo vazio aceitos), `mcpServers` de outro tipo ou JSON inválido = recusa sem tocar no arquivo (`unreadable_config`), symlink recusado, limite de 16 MB, só a chave `g2boost` muda, ordem preservada, backup em `%LOCALAPPDATA%\G2 Boost\claude-backups` antes de cada escrita, escrita atômica (temp + rename). Cliente vindo da UI é enum (`desktop`/`code`); o comando gravado é sempre o próprio exe (`current_exe`). Testes em sandbox: preserva outras chaves e ordem, idempotente, remover tira só a nossa, arquivos hostis intactos.
+- **Plano Max:** pelo Desktop/Cowork/Code o uso conta no limite do plano, sem cobrança por token. O chat dentro do app continua BYOK: os termos da Anthropic proíbem app de terceiro oferecer login do Claude.ai ou rotear pedidos pelas credenciais Free/Pro/Max ([legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)).
+
+**Um binário só:** o app, quando iniciado com `--mcp`, roda `g2boost_mcp::serve()` no runtime do Tauri e não abre janela (exe GUI recebe os pipes do cliente normalmente). Evita sidecar (que exigiria o binário pré-compilado para `cargo test`/clippy e uma segunda assinatura). `g2boost-mcp.exe` continua existindo para desenvolvimento. A página Luli tem o card "Conectar ao Claude" (§5.1) e o comando manual com o caminho real do exe.
 
 Registro:
 

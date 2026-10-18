@@ -12,7 +12,7 @@ publish = false
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
 
 # No-admin toolchain (Docs/core/architecture.md §8): vswhom-sys would compile C++ with cl.exe.

@@ -92,6 +92,14 @@ pub fn startup_items() -> Vec<Value> {
         .collect()
 }
 
+/// The 12 most frequent Event Log error groups of the last 7 days (harmless DCOM noise left out).
+fn windows_errors() -> Value {
+    let mut s = crate::winevents::summary(7);
+    s.groups.retain(|g| g.hint != Some("dcom_noise"));
+    s.groups.truncate(12);
+    serde_json::to_value(s).unwrap_or(Value::Null)
+}
+
 pub fn build(sample: Option<Sample>) -> Value {
     build_with(&hardware::profile(), sample)
 }
@@ -135,6 +143,7 @@ pub fn build_with(profile: &Profile, sample: Option<Sample>) -> Value {
         "live_sample": sample,
         "cpu_temperature_c": env.cpu_temp_c,
         "thermal_limits_c": advisor::THERMAL,
+        "windows_errors": windows_errors(),
         "cpu_temperature_note": if env.cpu_temp_c.is_some() {
             "read from HWiNFO or LibreHardwareMonitor running on this PC"
         } else {

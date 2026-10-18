@@ -20,6 +20,10 @@ Muitos problemas não têm ação dentro do G2 Boost. Mesmo assim, ajude: expliq
 - **MEMORY_MANAGEMENT, PAGE_FAULT_IN_NONPAGED_AREA:** RAM ou XMP instável; rodar o Diagnóstico de Memória, testar sem XMP.
 - **IRQL_NOT_LESS_OR_EQUAL, DRIVER_IRQL_NOT_LESS_OR_EQUAL:** driver com defeito. O nome do driver no dump aponta o culpado (rede, áudio, antivírus de terceiros).
 - **Eventos de disco (disk 7, 153, 157) ou Ntfs 55:** disco ou cabo SATA com problema. Backup primeiro, depois verificar a saúde do disco.
+- **EventLog 6008:** o desligamento anterior foi inesperado; mesma leitura do Kernel-Power 41.
+- **Volsnap 36:** pontos de restauração apagados por falta de espaço reservado. Liberar espaço no disco do sistema e criar um ponto novo (Painel).
+- **DistributedCOM 10010, 10016 e parecidos (`dcom_noise`):** ruído comum do Windows, sem efeito em desempenho. Diga para ignorar.
+- **Service Control Manager 7000, 7009, 7031:** um serviço não iniciou ou parou. Importa só se for de algo que o usuário usa (driver de áudio, antivírus, launcher); serviço de app desinstalado pede limpeza das sobras em Desinstalar apps.
 - **Wi-Fi caindo:** driver do adaptador pelo site do fabricante, economia de energia do adaptador, rede de 5 GHz ou cabo.
 
 ## Atualizações e drivers

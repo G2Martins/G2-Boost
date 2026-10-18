@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, context, dns, firmware, power, procs, registry, secrets, startup};
+use g2boost_core::{advisor, apps, claude_connect, context, dns, firmware, power, procs, registry, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -420,6 +420,36 @@ struct Routines {
 #[tauri::command]
 fn settings_get(r: State<'_, Routines>) -> Settings {
     r.settings.lock().unwrap().clone()
+}
+
+fn this_exe() -> Result<std::path::PathBuf, String> {
+    std::env::current_exe().map_err(|e| e.to_string())
+}
+
+/// Claude Desktop / Claude Code configs found on this PC and whether G2 Boost is registered.
+#[tauri::command]
+async fn claude_targets() -> Result<Vec<claude_connect::Target>, String> {
+    let exe = this_exe()?;
+    tauri::async_runtime::spawn_blocking(move || claude_connect::targets(&exe)).await.map_err(|e| e.to_string())
+}
+
+/// Register `"<this exe>" --mcp` with one client (the UI confirms first; the file is backed up).
+#[tauri::command]
+async fn claude_connect(client: claude_connect::Client) -> Result<Vec<claude_connect::Target>, String> {
+    let exe = this_exe()?;
+    tauri::async_runtime::spawn_blocking(move || claude_connect::connect(client, &exe))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn claude_disconnect(client: claude_connect::Client) -> Result<Vec<claude_connect::Target>, String> {
+    let exe = this_exe()?;
+    tauri::async_runtime::spawn_blocking(move || claude_connect::disconnect(client, &exe))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
 }
 
 /// Settings come from the UI, get sanitized in the core, and only then replace the live copy.
@@ -1281,7 +1311,10 @@ pub fn run() {
             apps_protect,
             apps_undo_status,
             apps_undo,
-            apps_icon
+            apps_icon,
+            claude_targets,
+            claude_connect,
+            claude_disconnect
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

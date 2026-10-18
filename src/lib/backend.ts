@@ -5,6 +5,15 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 /** True inside the Tauri webview; false in a plain browser (`bun run dev`). */
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+export type ClaudeClient = "desktop" | "code";
+export type ClaudeTarget = {
+  client: ClaudeClient;
+  path: string;
+  exists: boolean;
+  connected: boolean;
+  points_here: boolean;
+};
+
 export type AppInfo = {
   version: string;
   core_version: string;
@@ -454,6 +463,11 @@ async function callOrThrow<T>(cmd: string, args?: Record<string, unknown>): Prom
 
 export const backend = {
   appInfo: () => call<AppInfo>("app_info"),
+  claudeTargets: () => call<ClaudeTarget[]>("claude_targets"),
+  claudeConnect: (client: ClaudeClient) =>
+    callOrThrow<ClaudeTarget[]>("claude_connect", { client }),
+  claudeDisconnect: (client: ClaudeClient) =>
+    callOrThrow<ClaudeTarget[]>("claude_disconnect", { client }),
   listDrives: () => call<DriveInfo[]>("list_drives"),
   memoryStatus: () => call<MemoryStatus>("memory_status"),
 

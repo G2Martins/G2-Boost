@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ClaudeConnectCard } from "@/components/claude-connect";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliMark } from "@/components/luli-card";
 import { ExternalLink, SafeMarkdown } from "@/components/safe-markdown";
@@ -230,7 +231,7 @@ export function AiPage() {
               <p className="mt-3 text-[11px] text-muted-foreground">{t("ai.knowledge")}</p>
             </Card>
 
-            <McpCard />
+            <ClaudeConnectCard style={rise(2)} />
           </div>
 
           {/* ---------------- conversation ---------------- */}
@@ -578,42 +579,5 @@ function AnswerExtras({ answer, latest }: { answer: Answer; latest: boolean }) {
         </div>
       ) : null}
     </>
-  );
-}
-
-/** How to plug this PC into Claude Desktop / Claude Code: the app binary serves MCP with `--mcp`. */
-function McpCard() {
-  const { t } = useI18n();
-  const [exe, setExe] = useState<string | null>(null);
-  useEffect(() => {
-    backend.appInfo().then((i) => setExe(i?.exe ?? null));
-  }, []);
-  const path = exe ?? "C:\\…\\G2 Boost.exe";
-  const cli = `claude mcp add g2boost -- "${path}" --mcp`;
-  const desktop = JSON.stringify(
-    { mcpServers: { g2boost: { command: path, args: ["--mcp"] } } },
-    null,
-    2,
-  );
-  return (
-    <Card className="animate-rise" style={rise(2)}>
-      <CardTitle help={t("ai.mcp.hint")}>
-        <Bot className="size-4" />
-        {t("ai.mcp.title")}
-      </CardTitle>
-      <p className="text-xs text-muted-foreground">{t("ai.mcp.body")}</p>
-      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Claude Code
-      </p>
-      <pre className="mt-1 overflow-x-auto rounded-md border border-border bg-background/70 p-2 font-mono text-[10px] text-foreground/90">
-        {cli}
-      </pre>
-      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Claude Desktop · claude_desktop_config.json
-      </p>
-      <pre className="mt-1 overflow-x-auto rounded-md border border-border bg-background/70 p-2 font-mono text-[10px] text-foreground/90">
-        {desktop}
-      </pre>
-    </Card>
   );
 }
