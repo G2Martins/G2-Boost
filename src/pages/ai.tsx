@@ -14,19 +14,20 @@ import {
   Trash2,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ClaudeConnectCard } from "@/components/claude-connect";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliMark } from "@/components/luli-card";
 import { LuliInstructionsCard, LuliMemoryCard, LuliSidebar } from "@/components/luli-sidebar";
-import { ExternalLink, SafeMarkdown } from "@/components/safe-markdown";
+import { LuliThinking, TypeText } from "@/components/luli-typing";
+import { ExternalLink } from "@/components/safe-markdown";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, HelpHint } from "@/components/ui/primitives";
 import { cleanupName, TWEAKS, tweakName } from "@/data/catalogs";
 import { type Answer, isTrustedSource, PROVIDERS } from "@/lib/ai";
 import { backend, inTauri, type StartupItem } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
-import { useLuli } from "@/lib/luli";
+import { type LuliMessage, useLuli } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -75,10 +76,44 @@ export function AiPage() {
   const showPanel = panel || !keys[provider];
   const title = luli.history.conversations.find((c) => c.id === luli.convId)?.title;
   const endRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  // The answer in progress is a row of the transcript, at the index the final answer takes, so
+  // the typewriter keeps its place when the streamed text becomes the saved answer.
+  const rows: LuliMessage[] = busy
+    ? [...messages, { role: "assistant", text: streaming }]
+    : messages;
+  // A new transcript (other conversation, new chat) remounts the rows: only answers born while
+  // Luli was answering type; reopened ones show at once.
+  const listKey = transcriptKey(messages[0]);
+  const live = useRef({ key: listKey, index: -1 });
+  if (live.current.key !== listKey) live.current = { key: listKey, index: -1 };
+  if (busy) live.current.index = messages.length;
 
   useEffect(() => {
     if (!context) void fetchContext();
   }, [context, fetchContext]);
+
+  // Follow the text while it is written, unless the user scrolled up to read.
+  useEffect(() => {
+    const list = listRef.current;
+    const content = contentRef.current;
+    if (!list || !content) return;
+    let atBottom = true;
+    const onScroll = () => {
+      atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+    };
+    const ro = new ResizeObserver(() => {
+      if (atBottom) list.scrollTop = list.scrollHeight;
+    });
+    list.addEventListener("scroll", onScroll, { passive: true });
+    ro.observe(content);
+    return () => {
+      list.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     // An empty chat keeps the page at the top (header and keys visible).
@@ -131,7 +166,12 @@ export function AiPage() {
 
           {/* ---------------- conversation ---------------- */}
           <Card
-            className="animate-rise flex min-h-140 flex-col lg:sticky lg:top-4 lg:h-[calc(100vh-13rem)] lg:self-start"
+            className={cn(
+              "animate-rise flex min-h-140 flex-col lg:h-[calc(100vh-13rem)] lg:self-start",
+              // Pinned only beside the settings column: below 2xl the settings sit under the chat
+              // and a pinned chat would cover them while scrolling.
+              "2xl:sticky 2xl:top-4",
+            )}
             style={rise(2)}
           >
             <CardTitle
@@ -155,72 +195,69 @@ export function AiPage() {
               </span>
             </CardTitle>
 
-            <div className="flex-1 space-y-4 overflow-y-auto pr-1">
-              {messages.length === 0 && !busy ? (
-                <div className="flex h-full flex-col items-start justify-center gap-3 py-10">
-                  <p className="font-display text-lg font-semibold">{t("ai.empty.title")}</p>
-                  <p className="max-w-xl text-sm text-muted-foreground">{t("ai.empty.body")}</p>
-                </div>
-              ) : null}
-              {messages.map((m, i) =>
-                m.role === "user" ? (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
-                  <div key={i} className="flex flex-col items-end gap-1">
-                    <p className="max-w-[80%] rounded-lg rounded-br-sm bg-card-hover px-3.5 py-2 text-sm">
-                      {m.text}
-                    </p>
-                    {m.sent ? (
-                      <span className="text-[10px] text-muted-foreground">
-                        {t("ai.page_data_sent")}
-                      </span>
-                    ) : null}
+            <div ref={listRef} className="flex-1 overflow-y-auto pr-1">
+              <div ref={contentRef} className="flex min-h-full flex-col space-y-4">
+                {messages.length === 0 && !busy ? (
+                  <div className="flex flex-1 flex-col items-start justify-center gap-3 py-10">
+                    <p className="font-display text-lg font-semibold">{t("ai.empty.title")}</p>
+                    <p className="max-w-xl text-sm text-muted-foreground">{t("ai.empty.body")}</p>
                   </div>
-                ) : (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
-                  <div key={i} className="border-l-2 border-primary/60 pl-4">
-                    {m.error ? (
-                      <p className="text-sm text-destructive">{m.error}</p>
+                ) : null}
+                <Fragment key={listKey}>
+                  {rows.map((m, i) =>
+                    m.role === "user" ? (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
+                      <div key={i} className="flex flex-col items-end gap-1">
+                        <p className="max-w-[80%] rounded-lg rounded-br-sm bg-card-hover px-3.5 py-2 text-sm">
+                          {m.text}
+                        </p>
+                        {m.sent ? (
+                          <span className="text-[10px] text-muted-foreground">
+                            {t("ai.page_data_sent")}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : (
-                      <SafeMarkdown text={m.text} />
-                    )}
-                    {m.answer ? (
-                      <AnswerExtras answer={m.answer} latest={i === messages.length - 1} />
-                    ) : null}
-                  </div>
-                ),
-              )}
-              {busy ? (
-                <div className="border-l-2 border-primary/60 pl-4">
-                  {streaming ? (
-                    <SafeMarkdown text={streaming} />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {web ? t("ai.thinking.web") : t("ai.thinking")}
-                    </p>
+                      // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
+                      <div key={i} className="border-l-2 border-primary/60 pl-4">
+                        {m.error ? (
+                          <p className="text-sm text-destructive">{m.error}</p>
+                        ) : !m.text && !m.answer ? (
+                          <LuliThinking web={web} />
+                        ) : (
+                          <TypeText
+                            text={m.text}
+                            live={i === live.current.index}
+                            pending={busy && i === rows.length - 1}
+                            after={
+                              m.answer ? (
+                                <AnswerExtras answer={m.answer} latest={i === rows.length - 1} />
+                              ) : null
+                            }
+                          />
+                        )}
+                      </div>
+                    ),
                   )}
-                  <span
-                    className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle"
-                    aria-hidden
-                  />
-                </div>
-              ) : null}
-              {askWeb ? (
-                <div className="animate-rise rounded-md border border-primary/35 bg-primary/5 p-3">
-                  <p className="flex items-center gap-2 text-sm">
-                    <Globe className="size-4 text-primary" />
-                    {t("ai.web.ask")}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button size="sm" variant="primary" onClick={() => luli.allowWeb("here")}>
-                      {t("ai.web.allow_here")}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => luli.allowWeb("always")}>
-                      {t("ai.web.allow_always")}
-                    </Button>
+                </Fragment>
+                {askWeb ? (
+                  <div className="animate-rise rounded-md border border-primary/35 bg-primary/5 p-3">
+                    <p className="flex items-center gap-2 text-sm">
+                      <Globe className="size-4 text-primary" />
+                      {t("ai.web.ask")}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="sm" variant="primary" onClick={() => luli.allowWeb("here")}>
+                        {t("ai.web.allow_here")}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => luli.allowWeb("always")}>
+                        {t("ai.web.allow_always")}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ) : null}
-              <div ref={endRef} />
+                ) : null}
+                <div ref={endRef} />
+              </div>
             </div>
 
             {messages.length === 0 ? (
@@ -446,6 +483,19 @@ export function AiPage() {
 }
 
 const PANEL_KEY = "g2boost.luli.settings";
+
+/** Stable id per transcript, from its first message object (appending keeps it). */
+const transcriptIds = new WeakMap<object, number>();
+let nextTranscript = 0;
+function transcriptKey(first: LuliMessage | undefined): string {
+  if (!first) return "empty";
+  let id = transcriptIds.get(first);
+  if (id === undefined) {
+    id = ++nextTranscript;
+    transcriptIds.set(first, id);
+  }
+  return `t${id}`;
+}
 
 function Chip({
   children,

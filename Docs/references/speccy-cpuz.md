@@ -1,6 +1,6 @@
 # CPU-Z 3.01 e Speccy 1.34 — análise estática (clean-room)
 
-**Última revisão:** 2026-10-18 (§4.1 energia/processos) · Método: inventário de arquivos, cabeçalhos PE (imports, version info, recursos), strings e eventos do System log; **nada executado, nada desmontado, nenhum driver gravado em disco**. Fontes: `C:\Program Files\CPUID\CPU-Z`, `C:\Program Files\Speccy`, prints do dono (2026-10-15). Feito por sub-agente; palpites marcados. O que extrair como *ideia* para o Meu PC está na seção 4.
+**Última revisão:** 2026-10-18 (§1.1 correções da segunda passada + zona ACPI medida; §4.1 energia/processos) · Método: inventário de arquivos, cabeçalhos PE (imports, version info, recursos), strings e eventos do System log; **nada executado, nada desmontado, nenhum driver gravado em disco**. Fontes: `C:\Program Files\CPUID\CPU-Z`, `C:\Program Files\Speccy`, prints do dono (2026-10-15). Feito por sub-agente; palpites marcados. O que extrair como *ideia* para o Meu PC está na seção 4.
 
 ## 1. O fato central: os dois usam driver de kernel
 
@@ -12,6 +12,16 @@
 Imports do driver: `MmMapIoSpace`, `HalGetBusDataByOffset`/`HalSetBusDataByOffset` (config space PCI), `READ/WRITE_PORT_*` (x86), `rdmsr` por instrução [palpite]. Ou seja: memória física, portas de I/O e MSR — a mesma classe de primitiva de BYOVD. Na máquina do dono HVCI + blocklist de drivers vulneráveis + Secure Boot estão ativos e os drivers carregaram (evento 7045, sem erro CodeIntegrity). Evidência no exe: `CreateServiceW`/`StartServiceA`/`DeleteService`, string `SeLoadDriverPrivilege`, mensagens "CPUID init driver error %u"; o readme do CPU-Z diz que `PCI=0` desliga chipset/SPD/sensores.
 
 **Decisão G2 Boost: sem driver.** Exigiria certificado EV + atestação WHCP, é o padrão que o Kaspersky flagra, e viola menor privilégio. HWiNFO/LibreHardwareMonitor não estão instalados aqui (integração opcional só quando existirem).
+
+### 1.1 Correções da segunda passada (2026-10-18, REA `inspect_pe_resources` + strings + busca de bytes; nada executado)
+
+- **Assinatura:** `Speccy64.exe`, `Speccy.exe` e `cpuidsdk.dll` são assinados por **Gen Digital Inc.** (dona atual da Piriform). Manifesto `asInvoker`: abre sem admin.
+- **Drivers em dois lugares:** `Speccy64.exe` RT_RCDATA 107..111 = `cpuz149` (x86/x64/ia64, assinado por CPUID S.A.R.L.U., EV, OriginalFilename `cpuz.sys`); `cpuidsdk.dll` RT_RCDATA 106..111 = `cpuz158` e `cpuz152`. Quem instala o serviço é a **DLL** (`CreateServiceW`, `OpenSCManagerA`, `StartServiceA`, `DeleteService`, `DeviceIoControl`, `SeLoadDriverPrivilege`); IOCTLs na família `0x9C40xxxx` (mesma do CPU-Z), sem mapear qual é MSR/PCI/memória.
+- **Temperatura da CPU = driver** (strings `CPU DTS`, `Package`, `SIO PECI`, rótulos de Super I/O ITE/Nuvoton/Fintek). Os MSRs não aparecem como imediato de código (vão como dado ao driver). AMD: bytes de `0x59800`/`0x59954` na DLL sugerem o caminho SMN do Tctl [palpite fraco]. GPU por NVAPI/ADL, disco por SMART. **Nenhum uso de WMI/ACPI térmico.** Sem admin o driver não carrega, então sem temperatura de CPU/placa [inferido, não executado].
+- **Sem licença de redistribuição** do `cpuz.sys` na pasta: reusar está fora (também é primitiva de BYOVD).
+- **Zona térmica ACPI medida nesta máquina (i5-10400, sem admin):** o contador PDH tem nome localizado (`\Informações de Zona Termal(*)\Temperatura`; em código usar `PdhAddEnglishCounterW` com `\Thermal Zone Information(*)\Temperature`). Valores **constantes** em leituras seguidas: `_TZ.TZ00` = 28 °C, `_TZ.TZ10` = 17 °C. São zonas falsas da placa, **inúteis como temperatura de CPU** aqui; `MSAcpi_ThermalZoneTemperature` exige admin e lê a mesma zona; `Win32_TemperatureProbe` é um sensor fictício sem leitura.
+- Notas completas fora do repo: `D:\dev\g2boost-experiments\speccy-rea\notes.md`.
+- **Opções para mostrar a temperatura do pacote** (decisão do dono pendente): (a) seguir com HWiNFO/LibreHardwareMonitor abertos (hoje, sem driver nosso); (b) **PawnIO** (driver assinado do namazso, usado pelo LibreHardwareMonitor desde 2025) como opt-in com admin: Intel MSR `0x1B1` + TjMax de `0x1A2`, AMD SMN; checar licença dos módulos e se redistribuímos o instalador; (c) zona ACPI só como último recurso e só se o valor variar. `cpuz.sys` e WinRing0 descartados.
 
 ## 2. Funcionalidade × mecanismo × o que fazemos
 

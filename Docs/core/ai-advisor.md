@@ -94,6 +94,13 @@ Histórico na sessão: Claude guarda o histórico nativo e append-only (o turno 
 - Layout: histórico | conversa | ajustes (provedor, contexto, personalização, memória, conectar ao Claude). A coluna de ajustes recolhe (`localStorage g2boost.luli.settings`, só conveniência) e nunca some sem chave salva.
 - Testes: `luli::tests::history_groups_and_memory_round_trip` (ids hostis, texto vazio, limite de mensagens, grupo apagado), `settings` (instruções sanitizadas), `tests/ai.test.ts` (memória/instruções no prompt e escapadas, `remember` limitado, resposta salva adulterada revalidada).
 
+### 4.3 Pensando e máquina de escrever (2026-10-18, pedido do dono)
+
+- **Pensando** (`src/components/luli-typing.tsx` `LuliThinking`): a estrela da Luli gira em trancos e pulsa, a frase brilha e muda com o tempo (lendo os dados, pensando ou pesquisando, conferindo, "ainda trabalhando, tento de novo sozinha" depois de 20 s) e um contador de segundos mostra que o app não travou.
+- **Máquina de escrever** (`TypeText`): só para a resposta que chega agora, com ou sem streaming; o ritmo acelera quando chega um pedaço grande (todo o texto sai em ~3 s). Ações, fontes e próximas perguntas aparecem quando a digitação termina. A resposta em andamento é uma linha da transcrição no mesmo índice da resposta final, então o texto não recomeça quando vira resposta salva. Conversas reabertas do histórico e `prefers-reduced-motion` mostram tudo de uma vez.
+- A conversa acompanha o texto (ResizeObserver) enquanto o usuário está no fim; se ele rolou para cima para ler, não puxa.
+- **Responsividade:** janela mínima 1100x700 (`tauri.conf.json`), todas as telas sem rolagem horizontal nesse tamanho (conferido em 2026-10-18). Abaixo de 2xl a coluna de ajustes vai para baixo da conversa e a conversa não fica fixa (fixa, ela cobria os ajustes ao rolar).
+
 ### Chaves e segurança
 - **BYOK**, chave no **Gerenciador de Credenciais do Windows** (`CredWriteW`, alvo `G2 Boost/ai/<provedor>`, protegido por DPAPI da conta). Nunca em `settings.json`/localStorage. Validação no core (provedor da allowlist; chave ASCII visível ≤ 512).
 - A chave vai para o webview **só no momento da pergunta** (`ai_key_get`) porque o SDK roda no TS. Camadas que limitam o estrago de um XSS hipotético: (1) React só renderiza texto — `SafeMarkdown` nunca injeta HTML do modelo; (2) CSP sem script remoto; (3) todo HTTP sai pelo `tauri-plugin-http` com **allowlist de hosts** nas capabilities (`api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` + os já existentes) — a chave não consegue ser enviada para outro host. Desde 2026-10-18 a allowlist é por **caminho** (`/v1/messages`, `/v1/responses`, `/v1beta/models/*`, `GetSDRConfig/v1/`), não `/*`.
