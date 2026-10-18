@@ -403,7 +403,7 @@ function TweakCard({
               className={cn(
                 "press rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors duration-200 ease-out-expo disabled:opacity-50",
                 state.level === lv
-                  ? "border-border-strong bg-foreground/[0.08] text-foreground"
+                  ? "border-border-strong bg-foreground/8 text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground",
               )}
             >

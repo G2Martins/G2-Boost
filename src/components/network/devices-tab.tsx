@@ -223,7 +223,7 @@ function DeviceCard({
       <div className="flex items-start gap-3">
         <span
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] text-muted-foreground",
+            "flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/6 text-muted-foreground",
             (d.kind === "router" || d.kind === "this_pc") && "bg-primary/12 text-primary",
           )}
           aria-hidden
@@ -267,7 +267,7 @@ function DeviceCard({
           {d.services.slice(0, 5).map((s) => (
             <span
               key={s}
-              className="rounded bg-foreground/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+              className="rounded bg-foreground/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
             >
               {s}
             </span>

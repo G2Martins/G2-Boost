@@ -163,7 +163,7 @@ export function ClaudeConnectCard({ style }: { style?: CSSProperties }) {
                   type="button"
                   onClick={() => copy(b.k, b.text)}
                   aria-label={t("claude.copy")}
-                  className="press ml-auto rounded p-1 hover:bg-foreground/[0.06] hover:text-foreground"
+                  className="press ml-auto rounded p-1 hover:bg-foreground/6 hover:text-foreground"
                 >
                   {copied === b.k ? (
                     <Check className="size-3.5 text-success" />

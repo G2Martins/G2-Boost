@@ -228,7 +228,7 @@ export function ConsolePage() {
               onClick={() => update(() => [])}
               disabled={list.length === 0}
               aria-label={t("console.clear")}
-              className="press rounded p-1 hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-40"
+              className="press rounded p-1 hover:bg-foreground/6 hover:text-foreground disabled:opacity-40"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -266,8 +266,8 @@ export function ConsolePage() {
                         inputRef.current?.focus();
                       }}
                       className={cn(
-                        "flex w-full items-baseline gap-3 rounded px-2 py-1.5 text-left hover:bg-foreground/[0.06]",
-                        i === 0 && "bg-foreground/[0.04]",
+                        "flex w-full items-baseline gap-3 rounded px-2 py-1.5 text-left hover:bg-foreground/6",
+                        i === 0 && "bg-foreground/4",
                       )}
                     >
                       <span className="font-mono text-[12px] text-foreground">{c.usage}</span>
@@ -303,7 +303,7 @@ export function ConsolePage() {
                 onClick={() => runLine(draft)}
                 disabled={!draft.trim()}
                 aria-label={t("console.run")}
-                className="press rounded p-1.5 text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-40"
+                className="press rounded p-1.5 text-muted-foreground hover:bg-foreground/6 hover:text-foreground disabled:opacity-40"
               >
                 <CornerDownLeft className="size-4" />
               </button>
@@ -474,7 +474,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="press rounded p-1 opacity-60 hover:bg-foreground/[0.06] hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
+      className="press rounded p-1 opacity-60 hover:bg-foreground/6 hover:text-foreground hover:opacity-100 focus-visible:opacity-100"
     >
       {children}
     </button>

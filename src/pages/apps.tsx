@@ -133,7 +133,7 @@ function AppIcon({ app, size = "size-8" }: { app: AppEntry; size?: string }) {
       aria-hidden
       className={cn(
         size,
-        "flex shrink-0 items-center justify-center rounded-md bg-foreground/[0.06] font-display text-[13px] font-semibold text-muted-foreground",
+        "flex shrink-0 items-center justify-center rounded-md bg-foreground/6 font-display text-[13px] font-semibold text-muted-foreground",
       )}
     >
       {app.name.slice(0, 1).toUpperCase()}
@@ -278,7 +278,7 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
               className={cn(
                 "press rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors duration-200 ease-out-expo",
                 sort === k
-                  ? "border-border-strong bg-foreground/[0.08] text-foreground"
+                  ? "border-border-strong bg-foreground/8 text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground",
               )}
             >
@@ -297,7 +297,7 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
           {apps === null && inTauri
             ? [0, 1, 2, 3, 4, 5].map((k) => <Skeleton key={k} className="my-2 h-12 w-full" />)
             : null}
-          <ul className="max-h-[640px] space-y-0.5 overflow-y-auto pr-1">
+          <ul className="max-h-160 space-y-0.5 overflow-y-auto pr-1">
             {rows.map((a) => (
               <li key={a.id}>
                 <button
@@ -306,7 +306,7 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
                   aria-pressed={a.id === selected}
                   className={cn(
                     "press flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors duration-200 ease-out-expo",
-                    a.id === selected ? "bg-foreground/[0.07]" : "hover:bg-foreground/[0.04]",
+                    a.id === selected ? "bg-foreground/7" : "hover:bg-foreground/4",
                   )}
                 >
                   <AppIcon app={a} />
@@ -537,9 +537,7 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
                   aria-pressed={selected?.app.id === o.app.id}
                   className={cn(
                     "press flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors duration-200 ease-out-expo",
-                    selected?.app.id === o.app.id
-                      ? "bg-foreground/[0.07]"
-                      : "hover:bg-foreground/[0.04]",
+                    selected?.app.id === o.app.id ? "bg-foreground/7" : "hover:bg-foreground/4",
                   )}
                 >
                   <span className="min-w-0 flex-1">
@@ -686,7 +684,7 @@ function LeftoversPanel({
                 checked={picked.has(x.id)}
                 onChange={() => toggle(x.id)}
                 aria-label={x.path}
-                className="mt-1 size-4 accent-[hsl(var(--primary))]"
+                className="mt-1 size-4 accent-primary"
               />
               <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">

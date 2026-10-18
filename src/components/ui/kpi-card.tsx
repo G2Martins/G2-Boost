@@ -55,7 +55,7 @@ export function KpiCard({
         {count === undefined ? (
           value
         ) : count === null ? (
-          <Skeleton className="h-[34px] w-28" />
+          <Skeleton className="h-8.5 w-28" />
         ) : (
           <CountUp value={count} format={format ?? ((n) => String(Math.round(n)))} />
         )}

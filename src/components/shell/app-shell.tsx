@@ -99,7 +99,7 @@ export function AppShell({
                 "ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold ring-1 ring-inset",
                 elevated
                   ? "bg-success/10 text-success ring-success/20"
-                  : "bg-foreground/[0.05] text-muted-foreground ring-foreground/10",
+                  : "bg-foreground/5 text-muted-foreground ring-foreground/10",
               )}
             >
               {elevated ? (
@@ -138,8 +138,8 @@ function NavButton({
       className={cn(
         "press relative flex size-11 items-center justify-center rounded-lg transition-colors duration-200 ease-out-expo",
         active
-          ? "bg-foreground/[0.08] text-foreground"
-          : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground",
+          ? "bg-foreground/8 text-foreground"
+          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
       )}
     >
       {active ? (

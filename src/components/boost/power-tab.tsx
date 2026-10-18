@@ -188,8 +188,8 @@ export function PowerTab() {
                   className={cn(
                     "press w-full rounded-md border px-3 py-2.5 text-left transition-colors duration-200 ease-out-expo",
                     p.guid === selected
-                      ? "border-border-strong bg-foreground/[0.06]"
-                      : "border-transparent hover:bg-foreground/[0.04]",
+                      ? "border-border-strong bg-foreground/6"
+                      : "border-transparent hover:bg-foreground/4",
                   )}
                 >
                   <span className="flex items-center gap-2">

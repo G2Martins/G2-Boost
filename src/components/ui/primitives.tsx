@@ -32,14 +32,13 @@ export function Button({
         size === "lg" && "h-11 px-5 text-sm",
         variant === "primary" &&
           "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18),0_0_0_1px_hsl(var(--primary)/0.5)] hover:brightness-110",
-        variant === "secondary" &&
-          "bg-foreground/[0.07] text-foreground hover:bg-foreground/[0.11]",
+        variant === "secondary" && "bg-foreground/7 text-foreground hover:bg-foreground/11",
         variant === "danger" &&
           "bg-destructive text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.16)] hover:brightness-110",
         variant === "outline" &&
-          "border border-border-strong bg-transparent text-foreground hover:bg-foreground/[0.05]",
+          "border border-border-strong bg-transparent text-foreground hover:bg-foreground/5",
         variant === "ghost" &&
-          "bg-transparent text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
+          "bg-transparent text-muted-foreground hover:bg-foreground/6 hover:text-foreground",
         className,
       )}
       {...props}
@@ -141,7 +140,7 @@ export function Switch({ className, ...props }: ComponentProps<typeof SwitchPrim
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb className="block size-5 translate-x-0.5 rounded-full bg-foreground shadow transition-transform duration-200 ease-out-expo data-[state=checked]:translate-x-[22px] data-[state=checked]:bg-background" />
+      <SwitchPrimitive.Thumb className="block size-5 translate-x-0.5 rounded-full bg-foreground shadow transition-transform duration-200 ease-out-expo data-[state=checked]:translate-x-5.5 data-[state=checked]:bg-background" />
     </SwitchPrimitive.Root>
   );
 }
@@ -174,7 +173,7 @@ export function StatusPill({
 
 /** Tinted chip: 12% fill + text + 1px inset ring of the same tone (status used sparingly). */
 const BADGE_TONE = {
-  neutral: "bg-foreground/[0.06] text-muted-foreground ring-foreground/10",
+  neutral: "bg-foreground/6 text-muted-foreground ring-foreground/10",
   accent: "bg-primary/12 text-primary ring-primary/25",
   success: "bg-success/12 text-success ring-success/25",
   warning: "bg-warning/12 text-warning ring-warning/25",
@@ -272,7 +271,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="press -m-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+            className="press -m-1 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/6 hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -331,7 +330,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-center">
+    <div className="flex min-h-70 flex-col items-center justify-center gap-3 text-center">
       <div className="flex size-11 items-center justify-center rounded-full border border-border bg-card-hover text-muted-foreground">
         {icon}
       </div>

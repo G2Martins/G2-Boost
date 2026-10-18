@@ -506,7 +506,7 @@ function MonitorCard({
                 className={cn(
                   "press flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors duration-200 ease-out-expo",
                   metric === m.id
-                    ? "border-border-strong bg-foreground/[0.08] text-foreground"
+                    ? "border-border-strong bg-foreground/8 text-foreground"
                     : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >

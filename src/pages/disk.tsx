@@ -413,7 +413,7 @@ function DriveBar({
                 size: formatBytes(progress.bytes, locale, 1),
               })}
             </span>
-            <span className="max-w-[320px] truncate">{progress.current}</span>
+            <span className="max-w-80 truncate">{progress.current}</span>
           </span>
         ) : summary ? (
           <span className="num">
@@ -568,7 +568,7 @@ function FilesTab({
     <Card className="animate-rise">
       <CardTitle help={t("disk.filter.help")}>{t("disk.tab.largest")}</CardTitle>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex min-w-[260px] flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 py-2 focus-within:border-ring">
+        <label className="flex min-w-65 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 py-2 focus-within:border-ring">
           <Search className="size-4 text-muted-foreground" />
           <input
             value={query}
@@ -654,10 +654,10 @@ function FilesTab({
                     checked={Boolean(picked[keyOf(f)])}
                     onChange={() => toggle(f)}
                     aria-label={f.path}
-                    className="accent-[hsl(var(--primary))]"
+                    className="accent-primary"
                   />
                 </td>
-                <td className="num max-w-[640px] truncate py-1.5" title={f.path}>
+                <td className="num max-w-160 truncate py-1.5" title={f.path}>
                   {f.path}
                 </td>
                 <td className="num py-1.5 text-right font-semibold">

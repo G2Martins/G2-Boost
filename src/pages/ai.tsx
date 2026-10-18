@@ -253,7 +253,7 @@ export function AiPage() {
           </div>
 
           {/* ---------------- conversation ---------------- */}
-          <Card className="animate-rise flex min-h-[560px] flex-col" style={rise(2)}>
+          <Card className="animate-rise flex min-h-140 flex-col" style={rise(2)}>
             <CardTitle
               right={
                 <Button

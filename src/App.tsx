@@ -52,7 +52,7 @@ function RemovedBanner({
         type="button"
         onClick={onClose}
         aria-label={t("common.cancel")}
-        className="press flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+        className="press flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/6 hover:text-foreground"
       >
         <X className="size-4" />
       </button>

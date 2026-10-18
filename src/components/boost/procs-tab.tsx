@@ -144,7 +144,7 @@ export function ProcsTab({ elevated }: { elevated: boolean }) {
               <span className="num text-right text-xs text-muted-foreground">{p.pid}</span>
               <span className="flex flex-col items-end gap-1">
                 <span className="num text-xs">{p.cpu_pct.toFixed(1)}%</span>
-                <span className="h-0.5 w-14 overflow-hidden rounded-full bg-foreground/[0.06]">
+                <span className="h-0.5 w-14 overflow-hidden rounded-full bg-foreground/6">
                   <span
                     className="block h-full rounded-full bg-primary/80 transition-[width] duration-500 ease-out-expo"
                     style={{ width: `${Math.min(100, p.cpu_pct)}%` }}
@@ -160,7 +160,7 @@ export function ProcsTab({ elevated }: { elevated: boolean }) {
                   onClick={() => reveal(p)}
                   aria-label={t("procs.reveal")}
                   title={t("procs.reveal")}
-                  className="press flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+                  className="press flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/6 hover:text-foreground"
                 >
                   <FolderOpen className="size-4" />
                 </button>

@@ -149,7 +149,7 @@ export function Treemap({
   return (
     <div
       ref={wrapRef}
-      className="relative h-[520px] w-full overflow-hidden rounded-md border border-border bg-background"
+      className="relative h-130 w-full overflow-hidden rounded-md border border-border bg-background"
     >
       <canvas
         ref={canvasRef}
