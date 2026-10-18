@@ -52,11 +52,6 @@
       }
     },
     "copyright": "© 2026 Grovic Data. Todos os direitos reservados.",
-    "category": "Utility",
-    "licenseFile": "../LICENSE",
-    "resources": {
-      "../LICENSE": "LICENSE.txt",
-      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
-    }
+    "category": "Utility"
   }
 }

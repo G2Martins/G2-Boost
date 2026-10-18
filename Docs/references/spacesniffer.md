@@ -2,8 +2,6 @@
 
 **Última revisão:** 2026-10-14 · Fonte: `SpaceSniffer User Manual.pdf` (30 págs.), `Release Notes.txt`, `Disclaimer.txt` do pacote em `Referencias/Downloads/`.
 
-> **Licença:** "This software must not be decompiled, disassembled, reverse engineered or otherwise modified." Freeware do Uderzo Umberto. Aqui só usamos a **documentação** para listar comportamento; a implementação é do zero (squarified treemap é algoritmo público — Bruls/Huizing/van Wijk 2000; WinDirStat/WizTree fazem o mesmo).
-
 ## O que ele faz (a replicar)
 - **Scan** de drive/pasta (vários caminhos no diálogo inicial), multi-thread, mostra o treemap **enquanto varre**; título da janela mostra progresso e espaço livre; detector de mudanças no filesystem atualiza a vista em tempo real (desligável).
 - **Treemap** com elementos aninhados (pasta contém filhos), elemento "espaço livre" só na raiz, "espaço desconhecido", barra vertical à esquerda indicando a fração do disco visível no zoom atual; animação de zoom; duplo clique = zoom na pasta; teclas Back/Forward/Home; **sub-scan** só da vista com zoom; "DynaSmooth" (detalhe adaptativo); flashing opcional dos elementos durante o scan.

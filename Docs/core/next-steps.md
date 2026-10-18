@@ -26,7 +26,7 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 - **IA:** playbook de segurança/temperatura/FPS/input lag/processos no system prompt, ações de inicialização (validadas contra a lista ao vivo), tweaks beta fora das ações, máx. 6 por lista, `tests/ai.test.ts`; contexto com firmware, sensores, inicialização (só nome do exe) e processos.
 - **Disco:** filtro (`*.mp4 >1gb >6m`), mostrar na pasta (shell API), Lixeira com guarda (`SafePath` + raízes protegidas + aviso do próprio Windows se não couber), essenciais grandes com explicação. Lixeira real verificada.
 - **Rede:** TCPing, gateway no monitor, DNS Optimizer (10 provedores, ranking por consulta UDP própria, aplicar/restaurar por adaptador com backup).
-- **Release:** `LICENSE` (proprietária, pt-BR + en), `THIRD_PARTY_NOTICES.md` gerado por `tools/third_party_notices.py` (sem GPL/LGPL/AGPL), `SECURITY.md`, README reescrito; NSIS com página de licença, copyright no VERSIONINFO, licença e avisos instalados; MCP servido pelo próprio exe (`--mcp`) — um binário para assinar.
+
 
 ## Feito (2026-10-15, madrugada — sessão autônoma após o dono decidir o escopo)
 - **Fase 4 (Boost):** `registry.rs` (HKCU/HKLM + backups JSON), `visualfx.rs` (17 itens do diálogo, 4 níveis, round-trip ao vivo ok), `boost.rs` (16 tweaks, SCM, SPI, energia, purge, `runas`); comandos Tauri; aba Boost com estado real, presets, níveis, pills de serviço, Elevar. Screenshot verificado: nível Média detectado = setup do dono.
@@ -57,8 +57,3 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 - Docs: análise estática dos binários (`binary-analysis.md`), verdict do Kaspersky confirmado, arquitetura/design/regras atualizados.
 - Verificação visual: exe aberto e fotografado (disco, monitor, MTR, ping de jogos) — `scratchpad/verify-ui.ps1` + env `G2BOOST_START_ROUTE`/`G2BOOST_START_TAB`/`G2BOOST_AUTORUN`.
 
-### Para o dono revisar de manhã
-1. Renomear a pasta para `G2 Boost` (VS Code fechado).
-2. Opcional: aprovar o UAC do `winget install Microsoft.VisualStudio.2022.BuildTools …` (architecture §8) — o build já funciona sem isso.
-3. Rodar `bun run tauri:dev` e clicar em tudo; o que estiver "Em breve" é o backlog das fases 1, 2 e 4.
-4. Decidir a prioridade: Fase 1 (scan + treemap, resolve o C: com 38 GB) ou fechar a Fase 3 (TCPing, DNS, gateway) / Fase 4 (tweaks, RAM).

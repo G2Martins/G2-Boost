@@ -1,6 +1,6 @@
 # CPU-Z 3.01 e Speccy 1.34 — análise estática (clean-room)
 
-**Última revisão:** 2026-10-15 · Método: inventário de arquivos, cabeçalhos PE (imports, version info, recursos), strings e eventos do System log; **nada executado, nada desmontado, nenhum driver gravado em disco**. Fontes: `C:\Program Files\CPUID\CPU-Z`, `C:\Program Files\Speccy`, prints do dono (2026-10-15). Feito por sub-agente; palpites marcados. O que extrair como *ideia* para o Meu PC está na seção 4.
+**Última revisão:** 2026-10-18 (§4.1 energia/processos) · Método: inventário de arquivos, cabeçalhos PE (imports, version info, recursos), strings e eventos do System log; **nada executado, nada desmontado, nenhum driver gravado em disco**. Fontes: `C:\Program Files\CPUID\CPU-Z`, `C:\Program Files\Speccy`, prints do dono (2026-10-15). Feito por sub-agente; palpites marcados. O que extrair como *ideia* para o Meu PC está na seção 4.
 
 ## 1. O fato central: os dois usam driver de kernel
 
@@ -38,13 +38,14 @@ Imports do driver: `MmMapIoSpace`, `HalGetBusDataByOffset`/`HalSetBusDataByOffse
 | Relatório TXT/HTML/XML, snapshot `.speccy` | formatos próprios | não | relatório próprio (TXT/JSON) **6.5** |
 | Validação / Publish Snapshot online | `valid.cpuid.com`, `license.piriform.com` | não | **não replicar** (serviço proprietário) |
 
-## 3. Licença e o que não copiar
-- CPU-Z (`cpuz_eula.txt`): freeware proprietário, direito autoral CPUID, lei francesa; sem cláusula explícita anti-engenharia reversa, mas sem licença de cópia. O SDK (`cpuidsdk.dll`) é produto comercial separado.
-- Speccy: EULA online da Gen Digital proíbe engenharia reversa "except as authorized by law" (não verificado na fonte: 403). O Speccy carrega pilha de telemetria Avast/Gen (`*.ff.avast.com`, `brain.jumpshot.com`).
-- **Não copiar:** `cpuz.sys`/`cpuidsdk.dll` e sua interface IOCTL; tabelas compiladas (nomes de CPU, chips Super I/O, controladores SMBus); strings, imagens, traduções, templates; protocolo de validação; `.speccy`; `AtaSmart.cpp` (derivado do CrystalDiskInfo — checar licença antes de reaproveitar ideia).
 
 ## 4. Strings úteis (registro/WMI/PDH que eles consultam)
 `HARDWARE\DESCRIPTION\System\CentralProcessor\`, `HARDWARE\DESCRIPTION\System\BIOS`, `Control\Class\{4d36e968…}` (`DriverVersion`), `Control\SecureBoot\State`, `SOFTWARE\Khronos\OpenCL\Vendors`, `SOFTWARE\Khronos\Vulkan\Drivers`, `Enum\DISPLAY\…\Device Parameters\EDID`; WMI `Win32_PhysicalMemory`, `Win32_VideoController`, `Win32_DiskDrive`, `Win32_NetworkAdapter(Configuration)`, `Win32_Printer`, `root\wmi MSSmBios_RawSMBiosTables`, `root\SecurityCenter2`; PDH `\GPU Adapter Memory(*)\Dedicated Usage`, `\GPU Engine(*)\Running time`, `\Processor Information(*)\% Processor Utility`; DLLs `nvapi64`, `nvml`, `atiadlxx`, `ControlLib`, `ze_loader`, `DXCore`, `hid`, `wlanapi`, `tbs`.
+
+## 4.1 Energia e processos (insumo da fase 3B) — 2026-10-18, busca de bytes
+- **Speccy** lê o plano ativo e seus timeouts: `PowerGetActiveScheme` + `PowerReadFriendlyName/PowerReadDescription` + `PowerReadACValue/PowerReadDCValue` com GUIDs binários de suspensão (`STANDBYIDLE`), desligar vídeo (`VIDEOIDLE`) e disco (`DISKIDLE`). Só leitura. Lista processos (Toolhelp, "Unable to take a snapshot of the running processes!") e serviços (`EnumServicesStatusExW`), também só leitura.
+- **CPU-Z**: `PowerEnumerate/PowerGetActiveScheme/PowerReadFriendlyName` → só o nome do plano ativo.
+- Nenhum dos dois grava setting de energia; `TerminateProcess` aparece no import, sem UI conhecida de encerrar processo **[não verificado]**.
 
 ## 5. Estimativa de FPS e IA (pedido do dono)
 Nem CPU-Z nem Speccy estimam FPS. Desenho em [../core/ai-advisor.md](../core/ai-advisor.md): classe de hardware local + números com fonte via busca web restrita a sites de benchmark, dentro do chat com IA (fase 9). Temperaturas para a IA: GPU (NVML) e discos (SMART, elevado); CPU só se HWiNFO/LHM existirem.

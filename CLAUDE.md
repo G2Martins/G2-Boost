@@ -2,7 +2,7 @@
 
 > **Spec viva.** Porta-de-entrada lida pelo agente toda sessão. Não duplica os docs profundos — **aponta** pra eles. Atualize quando uma regra, comando, módulo ou hurdle mudar.
 >
-> **Última revisão:** 2026-10-16 (disco completo, rede/DNS, BIOS/firmware, sensores externos, inicialização, IA endurecida, licença/README, MCP via `--mcp`, NSIS com licença)
+> **Última revisão:** 2026-10-16 (disco completo, rede/DNS, BIOS/firmware, sensores externos, inicialização, licença/README, MCP via `--mcp`, NSIS com licença)
 > **Fonte única de regras:** [Docs/core/global-rules.md](Docs/core/global-rules.md) · **Roadmap:** [Docs/core/next-steps.md](Docs/core/next-steps.md) · **Estado/sprints:** `.planning/STATE.md` (local, gitignored — criar com `/gsd-new-project`) · **Índice de docs:** [Docs/README.md](Docs/README.md)
 > **Pasta:** renomeada para `G2 Boost` em 2026-10-14 (memória do Claude na chave `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
 > **Projeto-irmão de referência (organização de pastas, Docs, design):** `G:\1. Projetos\6. Grovic Data\Valerium-Portal` (`CLAUDE.md`, `Docs/core/design-system.md`, `Docs/core/global-rules.md`). Mesmas convenções, outro domínio.
@@ -90,7 +90,8 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Kaspersky × scripts .bat = `PDM:Trojan.Win32.Generic` (System Watcher, "Análise de comportamento", 2026-10-13 23:45).** Matou o `cmd.exe` do mensal no meio e apagou o .bat do Desktop (a cópia em `Referencias/` sobreviveu). Gatilhos: auto-elevação `powershell Start-Process -Verb RunAs` sobre si mesmo, `-ExecutionPolicy Bypass`, one-liners de 1.900–2.600 chars, `del /s /f /q` em Prefetch/logs/minidumps/WER (assinatura anti-forense), `net stop wuauserv/bits/dosvc`, `reg add` em `HKLM\...\Policies`. Análise, verdicts prováveis e mitigação em [kaspersky-false-positive.md](Docs/security/kaspersky-false-positive.md). **O app herda o risco se repetir os padrões** → nativo + assinatura de código + submissão de falso positivo.
 - **Bug de precedência nos scripts legados.** `@('nome',$L+'\x|'+$L+'\y')` — em PowerShell a vírgula vence o `+`, então `$e[1]` vira só `$L`: "Cache de shaders", "Thumbnails", "Chrome", "Edge", "Spotify" medem a `AppData\Local` inteira (64 GB) e "Discord" mede `Roaming`; "Logs" perde os dumps. Relatório inflado/duplicado + medição lenta. Confirmado por teste em 2026-10-14. Portar a **intenção**, não os números.
 - **Prefetch: não limpar** (lentidão + indicador anti-forense). **Working set trim: não** (o próprio script v2.0 removeu por piorar). `DISM /ResetBase` impede desinstalar updates — opt-in com aviso.
-- **SpaceSniffer e ExitLag: análise estática feita** (imports PE, strings, drivers, serviços) em [binary-analysis.md](Docs/references/binary-analysis.md) — mecanismo no nível de API, sem copiar código/assets. Layout do treemap via `d3-hierarchy` `treemapSquarify`; render próprio em canvas.
+- **SpaceSniffer e ExitLag: análise estática feita** (imports PE, strings, drivers, serviços) em [binary-analysis.md](Docs/references/binary-analysis.md) — mecanismo no nível de API. Layout do treemap via `d3-hierarchy` `treemapSquarify`; render próprio em canvas.
+- **REA neste host (Windows):** Ghidra 12.1.4 em `D:\dev` só aceita **PE**; Mach-O/plist/assinatura nativos exigem macOS/Hopper. Para `.app`: `open_binary` no bundle + `decode_interface_builder` (nibs) funcionam; o resto por parser próprio de seções (`scratchpad`). Ghidra no `ExitLag.exe` (114 MB) é inviável — busca de bytes resolve.
 - **`IcmpSendEcho2Ex` (iphlpapi)** não precisa de admin nem raw socket; TTL incremental = traceroute/MTR sem driver.
 - **Cloudflare speedtest:** `https://speed.cloudflare.com/__down?bytes=N` e `__up`, CORS `*`; ISP/IP/cidade vêm nos headers `cf-meta-*` (o `/meta` via curl voltou `{}`). Ookla CLI é proprietário — não usar.
 - **Steam SDR:** `https://api.steampowered.com/ISteamApps/GetSDRConfig/v1/?appid=730` → 53 POPs com IPs de relay (`gru` = São Paulo). Serve CS2/Dota 2/Deadlock sem chave.
@@ -107,7 +108,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **`windows` crate:** `VARIANT` só existe com a feature `Win32_System_Ole` (além de `Win32_System_Com`/`Variant`); `BOOL` mora em `windows::core`; `LocalFree` em `Win32::Foundation`; `NtSetSystemInformation` não existe no crate (declarar `unsafe extern "system"` em `ntdll`); clippy 1.99 exige `as_chunks::<2>()` no lugar de `chunks_exact(2)`.
 - **Tarefa agendada de logon sem `SetUserId` = "qualquer usuário" → `E_ACCESSDENIED` sem admin.** Com `UserId = DOMÍNIO\usuário` o usuário comum registra a própria tarefa (round-trip testado).
 - **`windows` 0.62, mais pegadinhas:** `IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS` mora em `Storage::FileSystem` (não em `System::Ioctl`); `GetActiveProcessorCount`/`ALL_PROCESSOR_GROUPS` em `System::Threading`; `STATEMGRSTATUS.nStatus` é `WIN32_ERROR` (usar `.0`); `VARIANT` BSTR via `Anonymous.Anonymous.Anonymous.bstrVal`; `AtomicU32::fetch_update` está deprecado (clippy pede `try_update`; loop `compare_exchange` funciona). DXGI pode listar a mesma GPU 2× → dedupe. Tarefa do Compatibility Appraiser chama-se "… Appraiser Exp" no 24H2+.
-- **CPU-Z e Speccy usam driver de kernel (`cpuz.sys`, WHCP)** para temperatura/voltagem/SPD — instalado sob demanda e apagado ao sair. Nós não: ver [speccy-cpuz.md](Docs/references/speccy-cpuz.md). Clock efetivo vem de PDH `% Processor Performance` × `Processor Frequency` (o `CallNtPowerInformation` devolve o clock base); potência do pacote de PDH `Energy Meter(RAPL_Package0_PKG)`.
+- **CPU-Z e Speccy usam driver de kernel (`cpuz.sys`, WHCP)** para temperatura/voltagem/SPD — instalado sob demanda e apagado ao sair. ver [speccy-cpuz.md](Docs/references/speccy-cpuz.md). Clock efetivo vem de PDH `% Processor Performance` × `Processor Frequency` (o `CallNtPowerInformation` devolve o clock base); potência do pacote de PDH `Energy Meter(RAPL_Package0_PKG)`.
 - **SMBIOS: registro sem strings termina em `\0\0`** — pular os dois NULs, senão o parser se perde e some o tipo 17 (bug pego pelo teste com blob sintético).
 - **IA nunca executa:** respostas trazem ids num bloco `g2boost-actions`; a UI valida contra o catálogo e vira botão (fluxo normal com backup). Chave de API só no Cofre do Windows; o webview recebe por pergunta; HTTP só pelos hosts da allowlist das capabilities. Markdown do modelo renderizado como texto (`SafeMarkdown`), nunca HTML.
 - **rmcp 3.5:** `#[tool_router]` no impl + `#[tool_handler(router = self.tool_router)] impl ServerHandler` + `serve(rmcp::transport::stdio())`; tool que devolve `Result<String, String>` vira `isError` no erro. Serializar `Result` direto gera `{"Ok": …}` — desembrulhe antes.
@@ -134,7 +135,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Roadmap / fases** → [Docs/core/next-steps.md](Docs/core/next-steps.md)
 - **Release (assinatura, SmartScreen, instalar em outro PC)** → [Docs/release/distribution-and-trust.md](Docs/release/distribution-and-trust.md) · **Driver/sensores** → [Docs/security/kernel-driver-options.md](Docs/security/kernel-driver-options.md)
 - **Disco** → [Docs/disk/analyzer.md](Docs/disk/analyzer.md) · **Rede/DNS** → [Docs/network/network.md](Docs/network/network.md) · **IA/MCP** → [Docs/core/ai-advisor.md](Docs/core/ai-advisor.md)
-- **Licença** → [LICENSE](LICENSE) (proprietária) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) · [SECURITY.md](SECURITY.md)
+
 - **Arquitetura + decisão de stack** → [Docs/core/architecture.md](Docs/core/architecture.md)
 - **Regras de engenharia (completo)** → [Docs/core/global-rules.md](Docs/core/global-rules.md)
 - **Design system** → [Docs/core/design-system.md](Docs/core/design-system.md)
@@ -144,7 +145,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Painel, Meu PC, monitor, recomendação por hardware** → [Docs/boost/dashboard.md](Docs/boost/dashboard.md)
 - **IA no app, MCP, conselheiro local, estimativa de FPS** → [Docs/core/ai-advisor.md](Docs/core/ai-advisor.md) · **CPU-Z/Speccy (análise)** → [Docs/references/speccy-cpuz.md](Docs/references/speccy-cpuz.md)
 - **Pesquisa de serviços (evidência dos presets)** → [Docs/references/windows-services-research.md](Docs/references/windows-services-research.md) · **Galdino Optimizer (extração)** → [Docs/references/galdino-optimizer.md](Docs/references/galdino-optimizer.md)
-- **Referências** → [spacesniffer.md](Docs/references/spacesniffer.md) · [exitlag.md](Docs/references/exitlag.md) · [legacy-bat-scripts.md](Docs/references/legacy-bat-scripts.md)
+- **Referências** → [spacesniffer.md](Docs/references/spacesniffer.md) · [exitlag.md](Docs/references/exitlag.md) · [legacy-bat-scripts.md](Docs/references/legacy-bat-scripts.md) · [appcleaner.md](Docs/references/appcleaner.md) (base da 3C: desinstalar + resíduo)
 - **Segurança** → [kaspersky-false-positive.md](Docs/security/kaspersky-false-positive.md)
 - **Índice geral de docs** → [Docs/README.md](Docs/README.md)
 - **Memória cross-sessão** (auto-injetada) → `~/.claude/projects/.../memory/MEMORY.md`

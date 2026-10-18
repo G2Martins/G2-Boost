@@ -1,5 +1,5 @@
 # Análise estática — ExitLag e SpaceSniffer
-**Última revisão:** 2026-10-14
+**Última revisão:** 2026-10-18 (adendo §2.12)
 
 > Método: somente análise estática (parser PE próprio em Python + extração de strings ASCII/UTF-16LE + leitura do `.inf`). Nenhum binário foi executado, nada em `D:\ExitLag` foi alterado, nenhum asset/código foi copiado. Documentamos só **mecanismos** (APIs, chaves, serviços, drivers). Onde algo é inferência (não confirmado em disassembly) está marcado **[inferido]**.
 > Alvos: ExitLag 5.x (`D:\ExitLag`, 1537 arquivos, ~282 MB, build `exitlag-client-qml`) e SpaceSniffer 2.1.0.21 x64.
@@ -146,6 +146,11 @@ Rótulos soltos: "Australia (APNIC)", "California (Google LLC)", "California (Ci
 - Reboot: `SeShutdownPrivilege` + `InitiateSystemShutdownW` (após reparo de WMI).
 - Auth: OAuth2 loopback (`http://localhost:{{PORT}}/callback`), Google/Discord, reCAPTCHA (WebView2), credenciais protegidas com **DPAPI**.
 - Overlay: CTRL+SHIFT+I; jogos suportados na lista (ex.: `TL.exe`, `Aion2.exe`, `PioneerGame.exe`, `blackdesert32/64.exe`, `marathon.exe`).
+
+### 2.12 Adendo 2026-10-18 (fases 3A/3B) — busca de bytes, sem disassembly
+- **Energia** (`[PowerConfig]`): além do Ultimate e do Core Parking, grava **wake timers AC e DC** ("Failed to write AC/DC wake timer setting") num `applyPlanSettings`; `FpsBoostController::disableCoreParking`, flag `throttleOnSlow`. GUIDs presentes (texto UTF-16): subgrupo processador, `CPMINCORES`, Balanced, Ultimate. **Ausentes** (texto e binário): USB selective suspend, PCIe ASPM, sleep/hibernar, desligar vídeo/disco, min/max processor state, EPP, boost mode — o ExitLag não edita esses (limite: só o exe; config remota não vista).
+- **Processos**: `NtSuspendProcess`/`TerminateProcess` vêm do Crashpad (`ScopedProcessSuspend`). Não há gerenciador de tarefas nem "encerrar processo" — só prioridade (§2.6).
+- **Motion/paleta do QML embutido**: `NumberAnimation` 300 ms `Easing.OutCubic`; hover = `Behavior on color { ColorAnimation { Easing.OutQuad } }`; 800 ms `InOutQuad` só em animação decorativa (busca/onboarding). Paleta = rampa de ~15 neutros azul-acinzentados (fundo quase preto → texto quase branco), **1 accent** (cor da marca) e cada cor de status pareada com um fundo tingido muito escuro (~10%) — padrão "chip tingido". Para a 3A vale o padrão, **não os valores** (o accent é marca deles).
 
 ## 3. SpaceSniffer 2.1.0.21 (x64)
 
