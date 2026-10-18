@@ -47,7 +47,9 @@ Plano era `winget buscar/atualizacoes/instalar/atualizar` pela **API COM** (`Mic
 2. Ativação dentro do processo com a DLL do App Installer: `LoadLibrary` negado (`0x80070005`) para código em `WindowsApps` vindo de um exe sem pacote.
 3. O caminho oficial para apps sem pacote é a DLL cliente do NuGet `Microsoft.WindowsPackageManager.ComInterop` 1.29.380 (MIT, assinada pela Microsoft, 130 KB), distribuída junto do app. Carregar binário baixado precisa de aprovação do dono antes de testar.
 
-O trabalho (bindings, `winget.rs` validando ids e consultas, ferramenta de geração) está guardado fora do repositório até a decisão.
+4. **Testado com aprovação do dono (2026-10-18):** a DLL cliente (SHA-256 fixado, carregada ao lado do exe) cria o objeto, mas a primeira chamada falha igual: `IPackageManager` ({B375E3B9-F2E0-5C93-87A7-B67497F7E593}) não tem proxy fora do pacote. O App Installer registra os proxies só como `windows.activatableClass.proxyStub` do próprio pacote. A DLL do NuGet só ativa (`CoCreateInstance` ou ativação manual por RPC) e não traz proxies.
+
+Caminhos que sobram: dar identidade de pacote ao G2 Boost (pacote esparso MSIX com local externo; precisa de certificado de assinatura, junto com a release), embutir o motor do winget dentro do processo (DLL de vários MB, executa instaladores dentro do G2 Boost) ou chamar o `winget.exe` oficial com argumentos fixos (sem shell, saída em texto). O trabalho (bindings, `winget.rs` validando ids e consultas, ferramenta de geração, versão com a DLL) está guardado fora do repositório até a decisão.
 
 ## Testes
 

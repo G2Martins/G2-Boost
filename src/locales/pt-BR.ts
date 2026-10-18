@@ -216,6 +216,13 @@ export const ptBR = {
   "ai.provider.anthropic": "Claude",
   "ai.provider.openai": "ChatGPT",
   "ai.provider.gemini": "Gemini",
+  "ai.provider.nvidia": "NVIDIA",
+  "ai.key.placeholder.nvidia": "nvapi-…",
+  "ai.free.gemini":
+    "Tem camada grátis para testar: crie a chave no Google AI Studio, sem cartão. Na camada grátis o Google pode usar as perguntas para treino; o G2 Boost só manda dados sem nome nem número de série.",
+  "ai.free.nvidia":
+    "Catálogo grátis para testes (Kimi, DeepSeek, GLM e outros): crie a chave em build.nvidia.com. Sem pesquisa na web neste provedor.",
+  "ai.web.unavailable": "Sem web neste provedor",
   "ai.model": "Modelo",
   "ai.key.stored": "Chave guardada no Cofre do Windows",
   "ai.key.none": "Nenhuma chave salva",

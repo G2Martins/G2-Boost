@@ -120,6 +120,10 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Testes que gravam no data dir** (histórico, backups) precisam de `G2BOOST_DATA_DIR` (`registry::tests::test_data_dir()`), senão escrevem no `%LOCALAPPDATA%\G2 Boost` real.
 - **`cargo test` com vários filtros:** `cargo test -p g2boost-core -- dns network` (filtros depois do `--`).
 - **`DirectXUserGlobalSettings` é compartilhada** (Auto HDR, VRR, flip model): editar só a chave própria (`boost::dx_set`), nunca sobrescrever a string.
+- **WinGet COM não funciona em exe sem pacote:** `0x80073D54`/proxy de `IPackageManager` ausente, mesmo com a DLL cliente do NuGet ComInterop; `LoadLibrary` de `WindowsApps` = acesso negado. Detalhe e saídas em [console.md](Docs/core/console.md).
+- **Playwright fora do runner:** `bun` trava ao abrir o Edge (e tenta auto-instalar pacote se o script estiver fora do projeto). Script avulso = `.mjs` com `node`, dentro do repo (pasta ignorada `test-results/`).
+- **Gemini 2.5 fechado para chave nova de API** (2026-10): padrão do app é `gemini-3.8-flash`. Modelos da NVIDIA: `curl https://integrate.api.nvidia.com/v1/models` (público).
+- **MCP Apps:** UI no Claude Desktop via `_meta.ui.resourceUri` + recurso `text/html;profile=mcp-app` (`crates/mcp/src/panel.html`). `#[tool(meta = ...)]` do rmcp 3.5 recebe `MetaObject` (de `serde_json::Map`).
 - **Efeitos visuais são data-driven:** `HKLM\...\Explorer\VisualEffects\<item>` traz `SPIActionGet/Set` ou `RegPath`. Tabela congelada em `visualfx.rs`; o nível Média bateu com o setup do dono na primeira detecção.
 
 ## 7. Antes de fechar qualquer fase

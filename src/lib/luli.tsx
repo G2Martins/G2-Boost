@@ -22,6 +22,7 @@ import {
   ClaudeChat,
   DEFAULT_MODELS,
   isTimeout,
+  PROVIDER_WEB,
   PROVIDERS,
   type Provider,
   systemPrompt,
@@ -105,7 +106,10 @@ function useLuliState() {
   const [models, setModels] = useState<Record<Provider, string>>(() => ({
     anthropic: readLs(lsModel("anthropic")) || DEFAULT_MODELS.anthropic,
     openai: readLs(lsModel("openai")) || DEFAULT_MODELS.openai,
-    gemini: readLs(lsModel("gemini")) || DEFAULT_MODELS.gemini,
+    // gemini-2.5-* are closed to new API users: an old saved default falls back to the new one.
+    gemini:
+      (readLs(lsModel("gemini")) ?? "").replace(/^gemini-2\.5-pro$/, "") || DEFAULT_MODELS.gemini,
+    nvidia: readLs(lsModel("nvidia")) || DEFAULT_MODELS.nvidia,
   }));
   const [keys, setKeys] = useState<Record<string, boolean>>({});
   const [context, setContext] = useState<string | null>(null);
@@ -235,7 +239,8 @@ function useLuliState() {
       }
       const ctx = context ?? (await fetchContext());
       if (!ctx) return;
-      const web = opts.web ?? (webAlways || webHere);
+      const noWeb = !PROVIDER_WEB[provider];
+      const web = !noWeb && (opts.web ?? (webAlways || webHere));
       const sent = opts.sent ?? q;
       const prior = opts.prior ?? messages;
       setNote(null);
@@ -243,7 +248,7 @@ function useLuliState() {
       setBusy(true);
       setStreaming("");
       setMessages([...prior, { role: "user", text: q, sent: sent === q ? undefined : sent }]);
-      const system = systemPrompt(locale, ctx, { knowledge: KNOWLEDGE, web });
+      const system = systemPrompt(locale, ctx, { knowledge: KNOWLEDGE, web, noWeb });
       const ctrl = new AbortController();
       inflight.current = ctrl;
       try {
@@ -310,10 +315,12 @@ function useLuliState() {
       const ctx = context ?? (await fetchContext());
       if (!ctx) throw new Error("no_context");
       const sent = opts.sent ?? question.trim().slice(0, 4000);
-      const web = webAlways;
+      const noWeb = !PROVIDER_WEB[provider];
+      const web = !noWeb && webAlways;
       const system = systemPrompt(locale, ctx, {
         knowledge: KNOWLEDGE,
         web,
+        noWeb,
         console: opts.console,
       });
       const onText = opts.onText ?? (() => undefined);
@@ -371,7 +378,8 @@ function useLuliState() {
     ask,
     askOnce,
     newConversation,
-    web: webAlways || webHere,
+    web: PROVIDER_WEB[provider] && (webAlways || webHere),
+    webAvailable: PROVIDER_WEB[provider],
     webAlways,
     setWebAlways,
     webHere,

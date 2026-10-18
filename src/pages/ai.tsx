@@ -87,7 +87,12 @@ export function AiPage() {
 
   const contextKb = context ? (new TextEncoder().encode(context).length / 1024).toFixed(1) : "—";
   const last = messages[messages.length - 1];
-  const askWeb = !busy && !web && last?.role === "assistant" && last.answer?.actions.needWeb;
+  const askWeb =
+    luli.webAvailable &&
+    !busy &&
+    !web &&
+    last?.role === "assistant" &&
+    last.answer?.actions.needWeb;
 
   return (
     <>
@@ -101,7 +106,7 @@ export function AiPage() {
                 <Bot className="size-4" />
                 {t("ai.provider")}
               </CardTitle>
-              <div className="grid grid-cols-3 gap-1.5 rounded-lg border border-border bg-background/60 p-1">
+              <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-background/60 p-1">
                 {PROVIDERS.map((p) => (
                   <button
                     key={p}
@@ -128,6 +133,19 @@ export function AiPage() {
                   </button>
                 ))}
               </div>
+              {provider === "gemini" || provider === "nvidia" ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {t(`ai.free.${provider}` as const)}{" "}
+                  <ExternalLink
+                    url={
+                      provider === "gemini"
+                        ? "https://aistudio.google.com/apikey"
+                        : "https://build.nvidia.com/"
+                    }
+                    label={provider === "gemini" ? "aistudio.google.com" : "build.nvidia.com"}
+                  />
+                </p>
+              ) : null}
               <label
                 className="mt-4 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
                 htmlFor="ai-model"
@@ -362,7 +380,7 @@ export function AiPage() {
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                disabled={webAlways}
+                disabled={webAlways || !luli.webAvailable}
                 onClick={() => setWebHere(!webHere)}
                 aria-pressed={web}
                 className={cn(
@@ -373,7 +391,13 @@ export function AiPage() {
                 )}
               >
                 <Globe className="size-3.5" />
-                {webAlways ? t("ai.web.always") : web ? t("ai.web.on") : t("ai.web.off")}
+                {!luli.webAvailable
+                  ? t("ai.web.unavailable")
+                  : webAlways
+                    ? t("ai.web.always")
+                    : web
+                      ? t("ai.web.on")
+                      : t("ai.web.off")}
               </button>
               <p className="text-[10px] text-muted-foreground">{t("ai.footer")}</p>
             </div>

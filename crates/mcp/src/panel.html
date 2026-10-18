@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G2 Boost</title>
+<style>
+  /* Warm graphite + one ember accent, like the app. Host variables win when the host sends them. */
+  :root {
+    --bg: var(--color-background-primary, hsl(30 6% 6.5%));
+    --card: var(--color-background-secondary, hsl(30 7% 9%));
+    --line: var(--color-border-primary, hsl(30 6% 17%));
+    --fg: var(--color-text-primary, hsl(38 22% 91%));
+    --muted: var(--color-text-secondary, hsl(32 7% 60%));
+    --accent: hsl(12 86% 56%);
+    --ok: hsl(148 40% 52%);
+    --warn: hsl(38 82% 60%);
+    --bad: hsl(352 72% 63%);
+    --radius: var(--border-radius-md, 10px);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: var(--color-background-primary, hsl(36 20% 97%));
+    --card: var(--color-background-secondary, hsl(36 16% 93%));
+    --line: var(--color-border-primary, hsl(30 8% 82%));
+    --fg: var(--color-text-primary, hsl(30 10% 12%));
+    --muted: var(--color-text-secondary, hsl(30 6% 38%));
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 14px; background: var(--bg); color: var(--fg);
+    font: 13px/1.45 var(--font-sans, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif);
+  }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .mark { font: 800 15px/1 var(--font-sans, system-ui); color: var(--accent); letter-spacing: -1px; }
+  h1 { font-size: 15px; margin: 0; letter-spacing: .02em; }
+  .sub { color: var(--muted); font-size: 11px; }
+  .grow { flex: 1; }
+  button {
+    font: inherit; font-size: 12px; color: var(--fg); background: transparent; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px;
+  }
+  button:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: hsl(30 30% 98%); }
+  button:disabled { opacity: .45; cursor: default; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+  .tile, section { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+  .tile .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  .tile .v { font-weight: 600; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  section { margin-bottom: 10px; }
+  section h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; }
+  section h2 .grow { flex: 1; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  li:first-child { border-top: 0; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; transform: translateY(-1px); background: var(--muted); }
+  .dot.warn { background: var(--warn); } .dot.critical, .dot.error { background: var(--bad); } .dot.info { background: var(--accent); }
+  .count { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 2.2em; text-align: right; }
+  .mono { font-family: var(--font-mono, "Cascadia Mono", ui-monospace, monospace); font-size: 11px; }
+  .muted { color: var(--muted); }
+  .bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--line) 70%, transparent); overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar > i.hot { background: var(--bad); }
+  .empty { color: var(--muted); font-size: 12px; }
+  footer { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  @media (prefers-reduced-motion: no-preference) { section, .tile { animation: rise .25s ease-out both; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="mark" aria-hidden="true">//</span>
+  <div class="grow"><h1 id="t-title"></h1><div class="sub" id="t-sub"></div></div>
+  <button id="b-refresh"></button>
+  <button id="b-open" class="primary"></button>
+</header>
+<div class="tiles" id="tiles"></div>
+<section><h2><span id="t-findings"></span><span class="grow"></span><button id="b-explain"></button></h2><ul id="findings"></ul></section>
+<section><h2><span id="t-errors"></span><span class="grow"></span><button id="b-errors"></button><button id="b-open-console"></button></h2><ul id="errors"></ul></section>
+<section><h2><span id="t-drives"></span><span class="grow"></span><button id="b-open-disk"></button></h2><ul id="drives"></ul></section>
+<section><h2><span id="t-devices"></span><span class="grow"></span><button id="b-devices"></button></h2><ul id="devices"></ul></section>
+<footer id="t-foot"></footer>
+<script type="module">
+// Strings for this view (the app's own locales live in its React UI).
+const T = {
+  pt: {
+    title: "Painel do PC", sub: "G2 Boost dentro do Claude", refresh: "Atualizar", open: "Abrir o G2 Boost",
+    findings: "A Luli encontrou", explain: "Explicar", none: "Nada importante encontrado.",
+    errors: "Erros do Windows, 7 dias", investigate: "Investigar", console: "Console", noErrors: "Nenhum erro relevante.",
+    drives: "Unidades", openDisk: "Analisar", devices: "Aparelhos na rede", scan: "Procurar", scanning: "Procurando…",
+    free: "livre", foot: "Só leitura. Mudanças são feitas no app G2 Boost, com prévia e backup.",
+    cpu: "Processador", gpu: "Placa de vídeo", ram: "Memória", os: "Windows", score: "Otimização",
+    askFindings: "Explique os achados do painel do G2 Boost para este PC e diga o que fazer primeiro.",
+    askErrors: "Investigue os erros do Windows do painel do G2 Boost: use get_windows_errors e get_knowledge (saude-do-windows), diga quais importam e o que fazer.",
+    kinds: { router: "Roteador", this_pc: "Este PC", computer: "Computador", phone: "Celular", tv: "TV", console: "Console", printer: "Impressora", camera: "Câmera", speaker: "Caixa de som", iot: "Casa inteligente", nas: "NAS", unknown: "Desconhecido" },
+  },
+  en: {
+    title: "PC panel", sub: "G2 Boost inside Claude", refresh: "Refresh", open: "Open G2 Boost",
+    findings: "What Luli found", explain: "Explain", none: "Nothing important found.",
+    errors: "Windows errors, 7 days", investigate: "Investigate", console: "Console", noErrors: "No relevant errors.",
+    drives: "Drives", openDisk: "Analyze", devices: "Devices on the network", scan: "Search", scanning: "Searching…",
+    free: "free", foot: "Read-only. Changes happen in the G2 Boost app, with preview and backup.",
+    cpu: "CPU", gpu: "Graphics card", ram: "Memory", os: "Windows", score: "Optimization",
+    askFindings: "Explain the G2 Boost panel findings for this PC and say what to do first.",
+    askErrors: "Investigate the Windows errors in the G2 Boost panel: use get_windows_errors and get_knowledge (saude-do-windows), say which ones matter and what to do.",
+    kinds: { router: "Router", this_pc: "This PC", computer: "Computer", phone: "Phone", tv: "TV", console: "Console", printer: "Printer", camera: "Camera", speaker: "Speaker", iot: "Smart home", nas: "NAS", unknown: "Unknown" },
+  },
+};
+const FINDING = {
+  pt: { xmp_off: "Memória abaixo da velocidade nominal", single_channel: "RAM em canal único", ram_low: "Pouca RAM", hdd_system: "Windows num HD mecânico", sata_system_with_nvme: "Windows no SATA com NVMe livre", system_disk_full: "Disco do sistema quase cheio", vram_low: "Pouca memória de vídeo", vram_high_res: "VRAM curta para a resolução", gpu_driver_old: "Driver de vídeo antigo", refresh_below_max: "Monitor abaixo da taxa máxima", gpu_hot: "GPU quente", cpu_hot: "CPU quente", legacy_boot: "Boot legado (sem UEFI)", rebar_off: "Resizable BAR desligado", bios_old: "BIOS antiga", secure_boot_off: "Secure Boot desligado", tpm_missing: "Sem TPM", hvci_on: "Integridade de memória ligada", winsat_stale: "WinSAT desatualizado", winsat_never: "WinSAT nunca rodou", winsat_disk_weakest: "Disco é o ponto fraco" },
+  en: { xmp_off: "Memory below rated speed", single_channel: "Single-channel RAM", ram_low: "Low RAM", hdd_system: "Windows on a hard drive", sata_system_with_nvme: "Windows on SATA with a free NVMe", system_disk_full: "System disk almost full", vram_low: "Low video memory", vram_high_res: "VRAM short for the resolution", gpu_driver_old: "Old graphics driver", refresh_below_max: "Monitor below max refresh", gpu_hot: "GPU hot", cpu_hot: "CPU hot", legacy_boot: "Legacy boot (no UEFI)", rebar_off: "Resizable BAR off", bios_old: "Old BIOS", secure_boot_off: "Secure Boot off", tpm_missing: "No TPM", hvci_on: "Memory integrity on", winsat_stale: "WinSAT out of date", winsat_never: "WinSAT never ran", winsat_disk_weakest: "Disk is the weak spot" },
+};
+const HINT = {
+  pt: { hardware_whea: "erro de hardware", unexpected_shutdown: "desligamento inesperado", bugcheck: "tela azul", disk: "disco ou cabo", gpu_driver_timeout: "driver de vídeo travou", service_failed: "serviço falhou", driver_load_failed: "driver não carregou", app_crash: "app fechou com erro", app_hang: "app travou", restore_points_lost: "pontos de restauração apagados" },
+  en: { hardware_whea: "hardware error", unexpected_shutdown: "unexpected shutdown", bugcheck: "blue screen", disk: "disk or cable", gpu_driver_timeout: "graphics driver hung", service_failed: "service failed", driver_load_failed: "driver failed to load", app_crash: "app crashed", app_hang: "app hung", restore_points_lost: "restore points deleted" },
+};
+
+let lang = (navigator.language || "pt").toLowerCase().startsWith("pt") ? "pt" : "en";
+const t = (k) => T[lang][k] ?? k;
+
+/* ---------- MCP Apps bridge: JSON-RPC 2.0 over postMessage with the host ---------- */
+let nextId = 1;
+const pending = new Map();
+function request(method, params) {
+  const id = nextId++;
+  window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+}
+function notify(method, params) {
+  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+}
+window.addEventListener("message", (ev) => {
+  if (ev.source !== window.parent) return; // only the host talks to this view
+  const m = ev.data;
+  if (!m || m.jsonrpc !== "2.0") return;
+  if (m.id !== undefined && pending.has(m.id) && !m.method) {
+    const p = pending.get(m.id);
+    pending.delete(m.id);
+    if (m.error) p.reject(m.error); else p.resolve(m.result);
+    return;
+  }
+  if (m.method === "ui/notifications/tool-result") render(m.params?.structuredContent);
+  else if (m.method === "ui/notifications/host-context-changed") theme(m.params);
+  else if (m.method === "ui/resource-teardown" && m.id !== undefined) window.parent.postMessage({ jsonrpc: "2.0", id: m.id, result: {} }, "*");
+});
+
+function theme(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) document.documentElement.dataset.theme = ctx.theme;
+  const vars = ctx.styles?.variables;
+  if (vars) for (const [k, v] of Object.entries(vars)) if (k.startsWith("--") && typeof v === "string") document.documentElement.style.setProperty(k, v);
+  if (typeof ctx.locale === "string") { lang = ctx.locale.toLowerCase().startsWith("pt") ? "pt" : "en"; labels(); }
+}
+
+/* ---------- rendering (data only through textContent: nothing from the PC becomes HTML) ---------- */
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = String(text); return e; }
+function gb(b) { return (b / 1073741824).toFixed(b >= 107374182400 ? 0 : 1) + " GB"; }
+function when(unix) { try { return new Date(unix * 1000).toLocaleString(lang === "pt" ? "pt-BR" : "en", { dateStyle: "short", timeStyle: "short" }); } catch { return ""; } }
+
+function labels() {
+  for (const [id, k] of [["t-title", "title"], ["t-sub", "sub"], ["b-refresh", "refresh"], ["b-open", "open"], ["t-findings", "findings"], ["b-explain", "explain"], ["t-errors", "errors"], ["b-errors", "investigate"], ["b-open-console", "console"], ["t-drives", "drives"], ["b-open-disk", "openDisk"], ["t-devices", "devices"], ["b-devices", "scan"], ["t-foot", "foot"]]) $(id).textContent = t(k);
+}
+
+let last = null;
+function render(d) {
+  if (!d || typeof d !== "object") return;
+  last = d;
+  const tiles = $("tiles");
+  tiles.replaceChildren();
+  const tile = (k, v) => { const x = el("div", "tile"); x.append(el("div", "k", k), el("div", "v", v)); x.title = String(v); tiles.append(x); };
+  tile(t("cpu"), d.pc?.cpu ?? "?");
+  tile(t("gpu"), (d.pc?.gpus ?? []).join(" · ") || "?");
+  tile(t("ram"), d.pc?.ram ?? "?");
+  if (d.score) tile(t("score"), `${d.score.percent ?? "?"}%`);
+
+  const f = $("findings");
+  f.replaceChildren();
+  const findings = Array.isArray(d.findings) ? d.findings : [];
+  if (!findings.length) f.append(el("li", "empty", t("none")));
+  for (const x of findings.slice(0, 12)) {
+    const li = el("li");
+    li.append(el("span", `dot ${x.severity ?? ""}`), el("span", "", FINDING[lang][x.id] ?? x.id));
+    f.append(li);
+  }
+
+  const e = $("errors");
+  e.replaceChildren();
+  const groups = Array.isArray(d.errors?.groups) ? d.errors.groups : [];
+  if (!groups.length) e.append(el("li", "empty", t("noErrors")));
+  for (const g of groups.slice(0, 8)) {
+    const li = el("li");
+    const main = el("span", "grow");
+    main.append(el("span", "", `${g.source} #${g.event_id}`), el("span", "muted", g.hint ? ` · ${HINT[lang][g.hint] ?? g.hint}` : ""));
+    li.append(el("span", `dot ${g.level ?? ""}`), el("span", "count", `${g.count}×`), main, el("span", "muted mono", when(g.last_unix)));
+    if (g.message) li.title = g.message;
+    e.append(li);
+  }
+
+  const dr = $("drives");
+  dr.replaceChildren();
+  for (const x of (Array.isArray(d.drives) ? d.drives : []).filter((x) => x.total_bytes > 0)) {
+    const used = 1 - x.free_bytes / x.total_bytes;
+    const li = el("li");
+    li.style.display = "block";
+    const top = el("div");
+    top.append(el("span", "mono", x.letter), el("span", "muted", `  ${gb(x.free_bytes)} ${t("free")} / ${gb(x.total_bytes)}`));
+    const bar = el("div", "bar");
+    const fill = el("i", used > 0.85 ? "hot" : "");
+    fill.style.width = `${Math.round(used * 100)}%`;
+    bar.append(fill);
+    li.append(top, bar);
+    dr.append(li);
+  }
+  // Tell Claude what the user is looking at (overwrites the previous context).
+  request("ui/update-model-context", { structuredContent: { g2boost_panel: d } }).catch(() => {});
+}
+
+function renderDevices(r) {
+  const ul = $("devices");
+  ul.replaceChildren();
+  let data = r?.structuredContent;
+  if (!data && Array.isArray(r?.content)) { try { data = JSON.parse(r.content[0]?.text ?? "null"); } catch { data = null; } }
+  const list = Array.isArray(data?.devices) ? data.devices : [];
+  if (!list.length) { ul.append(el("li", "empty", data?.error ?? "—")); return; }
+  for (const x of list) {
+    const li = el("li");
+    li.append(el("span", `dot ${x.new ? "warn" : ""}`), el("span", "", x.name ?? x.hostname ?? x.vendor ?? "?"),
+      el("span", "muted", ` · ${T[lang].kinds[x.kind] ?? x.kind}`), el("span", "grow"), el("span", "muted mono", x.ip));
+    ul.append(li);
+  }
+}
+
+async function call(name, args = {}) { return request("tools/call", { name, arguments: args }); }
+const ask = (text) => request("ui/message", { role: "user", content: { type: "text", text } }).catch(() => {});
+
+$("b-refresh").onclick = async (ev) => { ev.target.disabled = true; try { const r = await call("panel_data"); render(r?.structuredContent); } finally { ev.target.disabled = false; } };
+$("b-open").onclick = () => call("open_in_g2boost", { route: "dashboard" }).catch(() => {});
+$("b-open-console").onclick = () => call("open_in_g2boost", { route: "console" }).catch(() => {});
+$("b-open-disk").onclick = () => call("open_in_g2boost", { route: "disk" }).catch(() => {});
+$("b-explain").onclick = () => ask(t("askFindings"));
+$("b-errors").onclick = () => ask(t("askErrors"));
+$("b-devices").onclick = async (ev) => {
+  const b = ev.target; b.disabled = true; b.textContent = t("scanning");
+  try { renderDevices(await call("get_network_devices")); } catch { renderDevices(null); } finally { b.disabled = false; b.textContent = t("scan"); }
+};
+
+labels();
+try {
+  const init = await request("ui/initialize", {
+    protocolVersion: "2026-01-26",
+    appInfo: { name: "G2 Boost", version: "1" },
+    clientInfo: { name: "G2 Boost", version: "1" },
+    appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
+  });
+  theme(init?.hostContext);
+} catch { /* older hosts: keep the defaults */ }
+notify("ui/notifications/initialized", {});
+</script>
+</body>
+</html>

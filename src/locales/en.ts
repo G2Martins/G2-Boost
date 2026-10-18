@@ -219,6 +219,13 @@ export const en = {
   "ai.provider.anthropic": "Claude",
   "ai.provider.openai": "ChatGPT",
   "ai.provider.gemini": "Gemini",
+  "ai.provider.nvidia": "NVIDIA",
+  "ai.key.placeholder.nvidia": "nvapi-…",
+  "ai.free.gemini":
+    "Has a free tier to try it: create the key in Google AI Studio, no card needed. On the free tier Google may use the prompts for training; G2 Boost only sends data without names or serial numbers.",
+  "ai.free.nvidia":
+    "Free catalog for testing (Kimi, DeepSeek, GLM and others): create the key at build.nvidia.com. No web search with this provider.",
+  "ai.web.unavailable": "No web with this provider",
   "ai.model": "Model",
   "ai.key.stored": "Key stored in the Windows vault",
   "ai.key.none": "No key saved",

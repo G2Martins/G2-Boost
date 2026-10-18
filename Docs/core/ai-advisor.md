@@ -64,7 +64,10 @@ Verificado na máquina do dono: `refresh_below_max` (AOC 27G2G4 em 120 Hz, supor
 |---|---|---|---|
 | Claude | SDK oficial `@anthropic-ai/sdk` 0.132.1, `client.beta.messages.stream`, `max_tokens` 64000, `output_config.effort: "high"`, thinking adaptativo (padrão do modelo), `fallbacks: "default"` + beta `server-side-fallback-2026-07-01` (recusa → modelo de fallback), system com `cache_control` (follow-ups baratos), loop de `pause_turn`, `stop_reason: "refusal"` tratado | `claude-opus-5-5` | `web_search_20260209`, só com permissão |
 | ChatGPT | REST `POST /v1/responses`, SSE (`stream:true`), extração do evento `response.completed` | `gpt-5` | `web_search`, só com permissão |
-| Gemini | REST `streamGenerateContent?alt=sse` | `gemini-2.5-pro` | `google_search`, só com permissão (links de redirect do Google; o título traz o domínio) |
+| Gemini | REST `streamGenerateContent?alt=sse` | `gemini-3.8-flash` (os 2.5 ficaram só para quem já usava; padrão salvo `gemini-2.5-pro` migra sozinho) | `google_search`, só com permissão (links de redirect do Google; o título traz o domínio) |
+| NVIDIA (build.nvidia.com) | Chat Completions compatível com OpenAI, `integrate.api.nvidia.com/v1/chat/completions`, SSE (`delta.content`; `reasoning_content` ignorado), `max_tokens` 8192 | `moonshotai/kimi-k2.6` (também `deepseek-ai/deepseek-v4.1-flash`, `z-ai/glm-5.3`) | não tem: prompt avisa, chip de web desligado, nunca pede permissão |
+
+**Testar de graça (2026-10-18):** Gemini pela chave do Google AI Studio (sem cartão; na camada grátis o Google pode usar as perguntas para treino, e o pacote de contexto não tem PII) é o mais próximo do Sonnet entre as opções grátis e já traz pesquisa. NVIDIA build.nvidia.com: catálogo grátis para protótipo (Kimi, DeepSeek, GLM, Nemotron), sem pesquisa. Assinatura Google AI Plus/Pro não dá chave de API; a Pro dá créditos de Cloud que exigem conta de faturamento. GitHub Models foi aposentado; Groq e Cerebras grátis têm limite de tokens por minuto baixo para um prompt de ~12 mil tokens. O card do provedor mostra o link para criar a chave.
 
 Sites de benchmark preferidos (selo nas fontes): techpowerup.com, tomshardware.com, gamersnexus.net, igorslab.de, notebookcheck.net, guru3d.com, eurogamer.net, pcgamingwiki.com, learn/support.microsoft.com, nvidia.com, amd.com, intel.com.
 
@@ -106,6 +109,15 @@ Histórico: Claude guarda o histórico nativo e append-only (o turno do assisten
 O pacote de contexto (app e `get_pc_context`) ganhou `windows_errors`: os 12 grupos mais frequentes dos últimos 7 dias, sem o ruído DCOM.
 
 Instruções do servidor: ler `get_knowledge` antes de aconselhar; para investigar o PC inteiro combinar `get_pc_context` + `get_windows_errors` + `get_disk_usage` e relatar problemas mesmo sem botão no app (causa + caminho pelo Windows ou site do fabricante); mesmas regras de segurança e temperatura do playbook. Sem dependência C nova (`preserve_order` do serde_json puxa só `indexmap`).
+
+### 5.0 Painel do G2 Boost dentro do Claude (MCP Apps, 2026-10-18)
+
+Extensão oficial MCP Apps (spec `2026-01-26`): a tool `show_panel` declara `_meta.ui.resourceUri = "ui://g2boost/panel"` (mais a chave plana antiga, ainda lida por alguns hosts) e o servidor serve o recurso com mime `text/html;profile=mcp-app` (`crates/mcp/src/panel.html`, embutido com `include_str!`). O Claude Desktop renderiza o painel na conversa, inclusive de servidor local stdio; o Claude Code mostra só o texto (o resultado leva o JSON como fallback).
+
+- **Painel:** resumo do PC, achados da Luli, pontuação de otimização, erros do Windows (7 dias, sem ruído DCOM), unidades. Botões: Atualizar (`panel_data`), Procurar aparelhos (`get_network_devices`), Explicar/Investigar (manda a pergunta para o Claude via `ui/message`), Abrir o G2 Boost/Console/Analisar (`open_in_g2boost`). A cada render manda `ui/update-model-context` para o Claude saber o que o usuário está vendo.
+- **Protocolo:** JSON-RPC 2.0 por `postMessage` (`ui/initialize` → `ui/notifications/initialized`; recebe `tool-input`/`tool-result`/`host-context-changed`; responde `ui/resource-teardown`). Tema e variáveis CSS do host aplicados com fallback nas cores do app.
+- **Segurança:** HTML autocontido (CSP do recurso sem nenhum domínio), dados só por `textContent` (teste garante que não há `innerHTML`, `eval` nem URL externa), mensagens aceitas só do `window.parent`. `panel_data` e `open_in_g2boost` são `visibility: ["app"]` (o modelo não chama). `open_in_g2boost` só abre o próprio exe com `--route` de uma allowlist (rota inválida = erro). Nada no painel muda o PC: ação continua no app, com prévia e backup.
+- **Verificado:** JSON-RPC (22 tools, `_meta` certo, `resources/list` e `resources/read`, rota maliciosa recusada) e render num host simulado (Edge + Playwright) com dados reais. Falta o dono ver no Claude Desktop depois de "Conectar ao Claude" (o Desktop pede permissão para exibir o app na primeira vez).
 
 ### 5.1 Conectar ao Claude (`claude_connect.rs`, card na página Luli)
 

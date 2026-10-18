@@ -10,7 +10,7 @@ use windows::core::{PCWSTR, PWSTR};
 
 use crate::registry::wide;
 
-pub const PROVIDERS: &[&str] = &["anthropic", "openai", "gemini"];
+pub const PROVIDERS: &[&str] = &["anthropic", "openai", "gemini", "nvidia"];
 const MAX_KEY_LEN: usize = 512;
 
 #[derive(Debug, thiserror::Error)]

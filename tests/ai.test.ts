@@ -81,3 +81,9 @@ test("console suggestions: bounded lines, only described when asked from the con
   expect(systemPrompt("pt-BR", "{}")).not.toContain("CONSOLE:");
   expect(systemPrompt("pt-BR", "{}", { console: ["ping <host>"] })).toContain("ping <host>");
 });
+
+test("providers without web search never get a permission request", () => {
+  const p = systemPrompt("pt-BR", "{}", { noWeb: true, web: true });
+  expect(p).toContain("not available with this provider");
+  expect(p).not.toContain("Web search is ON");
+});
