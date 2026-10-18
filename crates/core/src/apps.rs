@@ -218,6 +218,18 @@ fn entry(hive: Hive, key: &str, user_protected: &[String]) -> Option<App> {
 /// Every removable-looking entry (Uninstall keys + Store packages), deduplicated by name +
 /// version, sorted by name.
 pub fn list(user_protected: &[String]) -> Vec<App> {
+    let mut out = desktop_list(user_protected);
+    for a in store_apps(user_protected) {
+        if !out.iter().any(|o| o.name.eq_ignore_ascii_case(&a.name)) {
+            out.push(a);
+        }
+    }
+    out.sort_by_key(|a| a.name.to_lowercase());
+    out
+}
+
+/// Desktop apps only (Uninstall keys), deduplicated by name + version.
+fn desktop_list(user_protected: &[String]) -> Vec<App> {
     let mut out: Vec<App> = Vec::new();
     for hive in [Hive::Machine, Hive::Machine32, Hive::User] {
         for key in registry::subkeys(hive.root(), hive.base()).unwrap_or_default() {
@@ -228,13 +240,25 @@ pub fn list(user_protected: &[String]) -> Vec<App> {
             }
         }
     }
-    for a in store_apps(user_protected) {
-        if !out.iter().any(|o| o.name.eq_ignore_ascii_case(&a.name)) {
-            out.push(a);
-        }
-    }
-    out.sort_by_key(|a| a.name.to_lowercase());
     out
+}
+
+/// Apps the installer of `app` added next to it (Parsec → its virtual display and USB drivers):
+/// installed apps whose name starts with `app`'s name plus other (non-version) words, or from the
+/// same publisher on the same install day sharing a name word. Protected apps are left out.
+pub fn companions(app: &App, installed: &[App]) -> Vec<App> {
+    let m = Matcher::new(app);
+    let words: Vec<String> = norm(&app.name).split(' ').filter(|w| w.len() >= 4).map(str::to_string).collect();
+    let same_day = |o: &App| {
+        app.install_date.as_deref().is_some_and(|d| !d.is_empty() && o.install_date.as_deref() == Some(d))
+            && m.is_publisher(&o.publisher)
+            && norm(&o.name).split(' ').any(|w| words.iter().any(|x| x == w))
+    };
+    installed
+        .iter()
+        .filter(|o| o.id != app.id && o.protected.is_none() && (m.companion(&o.name) || same_day(o)))
+        .cloned()
+        .collect()
 }
 
 /// Still installed? (Uninstall key / Store package exists) — polled after starting an uninstaller.
@@ -556,6 +580,19 @@ impl Matcher {
             .then_some(Confidence::Low)
     }
 
+    /// `Parsec Virtual Display Driver` for `Parsec`: the app's whole name, then more words that are
+    /// not a version: a separate product its installer added. Never for short or versioned names.
+    pub(crate) fn companion(&self, name: &str) -> bool {
+        if self.full.len() < 5 || self.version.is_some() {
+            return false;
+        }
+        norm_with(name, false)
+            .strip_prefix(&self.norm_full)
+            .and_then(|r| r.strip_prefix(' '))
+            .and_then(|r| r.split(' ').next())
+            .is_some_and(|w| !is_versionish(w))
+    }
+
     pub(crate) fn is_publisher(&self, name: &str) -> bool {
         self.publisher.as_ref().is_some_and(|p| *p == compact(&norm(name)))
     }
@@ -589,6 +626,9 @@ pub enum Reason {
     CrashDump,
     /// A service whose program is inside the install folder (or named like the app) and is gone.
     ServiceBinaryGone,
+    /// Folder of a separate product the app's installer added (`Parsec Virtual Display Driver`)
+    /// that is no longer installed: High when only its uninstaller is left.
+    Companion,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -647,6 +687,10 @@ pub(crate) struct Ctx {
     services: bool,
     /// User folders that are never a leftover themselves (Documents, Downloads — wherever they live).
     protected: Vec<PathBuf>,
+    /// `Program Files` and `Program Files (x86)`: searched for the app's own and companion folders.
+    program_files: Vec<PathBuf>,
+    /// Install folders (lowercase) of the desktop apps still installed: never a companion leftover.
+    installed_dirs: Vec<String>,
 }
 
 /// A shell known folder (Desktop/Documents may be redirected to OneDrive).
@@ -699,6 +743,13 @@ impl Ctx {
             services: true,
             protected,
             profile,
+            program_files: {
+                let mut v: Vec<PathBuf> = ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"].iter().filter_map(|k| env(k)).collect();
+                v.sort();
+                v.dedup();
+                v
+            },
+            installed_dirs: desktop_list(&[]).iter().filter_map(|a| a.install_location.as_deref()).map(|l| lower(Path::new(l))).filter(|l| l.len() > 3).collect(),
         }
     }
 }
@@ -730,7 +781,7 @@ fn is_reparse(p: &Path) -> bool {
 
 /// The install folder may be removed only below a place where apps install (never a root).
 fn install_dir_ok(l: &str, ctx: &Ctx) -> bool {
-    let pf: Vec<String> = ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"].iter().filter_map(|v| crate::cleanup::env_dir(v)).map(|p| lower(&p)).collect();
+    let pf: Vec<String> = ctx.program_files.iter().map(|p| lower(p)).collect();
     let programs = ctx.data.iter().map(|d| lower(d)).filter(|d| d.ends_with(r"\programs"));
     let below = |base: &str| l.starts_with(&format!("{base}\\"));
     pf.iter().any(|b| below(b))
@@ -751,7 +802,8 @@ pub(crate) fn fs_allowed(p: &Path, ctx: &Ctx, install_dir: bool) -> Option<PathB
         return None;
     }
     // Roots: never the base itself, the profile, the drive or the shared install folders.
-    let mut roots: Vec<String> = ctx.data.iter().chain(&ctx.shortcuts).chain(&ctx.protected).map(|b| lower(b)).collect();
+    let mut roots: Vec<String> =
+        ctx.data.iter().chain(&ctx.shortcuts).chain(&ctx.protected).chain(&ctx.program_files).map(|b| lower(b)).collect();
     let prof = lower(&ctx.profile);
     roots.extend([prof.clone(), format!(r"{prof}\appdata"), format!(r"{prof}\documents"), format!(r"{prof}\downloads")]);
     let program_files = l.len() > 3 && matches!(&l[3..], "program files" | "program files (x86)" | "users" | "programdata");
@@ -775,6 +827,26 @@ fn measure(p: &Path) -> u64 {
     } else {
         fs::metadata(p).map(|m| m.len()).unwrap_or(0)
     }
+}
+
+/// A folder holding nothing but an uninstaller (and its logs): what an NSIS/Inno uninstaller that
+/// cannot delete itself leaves behind.
+fn only_uninstaller(p: &Path) -> bool {
+    let Ok(rd) = fs::read_dir(p) else {
+        return false;
+    };
+    let mut any = false;
+    for e in rd.flatten() {
+        if !e.file_type().is_ok_and(|t| t.is_file()) {
+            return false;
+        }
+        let n = e.file_name().to_string_lossy().to_ascii_lowercase();
+        if !(n.starts_with("unins") || n.starts_with("uninstall") || n.ends_with(".log") || n.ends_with(".dat")) {
+            return false;
+        }
+        any = true;
+    }
+    any
 }
 
 fn dirs(p: &Path) -> Vec<(String, PathBuf)> {
@@ -877,12 +949,32 @@ pub(crate) fn leftovers_in(app: &App, ctx: &Ctx) -> Vec<Leftover> {
             }
             if let Some(c) = m.folder(&name) {
                 f.fs(&path, ctx, LeftoverKind::Folder, c, Reason::NameMatch, false);
+            } else if m.companion(&name) && !ctx.installed_dirs.contains(&lower(&path)) {
+                let c = if only_uninstaller(&path) { Confidence::High } else { Confidence::Medium };
+                f.fs(&path, ctx, LeftoverKind::Folder, c, Reason::Companion, false);
             } else if m.is_publisher(&name) {
                 for (sub, sp) in dirs(&path) {
                     if let Some(c) = m.folder(&sub) {
                         f.fs(&sp, ctx, LeftoverKind::Folder, c, Reason::PublisherFolder, false);
                     }
                 }
+            }
+        }
+    }
+    // Program Files: the app's own folder (when its install location is missing or elsewhere) and
+    // companion products' folders, never one still used by an installed app.
+    let install_dir_l = install.as_deref().map(lower);
+    for root in &ctx.program_files {
+        for (name, path) in dirs(root) {
+            let l = lower(&path);
+            if install_dir_l.as_deref() == Some(l.as_str()) || ctx.installed_dirs.contains(&l) {
+                continue;
+            }
+            if m.folder(&name) == Some(Confidence::High) {
+                f.fs(&path, ctx, LeftoverKind::Folder, Confidence::High, Reason::NameMatch, true);
+            } else if m.companion(&name) {
+                let c = if only_uninstaller(&path) { Confidence::High } else { Confidence::Medium };
+                f.fs(&path, ctx, LeftoverKind::Folder, c, Reason::Companion, true);
             }
         }
     }
@@ -1487,6 +1579,11 @@ mod tests {
             roaming.join(r"Microsoft\Windows\Start Menu\Programs\Acme Widget"),
             root.join(r"Apps\Acme Widget\bin"),
             profile.join("Desktop"),
+            root.join(r"Program Files\Acme Widget Display Driver"),
+            root.join(r"Program Files\Acme Widget Pro Tools"),
+            root.join(r"Program Files\Acme Widget Bridge"),
+            root.join(r"Program Files\Acme Widget 2"),
+            root.join(r"Program Files\Other App"),
         ] {
             fs::create_dir_all(d).unwrap();
         }
@@ -1494,6 +1591,9 @@ mod tests {
         f.write_all(&[0u8; 2048]).unwrap();
         fs::write(local.join(r"CrashDumps\widget.exe.1234.dmp"), [0u8; 10]).unwrap();
         fs::write(local.join(r"CrashDumps\other.exe.1.dmp"), [0u8; 10]).unwrap();
+        // Parsec's case: only the companion's uninstaller survives in its own folder.
+        fs::write(root.join(r"Program Files\Acme Widget Display Driver\uninstall.exe"), [0u8; 64]).unwrap();
+        fs::write(root.join(r"Program Files\Acme Widget Pro Tools\tools.exe"), [0u8; 64]).unwrap();
         let ctx = Ctx {
             windows: PathBuf::from(r"C:\Windows"),
             profile: profile.clone(),
@@ -1503,6 +1603,8 @@ mod tests {
             reg: vec![],
             services: false,
             protected: vec![profile.join("Documents")],
+            program_files: vec![root.join("Program Files")],
+            installed_dirs: vec![lower(&root.join(r"Program Files\Acme Widget Bridge"))],
         };
         (root, ctx)
     }
@@ -1529,6 +1631,51 @@ mod tests {
         assert_eq!(inst.reason, Reason::InstallFolder);
         assert!(found.windows(2).all(|w| w[0].confidence >= w[1].confidence));
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn companion_products_left_in_program_files() {
+        let (root, ctx) = sandbox("companion");
+        let a = app("Acme Widget", "AcmeCorp", None, None);
+        let found = leftovers_in(&a, &ctx);
+        let by = |suffix: &str| found.iter().find(|l| l.path.to_ascii_lowercase().ends_with(&suffix.to_ascii_lowercase()));
+        let drv = by(r"Program Files\Acme Widget Display Driver").expect("companion with only its uninstaller");
+        assert_eq!((drv.confidence, drv.reason), (Confidence::High, Reason::Companion));
+        assert_eq!(by(r"Program Files\Acme Widget Pro Tools").expect("companion with files").confidence, Confidence::Medium);
+        assert!(by(r"Program Files\Acme Widget Bridge").is_none(), "still installed: not a leftover");
+        assert!(by(r"Program Files\Other App").is_none());
+        assert!(found.iter().all(|l| !l.path.to_ascii_lowercase().ends_with(r"\program files")), "never the root");
+        // Short or versioned names never claim companions.
+        assert!(!Matcher::new(&app("Edge", "", None, None)).companion("Edge Update"));
+        assert!(!Matcher::new(&app("EA SPORTS FC 27", "EA", None, None)).companion("EA SPORTS FC 27 Launcher"));
+        assert!(Matcher::new(&app("Parsec", "Parsec Cloud, Inc.", None, None)).companion("Parsec Virtual Display Driver"));
+        assert!(!Matcher::new(&app("Parsec", "", None, None)).companion("Parsec 2"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn companions_still_installed() {
+        let mk = |id: &str, name: &str, publisher: &str, date: &str| {
+            let mut a = app(name, publisher, None, None);
+            a.id = id.into();
+            a.install_date = Some(date.into());
+            a
+        };
+        let parsec = mk("m64:p", "Parsec", "Parsec Cloud, Inc.", "20261001");
+        let list = vec![
+            parsec.clone(),
+            mk("m64:d", "Parsec Virtual Display Driver", "Parsec Cloud, Inc.", "20261001"),
+            mk("m64:u", "Parsec Virtual USB Adapter Driver", "Parsec Cloud, Inc.", "20261001"),
+            mk("m64:x", "Steam", "Valve", "20261001"),
+            mk("m64:y", "Parsec Gaming Helper", "Other", "20250101"),
+            {
+                let mut r = mk("m64:z", "Parsec Runtime", "Parsec Cloud, Inc.", "20261001");
+                r.protected = Some("runtime".into());
+                r
+            },
+        ];
+        let ids: Vec<String> = companions(&parsec, &list).into_iter().map(|a| a.id).collect();
+        assert_eq!(ids, ["m64:d", "m64:u", "m64:y"]);
     }
 
     #[test]
@@ -1643,6 +1790,8 @@ mod tests {
             reg: vec![(Root::Hkcu, "Software".into())],
             services: false,
             protected: vec![],
+            program_files: vec![],
+            installed_dirs: vec![],
         };
         assert!(reg_path_allowed(Root::Hkcu, r"Software\Discord", &ctx));
         assert!(reg_path_allowed(Root::Hkcu, r"Software\Logitech\LGHUB", &ctx));

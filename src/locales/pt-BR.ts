@@ -1152,6 +1152,11 @@ export const ptBR = {
   "apps.title": "Desinstalar apps",
   "apps.subtitle":
     "O desinstalador do próprio app e o que ele deixa para trás, com prévia, motivo de cada item e Lixeira",
+  "apps.reason.companion":
+    "Produto que o instalador do app colocou junto (como os drivers do Parsec) e que não está mais instalado",
+  "apps.companions.title": "O {name} instalou também",
+  "apps.companions.help":
+    "Apps separados que o instalador colocou junto (mesmo nome no começo, ou mesmo fabricante no mesmo dia). Desinstalar o app principal não remove estes; desinstale cada um pelo próprio desinstalador.",
   "apps.tab.installed": "Instalados",
   "apps.tab.orphans": "Sobras de apps removidos",
   "apps.installed.title": "Apps instalados",

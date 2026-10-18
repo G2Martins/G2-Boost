@@ -32,6 +32,13 @@
 6. **Sobras de apps removidos** (SmartDelete): cada listagem grava `apps_snapshot.json`; a aba compara com o que está instalado agora e mostra os apps que sumiram e deixaram algo. Removeu tudo → o app sai do snapshot. **Ao vivo:** uma thread vigia as três chaves `Uninstall` (`RegNotifyChangeKeyValue`, sem polling, rajadas agrupadas em 1,5 s); um app conhecido que some vira o aviso "X foi desinstalado — ver sobras?" no topo do app, que abre a aba e já varre.
 7. **Arrastar e soltar**: um `.exe` ou `.lnk` solto em qualquer lugar da janela abre o desinstalador com o app dele (exe = `DisplayIcon`, ou a pasta de instalação mais longa que contém o alvo).
 
+## Apps companheiros (2026-10-18, caso Parsec)
+
+O instalador do Parsec coloca dois apps separados, **Parsec Virtual Display Driver** e **Parsec Virtual USB Adapter Driver**, cada um em `C:\Program Files\<nome>`. Depois de desinstalados, as duas pastas ficaram com só o `uninstall.exe` (o desinstalador NSIS não apaga a si mesmo) e a busca de sobras não as achou: `Program Files` não era varrida e "Parsec + palavras que não são versão" era descartado. O dono apagou à mão (Lixeira, 2026-10-18 13:01).
+
+- **Sobras de companheiro** (`Reason::Companion`): pastas em `Program Files`/`Program Files (x86)` (e nas pastas de dados) cujo nome é o nome inteiro do app seguido de outras palavras que não são versão (`Matcher::companion`; nunca para nomes curtos, menos de 5 letras, nem versionados), e que **não são a pasta de instalação de nenhum app ainda instalado**. Confiança alta quando só sobrou desinstalador/log (`only_uninstaller`), média caso contrário. A pasta do próprio app em `Program Files` com nome exato também entra (alta). A raiz `Program Files` nunca.
+- **Companheiros ainda instalados** (`companions`): mesmo prefixo de nome, ou mesmo fabricante instalado no mesmo dia e com uma palavra do nome em comum; protegidos ficam de fora. A tela mostra "O X instalou também" com botão Desinstalar de cada um (cada app pelo próprio desinstalador); o MCP devolve `companions_still_installed` em `get_app_leftovers`.
+
 ## Guarda de caminho (`fs_allowed`)
 Toda sobra de arquivo, mostrada ou removida: não é reparse point (junção/symlink nunca é seguida nem removida) → `canonicalize` → `SafePath` (System32, WinSxS, outro usuário, UNC = fora) → fora do `%SystemRoot%` → nunca uma raiz (as bases, o perfil, `Documents`, `Downloads`, unidade, `Program Files`, `Users`, `ProgramData`) → dentro de uma base; ProgramData só abaixo dela. A pasta de instalação passa só se estiver abaixo de `Program Files*`, de `LocalAppData\Programs` ou, em outra unidade, a dois níveis ou mais (`D:\Jogos\X`). Snapshot e nomes de família da Store são revalidados (arquivo editável pelo usuário).
 

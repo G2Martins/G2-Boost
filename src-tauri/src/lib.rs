@@ -1075,6 +1075,16 @@ async fn apps_uninstall(state: State<'_, AppsState>, id: String) -> Result<(), S
         .map_err(|e| e.to_string())?
 }
 
+/// Other installed apps the installer of `id` added (Parsec → its display and USB drivers).
+#[tauri::command]
+fn apps_companions(state: State<'_, AppsState>, id: String) -> Vec<apps::App> {
+    let Some(app) = state.find(&id) else {
+        return Vec::new();
+    };
+    let installed = state.apps.lock().unwrap().clone();
+    apps::companions(&app, &installed).into_iter().filter(apps::installed).collect()
+}
+
 #[tauri::command]
 fn apps_installed(state: State<'_, AppsState>, id: String) -> bool {
     state.find(&id).is_some_and(|a| apps::installed(&a))
@@ -1345,6 +1355,7 @@ pub fn run() {
             apps_remove,
             apps_uninstall,
             apps_installed,
+            apps_companions,
             apps_resolve,
             apps_protect,
             apps_undo_status,

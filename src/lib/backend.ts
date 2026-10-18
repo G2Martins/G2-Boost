@@ -620,6 +620,7 @@ export const backend = {
     (await call<string | null>("apps_resolve", { path })) ?? null,
   appsUndoStatus: () => call<UndoRecord | null>("apps_undo_status"),
   appsIcon: async (id: string) => (await call<string | null>("apps_icon", { id })) ?? null,
+  appsCompanions: async (id: string) => (await call<AppEntry[]>("apps_companions", { id })) ?? [],
   appsUndo: () => callOrThrow<UndoOutcome>("apps_undo"),
   appsProtect: (id: string, protect: boolean) =>
     callOrThrow<Settings>("apps_protect", { id, protect }),

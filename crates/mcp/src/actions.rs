@@ -274,8 +274,14 @@ pub fn app_leftovers(id: &str) -> Value {
         return json!({ "error": "unknown_app" });
     };
     let all = apps::leftovers(&app);
+    let s = settings::load();
+    let companions: Vec<Value> = apps::companions(&app, &apps::list(&s.protected_apps))
+        .iter()
+        .map(|c| json!({ "id": c.id, "name": c.name, "publisher": c.publisher }))
+        .collect();
     json!({
         "app": app.name,
+        "companions_still_installed": companions,
         "leftovers": all.iter().map(|l| json!({ "kind": l.kind, "path": g2boost_core::winevents::redact_here(&l.path), "bytes": l.bytes, "confidence": l.confidence, "reason": l.reason, "precious": l.precious, "needs_admin": l.needs_admin })).collect::<Vec<_>>(),
         "remove_app_leftovers_takes": removable(&app).len(),
         "note": "remove_app_leftovers never takes the user's own data (precious) or low-confidence items; the app's screen can.",

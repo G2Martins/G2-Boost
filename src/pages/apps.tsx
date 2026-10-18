@@ -402,6 +402,17 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
             </Card>
           )}
           {app ? (
+            <Companions
+              key={`c:${app.id}:${reload}`}
+              app={app}
+              busy={waiting !== null}
+              onPick={(c) => {
+                setSelected(c.id);
+                setAsk(c);
+              }}
+            />
+          ) : null}
+          {app ? (
             <LeftoversPanel
               key={`${app.id}:${reload}`}
               appId={app.id}
@@ -587,6 +598,56 @@ function appsError(
 }
 
 /** Leftovers of one app: reasons + confidence, checkboxes, confirmed removal (token in the core). */
+/** Apps this one's installer added and that are still installed (Parsec → its drivers). */
+function Companions({
+  app,
+  busy,
+  onPick,
+}: {
+  app: AppEntry;
+  busy: boolean;
+  onPick: (c: AppEntry) => void;
+}) {
+  const { t } = useI18n();
+  const [list, setList] = useState<AppEntry[]>([]);
+  useEffect(() => {
+    let alive = true;
+    backend.appsCompanions(app.id).then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, [app.id]);
+  if (list.length === 0) return null;
+  return (
+    <Card className="animate-rise border-warning/40">
+      <CardTitle help={t("apps.companions.help")}>
+        {t("apps.companions.title", { name: app.name })}
+      </CardTitle>
+      <ul className="space-y-2">
+        {list.map((c) => (
+          <li key={c.id} className="flex items-center gap-3">
+            <AppIcon app={c} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{c.name}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {c.publisher}
+              </span>
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || !!c.protected}
+              onClick={() => onPick(c)}
+            >
+              {t("apps.uninstall")}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 function LeftoversPanel({
   appId,
   appName,

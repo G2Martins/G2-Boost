@@ -1153,6 +1153,11 @@ export const en = {
   "apps.title": "Uninstall apps",
   "apps.subtitle":
     "The app's own uninstaller and what it leaves behind, with a preview, a reason for each item and the Recycle Bin",
+  "apps.reason.companion":
+    "A product the app's installer added (like Parsec's drivers) that is no longer installed",
+  "apps.companions.title": "{name} also installed",
+  "apps.companions.help":
+    "Separate apps the installer added (same leading name, or same publisher on the same day). Uninstalling the main app does not remove them; uninstall each with its own uninstaller.",
   "apps.tab.installed": "Installed",
   "apps.tab.orphans": "Leftovers of removed apps",
   "apps.installed.title": "Installed apps",
