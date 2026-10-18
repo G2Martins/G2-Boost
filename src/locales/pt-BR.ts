@@ -923,6 +923,16 @@ export const ptBR = {
   "apps.reason.publisher_folder": "dentro da pasta do fabricante",
   "apps.reason.crash_dump": "relatório de travamento do app",
   "apps.reason.service_binary_gone": "serviço do app cujo programa já foi apagado",
+  "apps.precious": "Seus dados",
+  "apps.confirm.precious":
+    "Inclui dados seus — saves, perfis de navegador/app ou cofres. Vão para a Lixeira (dá para restaurar), mas confira se não vai precisar deles.",
+  "apps.undo": "Desfazer remoção de {app}",
+  "apps.undo.hint":
+    "Devolve os {n} itens removidos de {app}: arquivos saem da Lixeira para onde estavam e as chaves de registro voltam do backup.",
+  "apps.undo.done": "Restaurado: {files} arquivos/pastas e {keys} chaves ({failed} falharam).",
+  "apps.removed_banner": "{name} foi desinstalado. Quer ver o que ele deixou para trás?",
+  "apps.removed_banner.action": "Ver sobras",
+  "apps.error.running": "Feche {exe} antes de desinstalar (o app está aberto).",
   "apps.selected": "{n} selecionados · {size}",
   "apps.remove": "Remover {n}",
   "apps.confirm.title": "Remover {n} sobras de {name}?",

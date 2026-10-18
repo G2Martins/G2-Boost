@@ -1,11 +1,12 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, type Route } from "@/components/shell/app-shell";
-import { TooltipProvider } from "@/components/ui/primitives";
+import { Button, TooltipProvider } from "@/components/ui/primitives";
 import { backend, inTauri } from "@/lib/backend";
 import { boot } from "@/lib/boot";
-import { I18nProvider } from "@/lib/i18n";
-import { emitDrop, onNavigate } from "@/lib/nav";
+import { I18nProvider, useI18n } from "@/lib/i18n";
+import { emitDrop, onNavigate, openOrphans } from "@/lib/nav";
 import { AiPage } from "@/pages/ai";
 import { AppsPage } from "@/pages/apps";
 import { BoostPage } from "@/pages/boost";
@@ -27,6 +28,34 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
 };
 
 const isRoute = (r: string | null | undefined): r is Route => !!r && r in PAGES;
+
+function RemovedBanner({
+  name,
+  onOpen,
+  onClose,
+}: {
+  name: string;
+  onOpen: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="animate-rise sticky top-0 z-40 flex items-center gap-3 border-b border-border-strong bg-surface/95 px-6 py-2.5 backdrop-blur">
+      <span className="text-[13px]">{t("apps.removed_banner", { name })}</span>
+      <Button size="sm" variant="primary" className="ml-auto" onClick={onOpen}>
+        {t("apps.removed_banner.action")}
+      </Button>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t("common.cancel")}
+        className="press flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+      >
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
 
 export default function App() {
   const [route, setRoute] = useState<Route>("dashboard");
@@ -78,11 +107,30 @@ export default function App() {
       void off.then((f) => f());
     };
   }, []);
+  // SmartDelete: an app removed outside G2 Boost → offer its leftovers.
+  const [removed, setRemoved] = useState<string | null>(null);
+  useEffect(() => {
+    const off = backend.on<{ id: string; name: string }>("apps:removed", (a) => setRemoved(a.name));
+    return () => {
+      void off.then((f) => f());
+    };
+  }, []);
   const Page = PAGES[route];
   return (
     <I18nProvider>
       <TooltipProvider>
         <AppShell route={route} onNavigate={setRoute} version={version} elevated={elevated}>
+          {removed ? (
+            <RemovedBanner
+              name={removed}
+              onOpen={() => {
+                setRemoved(null);
+                openOrphans();
+                setRoute("apps");
+              }}
+              onClose={() => setRemoved(null)}
+            />
+          ) : null}
           {ready ? (
             // Only the content area enters (200 ms, 4 px); the shell stays still.
             <div key={route} className="route-enter min-h-full">

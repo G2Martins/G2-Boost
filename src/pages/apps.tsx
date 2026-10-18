@@ -7,6 +7,7 @@ import {
   Lock,
   PackageX,
   RefreshCw,
+  RotateCcw,
   Search,
   Shield,
   ShieldOff,
@@ -37,9 +38,10 @@ import {
   type Leftover,
   type LeftoverOutcome,
   type OrphanApp,
+  type UndoRecord,
 } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
-import { onDrop, takeDrop } from "@/lib/nav";
+import { APPS_REMOVED, onDrop, onOpenOrphans, takeDrop, takeOpenOrphans } from "@/lib/nav";
 import { cn, formatBytes } from "@/lib/utils";
 
 const KIND_ICON = {
@@ -54,7 +56,8 @@ const CONF_TONE = { high: "success", medium: "warning", low: "neutral" } as cons
 
 export function AppsPage() {
   const { t } = useI18n();
-  const [tab, setTab] = useState("installed");
+  const [autoScan, setAutoScan] = useState(() => takeOpenOrphans());
+  const [tab, setTab] = useState(autoScan ? "orphans" : "installed");
   const [drop, setDrop] = useState<string | null>(() => takeDrop());
   useEffect(
     () =>
@@ -64,10 +67,19 @@ export function AppsPage() {
       }),
     [],
   );
+  useEffect(
+    () =>
+      onOpenOrphans(() => {
+        setTab("orphans");
+        setAutoScan(true);
+      }),
+    [],
+  );
   return (
     <PageHeader
       title={t("apps.title")}
       subtitle={t("apps.subtitle")}
+      actions={<UndoButton />}
       tabs={
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
@@ -81,7 +93,7 @@ export function AppsPage() {
           </TabsContent>
           <TabsContent value="orphans">
             <PageBody className="px-0 pb-0">
-              <OrphansTab />
+              <OrphansTab autoScan={autoScan} onAutoScanned={() => setAutoScan(false)} />
             </PageBody>
           </TabsContent>
         </Tabs>
@@ -374,21 +386,68 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
   );
 }
 
-function OrphansTab() {
+/** "Undo last removal": Recycle Bin items back to their places, registry backups re-imported. */
+function UndoButton() {
+  const { t } = useI18n();
+  const errorText = useErrorText();
+  const [rec, setRec] = useState<UndoRecord | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const refresh = useCallback(() => {
+    backend.appsUndoStatus().then((r) => setRec(r));
+  }, []);
+  useEffect(() => {
+    refresh();
+    window.addEventListener(APPS_REMOVED, refresh);
+    return () => window.removeEventListener(APPS_REMOVED, refresh);
+  }, [refresh]);
+  if (!rec && !msg) return null;
+  return (
+    <span className="flex items-center gap-2">
+      {msg ? <span className="text-xs text-foreground/90">{msg}</span> : null}
+      {rec ? (
+        <Button
+          variant="outline"
+          size="sm"
+          title={t("apps.undo.hint", { app: rec.app, n: rec.files.length + rec.keys.length })}
+          onClick={async () => {
+            try {
+              const o = await backend.appsUndo();
+              setMsg(t("apps.undo.done", { files: o.files, keys: o.keys, failed: o.failed }));
+            } catch (e) {
+              setMsg(errorText(e));
+            }
+            refresh();
+          }}
+        >
+          <RotateCcw className="size-4" />
+          {t("apps.undo", { app: rec.app })}
+        </Button>
+      ) : null}
+    </span>
+  );
+}
+
+function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScanned: () => void }) {
   const { t, locale } = useI18n();
   const [list, setList] = useState<OrphanApp[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<OrphanApp | null>(null);
   const [reload, setReload] = useState(0);
 
-  const scan = async () => {
+  const scan = useCallback(async () => {
     setBusy(true);
     setSelected(null);
     // The orphan sweep compares with the installed list kept in the core: load it first.
     await backend.appsList();
     setList((await backend.appsOrphans()) ?? []);
     setBusy(false);
-  };
+  }, []);
+  // Opened from the "app removed" banner: sweep right away.
+  useEffect(() => {
+    if (!autoScan) return;
+    onAutoScanned();
+    void scan();
+  }, [autoScan, onAutoScanned, scan]);
 
   return (
     <>
@@ -467,6 +526,7 @@ function appsError(
 ) {
   const m = e instanceof Error ? e.message : String(e);
   if (m === "protected_app") return t("apps.error.protected");
+  if (m.startsWith("app_running:")) return t("apps.error.running", { exe: m.slice(12) });
   if (m === "uninstaller_blocked") return t("apps.error.blocked");
   if (m === "uninstaller_missing") return t("apps.error.missing");
   if (m === "still_installed") return t("apps.error.still_installed");
@@ -503,7 +563,8 @@ function LeftoversPanel({
     backend.appsLeftovers(appId).then((l) => {
       if (!alive || !l) return;
       setItems(l);
-      setPicked(new Set(l.filter((x) => x.confidence !== "low").map((x) => x.id)));
+      // The user's own data (saves, profiles, vaults) and near misses are never preselected.
+      setPicked(new Set(l.filter((x) => x.confidence !== "low" && !x.precious).map((x) => x.id)));
     });
     return () => {
       alive = false;
@@ -538,6 +599,7 @@ function LeftoversPanel({
           (out.needs_admin ? ` ${t("apps.removed_admin", { n: out.needs_admin })}` : ""),
       );
       onRemoved();
+      window.dispatchEvent(new Event(APPS_REMOVED));
     } catch (e) {
       setMsg(appsError(e, t, errorText));
     } finally {
@@ -582,6 +644,7 @@ function LeftoversPanel({
                     {t(`apps.conf.${x.confidence}` as I18nKey)}
                   </Badge>
                   {t(`apps.reason.${x.reason}` as I18nKey)}
+                  {x.precious ? <Badge tone="warning">{t("apps.precious")}</Badge> : null}
                   {x.needs_admin ? (
                     <Badge tone="neutral">{t("common.admin_required")}</Badge>
                   ) : null}
@@ -629,6 +692,11 @@ function LeftoversPanel({
           </>
         }
       >
+        {chosen.some((x) => x.precious) ? (
+          <p className="mb-3 rounded-md bg-warning/10 px-3 py-2 text-warning ring-1 ring-inset ring-warning/25">
+            {t("apps.confirm.precious")}
+          </p>
+        ) : null}
         <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
           <li>{t("apps.confirm.files")}</li>
           <li>{t("apps.confirm.registry")}</li>

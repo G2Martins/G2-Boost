@@ -45,6 +45,11 @@ pub enum AppsError {
     StillInstalled,
     #[error("cancelled")]
     Cancelled,
+    /// One of the app's programs is running: close it first (AppCleaner's "protect opened apps").
+    #[error("app_running:{0}")]
+    Running(String),
+    #[error("nothing_to_undo")]
+    NothingToUndo,
     #[error("win32: {0}")]
     Win32(String),
 }
@@ -423,6 +428,20 @@ fn norm_with(s: &str, pop_version: bool) -> String {
     toks.join(" ")
 }
 
+/// Edit distance (insert/delete/substitute), two-row DP.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut cur = vec![i + 1; b.len() + 1];
+        for (j, cb) in b.iter().enumerate() {
+            cur[j + 1] = (prev[j] + usize::from(ca != *cb)).min(prev[j + 1] + 1).min(cur[j] + 1);
+        }
+        prev = cur;
+    }
+    prev[b.len()]
+}
+
 fn compact(n: &str) -> String {
     n.chars().filter(|c| !c.is_whitespace()).collect()
 }
@@ -484,12 +503,19 @@ impl Matcher {
         }
         // `Name 2`, `Name_v3`: the name followed by a version word. When the app's own name
         // carries a version (yearly games: `FC 27`), it must be the same one — `FC 26` is another app.
-        let rest = n.strip_prefix(&self.norm_full).and_then(|r| r.strip_prefix(' '))?;
-        let first = rest.split(' ').next().filter(|w| is_versionish(w))?;
-        match &self.version {
-            Some(v) if v.split(' ').next() != Some(first) => None,
-            _ => Some(Confidence::Medium),
+        if let Some(rest) = n.strip_prefix(&self.norm_full).and_then(|r| r.strip_prefix(' '))
+            && let Some(first) = rest.split(' ').next().filter(|w| is_versionish(w))
+        {
+            return match &self.version {
+                Some(v) if v.split(' ').next() != Some(first) => None,
+                _ => Some(Confidence::Medium),
+            };
         }
+        // A near miss (typo, dropped letter: `Spotfy`): Low confidence, never preselected.
+        // Not for versioned names — `FC 26` must stay a different app from `FC 27`.
+        let limit = (self.full.len() / 8).max(1);
+        (self.version.is_none() && self.full.len() >= 6 && c.len().abs_diff(self.full.len()) <= limit && levenshtein(&c, &self.full) <= limit)
+            .then_some(Confidence::Low)
     }
 
     pub(crate) fn is_publisher(&self, name: &str) -> bool {
@@ -544,8 +570,29 @@ pub struct Leftover {
     pub confidence: Confidence,
     pub reason: Reason,
     pub needs_admin: bool,
+    /// Saves, browser/app profiles, vaults, backups: the user's own data (never preselected,
+    /// extra warning before removal — AppCleaner's "you are about to remove your user data").
+    pub precious: bool,
     #[serde(skip)]
     target: Target,
+}
+
+/// Does this folder/file hold data the user cannot get back from a reinstall?
+fn is_precious(p: &Path) -> bool {
+    const MARKS: &[&str] = &["save", "profile", "user data", "vault", "wallet", "backup", "keychain"];
+    let hit = |n: &str| {
+        let n = n.to_ascii_lowercase();
+        MARKS.iter().any(|m| n.contains(m)) || n.ends_with(".sav") || n.ends_with(".kdbx")
+    };
+    let l = lower(p);
+    if l.contains(r"\saved games\") || l.contains(r"\my games\") {
+        return true;
+    }
+    if p.file_name().is_some_and(|n| hit(&n.to_string_lossy())) {
+        return true;
+    }
+    // One level inside: `Game\Saves`, `Chrome\User Data`, `App\Profiles`.
+    p.is_dir() && fs::read_dir(p).is_ok_and(|rd| rd.flatten().take(300).any(|e| hit(&e.file_name().to_string_lossy())))
 }
 
 /// Where leftovers may live. `live()` for the real machine; tests build one over a sandbox.
@@ -560,14 +607,17 @@ pub(crate) struct Ctx {
     /// Registry bases searched for keys named like the app.
     reg: Vec<(Root, String)>,
     services: bool,
+    /// User folders that are never a leftover themselves (Documents, Downloads — wherever they live).
+    protected: Vec<PathBuf>,
 }
 
-fn known_desktop() -> Option<PathBuf> {
+/// A shell known folder (Desktop/Documents may be redirected to OneDrive).
+fn known_folder(id: &windows::core::GUID) -> Option<PathBuf> {
     use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::UI::Shell::{FOLDERID_Desktop, KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
-    // SAFETY: the API allocates the string; freed with CoTaskMemFree. Desktop may live in OneDrive.
+    use windows::Win32::UI::Shell::{KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
+    // SAFETY: the API allocates the string; freed with CoTaskMemFree.
     unsafe {
-        let p = SHGetKnownFolderPath(&FOLDERID_Desktop, KNOWN_FOLDER_FLAG(0), None).ok()?;
+        let p = SHGetKnownFolderPath(id, KNOWN_FOLDER_FLAG(0), None).ok()?;
         let s = p.to_string().ok();
         CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
         s.map(PathBuf::from)
@@ -592,7 +642,13 @@ impl Ctx {
         if let Some(pd) = &program_data {
             shortcuts.push(pd.join(r"Microsoft\Windows\Start Menu\Programs"));
         }
-        shortcuts.extend(known_desktop());
+        use windows::Win32::UI::Shell::{FOLDERID_Desktop, FOLDERID_Documents, FOLDERID_Downloads, FOLDERID_SavedGames};
+        shortcuts.extend(known_folder(&FOLDERID_Desktop));
+        // Game saves: searched too, always flagged precious (never preselected).
+        let documents = known_folder(&FOLDERID_Documents);
+        data.extend(known_folder(&FOLDERID_SavedGames).filter(|p| p.is_dir()));
+        data.extend(documents.as_ref().map(|d| d.join("My Games")).filter(|p| p.is_dir()));
+        let protected: Vec<PathBuf> = [documents, known_folder(&FOLDERID_Downloads)].into_iter().flatten().collect();
         if let Some(public) = env("PUBLIC") {
             shortcuts.push(public.join("Desktop"));
         }
@@ -603,6 +659,7 @@ impl Ctx {
             shortcuts,
             reg: vec![(Root::Hkcu, "Software".into()), (Root::Hklm, "SOFTWARE".into()), (Root::Hklm, r"SOFTWARE\WOW6432Node".into())],
             services: true,
+            protected,
             profile,
         }
     }
@@ -656,7 +713,7 @@ pub(crate) fn fs_allowed(p: &Path, ctx: &Ctx, install_dir: bool) -> Option<PathB
         return None;
     }
     // Roots: never the base itself, the profile, the drive or the shared install folders.
-    let mut roots: Vec<String> = ctx.data.iter().chain(&ctx.shortcuts).map(|b| lower(b)).collect();
+    let mut roots: Vec<String> = ctx.data.iter().chain(&ctx.shortcuts).chain(&ctx.protected).map(|b| lower(b)).collect();
     let prof = lower(&ctx.profile);
     roots.extend([prof.clone(), format!(r"{prof}\appdata"), format!(r"{prof}\documents"), format!(r"{prof}\downloads")]);
     let program_files = l.len() > 3 && matches!(&l[3..], "program files" | "program files (x86)" | "users" | "programdata");
@@ -738,7 +795,8 @@ impl Found {
             return;
         }
         let id = self.0.len() as u32;
-        self.0.push(Leftover { id, kind, path, bytes, confidence, reason, needs_admin, target });
+        let precious = matches!(&target, Target::Fs(p) if is_precious(p));
+        self.0.push(Leftover { id, kind, path, bytes, confidence, reason, needs_admin, precious, target });
     }
 
     fn fs(&mut self, p: &Path, ctx: &Ctx, kind: LeftoverKind, confidence: Confidence, reason: Reason, install_dir: bool) {
@@ -954,6 +1012,9 @@ pub fn uninstall(app: &App) -> Result<(), AppsError> {
     if app.hive == Hive::Store {
         return store_remove(&app.key);
     }
+    if let Some(exe) = running_exe(app) {
+        return Err(AppsError::Running(exe));
+    }
     let windows = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
     let (exe, args) = uninstaller(app, &windows)?;
     let file = registry::wide(&exe.to_string_lossy());
@@ -974,6 +1035,19 @@ pub fn uninstall(app: &App) -> Result<(), AppsError> {
         0x8007_0005 => AppsError::NeedsAdmin,
         _ => AppsError::Win32(e.message()),
     })
+}
+
+/// File name of a running program that belongs to `app` (its exe, or anything in its folder).
+fn running_exe(app: &App) -> Option<String> {
+    let loc = app.install_location.as_deref().map(|l| lower(Path::new(l))).filter(|l| l.len() > 3);
+    let exe = app.exe.as_deref().map(|e| lower(Path::new(e)));
+    crate::system::running_process_paths()
+        .into_iter()
+        .find(|p| {
+            let pl = lower(Path::new(p));
+            exe.as_deref() == Some(pl.as_str()) || loc.as_deref().is_some_and(|l| starts_with_dir(&pl, l))
+        })
+        .and_then(|p| Path::new(&p).file_name().map(|n| n.to_string_lossy().into_owned()))
 }
 
 /* ---------------- drag & drop ---------------- */
@@ -1028,6 +1102,7 @@ pub fn remove(app: &App, items: &[Leftover]) -> Result<RemoveOutcome, AppsError>
 pub(crate) fn remove_in(items: &[Leftover], app_name: &str, ctx: &Ctx, elevated: bool) -> RemoveOutcome {
     let t0 = std::time::Instant::now();
     let mut out = RemoveOutcome::default();
+    let mut undo = UndoRecord { at: registry::now_unix(), app: app_name.to_string(), ..Default::default() };
     let mut paths: Vec<(PathBuf, u64)> = Vec::new();
     for l in items {
         if l.needs_admin && !elevated && !matches!(l.target, Target::Fs(_)) {
@@ -1040,20 +1115,24 @@ pub(crate) fn remove_in(items: &[Leftover], app_name: &str, ctx: &Ctx, elevated:
                 _ => out.failed += 1,
             },
             Target::Reg(root, path) => {
-                // Only keys directly under the searched bases (or one publisher level below).
-                let ok = ctx.reg.iter().any(|(r, b)| r == root && path.strip_prefix(&format!(r"{b}\")).is_some_and(|rest| !rest.is_empty() && rest.matches('\\').count() <= 1));
-                let done = ok
-                    && registry::export_tree(*root, path)
-                        .ok()
+                let done = reg_path_allowed(*root, path, ctx)
+                    .then(|| registry::export_tree(*root, path).ok())
+                    .flatten()
                         .and_then(|tree| {
                             fs::create_dir_all(backup_dir()).ok()?;
                             let file = backup_dir().join(format!("{}-{}.json", registry::now_unix(), out.registry + out.failed));
-                            let doc = serde_json::json!({ "app": app_name, "root": root, "path": path, "tree": tree });
-                            fs::write(file, serde_json::to_string_pretty(&doc).ok()?).ok()
+                            let doc = KeyBackup { app: app_name.to_string(), root: *root, path: path.clone(), tree };
+                            fs::write(&file, serde_json::to_string_pretty(&doc).ok()?).ok()?;
+                            Some(file)
                         })
-                        .is_some()
-                    && registry::delete_tree(*root, path).is_ok();
-                if done { out.registry += 1 } else { out.failed += 1 }
+                        .filter(|_| registry::delete_tree(*root, path).is_ok());
+                match done {
+                    Some(file) => {
+                        out.registry += 1;
+                        undo.keys.push(file.to_string_lossy().into_owned());
+                    }
+                    None => out.failed += 1,
+                }
             }
             Target::Service(name) => {
                 if crate::boost::delete_orphan_service(name).is_ok() {
@@ -1071,10 +1150,14 @@ pub(crate) fn remove_in(items: &[Leftover], app_name: &str, ctx: &Ctx, elevated:
             if fs::symlink_metadata(p).is_err() {
                 out.recycled += 1;
                 out.bytes += bytes;
+                undo.files.push(p.to_string_lossy().into_owned());
             } else {
                 out.failed += 1;
             }
         }
+    }
+    if !undo.files.is_empty() || !undo.keys.is_empty() {
+        save_undo(&undo);
     }
     if out.recycled + out.registry + out.services > 0 {
         crate::cleanup::record_run(&crate::cleanup::RunRecord {
@@ -1091,6 +1174,144 @@ pub(crate) fn remove_in(items: &[Leftover], app_name: &str, ctx: &Ctx, elevated:
         });
     }
     out
+}
+
+/* ---------------- undo the last removal ---------------- */
+
+/// A registry tree saved before deletion (also the undo source).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct KeyBackup {
+    app: String,
+    root: Root,
+    path: String,
+    tree: registry::Tree,
+}
+
+/// The last removal: what went to the Recycle Bin and which registry backups to re-import.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UndoRecord {
+    pub at: u64,
+    pub app: String,
+    pub files: Vec<String>,
+    pub keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct UndoOutcome {
+    pub files: u32,
+    pub keys: u32,
+    pub failed: u32,
+}
+
+fn undo_file() -> PathBuf {
+    registry::data_dir().join("uninstall_undo.json")
+}
+
+fn save_undo(u: &UndoRecord) {
+    let _ = fs::create_dir_all(registry::data_dir());
+    let _ = fs::write(undo_file(), serde_json::to_string_pretty(u).unwrap_or_default());
+}
+
+pub fn undo_status() -> Option<UndoRecord> {
+    fs::read_to_string(undo_file()).ok().and_then(|t| serde_json::from_str(&t).ok())
+}
+
+/// Only keys directly under the searched bases (or one publisher level below), none of them shared.
+fn reg_path_allowed(root: Root, path: &str, ctx: &Ctx) -> bool {
+    ctx.reg.iter().any(|(r, b)| {
+        *r == root
+            && path.strip_prefix(&format!(r"{b}\")).is_some_and(|rest| {
+                !rest.is_empty()
+                    && rest.matches('\\').count() <= 1
+                    && rest.split('\\').all(|seg| !seg.is_empty() && seg != ".." && !DENY_KEYS.contains(&seg.to_ascii_lowercase().as_str()))
+            })
+    })
+}
+
+/// `$I` metadata of a recycled item (Vista+ v1, Windows 10+ v2): deletion FILETIME + original path.
+pub(crate) fn parse_recycle_info(b: &[u8]) -> Option<(u64, String)> {
+    let version = u64::from_le_bytes(b.get(0..8)?.try_into().ok()?);
+    let deleted = u64::from_le_bytes(b.get(16..24)?.try_into().ok()?);
+    let units: Vec<u16> = match version {
+        2 => {
+            let n = u32::from_le_bytes(b.get(24..28)?.try_into().ok()?) as usize;
+            b.get(28..28 + n * 2)?.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect()
+        }
+        1 => b.get(24..24 + 520)?.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect(),
+        _ => return None,
+    };
+    let end = units.iter().position(|&u| u == 0).unwrap_or(units.len());
+    Some((deleted, String::from_utf16_lossy(&units[..end])))
+}
+
+/// Every recycled item this user can read: (`$I` file, `$R` file, original path, deletion time).
+fn recycle_bin() -> Vec<(PathBuf, PathBuf, String, u64)> {
+    let mut out = Vec::new();
+    for letter in b'A'..=b'Z' {
+        let bin = PathBuf::from(format!(r"{}:\$Recycle.Bin", letter as char));
+        let Ok(sids) = fs::read_dir(&bin) else {
+            continue;
+        };
+        for sid in sids.flatten() {
+            let Ok(items) = fs::read_dir(sid.path()) else {
+                continue; // another user's bin
+            };
+            for e in items.flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                let Some(rest) = name.strip_prefix("$I") else {
+                    continue;
+                };
+                if let Some((deleted, original)) = fs::read(e.path()).ok().and_then(|b| parse_recycle_info(&b)) {
+                    out.push((e.path(), sid.path().join(format!("$R{rest}")), original, deleted));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Put the last removal back: recycled files to where they were, registry keys re-imported.
+/// The record and backups are user-writable: every target is checked like a fresh removal.
+pub fn undo() -> Result<UndoOutcome, AppsError> {
+    let rec = undo_status().ok_or(AppsError::NothingToUndo)?;
+    let ctx = Ctx::live();
+    let mut out = UndoOutcome::default();
+    let since = (rec.at.saturating_sub(120) + 11_644_473_600) * 10_000_000; // unix s → FILETIME
+    let bin = if rec.files.is_empty() { Vec::new() } else { recycle_bin() };
+    for original in &rec.files {
+        let target = PathBuf::from(original);
+        let safe = target.is_absolute()
+            && !target.exists()
+            && target.parent().is_some_and(Path::exists)
+            && SafePath::classify(&target, &ctx.windows, &ctx.profile).is_ok()
+            && !starts_with_dir(&lower(&target), &lower(&ctx.windows));
+        let item = bin.iter().filter(|(_, r, o, d)| o.eq_ignore_ascii_case(original) && *d >= since && r.exists()).max_by_key(|(_, _, _, d)| *d);
+        match (safe, item) {
+            (true, Some((i, r, _, _))) if fs::rename(r, &target).is_ok() => {
+                let _ = fs::remove_file(i);
+                out.files += 1;
+            }
+            _ => out.failed += 1,
+        }
+    }
+    for file in &rec.keys {
+        let backup: Option<KeyBackup> = fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok());
+        match backup {
+            Some(b) if reg_path_allowed(b.root, &b.path, &ctx) && registry::import_tree(b.root, &b.path, &b.tree).is_ok() => out.keys += 1,
+            _ => out.failed += 1,
+        }
+    }
+    let _ = fs::remove_file(undo_file());
+    Ok(out)
+}
+
+/// Uninstall keys watched for apps removed outside G2 Boost (SmartDelete).
+pub const UNINSTALL_KEYS: [(Root, &str); 3] = [(Root::Hklm, UNINSTALL), (Root::Hklm, UNINSTALL_WOW), (Root::Hkcu, UNINSTALL_USER)];
+
+/// Snapshot entry for an id (name of an app that just disappeared).
+pub fn remembered(id: &str) -> Option<App> {
+    let snap: Snapshot = fs::read_to_string(snapshot_file()).ok().and_then(|t| serde_json::from_str(&t).ok())?;
+    snap.apps.into_iter().find(|a| a.id == id)
 }
 
 /// What the shell keeps between "preview" and "remove": the leftovers of one app.
@@ -1145,6 +1366,11 @@ mod tests {
         assert_eq!(fc.folder("EA SPORTS FC 27"), Some(Confidence::High));
         assert_eq!(fc.folder("EA SPORTS FC 26"), None, "last year's game is another app");
         assert_eq!(fc.folder("EA SPORTS FC"), Some(Confidence::Medium), "shared by every year");
+        let spotify = Matcher::new(&app("Spotify", "Spotify AB", None, None));
+        assert_eq!(spotify.folder("Spotfy"), Some(Confidence::Low), "a typo is only Low");
+        assert_eq!(spotify.folder("Shopify"), None, "two edits on a short name is another word");
+        assert_eq!(fc.folder("EA SPORTS FC 28"), None, "versioned names never fuzzy-match");
+        assert_eq!(levenshtein("kitten", "sitting"), 3);
         assert!(m.is_publisher("Mozilla"));
         let short = Matcher::new(&app("Go", "Google", None, None));
         assert_eq!(short.folder("Go"), None, "too generic to match");
@@ -1234,6 +1460,7 @@ mod tests {
             dumps: Some(local.join("CrashDumps")),
             reg: vec![],
             services: false,
+            protected: vec![profile.join("Documents")],
         };
         (root, ctx)
     }
@@ -1315,6 +1542,84 @@ mod tests {
                 eprintln!("    {:?} {:?} {:?} {} ({} B)", x.confidence, x.kind, x.reason, x.path, x.bytes);
             }
         }
+    }
+
+    /// Real Recycle Bin: remove a sandbox leftover, then undo puts it back
+    /// (`cargo test -p g2boost-core -- --ignored undo_live`).
+    #[test]
+    #[ignore]
+    fn undo_live() {
+        // SAFETY: history/undo go to the test data dir.
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
+        let (root, ctx) = sandbox("undo");
+        let found = leftovers_in(&app("Acme Widget", "AcmeCorp", None, None), &ctx);
+        let item = found.iter().find(|l| l.path.ends_with(r"Roaming\Acme Widget")).unwrap().clone();
+        let out = remove_in(std::slice::from_ref(&item), "Acme Widget", &ctx, false);
+        assert_eq!(out.recycled, 1);
+        assert!(!Path::new(&item.path).exists());
+        let rec = undo_status().expect("undo recorded");
+        assert_eq!(rec.files, vec![item.path.clone()]);
+        let u = undo().unwrap();
+        assert_eq!((u.files, u.failed), (1, 0));
+        assert!(Path::new(&item.path).join(r"cache\blob.bin").exists(), "restored with its content");
+        assert!(undo_status().is_none());
+        assert_eq!(undo().unwrap_err(), AppsError::NothingToUndo);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn recycle_info_v1_and_v2_parse() {
+        let path = r"C:\Users\me\AppData\Roaming\Acme";
+        let units: Vec<u16> = path.encode_utf16().chain([0]).collect();
+        let mut v2 = Vec::new();
+        v2.extend(2u64.to_le_bytes());
+        v2.extend(123u64.to_le_bytes());
+        v2.extend(777u64.to_le_bytes());
+        v2.extend((units.len() as u32).to_le_bytes());
+        v2.extend(units.iter().flat_map(|u| u.to_le_bytes()));
+        assert_eq!(parse_recycle_info(&v2), Some((777, path.to_string())));
+        let mut v1 = Vec::new();
+        v1.extend(1u64.to_le_bytes());
+        v1.extend(0u64.to_le_bytes());
+        v1.extend(42u64.to_le_bytes());
+        let mut fixed = units.clone();
+        fixed.resize(260, 0);
+        v1.extend(fixed.iter().flat_map(|u| u.to_le_bytes()));
+        assert_eq!(parse_recycle_info(&v1), Some((42, path.to_string())));
+        assert_eq!(parse_recycle_info(&v2[..20]), None, "truncated");
+        assert_eq!(parse_recycle_info(&[9u8; 40]), None, "unknown version");
+    }
+
+    #[test]
+    fn registry_paths_for_removal_and_undo() {
+        let ctx = Ctx {
+            windows: PathBuf::from(r"C:\Windows"),
+            profile: PathBuf::from(r"C:\Users\me"),
+            data: vec![],
+            shortcuts: vec![],
+            dumps: None,
+            reg: vec![(Root::Hkcu, "Software".into())],
+            services: false,
+            protected: vec![],
+        };
+        assert!(reg_path_allowed(Root::Hkcu, r"Software\Discord", &ctx));
+        assert!(reg_path_allowed(Root::Hkcu, r"Software\Logitech\LGHUB", &ctx));
+        for bad in [r"Software", r"Software\", r"Software\Microsoft\Windows\CurrentVersion\Run", r"Software\Classes\exefile", r"Software\a\b\c", r"Software\..\x", r"System\x"] {
+            assert!(!reg_path_allowed(Root::Hkcu, bad, &ctx), "{bad}");
+        }
+        assert!(!reg_path_allowed(Root::Hklm, r"Software\Discord", &ctx), "other hive");
+    }
+
+    #[test]
+    fn precious_data_is_flagged() {
+        let (root, ctx) = sandbox("precious");
+        let roaming = ctx.data[0].clone();
+        fs::create_dir_all(roaming.join(r"Acme Widget\Saves")).unwrap();
+        let found = leftovers_in(&app("Acme Widget", "AcmeCorp", None, None), &ctx);
+        let r = found.iter().find(|l| l.path.ends_with(r"Roaming\Acme Widget")).unwrap();
+        assert!(r.precious, "a folder with Saves inside is the user's data");
+        assert!(!found.iter().find(|l| l.path.ends_with(r"ProgramData\Acme Widget")).unwrap().precious);
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

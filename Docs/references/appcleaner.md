@@ -1,6 +1,6 @@
 # AppCleaner 3.7 (macOS) — análise estática (clean-room) para o desinstalador do G2 Boost
 
-**Última revisão:** 2026-10-18 · Fonte: `Referencias/Downloads/AppCleaner_3.7/AppCleaner.app` · Alvo da fase 3C (desinstalar + resíduo).
+**Última revisão:** 2026-10-18 (mapeamento implementado: [../cleanup/app-uninstall.md](../cleanup/app-uninstall.md)) · Fonte: `Referencias/Downloads/AppCleaner_3.7/AppCleaner.app` · Alvo da fase 3C (desinstalar + resíduo).
 
 > **Método:** só dados do pacote — `Info.plist`/`BundlePaths.plist`/`InternetAccessPolicy.plist`, `Localizable.strings`, nibs decodificados pelo REA (`decode_interface_builder`, evidência `ev_bce3109f…`), e nomes de classe/método/strings das seções `__objc_classname`, `__objc_methname` e `__cstring` dos Mach-O (parser próprio, fatia x86_64). **Nenhum código foi desmontado nem executado** (o Ghidra do REA no Windows só aceita PE; Hopper exige macOS). Comportamento além do nome do símbolo está marcado **[inferido]**.
 > **Licença:** "Copyright © 2026 FreeMacSoft. All rights reserved." Documentamos **mecanismo**; não copiar ícones, sons (`drag to trash.aiff`, `restore from trash.aif`), textos, nibs nem a lista literal de pastas.
@@ -53,9 +53,9 @@
 | Regex de nome + Levenshtein | Mesma ideia em camadas com **confiança visível**: alta = dentro do `InstallLocation` ou alvo de `.lnk`/serviço/tarefa; média = pasta com nome normalizado (`^<nome>([.\-_\s\d].*)?$`, sem versão/arquitetura/"(x64)") sob publisher; baixa = fuzzy, **desmarcado por padrão**. Cada item mostra o motivo |
 | Dados preciosos | Perfis de navegador, `Saved Games`, `Documents\My Games`, cofres → confirmação extra com caminho, desmarcado por padrão |
 | Apps protegidos / SIP / abertos | `SystemComponent=1`, `ParentKeyName`/`ReleaseType` (updates), `NoRemove`, publisher do Windows; app em execução bloqueia até fechar; lista do usuário em `settings.json`; tudo passa por `SafePath` (System32, WinSxS, outros perfis = bloqueado) |
-| Lixeira + Desfazer | `SHFileOperationW` + `FOF_ALLOWUNDO` (guarda do `disk.rs`), com `ConfirmToken`; desfazer = backlog (enumerar a Lixeira e restaurar) |
+| Lixeira + Desfazer | `SHFileOperationW` + `FOF_ALLOWUNDO` (guarda do `disk.rs`), com `ConfirmToken`; **desfazer implementado**: metadados `$I` da Lixeira + `$R` renomeado de volta, registro reimportado do backup |
 | `achelper` | Sem helper: caminhos HKLM/ProgramData/serviço retornam `needs_admin`; "Elevar" relança via `runas` (padrão do projeto) |
-| SmartDelete (FSEvents na Lixeira) | `RegNotifyChangeKeyValue` nas chaves Uninstall + snapshot da lista (com `InstallLocation`) no data dir; entrada sumiu → oferecer varrer resíduo pelo snapshot. V1: botão "varrer órfãos" |
+| SmartDelete (FSEvents na Lixeira) | **implementado**: `RegNotifyChangeKeyValue` nas chaves Uninstall + snapshot no data dir; entrada sumiu → aviso no app que abre a varredura; também botão "procurar sobras" |
 | Arrastar `.app` | Arrastar `.exe`/`.lnk` (Tauri drag-drop) → resolver para a entrada Uninstall por prefixo do `InstallLocation` |
 
 ## 8. Não determinado

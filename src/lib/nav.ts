@@ -14,6 +14,33 @@ export function onNavigate(cb: (route: Route) => void): () => void {
   return () => window.removeEventListener(EVENT, handler);
 }
 
+/* "Show the leftovers sweep" (SmartDelete banner): the page takes it on mount or listens. */
+const OPEN_ORPHANS = "g2boost:open-orphans";
+let pendingOrphans = false;
+
+export function openOrphans() {
+  pendingOrphans = true;
+  window.dispatchEvent(new Event(OPEN_ORPHANS));
+}
+
+export function takeOpenOrphans(): boolean {
+  const p = pendingOrphans;
+  pendingOrphans = false;
+  return p;
+}
+
+export function onOpenOrphans(cb: () => void): () => void {
+  const handler = () => {
+    pendingOrphans = false;
+    cb();
+  };
+  window.addEventListener(OPEN_ORPHANS, handler);
+  return () => window.removeEventListener(OPEN_ORPHANS, handler);
+}
+
+/** Fired by the uninstaller after a removal (the undo button refreshes). */
+export const APPS_REMOVED = "g2boost:apps-removed";
+
 /* A file dropped on the window (an .exe/.lnk → "which app is this?"). The shell emits it and
    switches to the uninstaller; the page takes the last one on mount and listens for the next. */
 let lastDrop: string | null = null;

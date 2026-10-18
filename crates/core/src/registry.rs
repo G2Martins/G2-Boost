@@ -301,6 +301,68 @@ pub fn delete_tree(root: Root, path: &str) -> Result<(), RegError> {
     check(e)
 }
 
+/// Write a backed-up tree back (undo of a leftover removal): keys are created, values written
+/// with their original type and bytes. The caller validates `path` first.
+pub fn import_tree(root: Root, path: &str, tree: &Tree) -> Result<(), RegError> {
+    let key = create(root, path)?;
+    for v in &tree.values {
+        let n = wide(&v.name);
+        // SAFETY: raw payload exactly as exported, with its original value type.
+        check(unsafe { RegSetValueExW(key.0, PCWSTR(n.as_ptr()), None, REG_VALUE_TYPE(v.kind), Some(&v.data)) })?;
+    }
+    for (name, sub) in &tree.keys {
+        if name.contains('\\') || name.is_empty() {
+            return Err(RegError::Win32(87)); // a subkey name is one path segment
+        }
+        import_tree(root, &format!(r"{path}\{name}"), sub)?;
+    }
+    Ok(())
+}
+
+/// Block until `stop`, calling `on_change` whenever one of `keys` gains or loses a subkey
+/// (an app installed or removed under an Uninstall key). `RegNotifyChangeKeyValue`, re-armed
+/// after every signal; bursts (installers touch the key several times) are debounced.
+pub fn watch_subkeys(keys: &[(Root, &str)], stop: &std::sync::atomic::AtomicBool, mut on_change: impl FnMut()) {
+    use std::sync::atomic::Ordering;
+    use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
+    use windows::Win32::System::Registry::{KEY_NOTIFY, REG_NOTIFY_CHANGE_NAME, RegNotifyChangeKeyValue};
+    use windows::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects};
+
+    let mut watched: Vec<(Key, HANDLE)> = Vec::new();
+    for (root, path) in keys {
+        let Ok(Some(key)) = open(*root, path, KEY_NOTIFY) else {
+            continue;
+        };
+        // SAFETY: auto-reset event; armed on the open key handle (both live in `watched`).
+        let Ok(ev) = (unsafe { CreateEventW(None, false, false, PCWSTR::null()) }) else {
+            continue;
+        };
+        if unsafe { RegNotifyChangeKeyValue(key.0, false, REG_NOTIFY_CHANGE_NAME, Some(ev), true) } == ERROR_SUCCESS {
+            watched.push((key, ev));
+        } else {
+            let _ = unsafe { CloseHandle(ev) };
+        }
+    }
+    let events: Vec<HANDLE> = watched.iter().map(|(_, e)| *e).collect();
+    while !events.is_empty() && !stop.load(Ordering::Relaxed) {
+        // SAFETY: valid event handles; 1 s timeout so `stop` is honoured.
+        let r = unsafe { WaitForMultipleObjects(&events, false, 1000) };
+        let i = r.0.wrapping_sub(WAIT_OBJECT_0.0) as usize;
+        if i >= events.len() {
+            continue; // timeout
+        }
+        let (key, ev) = &watched[i];
+        // SAFETY: re-arm the same key/event pair.
+        let _ = unsafe { RegNotifyChangeKeyValue(key.0, false, REG_NOTIFY_CHANGE_NAME, Some(*ev), true) };
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        on_change();
+    }
+    for (_, ev) in watched {
+        // SAFETY: events created above, closed once; keys close on drop.
+        let _ = unsafe { CloseHandle(ev) };
+    }
+}
+
 /* ---------------- backups ---------------- */
 
 /// One original value captured before a tweak changed it. `path` is a registry
@@ -407,6 +469,13 @@ pub(crate) mod tests {
         assert!(subkeys(Root::Hkcu, base).unwrap().is_empty());
         delete_tree(Root::Hkcu, base).unwrap(); // already gone = Ok
         assert!(delete_tree(Root::Hkcu, "NoBackslash").is_err());
+        // Undo: the backup goes back exactly (values with their types, subkeys).
+        import_tree(Root::Hkcu, base, &t).unwrap();
+        assert_eq!(export_tree(Root::Hkcu, base).unwrap(), t);
+        delete_tree(Root::Hkcu, base).unwrap();
+        let evil = Tree { values: vec![], keys: vec![(r"..\Run".into(), Tree::default())] };
+        assert!(import_tree(Root::Hkcu, base, &evil).is_err(), "subkey names are single segments");
+        delete_tree(Root::Hkcu, base).unwrap();
     }
 
     #[test]

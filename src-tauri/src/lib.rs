@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, context, dns, firmware, power, procs, secrets, startup};
+use g2boost_core::{advisor, apps, context, dns, firmware, power, procs, registry, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -1017,6 +1017,47 @@ async fn apps_resolve(state: State<'_, AppsState>, path: String) -> Result<Optio
     tauri::async_runtime::spawn_blocking(move || apps::resolve_drop(&path, &list)).await.map_err(|e| e.to_string())
 }
 
+/// What the last leftover removal can put back (files in the Recycle Bin, registry backups).
+#[tauri::command]
+fn apps_undo_status() -> Option<apps::UndoRecord> {
+    apps::undo_status()
+}
+
+/// Restore the last removal (files from the Recycle Bin, registry trees from their backups).
+#[tauri::command]
+async fn apps_undo() -> Result<apps::UndoOutcome, String> {
+    tauri::async_runtime::spawn_blocking(|| apps::undo().map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
+}
+
+#[derive(Clone, serde::Serialize)]
+struct RemovedApp {
+    id: String,
+    name: String,
+}
+
+/// SmartDelete: watch the Uninstall keys; an app that disappears (removed outside G2 Boost)
+/// and was seen before is announced to the UI, which offers the leftover sweep.
+fn watch_uninstalls(app: AppHandle) {
+    std::thread::spawn(move || {
+        let ids = |l: &[apps::App]| l.iter().map(|a| a.id.clone()).collect::<std::collections::HashSet<_>>();
+        let first = apps::list(&[]);
+        apps::remember(&first);
+        let mut known = ids(&first);
+        let stop = AtomicBool::new(false);
+        registry::watch_subkeys(&apps::UNINSTALL_KEYS, &stop, || {
+            let now = apps::list(&[]);
+            let current = ids(&now);
+            for id in known.difference(&current) {
+                if let Some(a) = apps::remembered(id).filter(|a| a.protected.is_none()) {
+                    let _ = app.emit("apps:removed", RemovedApp { id: a.id, name: a.name });
+                }
+            }
+            apps::remember(&now);
+            known = current;
+        });
+    });
+}
+
 /// Add/remove an installed app (by id) to the user's protected list.
 #[tauri::command]
 fn apps_protect(state: State<'_, AppsState>, r: State<'_, Routines>, id: String, protect: bool) -> Result<Settings, String> {
@@ -1107,6 +1148,7 @@ pub fn run() {
             running: AtomicBool::new(false),
         })
         .setup(|app| {
+            watch_uninstalls(app.handle().clone());
             // Tray: left click opens, menu has Open / Quit. Labels follow the default locale (pt-BR).
             let open = MenuItem::with_id(app, "open", "Abrir", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
@@ -1220,7 +1262,9 @@ pub fn run() {
             apps_uninstall,
             apps_installed,
             apps_resolve,
-            apps_protect
+            apps_protect,
+            apps_undo_status,
+            apps_undo
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

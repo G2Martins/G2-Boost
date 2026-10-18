@@ -927,6 +927,16 @@ export const en = {
   "apps.reason.publisher_folder": "inside the publisher's folder",
   "apps.reason.crash_dump": "the app's crash dump",
   "apps.reason.service_binary_gone": "the app's service whose program is gone",
+  "apps.precious": "Your data",
+  "apps.confirm.precious":
+    "Includes your own data — saves, browser/app profiles or vaults. They go to the Recycle Bin (restorable), but make sure you won't need them.",
+  "apps.undo": "Undo removing {app}",
+  "apps.undo.hint":
+    "Puts back the {n} items removed from {app}: files leave the Recycle Bin for where they were and registry keys return from the backup.",
+  "apps.undo.done": "Restored: {files} files/folders and {keys} keys ({failed} failed).",
+  "apps.removed_banner": "{name} was uninstalled. Want to see what it left behind?",
+  "apps.removed_banner.action": "See leftovers",
+  "apps.error.running": "Close {exe} before uninstalling (the app is open).",
   "apps.selected": "{n} selected · {size}",
   "apps.remove": "Remove {n}",
   "apps.confirm.title": "Remove {n} leftovers of {name}?",

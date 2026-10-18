@@ -414,7 +414,11 @@ export type Leftover = {
     | "crash_dump"
     | "service_binary_gone";
   needs_admin: boolean;
+  /** Saves, profiles, vaults: never preselected, extra warning. */
+  precious: boolean;
 };
+export type UndoRecord = { at: number; app: string; files: string[]; keys: string[] };
+export type UndoOutcome = { files: number; keys: number; failed: number };
 export type LeftoverOutcome = {
   recycled: number;
   bytes: number;
@@ -532,6 +536,8 @@ export const backend = {
   appsInstalled: async (id: string) => (await call<boolean>("apps_installed", { id })) ?? false,
   appsResolve: async (path: string) =>
     (await call<string | null>("apps_resolve", { path })) ?? null,
+  appsUndoStatus: () => call<UndoRecord | null>("apps_undo_status"),
+  appsUndo: () => callOrThrow<UndoOutcome>("apps_undo"),
   appsProtect: (id: string, protect: boolean) =>
     callOrThrow<Settings>("apps_protect", { id, protect }),
   procsEnd: (pid: number, created: string) => callOrThrow<void>("procs_end", { pid, created }),
