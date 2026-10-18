@@ -16,3 +16,5 @@ Quando o app resolve, aponte a tela exata (nome como aparece no menu, em pt-BR o
 - **Configurações:** rotinas (limpeza agendada, limpar RAM ao abrir jogo, iniciar com o Windows na bandeja), ponto de restauração antes de preset, permissão de pesquisa na web da Luli.
 
 Itens que pedem administrador mostram "Elevar (administrador)": o app reabre elevado na mesma tela.
+
+Pelo Claude Desktop conectado ao G2 Boost, as mesmas ações existem como ferramentas: cada mudança abre uma janela de confirmação do Windows no PC e só acontece com o "Sim" da pessoa. Ações de administrador precisam do app elevado.

@@ -11,7 +11,7 @@ Entradas não confiáveis: UI (webview), servidor MCP (um LLM pode ser induzido 
 
 ### 1.2 Operação destrutiva
 1. **Prévia obrigatória**: o plano lista caminhos + bytes antes de qualquer `delete`.
-2. **Confirmação humana**: a UI emite um `ConfirmToken` de uso único e curto; `execute()` sem token = erro. O MCP nunca fabrica token.
+2. **Confirmação humana**: a UI emite um `ConfirmToken` de uso único e curto; `execute()` sem token = erro. O MCP nunca fabrica token. Ações pedidas pelo Claude via MCP (2026-10-18) passam por uma **janela nativa do Windows** aberta pelo próprio G2 Boost (`crates/mcp/src/actions.rs`): texto vindo dos dados do G2 Boost (nunca do modelo), sem caracteres de controle nem de direção de texto, "Não" como padrão, e um "Sim" depois de 3 min não vale. O modelo não clica nela.
 3. **Allowlist**: só caminhos do catálogo (`cleanup`) ou seleção explícita do usuário no treemap. Nunca varrer `*.*` a partir de uma raiz.
 4. **`SafePath`**: recusa `C:\Windows\System32`, `\Windows\WinSxS` direto, perfis de outros usuários, reparse points/junctions/symlinks (seguir junction é o jeito clássico de apagar o lugar errado), caminhos UNC não solicitados.
 5. **Reversível quando possível**: Lixeira (`IFileOperation` com `FOF_ALLOWUNDO`) para seleção manual; delete direto só para caches do catálogo.

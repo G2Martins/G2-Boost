@@ -110,6 +110,26 @@ O pacote de contexto (app e `get_pc_context`) ganhou `windows_errors`: os 12 gru
 
 Instruções do servidor: ler `get_knowledge` antes de aconselhar; para investigar o PC inteiro combinar `get_pc_context` + `get_windows_errors` + `get_disk_usage` e relatar problemas mesmo sem botão no app (causa + caminho pelo Windows ou site do fabricante); mesmas regras de segurança e temperatura do playbook. Sem dependência C nova (`preserve_order` do serde_json puxa só `indexmap`).
 
+### 5.0a O Claude faz o que o G2 Boost faz (2026-10-18, pedido do dono)
+
+Ferramentas de ação no MCP (43 ferramentas no total), cada uma validada no core e **confirmada por uma janela nativa do Windows** que o G2 Boost abre no PC (`actions.rs`):
+
+| Ferramenta | Faz | Admin |
+|---|---|---|
+| `run_cleanup(categories)` | categorias do catálogo, tamanhos medidos na janela | as do sistema |
+| `set_tweak(id, enabled)`, `set_visual_effects(level)` | ajustes com backup exato e reversão | HKLM/serviços |
+| `set_startup_item(location, name, enabled)` | igual ao Gerenciador de Tarefas; protegidos recusados | HKLM |
+| `set_power_plan(guid)`, `create_max_performance_plan` | planos de energia | não |
+| `set_dns(adapter, provider)`, `restore_dns(adapter)` | DNS com backup | sim |
+| `purge_standby_memory`, `create_restore_point` | memória em espera, ponto de restauração | sim |
+| `get_processes` (leitura) + `end_process(pid, created)` | sistema, crítico, serviço e segurança recusados | às vezes |
+| `uninstall_app(app_id)`, `get_app_leftovers` (leitura), `remove_app_leftovers` | desinstalador do próprio app; sobras para a Lixeira com backup do registro; nunca leva dados do usuário nem palpite de baixa confiança | às vezes |
+| `recycle_paths(paths)` | Lixeira com a mesma guarda do mapa do disco (`disk::validate_recycle`) | não |
+| `winget_search`, `winget_upgrades` (leitura), `winget_install(id)`, `winget_upgrade(id)` | winget oficial | às vezes |
+| `run_console(line)` | qualquer comando do Console G2 (só leitura); instalar pelo console é barrado aqui | não |
+
+O servidor MCP roda como o usuário (o Claude Desktop o inicia sem elevação): ação de administrador volta `needs_admin` e a instrução manda pedir no app elevado. Testado ponta a ponta: a janela abriu em pt-BR com o detalhe certo, "Não" voltou `declined_by_user` sem mudança, pedidos inválidos nunca abrem a janela (teste unitário).
+
 ### 5.0 Painel do G2 Boost dentro do Claude (MCP Apps, 2026-10-18)
 
 Extensão oficial MCP Apps (spec `2026-01-26`): a tool `show_panel` declara `_meta.ui.resourceUri = "ui://g2boost/panel"` (mais a chave plana antiga, ainda lida por alguns hosts) e o servidor serve o recurso com mime `text/html;profile=mcp-app` (`crates/mcp/src/panel.html`, embutido com `include_str!`). O Claude Desktop renderiza o painel na conversa, inclusive de servidor local stdio; o Claude Code mostra só o texto (o resultado leva o JSON como fallback).

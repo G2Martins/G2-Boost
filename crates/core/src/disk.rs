@@ -533,6 +533,60 @@ pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome
     Ok(out)
 }
 
+/// Paths named by a caller outside the treemap (the MCP server, on the user's request): each must
+/// be absolute, local, existing, not a reparse point, and pass the treemap's guard once resolved.
+/// Returns the resolved paths, deduplicated, to show in the confirmation and then recycle.
+pub fn validate_recycle(paths: &[String]) -> Result<Vec<PathBuf>, RecycleError> {
+    if paths.is_empty() || paths.len() > 50 {
+        return Err(RecycleError::NotFound);
+    }
+    let win = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let profile = crate::cleanup::env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
+    let mut out: Vec<PathBuf> = Vec::new();
+    for raw in paths {
+        let raw = raw.trim();
+        let p = PathBuf::from(raw);
+        if raw.starts_with(r"\\") || raw.starts_with("//") || !p.is_absolute() {
+            return Err(RecycleError::Protected);
+        }
+        let md = fs::symlink_metadata(&p).map_err(|_| RecycleError::NotFound)?;
+        if is_reparse(&md) {
+            return Err(RecycleError::Protected);
+        }
+        let real = strip_verbatim(&fs::canonicalize(&p).map_err(|_| RecycleError::NotFound)?);
+        if !recyclable(&real, &win, &profile) {
+            return Err(RecycleError::Protected);
+        }
+        if !out.contains(&real) {
+            out.push(real);
+        }
+    }
+    Ok(out)
+}
+
+/// Send paths already checked by [`validate_recycle`] (and confirmed by the user) to the Recycle Bin.
+pub fn recycle_validated(paths: &[PathBuf], trigger: &str) -> RecycleOutcome {
+    let t0 = Instant::now();
+    let (_rc, _aborted) = shell_recycle(paths);
+    let gone = paths.iter().filter(|p| fs::symlink_metadata(p).is_err()).count() as u32;
+    let out = RecycleOutcome { recycled: gone, bytes: 0, failed: paths.len() as u32 - gone };
+    if gone > 0 {
+        crate::cleanup::record_run(&crate::cleanup::RunRecord {
+            at: crate::registry::now_unix(),
+            trigger: trigger.into(),
+            duration_ms: t0.elapsed().as_millis() as u64,
+            items: vec![crate::cleanup::ExecItem {
+                id: "disk_recycle".into(),
+                bytes_freed: 0,
+                files_deleted: u64::from(gone),
+                skipped: u64::from(out.failed),
+                error: None,
+            }],
+        });
+    }
+    out
+}
+
 /// One shell operation sending `paths` (validated by the caller) to the Recycle Bin. Windows asks
 /// itself before deleting for good anything too big for the Bin. Returns (code, user aborted).
 pub(crate) fn shell_recycle(paths: &[PathBuf]) -> (i32, bool) {
@@ -825,6 +879,23 @@ mod tests {
         assert!(sum.cancelled);
         assert_eq!(tree.children.len(), 0);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn named_paths_get_the_treemap_guard() {
+        let d = std::env::temp_dir().join(format!("g2boost-vr-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        let f = d.join("old.iso");
+        std::fs::write(&f, b"x").unwrap();
+        let ok = validate_recycle(&[f.to_string_lossy().into_owned(), f.to_string_lossy().into_owned()]).unwrap();
+        assert_eq!(ok.len(), 1, "deduplicated");
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        for bad in [format!(r"{win}\System32"), r"C:\".into(), r"\\server\share\x".into(), "relative\\x".into()] {
+            assert!(matches!(validate_recycle(std::slice::from_ref(&bad)), Err(RecycleError::Protected)), "{bad}");
+        }
+        assert!(matches!(validate_recycle(&[d.join("nope").to_string_lossy().into_owned()]), Err(RecycleError::NotFound)));
+        assert!(validate_recycle(&[]).is_err());
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
