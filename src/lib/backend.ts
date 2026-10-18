@@ -204,7 +204,28 @@ export type Settings = {
   game_exes: string[];
   restore_before_preset: boolean;
   ai_web_always: boolean;
+  luli_instructions: string;
 };
+
+export type LuliGroup = { id: string; name: string };
+export type LuliSummary = {
+  id: string;
+  title: string;
+  group: string | null;
+  created: number;
+  updated: number;
+  count: number;
+};
+export type LuliHistory = { groups: LuliGroup[]; conversations: LuliSummary[] };
+export type LuliConversation = {
+  id: string;
+  title: string;
+  group: string | null;
+  created: number;
+  updated: number;
+  messages: unknown[];
+};
+export type LuliMemoryItem = { id: string; text: string; created: number };
 
 export type Gpu = {
   name: string;
@@ -524,6 +545,22 @@ export const backend = {
   appInfo: () => call<AppInfo>("app_info"),
   claudeTargets: () => call<ClaudeTarget[]>("claude_targets"),
   consoleCommands: () => call<ConsoleCommand[]>("console_commands"),
+  luliHistory: () => call<LuliHistory>("luli_history"),
+  luliGet: (id: string) => call<LuliConversation>("luli_get", { id }),
+  luliSave: (conversation: Omit<LuliConversation, "created" | "updated">) =>
+    callOrThrow<LuliSummary>("luli_save", {
+      conversation: { ...conversation, created: 0, updated: 0 },
+    }),
+  luliRename: (id: string, title: string) => callOrThrow<void>("luli_rename", { id, title }),
+  luliMove: (id: string, group: string | null) => callOrThrow<void>("luli_move", { id, group }),
+  luliDelete: (id: string) => callOrThrow<void>("luli_delete", { id }),
+  luliClear: () => callOrThrow<void>("luli_clear"),
+  luliGroupPut: (id: string, name: string) =>
+    callOrThrow<LuliGroup[]>("luli_group_put", { id, name }),
+  luliGroupDelete: (id: string) => callOrThrow<LuliGroup[]>("luli_group_delete", { id }),
+  luliMemory: () => call<LuliMemoryItem[]>("luli_memory"),
+  luliRemember: (text: string) => callOrThrow<LuliMemoryItem[]>("luli_remember", { text }),
+  luliForget: (id: string) => callOrThrow<LuliMemoryItem[]>("luli_forget", { id }),
   devicesScan: () => callOrThrow<DeviceScan>("devices_scan"),
   devicesPorts: (ip: string) => callOrThrow<OpenPort[]>("devices_ports", { ip }),
   devicesKnown: (mac: string, known: boolean) => callOrThrow<void>("devices_known", { mac, known }),

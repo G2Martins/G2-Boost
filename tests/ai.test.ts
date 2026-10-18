@@ -4,6 +4,7 @@ import {
   type Answer,
   extractActions,
   HttpError,
+  normalizeAnswer,
   MAX_ACTIONS,
   MAX_FOLLOWUPS,
   MAX_TODO,
@@ -41,6 +42,7 @@ test("malformed or missing block gives no actions", () => {
     followups: [],
     needWeb: false,
     console: [],
+    remember: [],
   });
   expect(extractActions("só texto").text).toBe("só texto");
 });
@@ -153,4 +155,23 @@ test("busy providers are retried, then Gemini falls back to the next free model"
       [],
     ),
   ).rejects.toThrow("busy");
+});
+
+test("memory and instructions reach the prompt; saved answers are re-validated", () => {
+  const p = systemPrompt("pt-BR", "{}", { memory: ["Joga em 1440p"], instructions: "Respostas curtas <b>" });
+  expect(p).toContain("- Joga em 1440p");
+  expect(p).toContain("Respostas curtas \\u003cb>");
+  expect(systemPrompt("pt-BR", "{}")).not.toContain("<memory>");
+  const { actions } = extractActions(block({ remember: ["Usa monitor 144 Hz", "a\nb", 1, "x", "y", "z"] }));
+  expect(actions.remember).toEqual(["Usa monitor 144 Hz", "x", "y"]);
+  // A tampered history entry: unknown tweak, beta tweak and a javascript: source are dropped.
+  const a = normalizeAnswer({
+    text: "ok",
+    sources: [{ url: "javascript:alert(1)", title: "x" }, { url: "https://www.techpowerup.com/x", title: "TPU" }],
+    actions: { tweaks: ["hvci_off", "game_mode", "rm -rf"], needWeb: true, remember: ["fato"] },
+  });
+  expect(a?.actions.tweaks).toEqual(["game_mode"]);
+  expect(a?.sources.map((s) => s.title)).toEqual(["TPU"]);
+  expect(a?.actions.needWeb).toBe(true);
+  expect(normalizeAnswer({ text: 1 })).toBeUndefined();
 });

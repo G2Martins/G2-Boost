@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, claude_connect, console, context, devices, dns, firmware, power, procs, registry, secrets, startup};
+use g2boost_core::{advisor, apps, claude_connect, console, context, devices, dns, firmware, luli, power, procs, registry, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -488,6 +488,68 @@ async fn console_confirm(token: u64, action: String, id: String) -> Result<conso
 #[tauri::command]
 async fn console_run(line: String) -> Result<console::Reply, String> {
     tauri::async_runtime::spawn_blocking(move || console::run(&line)).await.map_err(|e| e.to_string())
+}
+
+/* ---------------- Luli history, memory ---------------- */
+
+#[tauri::command]
+fn luli_history() -> luli::History {
+    luli::history()
+}
+
+#[tauri::command]
+fn luli_get(id: String) -> Result<luli::Conversation, String> {
+    luli::get(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_save(conversation: luli::Conversation) -> Result<luli::Summary, String> {
+    luli::save(conversation).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_rename(id: String, title: String) -> Result<(), String> {
+    luli::rename(&id, &title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_move(id: String, group: Option<String>) -> Result<(), String> {
+    luli::set_group(&id, group.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_delete(id: String) -> Result<(), String> {
+    luli::delete(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_clear() -> Result<(), String> {
+    luli::clear().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_group_put(id: String, name: String) -> Result<Vec<luli::Group>, String> {
+    luli::put_group(&id, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_group_delete(id: String) -> Result<Vec<luli::Group>, String> {
+    luli::delete_group(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_memory() -> Vec<luli::MemoryItem> {
+    luli::memory()
+}
+
+#[tauri::command]
+fn luli_remember(text: String) -> Result<Vec<luli::MemoryItem>, String> {
+    luli::remember(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn luli_forget(id: String) -> Result<Vec<luli::MemoryItem>, String> {
+    luli::forget(&id).map_err(|e| e.to_string())
 }
 
 /// Settings come from the UI, get sanitized in the core, and only then replace the live copy.
@@ -1356,6 +1418,18 @@ pub fn run() {
             apps_uninstall,
             apps_installed,
             apps_companions,
+            luli_history,
+            luli_get,
+            luli_save,
+            luli_rename,
+            luli_move,
+            luli_delete,
+            luli_clear,
+            luli_group_put,
+            luli_group_delete,
+            luli_memory,
+            luli_remember,
+            luli_forget,
             apps_resolve,
             apps_protect,
             apps_undo_status,

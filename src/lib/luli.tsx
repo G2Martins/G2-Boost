@@ -23,13 +23,20 @@ import {
   DEFAULT_MODELS,
   isBusy,
   isTimeout,
+  normalizeAnswer,
   PROVIDER_WEB,
   PROVIDERS,
   type Provider,
   systemPrompt,
   type Turn,
 } from "@/lib/ai";
-import { type AdvisorReport, backend, inTauri } from "@/lib/backend";
+import {
+  type AdvisorReport,
+  backend,
+  inTauri,
+  type LuliHistory,
+  type LuliMemoryItem,
+} from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
 import { KNOWLEDGE } from "@/lib/knowledge";
 import { redactPaths } from "@/lib/utils";
@@ -95,6 +102,29 @@ export function withPageData(question: string, keys: string[]): string | undefin
   return `${question}\n\n<page_data>\n${data}\n</page_data>`;
 }
 
+/* ---------------- saved history ---------------- */
+
+const newId = (prefix: string) =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** A transcript read back from disk is hostile input: keep only well-formed turns, re-validated. */
+function sanitizeMessages(raw: unknown[]): LuliMessage[] {
+  const out: LuliMessage[] = [];
+  for (const m of raw) {
+    if (!m || typeof m !== "object") continue;
+    const x = m as Record<string, unknown>;
+    if ((x.role !== "user" && x.role !== "assistant") || typeof x.text !== "string") continue;
+    out.push({
+      role: x.role,
+      text: x.text.slice(0, 20000),
+      sent: typeof x.sent === "string" ? x.sent.slice(0, 20000) : undefined,
+      answer: x.role === "assistant" ? normalizeAnswer(x.answer) : undefined,
+      error: typeof x.error === "string" ? x.error.slice(0, 500) : undefined,
+    });
+  }
+  return out;
+}
+
 /* ---------------- session ---------------- */
 
 function useLuliState() {
@@ -124,6 +154,12 @@ function useLuliState() {
   const [webAlways, setWebAlways] = useState(false);
   const [webHere, setWebHere] = useState(false);
   const [report, setReport] = useState<AdvisorReport | null>(null);
+  /** Saved conversations (sidebar), what Luli remembers, the user's own instructions. */
+  const [history, setHistory] = useState<LuliHistory>({ groups: [], conversations: [] });
+  const [memory, setMemory] = useState<LuliMemoryItem[]>([]);
+  const [instructions, setInstructions] = useState("");
+  const [convId, setConvId] = useState<string | null>(null);
+  const conv = useRef<{ id: string | null; group: string | null }>({ id: null, group: null });
   const reportBusy = useRef(false);
   const claude = useRef<ClaudeChat | null>(null);
   // The request in flight: aborted on provider/model switch and on a new conversation, so a late
@@ -135,18 +171,146 @@ function useLuliState() {
     inflight.current = null;
   }, []);
 
+  const refreshHistory = useCallback(async () => {
+    const h = await backend.luliHistory();
+    if (h) setHistory(h);
+  }, []);
+
   useEffect(() => {
     backend.aiKeyStatus().then((k) => k && setKeys(k));
-    backend.settingsGet().then((s) => s && setWebAlways(!!s.ai_web_always));
-  }, []);
+    backend.settingsGet().then((s) => {
+      if (!s) return;
+      setWebAlways(!!s.ai_web_always);
+      setInstructions(s.luli_instructions ?? "");
+    });
+    backend.luliMemory().then((m) => m && setMemory(m));
+    void refreshHistory();
+  }, [refreshHistory]);
 
   const newConversation = useCallback(() => {
     cancel();
     claude.current = null;
+    conv.current = { id: null, group: null };
+    setConvId(null);
     setMessages([]);
     setWebHere(false);
     setNote(null);
   }, [cancel]);
+
+  /** Save the transcript under the current conversation (a new one gets an id and a title). */
+  const persist = useCallback(
+    async (transcript: LuliMessage[]) => {
+      const first = transcript.find((m) => m.role === "user");
+      if (!first || !inTauri) return;
+      const id = conv.current.id ?? newId("c");
+      conv.current.id = id;
+      setConvId(id);
+      try {
+        await backend.luliSave({
+          id,
+          title: first.text.slice(0, 80),
+          group: conv.current.group,
+          messages: transcript,
+        });
+        await refreshHistory();
+      } catch {
+        /* history is a convenience: a failed save never breaks the chat */
+      }
+    },
+    [refreshHistory],
+  );
+
+  /** Reopen a saved conversation; the next question continues it. */
+  const openConversation = useCallback(
+    async (id: string) => {
+      const c = await backend.luliGet(id);
+      if (!c) return;
+      cancel();
+      claude.current = null; // rebuilt from the transcript on the next question
+      conv.current = { id: c.id, group: c.group };
+      setConvId(c.id);
+      setMessages(sanitizeMessages(c.messages));
+      setWebHere(false);
+      setNote(null);
+    },
+    [cancel],
+  );
+
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      await backend.luliDelete(id).catch(() => undefined);
+      if (conv.current.id === id) newConversation();
+      await refreshHistory();
+    },
+    [newConversation, refreshHistory],
+  );
+
+  const renameConversation = useCallback(
+    async (id: string, title: string) => {
+      await backend.luliRename(id, title).catch(() => undefined);
+      await refreshHistory();
+    },
+    [refreshHistory],
+  );
+
+  const moveConversation = useCallback(
+    async (id: string, group: string | null) => {
+      await backend.luliMove(id, group).catch(() => undefined);
+      if (conv.current.id === id) conv.current.group = group;
+      await refreshHistory();
+    },
+    [refreshHistory],
+  );
+
+  const createGroup = useCallback(
+    async (name: string) => {
+      const id = newId("g");
+      await backend.luliGroupPut(id, name).catch(() => undefined);
+      await refreshHistory();
+      return id;
+    },
+    [refreshHistory],
+  );
+
+  const renameGroup = useCallback(
+    async (id: string, name: string) => {
+      await backend.luliGroupPut(id, name).catch(() => undefined);
+      await refreshHistory();
+    },
+    [refreshHistory],
+  );
+
+  const deleteGroup = useCallback(
+    async (id: string) => {
+      await backend.luliGroupDelete(id).catch(() => undefined);
+      if (conv.current.group === id) conv.current.group = null;
+      await refreshHistory();
+    },
+    [refreshHistory],
+  );
+
+  const clearHistory = useCallback(async () => {
+    await backend.luliClear().catch(() => undefined);
+    newConversation();
+    await refreshHistory();
+  }, [newConversation, refreshHistory]);
+
+  const remember = useCallback(async (text: string) => {
+    const m = await backend.luliRemember(text);
+    setMemory(m);
+  }, []);
+
+  const forget = useCallback(async (id: string) => {
+    const m = await backend.luliForget(id).catch(() => null);
+    if (m) setMemory(m);
+  }, []);
+
+  const saveInstructions = useCallback(async (text: string) => {
+    const s = await backend.settingsGet();
+    if (!s) return;
+    const saved = await backend.settingsSet({ ...s, luli_instructions: text });
+    setInstructions(saved.luli_instructions);
+  }, []);
 
   const fetchContext = useCallback(async (): Promise<string | null> => {
     if (!inTauri) return null;
@@ -248,14 +412,27 @@ function useLuliState() {
       setDraft("");
       setBusy(true);
       setStreaming("");
-      setMessages([...prior, { role: "user", text: q, sent: sent === q ? undefined : sent }]);
-      const system = systemPrompt(locale, ctx, { knowledge: KNOWLEDGE, web, noWeb });
+      const userMsg: LuliMessage = { role: "user", text: q, sent: sent === q ? undefined : sent };
+      setMessages([...prior, userMsg]);
+      const system = systemPrompt(locale, ctx, {
+        knowledge: KNOWLEDGE,
+        web,
+        noWeb,
+        memory: memory.map((m) => m.text),
+        instructions,
+      });
       const ctrl = new AbortController();
       inflight.current = ctrl;
       try {
         let answer: Answer;
         if (provider === "anthropic") {
-          if (!claude.current) claude.current = new ClaudeChat(models.anthropic);
+          if (!claude.current) {
+            claude.current = new ClaudeChat(models.anthropic);
+            // A reopened (or failed and restarted) conversation continues from its transcript.
+            claude.current.seed(
+              prior.filter((m) => !m.error).map((m) => ({ role: m.role, text: m.sent ?? m.text })),
+            );
+          }
           answer = await claude.current.ask(sent, system, web, setStreaming, ctrl.signal);
         } else {
           const turns: Turn[] = [
@@ -272,8 +449,11 @@ function useLuliState() {
             ctrl.signal,
           );
         }
-        if (!ctrl.signal.aborted)
-          setMessages((m) => [...m, { role: "assistant", text: answer.text, answer }]);
+        if (!ctrl.signal.aborted) {
+          const reply: LuliMessage = { role: "assistant", text: answer.text, answer };
+          setMessages((m) => [...m, reply]);
+          void persist([...prior.filter((m) => !m.error), userMsg, reply]);
+        }
       } catch (e) {
         if (!ctrl.signal.aborted) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -297,7 +477,21 @@ function useLuliState() {
         setStreaming("");
       }
     },
-    [keys, provider, context, fetchContext, webAlways, webHere, messages, locale, models, t],
+    [
+      keys,
+      provider,
+      context,
+      fetchContext,
+      webAlways,
+      webHere,
+      messages,
+      locale,
+      models,
+      t,
+      memory,
+      instructions,
+      persist,
+    ],
   );
 
   /**
@@ -325,6 +519,8 @@ function useLuliState() {
         web,
         noWeb,
         console: opts.console,
+        memory: memory.map((m) => m.text),
+        instructions,
       });
       const onText = opts.onText ?? (() => undefined);
       return provider === "anthropic"
@@ -339,7 +535,7 @@ function useLuliState() {
             opts.signal,
           );
     },
-    [keys, provider, context, fetchContext, webAlways, locale, models],
+    [keys, provider, context, fetchContext, webAlways, locale, models, memory, instructions],
   );
 
   /** The last answer asked for the web: allow it (here or always) and ask the same question again. */
@@ -390,6 +586,21 @@ function useLuliState() {
     allowWeb,
     report,
     loadReport,
+    history,
+    convId,
+    openConversation,
+    deleteConversation,
+    renameConversation,
+    moveConversation,
+    createGroup,
+    renameGroup,
+    deleteGroup,
+    clearHistory,
+    memory,
+    remember,
+    forget,
+    instructions,
+    saveInstructions,
   };
 }
 

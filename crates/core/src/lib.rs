@@ -18,6 +18,7 @@ pub mod winevents;
 pub mod claude_connect;
 pub mod console;
 pub mod devices;
+pub mod luli;
 pub mod winget;
 pub mod monitor;
 pub mod network;

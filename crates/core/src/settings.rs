@@ -38,6 +38,8 @@ pub struct Settings {
     pub protected_apps: Vec<String>,
     /// Luli may search the web in every conversation (off = she asks per conversation).
     pub ai_web_always: bool,
+    /// The user's own instructions for Luli (tone, level, preferences), sent with every question.
+    pub luli_instructions: String,
 }
 
 impl Default for Settings {
@@ -55,6 +57,7 @@ impl Default for Settings {
             game_exes: Vec::new(),
             protected_apps: Vec::new(),
             ai_web_always: false,
+            luli_instructions: String::new(),
         }
     }
 }
@@ -87,6 +90,15 @@ pub fn sanitize(mut s: Settings) -> Settings {
         .filter(|n| !n.is_empty() && n.chars().count() <= 200 && !n.chars().any(char::is_control) && seen.insert(n.to_lowercase()))
         .take(300)
         .collect();
+    // Free text the user wrote: bounded, no control characters except line breaks.
+    s.luli_instructions = s
+        .luli_instructions
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\n')
+        .take(1500)
+        .collect::<String>()
+        .trim()
+        .to_string();
     s.schedule = match s.schedule {
         Schedule::EveryHours { hours } => Schedule::EveryHours { hours: hours.clamp(1, 168) },
         Schedule::Daily { hour } => Schedule::Daily { hour: hour.min(23) },
@@ -130,6 +142,7 @@ mod tests {
             routine_categories: vec!["temp_user".into(), "nope".into(), "temp_user".into(), "../x".into()],
             game_ram_clean: true,
             ai_web_always: false,
+            luli_instructions: "  seja direta\u{0}\n".into(),
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
@@ -153,6 +166,7 @@ mod tests {
         assert!(!d.routine_categories.contains(&"shaders".to_string()));
         assert!(!d.routine_categories.contains(&"recycle".to_string()));
         assert!(!d.routine_categories.contains(&"temp_windows".to_string()), "admin categories are opt-in");
+        assert_eq!(s.luli_instructions, "seja direta", "trimmed, control characters removed");
     }
 
     #[test]

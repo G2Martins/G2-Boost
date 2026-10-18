@@ -1,15 +1,16 @@
 import {
   Bot,
+  Brain,
   ChevronDown,
   CircleCheck,
   Globe,
   KeyRound,
   ListTodo,
   Lock,
-  MessageSquarePlus,
   RefreshCw,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
   Wrench,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ClaudeConnectCard } from "@/components/claude-connect";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliMark } from "@/components/luli-card";
+import { LuliInstructionsCard, LuliMemoryCard, LuliSidebar } from "@/components/luli-sidebar";
 import { ExternalLink, SafeMarkdown } from "@/components/safe-markdown";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, HelpHint } from "@/components/ui/primitives";
@@ -52,6 +54,26 @@ export function AiPage() {
   } = luli;
   const [keyDraft, setKeyDraft] = useState("");
   const [showContext, setShowContext] = useState(false);
+  // The settings column (provider, context, personalization, memory) can be folded away.
+  const [panel, setPanel] = useState(() => {
+    try {
+      return localStorage.getItem(PANEL_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const togglePanel = () =>
+    setPanel((v) => {
+      try {
+        localStorage.setItem(PANEL_KEY, v ? "0" : "1");
+      } catch {
+        /* per-viewer convenience only */
+      }
+      return !v;
+    });
+  // Without a key the provider card is the only way forward: never hide it then.
+  const showPanel = panel || !keys[provider];
+  const title = luli.history.conversations.find((c) => c.id === luli.convId)?.title;
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -98,177 +120,36 @@ export function AiPage() {
     <>
       <PageHeader title={t("ai.title")} subtitle={t("ai.subtitle")} />
       <PageBody>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_1fr]">
-          {/* ---------------- session rail ---------------- */}
-          <div className="flex flex-col gap-4">
-            <Card className="animate-rise">
-              <CardTitle help={t("ai.provider.hint")}>
-                <Bot className="size-4" />
-                {t("ai.provider")}
-              </CardTitle>
-              <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-background/60 p-1">
-                {PROVIDERS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => {
-                      setKeyDraft("");
-                      luli.switchProvider(p);
-                    }}
-                    className={cn(
-                      "rounded-md px-2 py-2 font-display text-[12px] font-semibold tracking-wide transition-colors",
-                      provider === p
-                        ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.45)]"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {t(`ai.provider.${p}` as const)}
-                    <span
-                      className={cn(
-                        "ml-1.5 inline-block size-1.5 rounded-full align-middle",
-                        keys[p] ? "bg-success" : "bg-muted-foreground/40",
-                      )}
-                      aria-hidden
-                    />
-                  </button>
-                ))}
-              </div>
-              {provider === "gemini" || provider === "nvidia" ? (
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  {t(`ai.free.${provider}` as const)}{" "}
-                  <ExternalLink
-                    url={
-                      provider === "gemini"
-                        ? "https://aistudio.google.com/apikey"
-                        : "https://build.nvidia.com/"
-                    }
-                    label={provider === "gemini" ? "aistudio.google.com" : "build.nvidia.com"}
-                  />
-                </p>
-              ) : null}
-              <label
-                className="mt-4 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-                htmlFor="ai-model"
-              >
-                {t("ai.model")}
-              </label>
-              <input
-                id="ai-model"
-                value={models[provider]}
-                onChange={(e) => luli.setModel(provider, e.target.value.trim())}
-                spellCheck={false}
-                maxLength={64}
-                className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-xs outline-none focus:border-ring"
-              />
-              <div className="mt-4 rounded-md border border-border bg-background/60 p-3">
-                <p className="flex items-center gap-2 text-xs">
-                  {keys[provider] ? (
-                    <Lock className="size-3.5 text-success" />
-                  ) : (
-                    <KeyRound className="size-3.5 text-muted-foreground" />
-                  )}
-                  <span className={keys[provider] ? "text-success" : "text-muted-foreground"}>
-                    {keys[provider] ? t("ai.key.stored") : t("ai.key.none")}
-                  </span>
-                  <HelpHint text={t("ai.key.hint")} />
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="password"
-                    value={keyDraft}
-                    onChange={(e) => setKeyDraft(e.target.value)}
-                    placeholder={t(`ai.key.placeholder.${provider}` as const)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none focus:border-ring"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!keyDraft.trim() || !inTauri}
-                    onClick={async () => {
-                      if (await luli.saveKey(keyDraft)) setKeyDraft("");
-                    }}
-                  >
-                    {t("ai.key.save")}
-                  </Button>
-                </div>
-                {keys[provider] ? (
-                  <button
-                    type="button"
-                    onClick={luli.deleteKey}
-                    className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="size-3" />
-                    {t("ai.key.delete")}
-                  </button>
-                ) : null}
-              </div>
-              {note ? <p className="mt-3 text-xs text-foreground/90">{note}</p> : null}
-            </Card>
-
-            <Card className="animate-rise" style={rise(1)}>
-              <CardTitle
-                help={t("ai.context.hint")}
-                right={
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={contextBusy || !inTauri}
-                    onClick={luli.reloadContext}
-                    aria-label={t("ai.context.refresh")}
-                  >
-                    <RefreshCw className={cn("size-4", contextBusy && "animate-spin")} />
-                  </Button>
-                }
-              >
-                <ShieldCheck className="size-4" />
-                {t("ai.context")}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {t("ai.context.summary", {
-                  kb: contextKb,
-                  provider: t(`ai.provider.${provider}` as const),
-                })}
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowContext((v) => !v)}
-                className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                <ChevronDown
-                  className={cn("size-3.5 transition-transform", showContext && "rotate-180")}
-                />
-                {showContext ? t("ai.context.hide") : t("ai.context.show")}
-              </button>
-              {showContext && context ? (
-                <pre className="mt-2 max-h-72 overflow-auto rounded-md border border-border bg-background/70 p-2 font-mono text-[10px] leading-snug text-muted-foreground">
-                  {JSON.stringify(JSON.parse(context), null, 2)}
-                </pre>
-              ) : null}
-              <p className="mt-3 text-[11px] text-muted-foreground">{t("ai.knowledge")}</p>
-            </Card>
-
-            <ClaudeConnectCard style={rise(2)} />
-          </div>
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-4 lg:grid-cols-[256px_minmax(0,1fr)]",
+            showPanel && "2xl:grid-cols-[256px_minmax(0,1fr)_320px]",
+          )}
+        >
+          {/* ---------------- history ---------------- */}
+          <LuliSidebar />
 
           {/* ---------------- conversation ---------------- */}
-          <Card className="animate-rise flex min-h-140 flex-col" style={rise(2)}>
+          <Card
+            className="animate-rise flex min-h-140 flex-col lg:sticky lg:top-4 lg:h-[calc(100vh-13rem)] lg:self-start"
+            style={rise(2)}
+          >
             <CardTitle
               right={
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={messages.length === 0 && !busy}
-                  onClick={luli.newConversation}
+                  onClick={togglePanel}
+                  aria-pressed={showPanel}
+                  disabled={!keys[provider]}
                 >
-                  <MessageSquarePlus className="size-4" />
-                  {t("ai.new_chat")}
+                  <SlidersHorizontal className="size-4" />
+                  {showPanel ? t("ai.panel.hide") : t("ai.panel.show")}
                 </Button>
               }
             >
               <LuliMark className="size-6" />
-              {t("ai.console")}
+              <span className="min-w-0 truncate">{title ?? t("ai.console")}</span>
               <span className="ml-2 font-mono text-[11px] font-normal text-muted-foreground">
                 {models[provider]}
               </span>
@@ -402,11 +283,169 @@ export function AiPage() {
               <p className="text-[10px] text-muted-foreground">{t("ai.footer")}</p>
             </div>
           </Card>
+          {/* ---------------- settings ---------------- */}
+          {showPanel ? (
+            <div className="grid content-start gap-4 lg:col-start-2 lg:grid-cols-2 2xl:col-start-auto 2xl:grid-cols-1">
+              <Card className="animate-rise">
+                <CardTitle help={t("ai.provider.hint")}>
+                  <Bot className="size-4" />
+                  {t("ai.provider")}
+                </CardTitle>
+                <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-background/60 p-1">
+                  {PROVIDERS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => {
+                        setKeyDraft("");
+                        luli.switchProvider(p);
+                      }}
+                      className={cn(
+                        "rounded-md px-2 py-2 font-display text-[12px] font-semibold tracking-wide transition-colors",
+                        provider === p
+                          ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.45)]"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {t(`ai.provider.${p}` as const)}
+                      <span
+                        className={cn(
+                          "ml-1.5 inline-block size-1.5 rounded-full align-middle",
+                          keys[p] ? "bg-success" : "bg-muted-foreground/40",
+                        )}
+                        aria-hidden
+                      />
+                    </button>
+                  ))}
+                </div>
+                {provider === "gemini" || provider === "nvidia" ? (
+                  <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    {t(`ai.free.${provider}` as const)}{" "}
+                    <ExternalLink
+                      url={
+                        provider === "gemini"
+                          ? "https://aistudio.google.com/apikey"
+                          : "https://build.nvidia.com/"
+                      }
+                      label={provider === "gemini" ? "aistudio.google.com" : "build.nvidia.com"}
+                    />
+                  </p>
+                ) : null}
+                <label
+                  className="mt-4 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  htmlFor="ai-model"
+                >
+                  {t("ai.model")}
+                </label>
+                <input
+                  id="ai-model"
+                  value={models[provider]}
+                  onChange={(e) => luli.setModel(provider, e.target.value.trim())}
+                  spellCheck={false}
+                  maxLength={64}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-xs outline-none focus:border-ring"
+                />
+                <div className="mt-4 rounded-md border border-border bg-background/60 p-3">
+                  <p className="flex items-center gap-2 text-xs">
+                    {keys[provider] ? (
+                      <Lock className="size-3.5 text-success" />
+                    ) : (
+                      <KeyRound className="size-3.5 text-muted-foreground" />
+                    )}
+                    <span className={keys[provider] ? "text-success" : "text-muted-foreground"}>
+                      {keys[provider] ? t("ai.key.stored") : t("ai.key.none")}
+                    </span>
+                    <HelpHint text={t("ai.key.hint")} />
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="password"
+                      value={keyDraft}
+                      onChange={(e) => setKeyDraft(e.target.value)}
+                      placeholder={t(`ai.key.placeholder.${provider}` as const)}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none focus:border-ring"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!keyDraft.trim() || !inTauri}
+                      onClick={async () => {
+                        if (await luli.saveKey(keyDraft)) setKeyDraft("");
+                      }}
+                    >
+                      {t("ai.key.save")}
+                    </Button>
+                  </div>
+                  {keys[provider] ? (
+                    <button
+                      type="button"
+                      onClick={luli.deleteKey}
+                      className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="size-3" />
+                      {t("ai.key.delete")}
+                    </button>
+                  ) : null}
+                </div>
+                {note ? <p className="mt-3 text-xs text-foreground/90">{note}</p> : null}
+              </Card>
+
+              <Card className="animate-rise" style={rise(1)}>
+                <CardTitle
+                  help={t("ai.context.hint")}
+                  right={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={contextBusy || !inTauri}
+                      onClick={luli.reloadContext}
+                      aria-label={t("ai.context.refresh")}
+                    >
+                      <RefreshCw className={cn("size-4", contextBusy && "animate-spin")} />
+                    </Button>
+                  }
+                >
+                  <ShieldCheck className="size-4" />
+                  {t("ai.context")}
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {t("ai.context.summary", {
+                    kb: contextKb,
+                    provider: t(`ai.provider.${provider}` as const),
+                  })}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowContext((v) => !v)}
+                  className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronDown
+                    className={cn("size-3.5 transition-transform", showContext && "rotate-180")}
+                  />
+                  {showContext ? t("ai.context.hide") : t("ai.context.show")}
+                </button>
+                {showContext && context ? (
+                  <pre className="mt-2 max-h-72 overflow-auto rounded-md border border-border bg-background/70 p-2 font-mono text-[10px] leading-snug text-muted-foreground">
+                    {JSON.stringify(JSON.parse(context), null, 2)}
+                  </pre>
+                ) : null}
+                <p className="mt-3 text-[11px] text-muted-foreground">{t("ai.knowledge")}</p>
+              </Card>
+
+              <LuliInstructionsCard />
+              <LuliMemoryCard />
+              <ClaudeConnectCard />
+            </div>
+          ) : null}
         </div>
       </PageBody>
     </>
   );
 }
+
+const PANEL_KEY = "g2boost.luli.settings";
 
 function Chip({
   children,
@@ -537,6 +576,37 @@ function AnswerExtras({ answer, latest }: { answer: Answer; latest: boolean }) {
             ))}
           </ul>
           <p className="mt-2 text-[10px] text-muted-foreground">{t("ai.actions.note")}</p>
+        </div>
+      ) : null}
+      {answer.actions.remember.length > 0 ? (
+        <div className="mt-3 rounded-md border border-border bg-background/50 p-3">
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Brain className="size-3.5" />
+            {t("ai.remember.title")}
+          </p>
+          <ul className="space-y-1.5">
+            {answer.actions.remember.map((r) => {
+              const saved = luli.memory.some((m) => m.text.toLowerCase() === r.toLowerCase());
+              return (
+                <li key={r} className="flex items-center gap-2 text-sm">
+                  <span className="min-w-0 flex-1">{r}</span>
+                  {saved ? (
+                    <span className="text-xs text-success">{t("ai.remember.saved")}</span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!inTauri}
+                      onClick={() => luli.remember(r).catch(() => undefined)}
+                    >
+                      {t("ai.remember.save")}
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-[10px] text-muted-foreground">{t("ai.remember.note")}</p>
         </div>
       ) : null}
       {answer.model ? (
