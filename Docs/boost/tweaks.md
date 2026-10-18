@@ -9,6 +9,12 @@
 - Cada tweak é **dado** (lista de valores de registro, nomes de serviço, parâmetros `SystemParametersInfo`, esquema de energia). O core expõe `detect` / `apply` / `revert`; a UI só mostra estado e chama.
 - **Backup exato antes de aplicar.** `apply(id, true)` lê os valores atuais de tudo que o tweak toca e grava `%LOCALAPPDATA%\G2 Boost\backups\<id>.json` (uma vez; um segundo `apply` não sobrescreve). `apply(id, false)` restaura esse backup e apaga o arquivo. Sem backup (o usuário já tinha mexido à mão), desligar grava o **padrão documentado do Windows** e a UI avisa ("Sem backup: desligar grava o padrão do Windows").
 - **Nunca shell.** Registro via `RegOpenKeyExW`/`RegSetValueExW`; serviços via SCM (`OpenServiceW`, `ChangeServiceConfigW`, `ControlService`, `StartServiceW`); energia via `PowerGetActiveScheme`/`PowerSetActiveScheme`/`PowerDuplicateScheme`; RAM via `NtSetSystemInformation(SystemMemoryListInformation, MemoryPurgeStandbyList)`; elevação via `ShellExecuteExW("runas")`.
+- **Detecção = o que o Windows mostra (2026-10-18).** `detect` conta só os valores que distinguem ligado de desligado:
+  - valor igual nos dois estados (MMCSS `GPU Priority` = 8) é ignorado;
+  - `op_default_on`: ausência já significa "ligado" no Windows (Modo de jogo: `AutoGameModeEnabled`/`AllowAutoGameMode` ausentes = ligado, só `0` explícito desliga), então não puxa o estado para Parcial;
+  - **estado em execução onde o registro é só um pedido:** HAGS lê o driver (`hardware::hags_state`, D3DKMT `KMTQAITYPE_WDDM_2_7_CAPS`; GPU sem suporte = Indisponível) e `hvci_off` lê a WMI `Win32_DeviceGuard` (`advisor::hvci_running`). Valor ausente → mostra o padrão em execução; pedido ≠ execução → `detail = "reboot_pending"` e a UI avisa "Reinicie o PC para valer";
+  - plano de energia: qualquer cópia do Desempenho máximo conta como ligado (nome do modelo localizado ou "Ultimate Performance (…)" de outras ferramentas).
+  - A página relê tudo quando a janela volta ao foco (`focus` + `visibilitychange`): mexeu em Configurações do Windows, o G2 Boost acompanha.
 - **Admin:** o app roda `asInvoker`. Tweaks `HKLM`, serviços, energia e purge de RAM retornam `needs_admin` sem tentar; a UI mostra "Elevar (administrador)", que relança o exe elevado com `--route boost` e fecha a instância atual. IDs vindos da UI passam por `registry::safe_id` (`[a-z0-9_]`) antes de virar nome de arquivo.
 
 ## Presets (decisão do dono, 2026-10-14)

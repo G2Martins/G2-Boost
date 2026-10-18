@@ -93,7 +93,7 @@ fn check(e: WIN32_ERROR) -> Result<(), BoostError> {
 
 /* ---------------- catalog ---------------- */
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Desired {
     Dword(u32),
     Str(&'static str),
@@ -119,6 +119,8 @@ struct RegOp {
     name: &'static str,
     on: Desired,
     off: Desired,
+    /// The value missing means the same as `on` (Windows' own default is already "on", e.g. Game Mode).
+    absent_is_on: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -212,12 +214,18 @@ fn dx_write(key: &str, value: Option<&str>) -> Result<(), BoostError> {
 }
 
 const fn op(root: Root, path: &'static str, name: &'static str, on: Desired, off: Desired) -> RegOp {
-    RegOp { root, path, name, on, off }
+    RegOp { root, path, name, on, off, absent_is_on: false }
+}
+
+/// A value whose absence already means "on" in Windows (its default).
+const fn op_default_on(root: Root, path: &'static str, name: &'static str, on: Desired, off: Desired) -> RegOp {
+    RegOp { root, path, name, on, off, absent_is_on: true }
 }
 
 const GAME_MODE: &[RegOp] = &[
-    op(HKCU, GAME_BAR, "AutoGameModeEnabled", Desired::Dword(1), Desired::Absent),
-    op(HKCU, GAME_BAR, "AllowAutoGameMode", Desired::Dword(1), Desired::Absent),
+    // Game Mode is on by default in Windows 10/11: missing values mean "on", only an explicit 0 is off.
+    op_default_on(HKCU, GAME_BAR, "AutoGameModeEnabled", Desired::Dword(1), Desired::Absent),
+    op_default_on(HKCU, GAME_BAR, "AllowAutoGameMode", Desired::Dword(1), Desired::Absent),
     op(HKCU, GAME_CONFIG, "GameDVR_Enabled", Desired::Dword(0), Desired::Dword(1)),
     op(HKCU, GAME_DVR, "AppCaptureEnabled", Desired::Dword(0), Desired::Dword(1)),
 ];
@@ -401,6 +409,40 @@ pub struct TweakState {
     pub services: Vec<ServiceState>,
 }
 
+/// An Ultimate Performance copy, whoever made it: our copy carries the template's localized name,
+/// other tools name theirs "Ultimate Performance (…)".
+fn is_ultimate_name(name: &str, template: &str) -> bool {
+    let (n, t) = (name.to_lowercase(), template.to_lowercase());
+    (!t.is_empty() && n.contains(&t)) || n.contains("ultimate performance")
+}
+
+/// Where the registry is only a request, show what Windows is running now.
+/// `detail = "reboot_pending"` when the request and the running state differ.
+fn live_state(id: &str, any_absent: bool, st: &mut TweakState) {
+    let live = match id {
+        "hags" => match crate::hardware::hags_state() {
+            Some((false, _)) => {
+                st.status = Status::Unavailable; // GPU/driver without HAGS
+                return;
+            }
+            Some((true, enabled)) => Some(enabled),
+            None => None,
+        },
+        // `hvci_off` is "on" when Memory Integrity is NOT running.
+        "hvci_off" => crate::advisor::hvci_running().map(|running| !running),
+        _ => return,
+    };
+    let Some(live_on) = live else {
+        return;
+    };
+    let live_status = if live_on { Status::On } else { Status::Off };
+    if any_absent {
+        st.status = live_status; // never configured: the driver/OS default is the truth
+    } else if st.status != live_status {
+        st.detail = Some("reboot_pending".into());
+    }
+}
+
 fn status_of(matches: usize, total: usize) -> Status {
     if total == 0 {
         Status::Unavailable
@@ -436,15 +478,28 @@ pub fn detect(t: &Tweak) -> TweakState {
     };
     match t.kind {
         Kind::Registry(ops) => {
-            let mut matches = 0;
+            let (mut matches, mut total, mut any_absent) = (0, 0, false);
             for o in ops {
-                match registry::read(o.root, o.path, o.name) {
-                    Ok(v) if v == o.on.value() => matches += 1,
-                    Ok(_) => {}
+                // Same value in both states (MMCSS "GPU Priority" 8): says nothing either way.
+                if o.on == o.off {
+                    continue;
+                }
+                let v = match registry::read(o.root, o.path, o.name) {
+                    Ok(v) => v,
                     Err(_) => return st,
+                };
+                any_absent |= v == Value::Absent;
+                // Windows default already "on" and nothing set (or set on): neutral, like a stock PC.
+                if o.absent_is_on && (v == Value::Absent || v == o.on.value()) {
+                    continue;
+                }
+                total += 1;
+                if v == o.on.value() {
+                    matches += 1;
                 }
             }
-            st.status = status_of(matches, ops.len());
+            st.status = if total == 0 && ops.iter().any(|o| o.absent_is_on) { Status::On } else { status_of(matches, total) };
+            live_state(t.id, any_absent, &mut st);
         }
         Kind::Services(list) => {
             let mut total = 0;
@@ -486,7 +541,7 @@ pub fn detect(t: &Tweak) -> TweakState {
         Kind::Power => {
             if let Ok(active) = active_scheme() {
                 let name = friendly_name(&active);
-                st.status = if name == friendly_name(&ULTIMATE) { Status::On } else { Status::Off };
+                st.status = if is_ultimate_name(&name, &friendly_name(&ULTIMATE)) { Status::On } else { Status::Off };
                 st.detail = Some(name);
             }
         }
@@ -1144,6 +1199,33 @@ mod tests {
         assert_eq!(dx_set("", "SwapEffectUpgradeEnable", None), "");
         assert_eq!(dx_set("", "SwapEffectUpgradeEnable", Some("1")), "SwapEffectUpgradeEnable=1;");
         assert_eq!(dx_get("SwapEffectUpgradeEnableX=1;", "SwapEffectUpgradeEnable"), None);
+    }
+
+    #[test]
+    fn absent_default_on_and_neutral_ops_do_not_skew_status() {
+        const P: &str = r"Software\G2 Boost\Test\boost_default";
+        const OPS: &[RegOp] = &[
+            op_default_on(HKCU, P, "mode", Desired::Dword(1), Desired::Absent),
+            op(HKCU, P, "same", Desired::Dword(8), Desired::Dword(8)),
+            op(HKCU, P, "dvr", Desired::Dword(0), Desired::Dword(1)),
+        ];
+        const T: Tweak = tw("unit_test_default_on", false, false, Performance, Kind::Registry(OPS));
+        for n in ["mode", "same", "dvr"] {
+            registry::write(HKCU, P, n, &Value::Absent).unwrap();
+        }
+        assert_eq!(detect(&T).status, Status::Off, "stock PC: only dvr counts");
+        registry::write(HKCU, P, "dvr", &Value::Dword(0)).unwrap();
+        assert_eq!(detect(&T).status, Status::On, "mode absent = Windows default on");
+        registry::write(HKCU, P, "mode", &Value::Dword(0)).unwrap();
+        assert_eq!(detect(&T).status, Status::Partial, "explicit 0 turns mode off");
+        for n in ["mode", "dvr"] {
+            registry::write(HKCU, P, n, &Value::Absent).unwrap();
+        }
+
+        assert!(is_ultimate_name("Ultimate Performance (ExitLag)", "Desempenho Máximo"));
+        assert!(is_ultimate_name("Desempenho Máximo", "Desempenho Máximo"));
+        assert!(!is_ultimate_name("Alto desempenho", "Desempenho Máximo"));
+        assert!(!is_ultimate_name("Equilibrado", ""));
     }
 
     #[test]

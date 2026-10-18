@@ -893,6 +893,8 @@ struct AppsState {
     apps: Mutex<Vec<apps::App>>,
     orphans: Mutex<Vec<apps::App>>,
     pending: Mutex<Option<apps::Pending>>,
+    /// id → PNG data URL (None = no icon), filled on demand.
+    icons: Mutex<std::collections::HashMap<String, Option<String>>>,
 }
 
 impl AppsState {
@@ -1008,6 +1010,20 @@ async fn apps_uninstall(state: State<'_, AppsState>, id: String) -> Result<(), S
 #[tauri::command]
 fn apps_installed(state: State<'_, AppsState>, id: String) -> bool {
     state.find(&id).is_some_and(|a| apps::installed(&a))
+}
+
+/// The app's icon as a PNG data URL (cached; the UI asks per visible row).
+#[tauri::command]
+async fn apps_icon(state: State<'_, AppsState>, id: String) -> Result<Option<String>, String> {
+    if let Some(hit) = state.icons.lock().unwrap().get(&id) {
+        return Ok(hit.clone());
+    }
+    let Some(app) = state.find(&id) else {
+        return Ok(None);
+    };
+    let icon = tauri::async_runtime::spawn_blocking(move || apps::icon(&app)).await.map_err(|e| e.to_string())?;
+    state.icons.lock().unwrap().insert(id, icon.clone());
+    Ok(icon)
 }
 
 /// A dropped `.exe`/`.lnk` → the id of the app it belongs to.
@@ -1264,7 +1280,8 @@ pub fn run() {
             apps_resolve,
             apps_protect,
             apps_undo_status,
-            apps_undo
+            apps_undo,
+            apps_icon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

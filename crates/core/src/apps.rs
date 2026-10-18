@@ -99,6 +99,9 @@ pub struct App {
     pub install_location: Option<String>,
     /// Main executable (from `DisplayIcon`), when it names an .exe.
     pub exe: Option<String>,
+    /// Where the icon comes from: `DisplayIcon` (`path[,index]`) or a Store package logo path.
+    #[serde(default)]
+    pub icon_source: Option<String>,
     pub size_bytes: Option<u64>,
     /// `YYYYMMDD` as Windows stores it.
     pub install_date: Option<String>,
@@ -177,7 +180,8 @@ fn entry(hive: Hive, key: &str, user_protected: &[String]) -> Option<App> {
     }
     let uninstall = read_str(root, &path, "UninstallString")?;
     let publisher = read_str(root, &path, "Publisher").unwrap_or_default();
-    let exe = read_str(root, &path, "DisplayIcon").and_then(|i| {
+    let icon_source = read_str(root, &path, "DisplayIcon");
+    let exe = icon_source.clone().and_then(|i| {
         let p = i.rsplit_once(',').filter(|(_, n)| n.trim().parse::<i32>().is_ok()).map_or(i.as_str(), |(p, _)| p).trim().trim_matches('"');
         p.to_ascii_lowercase().ends_with(".exe").then(|| p.to_string())
     });
@@ -199,6 +203,7 @@ fn entry(hive: Hive, key: &str, user_protected: &[String]) -> Option<App> {
         version: read_str(root, &path, "DisplayVersion").unwrap_or_default(),
         install_location: read_str(root, &path, "InstallLocation").map(|l| l.trim_end_matches('\\').to_string()).filter(|l| !l.is_empty()),
         exe,
+        icon_source,
         size_bytes: read_dword(root, &path, "EstimatedSize").map(|kb| u64::from(kb) * 1024),
         install_date: read_str(root, &path, "InstallDate"),
         msi: read_dword(root, &path, "WindowsInstaller") == Some(1),
@@ -300,6 +305,7 @@ fn store_apps(user_protected: &[String]) -> Vec<App> {
             // Never offered as a leftover: WindowsApps belongs to the Store servicing stack.
             install_location: None,
             exe: None,
+            icon_source: p.Logo().ok().and_then(|u| u.AbsoluteUri().ok()).and_then(|u| file_uri_path(&u.to_string())),
             size_bytes: None,
             install_date: None,
             // Store apps keep their family name here (no UninstallString); validated before use.
@@ -316,6 +322,38 @@ fn store_apps(user_protected: &[String]) -> Vec<App> {
 /// The snapshot file is user-writable, so this is checked before it is joined to a folder.
 fn valid_family(f: &str) -> bool {
     !f.is_empty() && f.len() <= 128 && !f.contains("..") && f.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
+/// `file:///C:/Program%20Files/...` → `C:\Program Files\...` (only local file URIs).
+fn file_uri_path(uri: &str) -> Option<String> {
+    let rest = uri.strip_prefix("file:///")?;
+    let bytes = rest.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(if bytes[i] == b'/' { b'\\' } else { bytes[i] });
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+/// The app's icon as a PNG data URL (Store logo, or the `DisplayIcon` resource, or its exe).
+pub fn icon(app: &App) -> Option<String> {
+    let src = app.icon_source.as_deref()?;
+    let png = if app.hive == Hive::Store {
+        crate::icons::store_logo(Path::new(src))
+    } else {
+        crate::icons::parse_source(src)
+            .and_then(|(p, i)| crate::icons::png_from_resource(&p, i))
+            .or_else(|| app.exe.as_deref().and_then(|e| crate::icons::png_from_resource(Path::new(e), 0)))
+    }?;
+    Some(crate::icons::data_url(&png))
 }
 
 /// The installed package with this full name, if any.
@@ -1342,6 +1380,7 @@ mod tests {
             version: "1.0".into(),
             install_location: install.map(str::to_string),
             exe: exe.map(str::to_string),
+            icon_source: None,
             size_bytes: None,
             install_date: None,
             uninstall: String::new(),
@@ -1418,6 +1457,9 @@ mod tests {
         assert!(!runtime("Discord", "Discord Inc."));
         assert!(runtime("Microsoft GameInput", "Microsoft Corporation"));
         assert!(valid_family("Microsoft.ZuneMusic_8wekyb3d8bbwe"));
+        assert_eq!(file_uri_path("file:///C:/Program%20Files/WindowsApps/A/Assets/Logo.png").as_deref(), Some(r"C:\Program Files\WindowsApps\A\Assets\Logo.png"));
+        assert_eq!(file_uri_path("https://x/y.png"), None);
+        assert_eq!(file_uri_path("file:///C:/a%zz"), None);
         for bad in ["", "..", r"..\Microsoft", "a/b", r"C:\x", "a b"] {
             assert!(!valid_family(bad), "{bad}");
         }

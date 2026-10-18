@@ -18,6 +18,52 @@ use windows::Win32::Devices::Display::{
 use windows::Win32::Graphics::Gdi::{DEVMODEW, ENUM_DISPLAY_SETTINGS_MODE, EnumDisplaySettingsW};
 use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE};
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
+
+/// Hardware-accelerated GPU scheduling as the driver reports it *now* (not the registry request):
+/// `(supported, enabled)` for the first hardware adapter that answers `KMTQAITYPE_WDDM_2_7_CAPS`.
+/// Differs from `HwSchMode` until the next reboot after a change.
+pub fn hags_state() -> Option<(bool, bool)> {
+    use windows::Wdk::Graphics::Direct3D::{
+        D3DKMT_CLOSEADAPTER, D3DKMT_OPENADAPTERFROMLUID, D3DKMT_QUERYADAPTERINFO, D3DKMT_WDDM_2_7_CAPS, D3DKMTCloseAdapter,
+        D3DKMTOpenAdapterFromLuid, D3DKMTQueryAdapterInfo, KMTQAITYPE_WDDM_2_7_CAPS,
+    };
+    // SAFETY: DXGI enumeration; each opened KMT adapter handle is closed below; caps is a plain u32 bitfield.
+    unsafe {
+        let factory = CreateDXGIFactory1::<IDXGIFactory1>().ok()?;
+        for i in 0..8 {
+            let Ok(adapter) = factory.EnumAdapters1(i) else {
+                break;
+            };
+            let Ok(desc) = adapter.GetDesc1() else {
+                continue;
+            };
+            if desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 {
+                continue;
+            }
+            let mut open = D3DKMT_OPENADAPTERFROMLUID { AdapterLuid: desc.AdapterLuid, hAdapter: 0 };
+            if D3DKMTOpenAdapterFromLuid(&mut open).is_err() {
+                continue;
+            }
+            let mut caps = D3DKMT_WDDM_2_7_CAPS::default();
+            let mut q = D3DKMT_QUERYADAPTERINFO {
+                hAdapter: open.hAdapter,
+                Type: KMTQAITYPE_WDDM_2_7_CAPS,
+                pPrivateDriverData: (&mut caps as *mut D3DKMT_WDDM_2_7_CAPS).cast(),
+                PrivateDriverDataSize: std::mem::size_of::<D3DKMT_WDDM_2_7_CAPS>() as u32,
+            };
+            let ok = D3DKMTQueryAdapterInfo(&mut q).is_ok();
+            let _ = D3DKMTCloseAdapter(&D3DKMT_CLOSEADAPTER { hAdapter: open.hAdapter });
+            if ok {
+                // Bits: 0 HwSchSupported, 1 HwSchEnabled, 2 HwSchEnabledByDefault.
+                let bits = caps.Anonymous.Value;
+                if bits & 1 != 0 {
+                    return Some((true, bits & 2 != 0));
+                }
+            }
+        }
+        Some((false, false))
+    }
+}
 use windows::Win32::Storage::FileSystem::{
     BusTypeNvme, BusTypeRAID, BusTypeSas, BusTypeSata, BusTypeUsb, CreateFileW, FILE_FLAGS_AND_ATTRIBUTES, FILE_SHARE_READ,
     FILE_SHARE_WRITE, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, OPEN_EXISTING, STORAGE_BUS_TYPE,
@@ -868,6 +914,14 @@ fn tpm_version() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hags_state_answers() {
+        // DXGI always lists at least the software adapter, so the query itself never fails.
+        let s = hags_state();
+        println!("hags (supported, enabled) = {s:?}");
+        assert!(s.is_some());
+    }
 
     fn smbios_blob() -> Vec<u8> {
         // RawSMBIOSData header (8 bytes) + Type 0 + Type 1 + Type 2 + Type 3 + Type 16 + Type 17 ×2 + Type 127.

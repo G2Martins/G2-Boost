@@ -22,7 +22,7 @@ export const ptBR = {
   "dash.restore.unknown": "Proteção do sistema: desconhecida",
   "dash.kpi.restore.last": "último {when}",
   "dash.kpi.restore.action": "Criar ponto",
-  "dash.restore.description": "G2 Boost — antes de otimizar",
+  "dash.restore.description": "G2 Boost, antes de otimizar",
   "dash.restore.created": "Ponto de restauração criado.",
   "dash.restore.skipped":
     "O Windows pulou: já existe ponto nos últimos {minutes} min (limite do sistema).",
@@ -74,7 +74,7 @@ export const ptBR = {
   "mypc.memory.speed": "{configured} MT/s configurada · SPD {spd} MT/s",
   "mypc.memory.rated": "nominal {rated} MT/s",
   "mypc.memory.below_rated":
-    "Rodando abaixo da velocidade nominal do módulo — XMP/EXPO desligado na BIOS? Ligar é o upgrade grátis mais comum.",
+    "Rodando abaixo da velocidade nominal do módulo. O XMP/EXPO está desligado na BIOS? Ligar é o upgrade grátis mais comum.",
   "mypc.memory.empty_slot": "vazio",
   "mypc.board_bios": "Placa-mãe, BIOS e firmware",
   "mypc.bios": "BIOS",
@@ -97,7 +97,7 @@ export const ptBR = {
   "mypc.winsat.started": "Avaliação iniciada. Aguarde a tela de teste terminar e atualize.",
   "mypc.winsat.state.unknown": "sem avaliação",
   "mypc.winsat.state.valid": "válida",
-  "mypc.winsat.state.incoherent": "hardware mudou — refazer",
+  "mypc.winsat.state.incoherent": "hardware mudou, refazer",
   "mypc.winsat.state.never": "nunca rodou",
   "mypc.winsat.state.invalid": "inválida",
   "dash.monitor.cpu_power": "potência CPU",
@@ -135,7 +135,7 @@ export const ptBR = {
   "mypc.fw.hibernation": "Hibernação",
   "mypc.fw.unknown": "não dá para saber",
   "mypc.fw.note":
-    "Lido do Windows, sem driver. C-states, limites de energia e curvas de ventoinha não aparecem para o sistema — só na própria BIOS.",
+    "Lido do Windows, sem driver. C-states, limites de energia e curvas de ventoinha não aparecem para o sistema, só na própria BIOS.",
   "mypc.disks": "Discos",
   "mypc.ssd": "SSD",
   "mypc.hdd": "HD mecânico",
@@ -167,7 +167,7 @@ export const ptBR = {
     "Ponto de restauração pulado pelo Windows (já existe um recente).",
   "boost.tweak.show_extensions": "Mostrar extensões dos arquivos",
   "boost.tweak.show_extensions.desc":
-    "O Explorer exibe .exe, .jpg, .txt — ajuda a identificar arquivos e golpes como 'foto.jpg.exe'.",
+    "O Explorer exibe .exe, .jpg, .txt. Ajuda a identificar arquivos e golpes como 'foto.jpg.exe'.",
   "boost.tweak.show_extensions.warn": "você prefere nomes limpos no Explorer.",
   "boost.tweak.widgets_off": "Desligar os Widgets",
   "boost.tweak.widgets_off.desc":
@@ -175,7 +175,7 @@ export const ptBR = {
   "boost.tweak.widgets_off.warn": "você usa o painel de Widgets.",
   "boost.tweak.search_highlights_off": "Sem destaques na pesquisa",
   "boost.tweak.search_highlights_off.desc":
-    "Tira os destaques da nuvem e a busca Bing da caixa de pesquisa do Iniciar.",
+    "Tira os destaques da nuvem da caixa de pesquisa do Iniciar e pede ao Windows para não misturar resultados do Bing. Algumas versões do Windows 11 ignoram esse segundo pedido.",
   "boost.tweak.search_highlights_off.warn": "você usa a busca na web pelo Iniciar.",
   "boost.tweak.silent_apps_off": "Sem apps instalados sozinhos",
   "boost.tweak.silent_apps_off.desc":
@@ -193,9 +193,9 @@ export const ptBR = {
   "boost.tweak.svc_dps.desc":
     "Para o DPS. Os solucionadores de problemas do Windows deixam de funcionar. Ganho baixo; o Galdino recomenda, a Microsoft avisa.",
   "boost.tweak.svc_dps.warn": "você usa os solucionadores de problemas do Windows.",
-  "boost.tweak.svc_geolocation": "Desligar geolocalização",
+  "boost.tweak.svc_geolocation": "Desligar o serviço de localização",
   "boost.tweak.svc_geolocation.desc":
-    "Para o serviço lfsvc. Apps perdem localização (mapas, clima). Privacidade, não desempenho.",
+    "Para o serviço lfsvc. Apps perdem localização (mapas, clima). A chave Localização em Configurações não muda; este ajuste desliga o serviço por baixo dela. Privacidade, não desempenho.",
   "boost.tweak.svc_geolocation.warn": "algum app precisa da sua localização.",
   "boost.tweak.hvci_off": "Desligar Isolamento de Núcleo (integridade de memória)",
   "boost.tweak.hvci_off.desc":
@@ -208,7 +208,7 @@ export const ptBR = {
   "settings.restore_before_preset.body": "Rede de segurança extra além do backup por ajuste.",
   "nav.ai": "Assistente IA",
   "ai.title": "Assistente IA",
-  "ai.subtitle": "Claude, ChatGPT ou Gemini analisando este PC — sua chave, seu custo",
+  "ai.subtitle": "Claude, ChatGPT ou Gemini analisando este PC, com a sua chave e o seu custo",
   "ai.provider": "Provedor",
   "ai.provider.hint":
     "A pergunta vai direto do app para o provedor escolhido (via cliente HTTP do Rust, só para os hosts liberados). Nada passa por servidor nosso.",
@@ -240,7 +240,7 @@ export const ptBR = {
   "ai.console": "Conversa",
   "ai.empty.title": "Pergunte sobre este PC",
   "ai.empty.body":
-    "A IA já recebe o hardware, os achados e os ajustes. Peça um diagnóstico, um upgrade com bom custo-benefício ou uma estimativa de FPS — números de FPS vêm de benchmarks citados, nunca inventados.",
+    "A IA já recebe o hardware, os achados e os ajustes. Peça um diagnóstico, um upgrade com bom custo-benefício ou uma estimativa de FPS. Números de FPS vêm de benchmarks citados, nunca inventados.",
   "ai.quick.analyze": "Analise meu PC: as 3 ações com mais impacto em jogos",
   "ai.quick.upgrade": "Qual upgrade vale mais a pena para jogar?",
   "ai.quick.temps": "Minhas temperaturas e consumo estão ok?",
@@ -257,9 +257,9 @@ export const ptBR = {
   "ai.action.startup_done": "Não inicia mais com o Windows (religue em PC Boost › Inicialização)",
   "ai.mcp.title": "Usar no Claude Desktop / Claude Code",
   "ai.mcp.hint":
-    "MCP (Model Context Protocol): o Claude da sua máquina consulta o diagnóstico deste PC direto do G2 Boost. Só leitura — nada é alterado por ali.",
+    "MCP (Model Context Protocol): o Claude da sua máquina consulta o diagnóstico deste PC direto do G2 Boost. Só leitura: nada é alterado por ali.",
   "ai.mcp.body":
-    "O próprio G2 Boost vira o servidor MCP com --mcp. As ferramentas só leem (hardware, BIOS, sensores, inicialização, processos, ajustes, prévia de limpeza); aplicar qualquer coisa continua sendo um clique seu aqui no app.",
+    "O próprio G2 Boost vira o servidor MCP com a opção mcp. As ferramentas só leem (hardware, BIOS, sensores, inicialização, processos, ajustes, prévia de limpeza); aplicar qualquer coisa continua sendo um clique seu aqui no app.",
   "ai.action.applied": "Aplicado",
   "ai.action.open_cleanup": "Abrir Limpeza",
   "ai.error.empty":
@@ -291,7 +291,7 @@ export const ptBR = {
     "Ligue o XMP/EXPO na BIOS. Pró: mais FPS mínimo em jogos CPU-bound, sem custo. Contra: em placas raras pode exigir ajuste de estabilidade.",
   "advisor.single_channel.title": "RAM em canal único ({size} GB num pente só)",
   "advisor.single_channel.body":
-    "Um segundo pente igual dobra a banda de memória — ganho grande em jogos e no vídeo integrado. Custo baixo.",
+    "Um segundo pente igual dobra a banda de memória, um ganho grande em jogos e no vídeo integrado. Custo baixo.",
   "advisor.ram_low.title": "Pouca RAM ({total} GB)",
   "advisor.ram_low.body":
     "Jogos atuais pedem 16 GB; 32 GB folga para Discord, navegador e streaming. Prefira 2 pentes iguais.",
@@ -327,19 +327,19 @@ export const ptBR = {
     "Exigido pelo Windows 11 e por alguns anti-cheats. Ative o fTPM/PTT na BIOS.",
   "advisor.hvci_on.title": "Integridade de memória (HVCI) ligada",
   "advisor.hvci_on.body":
-    "Protege contra drivers maliciosos e custa ~5% de FPS em alguns jogos (Tom's Hardware). Desligar é opção no PC Boost › Personalizado — troca segurança por desempenho.",
+    "Protege contra drivers maliciosos e custa ~5% de FPS em alguns jogos (Tom's Hardware). Desligar é opção no PC Boost › Personalizado e troca segurança por desempenho.",
   "advisor.cpu_hot.title": "Processador quente ({temp} °C)",
   "advisor.cpu_hot.body":
-    "Acima de ~90 °C o processador reduz o clock (throttling) e o FPS cai. Limpe a poeira, confira o cooler e a pasta térmica, use o plano Equilibrado fora dos jogos e limite o FPS ao refresh do monitor — menos calor sem perder fluidez.",
+    "Acima de ~90 °C o processador reduz o clock (throttling) e o FPS cai. Limpe a poeira, confira o cooler e a pasta térmica, use o plano Equilibrado fora dos jogos e limite o FPS ao refresh do monitor: menos calor sem perder fluidez.",
   "advisor.legacy_boot.title": "Windows iniciado em modo legado (CSM)",
   "advisor.legacy_boot.body":
-    "Sem UEFI não há Secure Boot, exigido por anti-cheats como o do Valorant. Converter o disco para GPT (MBR2GPT da Microsoft) e trocar para UEFI na BIOS — faça backup antes.",
+    "Sem UEFI não há Secure Boot, exigido por anti-cheats como o do Valorant. Converta o disco para GPT (MBR2GPT da Microsoft) e troque para UEFI na BIOS. Faça backup antes.",
   "advisor.rebar_off.title": "Resizable BAR desligado (janela de {bar_mb} MB)",
   "advisor.rebar_off.body":
     "Em placas RTX 30/40/50 e RX 6000+ o ReBAR dá alguns % de FPS em vários jogos. Ligue “Above 4G Decoding” e “Re-Size BAR” na BIOS (exige modo UEFI). Grátis.",
   "advisor.bios_old.title": "BIOS com cerca de {years} anos ({version})",
   "advisor.bios_old.body":
-    "Atualizações de BIOS trazem microcódigo, compatibilidade de memória e correções de segurança. Atualize só pelo site do fabricante da placa, com energia estável — nunca durante tempestade ou na bateria.",
+    "Atualizações de BIOS trazem microcódigo, compatibilidade de memória e correções de segurança. Atualize só pelo site do fabricante da placa, com energia estável, nunca durante tempestade ou na bateria.",
   "advisor.winsat_stale.title": "Nota do WinSAT desatualizada",
   "advisor.winsat_stale.body": "O hardware mudou desde a última avaliação. Rode de novo em Meu PC.",
   "advisor.winsat_never.title": "WinSAT nunca rodou",
@@ -408,7 +408,7 @@ export const ptBR = {
   "disk.reveal": "Mostrar na pasta",
   "disk.recycle": "Lixeira",
   "disk.recycle.selected": "Enviar {count} para a Lixeira ({size})",
-  "disk.recycle.confirm_title": "Enviar {count} item(ns) para a Lixeira — {size}",
+  "disk.recycle.confirm_title": "Enviar {count} item(ns) para a Lixeira ({size})",
   "disk.recycle.confirm_body":
     "Vai para a Lixeira e pode ser restaurado de lá. Se algo for grande demais para a Lixeira, o próprio Windows pergunta antes de apagar de vez. Pastas do sistema e de outros usuários são bloqueadas.",
   "disk.recycle.confirm": "Enviar para a Lixeira",
@@ -445,7 +445,7 @@ export const ptBR = {
     "Pacotes de atualização já baixados. Podem ser removidos com segurança por Limpeza › Cache do Windows Update.",
   "disk.ess.installer.title": "Cache de instaladores (Windows\\Installer)",
   "disk.ess.installer.body":
-    "Necessário para reparar e desinstalar programas. Não apague à mão — desinstalar programas que você não usa é o jeito seguro de reduzir.",
+    "Necessário para reparar e desinstalar programas. Não apague à mão: desinstalar programas que você não usa é o jeito seguro de reduzir.",
   "disk.ess.package_cache.title": "Cache de pacotes (ProgramData\\Package Cache)",
   "disk.ess.package_cache.body":
     "Instaladores de Visual Studio, runtimes e SDKs, usados para reparar e atualizar. Apagar quebra desinstalações; reduza removendo o programa dono.",
@@ -455,7 +455,7 @@ export const ptBR = {
     "Arquivos grandes que o Windows precisa (hiberfil, pagefile, WinSxS) com explicação e a ação segura para cada um.",
 
   "cleanup.title": "Limpeza",
-  "cleanup.subtitle": "Caches, temporários e logs — com prévia antes de apagar",
+  "cleanup.subtitle": "Caches, temporários e logs, com prévia antes de apagar",
   "cleanup.tab.daily": "Diária",
   "cleanup.tab.monthly": "Mensal",
   "cleanup.tab.advanced": "Avançado",
@@ -494,9 +494,9 @@ export const ptBR = {
     "Categorias do sistema (Temp do Windows, WER, Windows Update, DISM, logs, dumps) precisam de administrador. Eleve o app para incluí-las.",
   "cleanup.error.bad_token": "A confirmação expirou. Faça a prévia de novo.",
   "cleanup.cat.temp_windows": "Temporários do Windows",
-  "cleanup.cat.temp_windows.hint": "C:\\Windows\\Temp — arquivos em uso são pulados.",
+  "cleanup.cat.temp_windows.hint": "C:\\Windows\\Temp. Arquivos em uso são pulados.",
   "cleanup.cat.temp_user": "Temporários do usuário",
-  "cleanup.cat.temp_user.hint": "%TEMP% — instaladores e rascunhos esquecidos.",
+  "cleanup.cat.temp_user.hint": "%TEMP%: instaladores e rascunhos esquecidos.",
   "cleanup.cat.wer": "Relatórios de erro (WER)",
   "cleanup.cat.wer.hint": "Relatórios de travamento já enviados ou nunca enviados.",
   "cleanup.cat.shaders": "Cache de shaders",
@@ -532,7 +532,7 @@ export const ptBR = {
   "cleanup.cat.dumps.hint": "Minidumps e memory.dmp. Podem ser grandes.",
 
   "network.title": "Analisador de rede",
-  "network.subtitle": "Latência, perda, velocidade e DNS — medidos aqui, sem túnel",
+  "network.subtitle": "Latência, perda, velocidade e DNS medidos aqui, sem túnel",
   "network.tab.monitor": "Monitoramento em tempo real",
   "network.tab.scanner": "Scanner",
   "network.tab.games": "Ping para jogos",
@@ -629,7 +629,7 @@ export const ptBR = {
   "boost.tab.procs": "Processos",
   "boost.startup.title": "Apps que iniciam com o Windows",
   "boost.startup.help":
-    "Desligar aqui faz o mesmo que o Gerenciador de Tarefas: o app continua instalado e a entrada fica onde estava — só deixa de abrir sozinho. Ligue de volta quando quiser.",
+    "Desligar aqui faz o mesmo que o Gerenciador de Tarefas: o app continua instalado e a entrada fica onde estava, só deixa de abrir sozinho. Ligue de volta quando quiser.",
   "boost.startup.count": "{on} de {total} ligados",
   "boost.startup.refresh": "Atualizar lista",
   "boost.startup.note":
@@ -654,12 +654,12 @@ export const ptBR = {
   "boost.preset.high": "Alto desempenho",
   "boost.preset.custom": "Personalizado",
   "boost.tweaks.help":
-    "Cada ajuste salva o valor anterior antes de mudar e volta ao original ao desligar — nunca um 'padrão' chutado.",
+    "Cada ajuste salva o valor anterior antes de mudar e volta ao original ao desligar, nunca a um 'padrão' chutado.",
   "boost.tweak.visual_fx": "Efeitos visuais do Windows",
   "boost.tweak.visual_fx.desc":
     "Os 17 itens de 'Opções de Desempenho' em níveis. Mínima tira só o pesado; Média é a configuração equilibrada; Máxima deixa só as fontes suavizadas. Aplica na hora, sem logoff.",
   "boost.tweak.visual_fx.warn":
-    "você gosta das animações — isso muda a sensação do desktop, não o FPS em tela cheia.",
+    "você gosta das animações. Isso muda a sensação do desktop, não o FPS em tela cheia.",
   "boost.tweak.game_mode": "Modo de jogo e Game DVR",
   "boost.tweak.game_mode.desc":
     "Game Mode ligado; gravação em segundo plano (Game DVR) e captura da Xbox Game Bar desligadas.",
@@ -672,7 +672,7 @@ export const ptBR = {
   "boost.tweak.windowed_optimizations.desc":
     "Jogos DirectX 10/11 em janela ou sem borda passam a usar o modelo flip: menos latência e suporte a VRR/Auto HDR. A mesma opção de Configurações › Tela › Gráficos (Windows 11).",
   "boost.tweak.windowed_optimizations.warn":
-    "algum jogo antigo passou a piscar ou travar em janela — dá para desligar só para ele em Configurações › Tela › Gráficos.",
+    "algum jogo antigo passou a piscar ou travar em janela. Dá para desligar só para ele em Configurações › Tela › Gráficos.",
   "boost.tweak.keyboard": "Reduzir tempo de entrada do teclado",
   "boost.tweak.keyboard.desc":
     "Menor atraso e maior taxa de repetição de teclas (SystemParametersInfo).",
@@ -689,7 +689,7 @@ export const ptBR = {
   "boost.tweak.svc_sysmain.desc":
     "Para o serviço que pré-carrega apps na RAM e alimenta o Prefetch. Em SSD o ganho dele é ~0; parar tira leitura de disco em segundo plano.",
   "boost.tweak.svc_sysmain.warn":
-    "o Windows está num HD mecânico — aí o SysMain ajuda a abrir programas.",
+    "o Windows está num HD mecânico. Nesse caso o SysMain ajuda a abrir programas.",
   "boost.tweak.svc_telemetry": "Desligar telemetria",
   "boost.tweak.svc_telemetry.desc":
     "Para os serviços DiagTrack e dmwappushservice (Experiências do Usuário Conectado e Telemetria).",
@@ -726,7 +726,7 @@ export const ptBR = {
   "boost.tweak.perf_counters.desc":
     "Desativa a coleta de contadores (Perflib) que consome CPU em segundo plano.",
   "boost.tweak.perf_counters.warn":
-    "você usa Monitor de Desempenho, Gerenciador de Tarefas detalhado ou ferramentas de telemetria.",
+    "você usa Monitor de Desempenho, Gerenciador de Tarefas detalhado ou o monitor do Painel do G2 Boost, que lê esses mesmos contadores.",
   "boost.fx.level.appearance": "Aparência",
   "boost.fx.level.minimal": "Mínima",
   "boost.fx.level.balanced": "Média",
@@ -742,6 +742,8 @@ export const ptBR = {
   "boost.state.backup.hint": "Desligar restaura exatamente o valor original.",
   "boost.state.no_backup.hint": "Sem backup: desligar grava o padrão do Windows.",
   "boost.state.reboot": "Vale após reiniciar",
+  "boost.state.reboot_pending":
+    "Configurado, mas o Windows ainda roda o estado anterior. Reinicie o PC para valer.",
   "boost.svc.auto": "automático",
   "boost.svc.manual": "manual",
   "boost.svc.disabled": "desativado",
@@ -818,7 +820,7 @@ export const ptBR = {
   "power.choice.wake_timers.2": "Só os importantes",
   "power.setting.usb_suspend": "Suspensão seletiva de USB",
   "power.setting.usb_suspend.help":
-    "Desliga portas USB ociosas. Em mouse, teclado, headset ou DAC USB pode causar engasgo ou desconexão — desligar é o mais seguro para jogos.",
+    "Desliga portas USB ociosas. Em mouse, teclado, headset ou DAC USB pode causar engasgo ou desconexão, então desligar é o mais seguro para jogos.",
   "power.choice.usb_suspend.0": "Desligado",
   "power.choice.usb_suspend.1": "Ligado",
   "power.setting.pcie_aspm": "PCI Express: economia do link",
@@ -832,7 +834,7 @@ export const ptBR = {
     "O piso do clock. 5–10% deixa o processador descansar ocioso; 100% força clock alto o tempo todo (mais calor, ganho pequeno).",
   "power.setting.cpu_max": "Estado máximo do processador",
   "power.setting.cpu_max.help":
-    "O teto. Abaixo de 100% desliga o turbo em muitos processadores — útil para esfriar notebook, ruim para FPS.",
+    "O teto. Abaixo de 100% desliga o turbo em muitos processadores: útil para esfriar notebook, ruim para FPS.",
   "power.setting.cpu_boost": "Modo de turbo do processador",
   "power.setting.cpu_boost.help":
     "Desativado = sem turbo (mais frio, menos FPS). Agressivo sobe o clock mais cedo.",
@@ -872,7 +874,7 @@ export const ptBR = {
     "Processo protegido: do Windows, de um serviço, de um antivírus ou do G2 Boost.",
   "apps.title": "Desinstalar apps",
   "apps.subtitle":
-    "O desinstalador do próprio app e o que ele deixa para trás — com prévia, motivo de cada item e Lixeira",
+    "O desinstalador do próprio app e o que ele deixa para trás, com prévia, motivo de cada item e Lixeira",
   "apps.tab.installed": "Instalados",
   "apps.tab.orphans": "Sobras de apps removidos",
   "apps.installed.title": "Apps instalados",
@@ -900,7 +902,7 @@ export const ptBR = {
   "apps.uninstall": "Desinstalar",
   "apps.uninstall_confirm.title": "Desinstalar {name}?",
   "apps.uninstall_confirm.desktop":
-    "O desinstalador do próprio app abre em seguida — siga as telas dele. Depois o G2 Boost mostra o que sobrou.",
+    "O desinstalador do próprio app abre em seguida. Siga as telas dele; depois o G2 Boost mostra o que sobrou.",
   "apps.uninstall_confirm.store":
     "Apps da Store são removidos na hora para a sua conta, sem outra tela de confirmação. Depois o G2 Boost mostra o que sobrou.",
   "apps.waiting": "Aguardando o desinstalador…",
@@ -925,7 +927,7 @@ export const ptBR = {
   "apps.reason.service_binary_gone": "serviço do app cujo programa já foi apagado",
   "apps.precious": "Seus dados",
   "apps.confirm.precious":
-    "Inclui dados seus — saves, perfis de navegador/app ou cofres. Vão para a Lixeira (dá para restaurar), mas confira se não vai precisar deles.",
+    "Inclui dados seus, como saves, perfis de navegador e de apps ou cofres. Vão para a Lixeira (dá para restaurar), mas confira se não vai precisar deles.",
   "apps.undo": "Desfazer remoção de {app}",
   "apps.undo.hint":
     "Devolve os {n} itens removidos de {app}: arquivos saem da Lixeira para onde estavam e as chaves de registro voltam do backup.",
@@ -995,7 +997,7 @@ export const ptBR = {
   "boost.dns.routed": "usado pela internet",
   "network.monitor.gateway": "Roteador",
   "network.tools.tcping_hint":
-    "Formato host:porta (padrão 443). Mede o handshake TCP — funciona onde o ping (ICMP) é bloqueado, como em servidores de jogo.",
+    "Formato host:porta (padrão 443). Mede o handshake TCP e funciona onde o ping (ICMP) é bloqueado, como em servidores de jogo.",
   "settings.title": "Configurações",
   "settings.subtitle": "Idioma, versão e diagnóstico",
   "settings.language": "Idioma",
@@ -1015,7 +1017,7 @@ export const ptBR = {
     "Vale enquanto a limpeza agendada ou a limpeza de RAM ao abrir jogo estiverem ligadas.",
   "settings.routine": "Limpeza automática",
   "settings.routine.hint":
-    "Roda as categorias marcadas sem perguntar — você já confirmou aqui. Shaders e Lixeira ficam de fora por padrão; limpar shader toda hora recompila tudo e trava o jogo.",
+    "Roda as categorias marcadas sem perguntar, porque você já confirmou aqui. Shaders e Lixeira ficam de fora por padrão; limpar shader toda hora recompila tudo e trava o jogo.",
   "settings.routine.mode.off": "Desligada",
   "settings.routine.mode.at_logon": "Ao ligar",
   "settings.routine.mode.every_hours": "A cada N horas",
@@ -1039,7 +1041,7 @@ export const ptBR = {
     "Detecta jogo pela Steam (RunningAppID), por executável da lista ou por processo dentro de steamapps\\common, e faz o purge da standby list uma vez por jogo aberto.",
   "settings.game.current": "Jogo em execução: {name}",
   "settings.game.none": "Nenhum jogo detectado",
-  "settings.game.last": "Último: {name} — {freed} liberados",
+  "settings.game.last": "Último: {name}, {freed} liberados",
   "settings.game.needs_admin":
     "O purge precisa de administrador; sem isso o evento é só registrado.",
   "settings.game.exes": "Jogos por executável",

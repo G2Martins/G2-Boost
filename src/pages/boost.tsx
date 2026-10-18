@@ -195,6 +195,14 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
   }, []);
   useEffect(() => {
     refresh();
+    // Changed something in Windows Settings meanwhile? Re-read when the window comes back.
+    const onBack = () => document.visibilityState === "visible" && refresh();
+    window.addEventListener("focus", onBack);
+    document.addEventListener("visibilitychange", onBack);
+    return () => {
+      window.removeEventListener("focus", onBack);
+      document.removeEventListener("visibilitychange", onBack);
+    };
   }, [refresh]);
   useEffect(() => {
     backend
@@ -424,7 +432,11 @@ function TweakCard({
         </ul>
       ) : null}
 
-      {state?.detail ? <p className="text-[11px] text-muted-foreground">{state.detail}</p> : null}
+      {state?.detail === "reboot_pending" ? (
+        <p className="text-[11px] text-warning">{t("boost.state.reboot_pending")}</p>
+      ) : state?.detail ? (
+        <p className="text-[11px] text-muted-foreground">{state.detail}</p>
+      ) : null}
 
       <details className="text-[11px]">
         <summary className="cursor-pointer text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground">

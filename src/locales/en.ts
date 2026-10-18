@@ -25,7 +25,7 @@ export const en = {
   "dash.restore.unknown": "System Protection: unknown",
   "dash.kpi.restore.last": "latest {when}",
   "dash.kpi.restore.action": "Create point",
-  "dash.restore.description": "G2 Boost — before optimizing",
+  "dash.restore.description": "G2 Boost, before optimizing",
   "dash.restore.created": "Restore point created.",
   "dash.restore.skipped":
     "Windows skipped it: a point already exists within the last {minutes} min (system limit).",
@@ -77,7 +77,7 @@ export const en = {
   "mypc.memory.speed": "{configured} MT/s configured · SPD {spd} MT/s",
   "mypc.memory.rated": "rated {rated} MT/s",
   "mypc.memory.below_rated":
-    "Running below the module's rated speed — XMP/EXPO off in the BIOS? Enabling it is the most common free upgrade.",
+    "Running below the module's rated speed. Is XMP/EXPO off in the BIOS? Enabling it is the most common free upgrade.",
   "mypc.memory.empty_slot": "empty",
   "mypc.board_bios": "Motherboard, BIOS and firmware",
   "mypc.bios": "BIOS",
@@ -100,7 +100,7 @@ export const en = {
   "mypc.winsat.started": "Assessment started. Wait for the test screen to finish, then refresh.",
   "mypc.winsat.state.unknown": "no assessment",
   "mypc.winsat.state.valid": "valid",
-  "mypc.winsat.state.incoherent": "hardware changed — rerun",
+  "mypc.winsat.state.incoherent": "hardware changed, rerun",
   "mypc.winsat.state.never": "never ran",
   "mypc.winsat.state.invalid": "invalid",
   "dash.monitor.cpu_power": "CPU power",
@@ -138,7 +138,7 @@ export const en = {
   "mypc.fw.hibernation": "Hibernation",
   "mypc.fw.unknown": "cannot tell",
   "mypc.fw.note":
-    "Read from Windows, no driver. C-states, power limits and fan curves are invisible to the OS — only the BIOS itself shows them.",
+    "Read from Windows, no driver. C-states, power limits and fan curves are invisible to the OS; only the BIOS itself shows them.",
   "mypc.disks": "Disks",
   "mypc.ssd": "SSD",
   "mypc.hdd": "Mechanical HDD",
@@ -169,7 +169,7 @@ export const en = {
   "boost.preset.restore_skipped": "Restore point skipped by Windows (a recent one exists).",
   "boost.tweak.show_extensions": "Show file extensions",
   "boost.tweak.show_extensions.desc":
-    "Explorer shows .exe, .jpg, .txt — helps identify files and scams like 'photo.jpg.exe'.",
+    "Explorer shows .exe, .jpg, .txt. Helps identify files and scams like 'photo.jpg.exe'.",
   "boost.tweak.show_extensions.warn": "you prefer clean names in Explorer.",
   "boost.tweak.widgets_off": "Turn off Widgets",
   "boost.tweak.widgets_off.desc":
@@ -177,7 +177,7 @@ export const en = {
   "boost.tweak.widgets_off.warn": "you use the Widgets panel.",
   "boost.tweak.search_highlights_off": "No search highlights",
   "boost.tweak.search_highlights_off.desc":
-    "Removes cloud highlights and Bing search from the Start search box.",
+    "Removes cloud highlights from the Start search box and asks Windows not to mix in Bing results. Some Windows 11 builds ignore that second request.",
   "boost.tweak.search_highlights_off.warn": "you use web search from Start.",
   "boost.tweak.silent_apps_off": "No silently installed apps",
   "boost.tweak.silent_apps_off.desc":
@@ -196,9 +196,9 @@ export const en = {
   "boost.tweak.svc_dps.desc":
     "Stops DPS. Windows troubleshooters stop working. Low gain; Galdino recommends it, Microsoft warns.",
   "boost.tweak.svc_dps.warn": "you use the Windows troubleshooters.",
-  "boost.tweak.svc_geolocation": "Disable geolocation",
+  "boost.tweak.svc_geolocation": "Disable the location service",
   "boost.tweak.svc_geolocation.desc":
-    "Stops lfsvc. Apps lose location (maps, weather). Privacy, not performance.",
+    "Stops lfsvc. Apps lose location (maps, weather). The Location switch in Settings does not change; this turns off the service beneath it. Privacy, not performance.",
   "boost.tweak.svc_geolocation.warn": "some app needs your location.",
   "boost.tweak.hvci_off": "Turn off Core Isolation (memory integrity)",
   "boost.tweak.hvci_off.desc":
@@ -211,7 +211,7 @@ export const en = {
   "settings.restore_before_preset.body": "Extra safety net on top of the per-tweak backup.",
   "nav.ai": "AI assistant",
   "ai.title": "AI assistant",
-  "ai.subtitle": "Claude, ChatGPT or Gemini analyzing this PC — your key, your cost",
+  "ai.subtitle": "Claude, ChatGPT or Gemini analyzing this PC, with your key and your cost",
   "ai.provider": "Provider",
   "ai.provider.hint":
     "Your question goes straight from the app to the chosen provider (through the Rust HTTP client, allowed hosts only). Nothing goes through our servers.",
@@ -243,7 +243,7 @@ export const en = {
   "ai.console": "Conversation",
   "ai.empty.title": "Ask about this PC",
   "ai.empty.body":
-    "The AI already receives the hardware, the findings and the tweaks. Ask for a diagnosis, a good-value upgrade or an FPS estimate — FPS numbers come from cited benchmarks, never made up.",
+    "The AI already receives the hardware, the findings and the tweaks. Ask for a diagnosis, a good-value upgrade or an FPS estimate. FPS numbers come from cited benchmarks, never made up.",
   "ai.quick.analyze": "Analyze my PC: the 3 actions with the most gaming impact",
   "ai.quick.upgrade": "Which upgrade is most worth it for gaming?",
   "ai.quick.temps": "Are my temperatures and power draw ok?",
@@ -260,9 +260,9 @@ export const en = {
   "ai.action.startup_done": "No longer starts with Windows (turn it back on in PC Boost › Startup)",
   "ai.mcp.title": "Use with Claude Desktop / Claude Code",
   "ai.mcp.hint":
-    "MCP (Model Context Protocol): the Claude on your machine reads this PC's diagnostics straight from G2 Boost. Read-only — nothing is changed through it.",
+    "MCP (Model Context Protocol): the Claude on your machine reads this PC's diagnostics straight from G2 Boost. Read-only: nothing is changed through it.",
   "ai.mcp.body":
-    "G2 Boost itself becomes the MCP server with --mcp. The tools only read (hardware, BIOS, sensors, startup, processes, tweaks, cleanup preview); applying anything is still your click here in the app.",
+    "G2 Boost itself becomes the MCP server with the mcp option. The tools only read (hardware, BIOS, sensors, startup, processes, tweaks, cleanup preview); applying anything is still your click here in the app.",
   "ai.action.applied": "Applied",
   "ai.action.open_cleanup": "Open Cleanup",
   "ai.error.empty":
@@ -294,7 +294,7 @@ export const en = {
     "Enable XMP/EXPO in the BIOS. Pro: higher minimum FPS in CPU-bound games, free. Con: on rare boards it may need stability tuning.",
   "advisor.single_channel.title": "Single-channel RAM ({size} GB on one stick)",
   "advisor.single_channel.body":
-    "A second identical stick doubles memory bandwidth — a big gain in games and on integrated graphics. Low cost.",
+    "A second identical stick doubles memory bandwidth, a big gain in games and on integrated graphics. Low cost.",
   "advisor.ram_low.title": "Low RAM ({total} GB)",
   "advisor.ram_low.body":
     "Current games want 16 GB; 32 GB leaves room for Discord, browser and streaming. Prefer 2 identical sticks.",
@@ -330,19 +330,19 @@ export const en = {
     "Required by Windows 11 and some anti-cheats. Enable fTPM/PTT in the BIOS.",
   "advisor.hvci_on.title": "Memory integrity (HVCI) is on",
   "advisor.hvci_on.body":
-    "Protects against malicious drivers and costs ~5% FPS in some games (Tom's Hardware). Turning it off is an option in PC Boost › Custom — security traded for performance.",
+    "Protects against malicious drivers and costs ~5% FPS in some games (Tom's Hardware). Turning it off is an option in PC Boost › Custom and trades security for performance.",
   "advisor.cpu_hot.title": "CPU running hot ({temp} °C)",
   "advisor.cpu_hot.body":
-    "Above ~90 °C the CPU throttles and FPS drops. Clean the dust, check the cooler and thermal paste, use the Balanced plan outside games and cap FPS at the monitor refresh rate — less heat without losing smoothness.",
+    "Above ~90 °C the CPU throttles and FPS drops. Clean the dust, check the cooler and thermal paste, use the Balanced plan outside games and cap FPS at the monitor refresh rate: less heat without losing smoothness.",
   "advisor.legacy_boot.title": "Windows booted in legacy mode (CSM)",
   "advisor.legacy_boot.body":
-    "Without UEFI there is no Secure Boot, which anti-cheats such as Valorant's require. Convert the disk to GPT (Microsoft MBR2GPT) and switch to UEFI in the BIOS — back up first.",
+    "Without UEFI there is no Secure Boot, which anti-cheats such as Valorant's require. Convert the disk to GPT (Microsoft MBR2GPT) and switch to UEFI in the BIOS. Back up first.",
   "advisor.rebar_off.title": "Resizable BAR is off ({bar_mb} MB aperture)",
   "advisor.rebar_off.body":
     "On RTX 30/40/50 and RX 6000+ cards ReBAR adds a few % FPS in many games. Enable “Above 4G Decoding” and “Re-Size BAR” in the BIOS (requires UEFI mode). Free.",
   "advisor.bios_old.title": "BIOS about {years} years old ({version})",
   "advisor.bios_old.body":
-    "BIOS updates bring microcode, memory compatibility and security fixes. Update only from the motherboard maker's website, on stable power — never during a storm or on battery.",
+    "BIOS updates bring microcode, memory compatibility and security fixes. Update only from the motherboard maker's website, on stable power, never during a storm or on battery.",
   "advisor.winsat_stale.title": "WinSAT score is outdated",
   "advisor.winsat_stale.body":
     "The hardware changed since the last assessment. Run it again in My PC.",
@@ -412,7 +412,7 @@ export const en = {
   "disk.reveal": "Show in folder",
   "disk.recycle": "Recycle Bin",
   "disk.recycle.selected": "Send {count} to the Recycle Bin ({size})",
-  "disk.recycle.confirm_title": "Send {count} item(s) to the Recycle Bin — {size}",
+  "disk.recycle.confirm_title": "Send {count} item(s) to the Recycle Bin ({size})",
   "disk.recycle.confirm_body":
     "It goes to the Recycle Bin and can be restored from there. If something is too big for the Bin, Windows itself asks before deleting it for good. System folders and other users' folders are blocked.",
   "disk.recycle.confirm": "Send to Recycle Bin",
@@ -449,7 +449,7 @@ export const en = {
     "Update packages already downloaded. Safe to remove with Cleanup › Windows Update cache.",
   "disk.ess.installer.title": "Installer cache (Windows\\Installer)",
   "disk.ess.installer.body":
-    "Needed to repair and uninstall programs. Do not delete by hand — uninstalling programs you do not use is the safe way to shrink it.",
+    "Needed to repair and uninstall programs. Do not delete by hand: uninstalling programs you do not use is the safe way to shrink it.",
   "disk.ess.package_cache.title": "Package cache (ProgramData\\Package Cache)",
   "disk.ess.package_cache.body":
     "Installers for Visual Studio, runtimes and SDKs, used to repair and update. Deleting breaks uninstalls; shrink it by removing the owning program.",
@@ -459,7 +459,7 @@ export const en = {
     "Large files Windows needs (hiberfil, pagefile, WinSxS) with an explanation and the safe action for each.",
 
   "cleanup.title": "Cleanup",
-  "cleanup.subtitle": "Caches, temp files and logs — previewed before anything is deleted",
+  "cleanup.subtitle": "Caches, temp files and logs, previewed before anything is deleted",
   "cleanup.tab.daily": "Daily",
   "cleanup.tab.monthly": "Monthly",
   "cleanup.tab.advanced": "Advanced",
@@ -498,9 +498,9 @@ export const en = {
     "System categories (Windows Temp, WER, Windows Update, DISM, logs, dumps) need administrator. Elevate the app to include them.",
   "cleanup.error.bad_token": "The confirmation expired. Run the preview again.",
   "cleanup.cat.temp_windows": "Windows temporary files",
-  "cleanup.cat.temp_windows.hint": "C:\\Windows\\Temp — files in use are skipped.",
+  "cleanup.cat.temp_windows.hint": "C:\\Windows\\Temp. Files in use are skipped.",
   "cleanup.cat.temp_user": "User temporary files",
-  "cleanup.cat.temp_user.hint": "%TEMP% — forgotten installers and drafts.",
+  "cleanup.cat.temp_user.hint": "%TEMP%: forgotten installers and drafts.",
   "cleanup.cat.wer": "Error reports (WER)",
   "cleanup.cat.wer.hint": "Crash reports already sent or never sent.",
   "cleanup.cat.shaders": "Shader cache",
@@ -536,7 +536,7 @@ export const en = {
   "cleanup.cat.dumps.hint": "Minidumps and memory.dmp. Can be large.",
 
   "network.title": "Network analyzer",
-  "network.subtitle": "Latency, loss, speed and DNS — measured here, no tunnel",
+  "network.subtitle": "Latency, loss, speed and DNS measured here, no tunnel",
   "network.tab.monitor": "Real-time monitoring",
   "network.tab.scanner": "Scanner",
   "network.tab.games": "Game ping",
@@ -633,7 +633,7 @@ export const en = {
   "boost.tab.procs": "Processes",
   "boost.startup.title": "Apps that start with Windows",
   "boost.startup.help":
-    "Turning an item off here does what Task Manager does: the app stays installed and its entry stays where it was — it just stops launching on its own. Turn it back on any time.",
+    "Turning an item off here does what Task Manager does: the app stays installed and its entry stays where it was; it just stops launching on its own. Turn it back on any time.",
   "boost.startup.count": "{on} of {total} on",
   "boost.startup.refresh": "Refresh list",
   "boost.startup.note":
@@ -659,12 +659,12 @@ export const en = {
   "boost.preset.high": "High performance",
   "boost.preset.custom": "Custom",
   "boost.tweaks.help":
-    "Every tweak saves the previous value before changing it and restores the original when turned off — never a guessed 'default'.",
+    "Every tweak saves the previous value before changing it and restores the original when turned off, never a guessed 'default'.",
   "boost.tweak.visual_fx": "Windows visual effects",
   "boost.tweak.visual_fx.desc":
     "The 17 items of 'Performance Options' as levels. Minimal removes only the heavy ones; Balanced is the middle ground; Maximum keeps only smooth fonts. Applies instantly, no logoff.",
   "boost.tweak.visual_fx.warn":
-    "you like the animations — this changes how the desktop feels, not fullscreen FPS.",
+    "you like the animations. This changes how the desktop feels, not fullscreen FPS.",
   "boost.tweak.game_mode": "Game Mode and Game DVR",
   "boost.tweak.game_mode.desc":
     "Game Mode on; background recording (Game DVR) and Xbox Game Bar capture off.",
@@ -677,7 +677,7 @@ export const en = {
   "boost.tweak.windowed_optimizations.desc":
     "DirectX 10/11 games in windowed or borderless mode use the flip model: lower latency plus VRR/Auto HDR support. Same switch as Settings › Display › Graphics (Windows 11).",
   "boost.tweak.windowed_optimizations.warn":
-    "an old game starts flickering or stuttering in windowed mode — you can turn it off for that game alone in Settings › Display › Graphics.",
+    "an old game starts flickering or stuttering in windowed mode. You can turn it off for that game alone in Settings › Display › Graphics.",
   "boost.tweak.keyboard": "Reduce keyboard input delay",
   "boost.tweak.keyboard.desc":
     "Shorter repeat delay and faster repeat rate (SystemParametersInfo).",
@@ -693,7 +693,7 @@ export const en = {
   "boost.tweak.svc_sysmain.desc":
     "Stops the service that preloads apps into RAM and feeds Prefetch. On an SSD its gain is ~0; stopping it removes background disk reads.",
   "boost.tweak.svc_sysmain.warn":
-    "Windows runs on a mechanical HDD — there SysMain helps launch programs.",
+    "Windows runs on a mechanical HDD. In that case SysMain helps launch programs.",
   "boost.tweak.svc_telemetry": "Disable telemetry",
   "boost.tweak.svc_telemetry.desc":
     "Stops the DiagTrack and dmwappushservice services (Connected User Experiences and Telemetry).",
@@ -730,7 +730,7 @@ export const en = {
   "boost.tweak.perf_counters.desc":
     "Turns off the counter collection (Perflib) that burns CPU in the background.",
   "boost.tweak.perf_counters.warn":
-    "you use Performance Monitor, the detailed Task Manager or telemetry tools.",
+    "you use Performance Monitor, the detailed Task Manager or the G2 Boost Dashboard monitor, which reads these same counters.",
   "boost.fx.level.appearance": "Appearance",
   "boost.fx.level.minimal": "Minimal",
   "boost.fx.level.balanced": "Balanced",
@@ -746,6 +746,8 @@ export const en = {
   "boost.state.backup.hint": "Turning off restores the exact original value.",
   "boost.state.no_backup.hint": "No backup: turning off writes the Windows default.",
   "boost.state.reboot": "Takes effect after reboot",
+  "boost.state.reboot_pending":
+    "Set, but Windows still runs the previous state. Restart the PC for it to apply.",
   "boost.svc.auto": "automatic",
   "boost.svc.manual": "manual",
   "boost.svc.disabled": "disabled",
@@ -822,7 +824,7 @@ export const en = {
   "power.choice.wake_timers.2": "Important only",
   "power.setting.usb_suspend": "USB selective suspend",
   "power.setting.usb_suspend.help":
-    "Powers down idle USB ports. With a USB mouse, keyboard, headset or DAC it can cause hiccups or disconnects — off is the safe choice for gaming.",
+    "Powers down idle USB ports. With a USB mouse, keyboard, headset or DAC it can cause hiccups or disconnects, so off is the safe choice for gaming.",
   "power.choice.usb_suspend.0": "Off",
   "power.choice.usb_suspend.1": "On",
   "power.setting.pcie_aspm": "PCI Express link power",
@@ -836,7 +838,7 @@ export const en = {
     "The clock floor. 5–10% lets the CPU rest when idle; 100% forces a high clock all the time (more heat, small gain).",
   "power.setting.cpu_max": "Maximum processor state",
   "power.setting.cpu_max.help":
-    "The ceiling. Below 100% disables turbo on many CPUs — useful to cool a laptop, bad for FPS.",
+    "The ceiling. Below 100% disables turbo on many CPUs: useful to cool a laptop, bad for FPS.",
   "power.setting.cpu_boost": "Processor boost mode",
   "power.setting.cpu_boost.help":
     "Disabled = no turbo (cooler, fewer FPS). Aggressive boosts earlier.",
@@ -876,7 +878,7 @@ export const en = {
   "procs.error.protected": "Protected process: Windows, a service, an antivirus or G2 Boost.",
   "apps.title": "Uninstall apps",
   "apps.subtitle":
-    "The app's own uninstaller and what it leaves behind — with a preview, a reason for each item and the Recycle Bin",
+    "The app's own uninstaller and what it leaves behind, with a preview, a reason for each item and the Recycle Bin",
   "apps.tab.installed": "Installed",
   "apps.tab.orphans": "Leftovers of removed apps",
   "apps.installed.title": "Installed apps",
@@ -904,7 +906,7 @@ export const en = {
   "apps.uninstall": "Uninstall",
   "apps.uninstall_confirm.title": "Uninstall {name}?",
   "apps.uninstall_confirm.desktop":
-    "The app's own uninstaller opens next — follow its screens. Then G2 Boost shows what was left.",
+    "The app's own uninstaller opens next. Follow its screens; then G2 Boost shows what was left.",
   "apps.uninstall_confirm.store":
     "Store apps are removed right away for your account, with no other confirmation screen. Then G2 Boost shows what was left.",
   "apps.waiting": "Waiting for the uninstaller…",
@@ -929,7 +931,7 @@ export const en = {
   "apps.reason.service_binary_gone": "the app's service whose program is gone",
   "apps.precious": "Your data",
   "apps.confirm.precious":
-    "Includes your own data — saves, browser/app profiles or vaults. They go to the Recycle Bin (restorable), but make sure you won't need them.",
+    "Includes your own data, such as saves, browser and app profiles or vaults. They go to the Recycle Bin (restorable), but make sure you won't need them.",
   "apps.undo": "Undo removing {app}",
   "apps.undo.hint":
     "Puts back the {n} items removed from {app}: files leave the Recycle Bin for where they were and registry keys return from the backup.",
@@ -998,7 +1000,7 @@ export const en = {
   "boost.dns.routed": "carries internet traffic",
   "network.monitor.gateway": "Router",
   "network.tools.tcping_hint":
-    "Format host:port (default 443). Times the TCP handshake — works where ping (ICMP) is blocked, like game servers.",
+    "Format host:port (default 443). Times the TCP handshake and works where ping (ICMP) is blocked, like game servers.",
   "settings.title": "Settings",
   "settings.subtitle": "Language, version and diagnostics",
   "settings.language": "Language",
@@ -1017,7 +1019,7 @@ export const en = {
   "settings.tray.body": "Applies while scheduled cleanup or RAM cleanup on game start is on.",
   "settings.routine": "Automatic cleanup",
   "settings.routine.hint":
-    "Runs the checked categories without asking — you confirmed here. Shaders and the Recycle Bin stay out by default; wiping shaders hourly recompiles everything and stutters the game.",
+    "Runs the checked categories without asking, because you confirmed here. Shaders and the Recycle Bin stay out by default; wiping shaders hourly recompiles everything and stutters the game.",
   "settings.routine.mode.off": "Off",
   "settings.routine.mode.at_logon": "At startup",
   "settings.routine.mode.every_hours": "Every N hours",
@@ -1041,7 +1043,7 @@ export const en = {
     "Detects a game through Steam (RunningAppID), an executable from the list or a process under steamapps\\common, and purges the standby list once per game launch.",
   "settings.game.current": "Game running: {name}",
   "settings.game.none": "No game detected",
-  "settings.game.last": "Last: {name} — {freed} freed",
+  "settings.game.last": "Last: {name}, {freed} freed",
   "settings.game.needs_admin":
     "The purge needs administrator; without it the event is only logged.",
   "settings.game.exes": "Games by executable",

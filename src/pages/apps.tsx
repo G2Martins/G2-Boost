@@ -102,6 +102,37 @@ export function AppsPage() {
   );
 }
 
+/** The app's own icon (extracted natively, PNG); its initial on a tinted tile until it loads. */
+function AppIcon({ app, size = "size-8" }: { app: AppEntry; size?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    backend.appsIcon(app.id).then((s) => alive && setSrc(s));
+    return () => {
+      alive = false;
+    };
+  }, [app.id]);
+  return src ? (
+    <img
+      src={src}
+      alt=""
+      aria-hidden
+      className={cn(size, "shrink-0 object-contain")}
+      draggable={false}
+    />
+  ) : (
+    <span
+      aria-hidden
+      className={cn(
+        size,
+        "flex shrink-0 items-center justify-center rounded-md bg-foreground/[0.06] font-display text-[13px] font-semibold text-muted-foreground",
+      )}
+    >
+      {app.name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
 function fmtDate(d: string | null, locale: string) {
   if (!d || !/^\d{8}$/.test(d)) return null;
   const date = new Date(Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8)));
@@ -257,6 +288,7 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
                     a.id === selected ? "bg-foreground/[0.07]" : "hover:bg-foreground/[0.04]",
                   )}
                 >
+                  <AppIcon app={a} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
                       <span className="truncate text-sm font-semibold">{a.name}</span>
@@ -285,6 +317,7 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
           {app ? (
             <Card className="animate-rise" style={rise(2)}>
               <div className="flex flex-wrap items-start gap-3">
+                <AppIcon app={app} size="size-12" />
                 <div className="min-w-0 flex-1">
                   <h3 className="font-display text-[17px] font-semibold tracking-wide">
                     {app.name}

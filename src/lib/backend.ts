@@ -392,6 +392,7 @@ export type AppEntry = {
   version: string;
   install_location: string | null;
   exe: string | null;
+  icon_source: string | null;
   size_bytes: number | null;
   install_date: string | null;
   uninstall: string;
@@ -537,6 +538,7 @@ export const backend = {
   appsResolve: async (path: string) =>
     (await call<string | null>("apps_resolve", { path })) ?? null,
   appsUndoStatus: () => call<UndoRecord | null>("apps_undo_status"),
+  appsIcon: async (id: string) => (await call<string | null>("apps_icon", { id })) ?? null,
   appsUndo: () => callOrThrow<UndoOutcome>("apps_undo"),
   appsProtect: (id: string, protect: boolean) =>
     callOrThrow<Settings>("apps_protect", { id, protect }),
