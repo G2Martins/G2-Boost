@@ -1,6 +1,6 @@
 # Analisador de rede e DNS Optimizer
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
+**Última revisão:** 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), UI `src/components/network/devices-tab.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
 
 ## Monitor de conexão
 
@@ -13,6 +13,22 @@ Cloudflare (`speed.cloudflare.com/__down` e `__up`, CORS liberado): download, up
 ## Ping para jogos
 
 Steam Datagram Relay (`ISteamApps/GetSDRConfig`, sem chave) via `tauri-plugin-http` (host na allowlist): POPs com IPs de relay de CS2, Dota 2 e Deadlock (`gru` = São Paulo), pingados por ICMP.
+
+## Dispositivos (`devices.rs`, aba Dispositivos; Fase 21, 2026-10-18)
+
+Quem está na rede, **sem driver, pcap, socket bruto nem admin** (o niv-on usado como referência de ideias depende de Npcap + admin; aqui não):
+
+1. **Varredura ICMP** do /24 deste PC (rede maior que /24 = só o /24 em volta; /31 e /32 = nada), 64 threads, 400 ms. Serve para o Windows resolver ARP e preencher a tabela de vizinhos (aparelho que bloqueia ping ainda responde ARP).
+2. **`GetIpNetTable2`** na interface principal: IP ↔ MAC (estados Probe a Permanent; ignora MAC zerado, broadcast e multicast).
+3. **mDNS / DNS-SD** (224.0.0.251:5353, bit de resposta unicast, socket efêmero ligado ao IP do PC): tipos de serviço, nome da instância só para serviços conhecidos (`_googlecast`, `_airplay`, `_ipp`…), hostname `.local`. Serviços com id aleatório em hex são descartados. Parser DNS próprio com limites (ponteiros só para trás, ≤ 32 rótulos, ≤ 256 registros); teste corta o pacote em todo tamanho sem pânico.
+4. **SSDP / UPnP** (M-SEARCH `ssdp:all`): `SERVER`, `ST`; a descrição XML (`friendlyName`, `manufacturer`, `modelName`, `deviceType`) só é buscada se o `LOCATION` aponta para **o mesmo IP que respondeu**, `http://` puro, porta válida, caminho ASCII ≤ 200, 64 KB, timeouts curtos (anti-SSRF: um aparelho não consegue fazer o app buscar outro endereço).
+5. **DNS reverso** (`GetNameInfoW` com `NI_NAMEREQD`) em paralelo.
+6. **Fabricante** pelo registro público MA-L do IEEE (40 mil prefixos, 800 KB embutidos, nomes encurtados por `tools/oui.py`; baixar `oui.csv` em `D:\dev\oui` para regenerar). MAC administrado localmente = "aleatório" (celulares, Windows com endereço aleatório).
+7. **Tipo provável** em ordem: este PC, roteador (gateway), serviços mDNS/UPnP, nomes (hostname, UPnP, modelo), fabricante, MAC aleatório (provável celular), desconhecido.
+8. **Histórico** em `devices.json` (MAC → primeira/última vez, conhecido; chaves inválidas descartadas ao carregar; até 500): **Novo** só a partir da segunda varredura; "Conheço este" tira o selo.
+9. **Portas de risco (opcional, por aparelho):** conexão TCP de 600 ms a 16 portas (Telnet 23/2323 e ADB 5555 = alto; FTP, SMB, RTSP, MQTT, RDP, VNC, TR-069 = médio; SSH, HTTP, NetBIOS, impressão = informativo), cada uma com explicação. **Só IPs da última varredura** (`LAST`): o app não vira scanner de endereço arbitrário.
+
+Na máquina do dono (2026-10-18): 4 aparelhos em 7,2 s (roteador ZTE via UPnP IGD, este PC, dois celulares: um pelo hostname Android, outro pelo MAC aleatório). Também no Console (`dispositivos`) e no MCP (`get_network_devices`, sem MACs). A Luli lê o retrato da aba sem MACs. Backlog: mapeamentos de porta UPnP do roteador (o que está exposto à internet), alerta de aparelho novo pela rotina em segundo plano.
 
 ## Ferramentas
 

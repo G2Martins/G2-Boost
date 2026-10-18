@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::{apps, disk, dns, hardware, network, power, procs, sensors, settings, startup, system, winevents};
+use crate::{apps, devices, disk, dns, hardware, network, power, procs, sensors, settings, startup, system, winevents};
 
 const MAX_LINE: usize = 512;
 
@@ -28,6 +28,7 @@ pub const COMMANDS: &[Command] = &[
     Command { name: "tcping", aliases: &[], usage: "tcping <host>[:porta]" },
     Command { name: "dns", aliases: &["nslookup", "resolver"], usage: "dns <nome>" },
     Command { name: "rede", aliases: &["ip", "ipconfig", "network"], usage: "rede" },
+    Command { name: "dispositivos", aliases: &["devices", "lan"], usage: "dispositivos" },
     Command { name: "processos", aliases: &["top", "ps", "processes"], usage: "processos [quantos]" },
     Command { name: "disco", aliases: &["df", "drives"], usage: "disco" },
     Command { name: "pasta", aliases: &["du", "folder"], usage: "pasta <caminho> [segundos]" },
@@ -217,6 +218,7 @@ pub fn run(line: &str) -> Reply {
             None => usage(),
         },
         "rede" => adapters(cmd.name),
+        "dispositivos" => lan(cmd.name),
         "processos" => match int_arg(args.first(), 15, 1, 50) {
             Ok(n) => processes(cmd.name, n as usize),
             Err(()) => usage(),
@@ -387,6 +389,38 @@ fn adapters(command: &'static str) -> Reply {
         })
         .collect();
     Reply::ok(command, vec![Block::Table { columns: vec!["adapter", "primary", "gateway", "dns", "provider", "mbps"], rows }])
+}
+
+fn lan(command: &'static str) -> Reply {
+    match devices::scan() {
+        Err(_) => Reply::err(Some(command), msg("err.network", &[])),
+        Ok(s) => {
+            let rows = s
+                .devices
+                .iter()
+                .map(|d| {
+                    vec![
+                        serde_json::to_value(d.kind).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
+                        d.ip.clone(),
+                        d.name.clone().or_else(|| d.hostname.clone()).unwrap_or_default(),
+                        d.vendor.clone().unwrap_or_default(),
+                        d.mac.clone(),
+                        if d.new { "✓".into() } else { String::new() },
+                    ]
+                })
+                .collect();
+            Reply::ok(
+                command,
+                vec![
+                    Block::Table { columns: vec!["device_kind", "ip", "name", "vendor", "mac", "new"], rows },
+                    Block::Note(msg(
+                        "note.devices",
+                        &[("count", s.devices.len().to_string()), ("subnet", s.subnet.clone()), ("new", s.new_count.to_string())],
+                    )),
+                ],
+            )
+        }
+    }
 }
 
 fn processes(command: &'static str, n: usize) -> Reply {

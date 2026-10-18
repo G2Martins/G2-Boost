@@ -1,6 +1,7 @@
 import { Activity, Gamepad2, Loader2, Play, Power, Route, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuliCard } from "@/components/luli-card";
+import { DevicesTab } from "@/components/network/devices-tab";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
 import {
@@ -32,7 +33,7 @@ import { cn, formatBytes, formatMbps, formatMs } from "@/lib/utils";
 
 export function NetworkPage() {
   const { t } = useI18n();
-  const initial = ["monitor", "scanner", "games", "tools"].includes(boot.startTab ?? "")
+  const initial = ["monitor", "scanner", "games", "devices", "tools"].includes(boot.startTab ?? "")
     ? (boot.startTab as string)
     : "monitor";
   return (
@@ -45,6 +46,7 @@ export function NetworkPage() {
             <TabsTrigger value="monitor">{t("network.tab.monitor")}</TabsTrigger>
             <TabsTrigger value="scanner">{t("network.tab.scanner")}</TabsTrigger>
             <TabsTrigger value="games">{t("network.tab.games")}</TabsTrigger>
+            <TabsTrigger value="devices">{t("network.tab.devices")}</TabsTrigger>
             <TabsTrigger value="tools">{t("network.tab.tools")}</TabsTrigger>
           </TabsList>
           <TabsContent value="monitor">
@@ -66,6 +68,11 @@ export function NetworkPage() {
           <TabsContent value="games">
             <PageBody className="px-0 pb-0">
               <Games />
+            </PageBody>
+          </TabsContent>
+          <TabsContent value="devices">
+            <PageBody className="px-0 pb-0">
+              <DevicesTab />
             </PageBody>
           </TabsContent>
           <TabsContent value="tools">

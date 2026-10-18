@@ -171,6 +171,12 @@ pub struct Adapter {
     pub link_mbps: u64,
     /// The interface Windows routes internet traffic through (`GetBestInterface` to a public IP).
     pub primary: bool,
+    /// This PC's IPv4 address on the adapter and its on-link prefix length (device scan).
+    pub ipv4: Option<Ipv4Addr>,
+    pub prefix: u8,
+    /// `aa:bb:cc:dd:ee:ff`, when the adapter has one.
+    pub mac: Option<String>,
+    pub if_index: u32,
 }
 
 fn sockaddr_v4(sa: &SOCKET_ADDRESS) -> Option<Ipv4Addr> {
@@ -318,6 +324,17 @@ pub fn adapters() -> Vec<Adapter> {
                 continue;
             }
             let static_dns = parse_guid(&guid_str).map(|g| static_servers(&g)).unwrap_or_default();
+            let (mut ipv4, mut prefix) = (None, 0u8);
+            let mut u = a.FirstUnicastAddress;
+            while !u.is_null() && ipv4.is_none() {
+                ipv4 = sockaddr_v4(&(*u).Address);
+                prefix = (*u).OnLinkPrefixLength;
+                u = (*u).Next;
+            }
+            let mac_len = (a.PhysicalAddressLength as usize).min(a.PhysicalAddress.len());
+            let mac = (mac_len == 6).then(|| {
+                a.PhysicalAddress[..6].iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":")
+            });
             let primary = best.is_some_and(|b| b == a.Anonymous1.Anonymous.IfIndex);
             out.push(Adapter {
                 primary,
@@ -329,6 +346,10 @@ pub fn adapters() -> Vec<Adapter> {
                 gateway,
                 static_dns,
                 link_mbps: a.TransmitLinkSpeed / 1_000_000,
+                ipv4,
+                prefix,
+                mac,
+                if_index: a.Anonymous1.Anonymous.IfIndex,
             });
         }
     }

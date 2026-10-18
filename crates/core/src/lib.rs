@@ -17,6 +17,7 @@ pub mod icons;
 pub mod winevents;
 pub mod claude_connect;
 pub mod console;
+pub mod devices;
 pub mod monitor;
 pub mod network;
 pub mod nvml;

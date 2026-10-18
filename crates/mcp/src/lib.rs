@@ -11,7 +11,7 @@
 use std::time::Duration;
 
 use g2boost_core::{
-    advisor, apps, boost, cleanup, context, disk, firmware, hardware, monitor, power, procs, recommend, sensors,
+    advisor, apps, boost, cleanup, context, devices, disk, firmware, hardware, monitor, power, procs, recommend, sensors,
     settings, steam, winevents, winsat,
 };
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -287,6 +287,27 @@ timeout) on AC and battery. Read-only; the user changes them in G2 Boost > PC Bo
             let active = plans.plans.iter().find(|p| p.active).map(|p| p.guid.clone());
             let settings = active.as_deref().and_then(|g| power::settings(g).ok());
             json!({ "plans": plans, "active_settings": settings })
+        })
+        .await
+    }
+
+    #[tool(description = "Devices on this PC's local network (takes ~8 s): IP, vendor from the MAC (IEEE \
+registry), randomized-MAC flag, hostname, UPnP/mDNS name and services, a guessed kind (router, this_pc, computer, \
+phone, tv, console, printer, camera, speaker, iot, nas, unknown) and whether it is new since earlier scans. Found \
+with an ICMP sweep of the /24, Windows' neighbor table, mDNS and SSDP; no driver, no admin. MAC addresses are \
+left out. Read-only; risky open ports are checked by the user in G2 Boost > Analisador de rede > Dispositivos.")]
+    async fn get_network_devices(&self) -> Result<String, String> {
+        blocking(|| match devices::scan() {
+            Err(e) => json!({ "error": e.to_string() }),
+            Ok(s) => json!({
+                "subnet": s.subnet,
+                "new_count": s.new_count,
+                "devices": s.devices.iter().map(|d| json!({
+                    "ip": d.ip, "kind": d.kind, "vendor": d.vendor, "private_mac": d.private_mac,
+                    "hostname": d.hostname, "name": d.name, "manufacturer": d.manufacturer, "model": d.model,
+                    "services": d.services, "new": d.new, "known": d.known,
+                })).collect::<Vec<Value>>(),
+            }),
         })
         .await
     }

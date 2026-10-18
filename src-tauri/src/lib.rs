@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, claude_connect, console, context, dns, firmware, power, procs, registry, secrets, startup};
+use g2boost_core::{advisor, apps, claude_connect, console, context, devices, dns, firmware, power, procs, registry, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -450,6 +450,26 @@ async fn claude_disconnect(client: claude_connect::Client) -> Result<Vec<claude_
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
+}
+
+/// Devices on this PC's network (sweep + neighbor table + mDNS + SSDP; no admin, no driver).
+#[tauri::command]
+async fn devices_scan() -> Result<devices::Scan, String> {
+    tauri::async_runtime::spawn_blocking(devices::scan).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+}
+
+/// Risky-port check on one device of the last scan (the core refuses any other address).
+#[tauri::command]
+async fn devices_ports(ip: String) -> Result<Vec<devices::OpenPort>, String> {
+    tauri::async_runtime::spawn_blocking(move || devices::check_ports(&ip))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn devices_known(mac: String, known: bool) -> Result<(), String> {
+    devices::set_known(&mac, known).map_err(|e| e.to_string())
 }
 
 /// The Console G2 command list (names, aliases, usage) for help and completion.
@@ -1328,7 +1348,10 @@ pub fn run() {
             claude_connect,
             claude_disconnect,
             console_commands,
-            console_run
+            console_run,
+            devices_scan,
+            devices_ports,
+            devices_known
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

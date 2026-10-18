@@ -510,9 +510,11 @@ function ConsoleTable({ columns, rows }: { columns: string[]; rows: string[][] }
                 const shown =
                   col === "part"
                     ? tr(`console.part.${cell}`, cell)
-                    : col === "hint" && cell
-                      ? tr(`console.hint.${cell}`, cell)
-                      : cell;
+                    : col === "device_kind"
+                      ? tr(`devices.kind.${cell}`, cell)
+                      : col === "hint" && cell
+                        ? tr(`console.hint.${cell}`, cell)
+                        : cell;
                 return (
                   <td
                     // biome-ignore lint/suspicious/noArrayIndexKey: static cells

@@ -12,3 +12,10 @@
 - **DNS:** não muda ping nem FPS dentro do jogo. Serve para resolver nomes mais rápido e às vezes para fugir de DNS lento do provedor. O DNS Optimizer mede antes de sugerir.
 - **Velocidade:** quase nenhum jogo precisa de mais de alguns Mbps. Download alto não corrige ping; o que importa é latência estável.
 - VPNs e "boosters" de rota só ajudam quando a rota do provedor até o servidor é ruim; o G2 Boost não faz isso.
+
+## Aparelhos na rede de casa (aba Dispositivos)
+
+- Aparelho que o usuário não reconhece: compare o fabricante e o tipo com o que existe na casa (TV, celulares, lâmpadas, câmeras). MAC aleatório é normal em celulares e notebooks modernos. Se ainda for estranho: trocar a senha do Wi-Fi (WPA2 ou WPA3) e ver a lista de clientes no próprio roteador.
+- Selo Novo: o aparelho nunca apareceu antes. Visita e celular novo são o comum; aparelho novo de madrugada merece atenção.
+- Portas de risco: Telnet (23, 2323) e depuração Android (5555) abertas são graves, desligue no aparelho. RTSP de câmera e páginas de configuração (80, 8080) pedem senha forte, nunca a padrão. SMB e RDP são normais em PCs, mas nunca devem ficar abertos para a internet.
+- Roteador: firmware em dia, senha de administrador trocada, WPS desligado, UPnP só se algum jogo precisar (NAT aberto). Rede de visitantes para aparelhos de casa inteligente quando o roteador oferece.

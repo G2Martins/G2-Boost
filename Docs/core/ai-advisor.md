@@ -93,7 +93,7 @@ Histórico: Claude guarda o histórico nativo e append-only (o turno do assisten
 
 ## 5. MCP local (`crates/mcp` como biblioteca; servido por `G2 Boost.exe --mcp`)
 
-`rmcp` 3.5 (SDK oficial Rust), transporte stdio, **18 tools só de leitura**: `get_pc_context` (comece aqui), `get_hardware_profile`, `get_firmware`, `get_live_metrics`, `get_sensors`, `get_startup_items`, `get_top_processes`, `get_advisor_report`, `get_tweaks`, `get_cleanup_preview`, `get_cleanup_history`, `get_winsat`, `get_steam_games` e, desde a Fase 19 (2026-10-18):
+`rmcp` 3.5 (SDK oficial Rust), transporte stdio, **19 tools só de leitura** (a 19ª, `get_network_devices`, veio na Fase 21: aparelhos da rede sem MACs, ver [network.md](../network/network.md)): `get_pc_context` (comece aqui), `get_hardware_profile`, `get_firmware`, `get_live_metrics`, `get_sensors`, `get_startup_items`, `get_top_processes`, `get_advisor_report`, `get_tweaks`, `get_cleanup_preview`, `get_cleanup_history`, `get_winsat`, `get_steam_games` e, desde a Fase 19 (2026-10-18):
 
 | Tool | O que faz |
 |---|---|

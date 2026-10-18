@@ -5,6 +5,44 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 /** True inside the Tauri webview; false in a plain browser (`bun run dev`). */
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+export type DeviceKind =
+  | "router"
+  | "this_pc"
+  | "computer"
+  | "phone"
+  | "tv"
+  | "console"
+  | "printer"
+  | "camera"
+  | "speaker"
+  | "iot"
+  | "nas"
+  | "unknown";
+export type NetDevice = {
+  ip: string;
+  mac: string;
+  vendor: string | null;
+  private_mac: boolean;
+  hostname: string | null;
+  name: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  kind: DeviceKind;
+  services: string[];
+  first_seen: number;
+  new: boolean;
+  known: boolean;
+};
+export type DeviceScan = {
+  subnet: string;
+  swept: number;
+  elapsed_ms: number;
+  devices: NetDevice[];
+  new_count: number;
+  first_scan: boolean;
+};
+export type OpenPort = { port: number; service: string; risk: "high" | "medium" | "info" };
+
 export type ConsoleCommand = { name: string; aliases: string[]; usage: string };
 export type ConsoleMsg = { key: string; params: Record<string, string> };
 export type ConsoleBlock =
@@ -478,6 +516,9 @@ export const backend = {
   appInfo: () => call<AppInfo>("app_info"),
   claudeTargets: () => call<ClaudeTarget[]>("claude_targets"),
   consoleCommands: () => call<ConsoleCommand[]>("console_commands"),
+  devicesScan: () => callOrThrow<DeviceScan>("devices_scan"),
+  devicesPorts: (ip: string) => callOrThrow<OpenPort[]>("devices_ports", { ip }),
+  devicesKnown: (mac: string, known: boolean) => callOrThrow<void>("devices_known", { mac, known }),
   consoleRun: (line: string) => callOrThrow<ConsoleReply>("console_run", { line }),
   claudeConnect: (client: ClaudeClient) =>
     callOrThrow<ClaudeTarget[]>("claude_connect", { client }),
