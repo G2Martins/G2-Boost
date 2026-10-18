@@ -6,6 +6,9 @@ node_modules/
 target/
 dist/
 out/
+# saídas do Playwright
+test-results/
+playwright-report/
 .turbo/
 *.log
 

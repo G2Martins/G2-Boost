@@ -54,6 +54,11 @@ export default function App() {
         boot.autorun = i.autorun;
         if (i.scan_path) boot.scanPath = i.scan_path;
         if (isRoute(i.start_route)) setRoute(i.start_route);
+      } else {
+        // Browser (`bun run dev`, e2e tests): `#/route/tab` picks the page — dev aid only.
+        const [r, tab] = window.location.hash.replace(/^#\/?/, "").split("/");
+        if (tab) boot.startTab = tab;
+        if (isRoute(r)) setRoute(r);
       }
       setReady(true);
     });

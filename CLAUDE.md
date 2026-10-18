@@ -38,7 +38,8 @@ bun run dev            # só a UI no browser (comandos Rust voltam null; speedte
 bun run typecheck      # tsc (também garante simetria pt-BR/en via `satisfies`)
 bun run lint           # Biome + cargo clippy -D warnings
 bun run test           # bun test tests (filtro de ações da IA) + cargo test --workspace
-bun run check          # typecheck + lint + test — DEVE estar verde antes de fechar fase
+bun run test:e2e       # Playwright no Edge instalado contra `bun run dev` (e2e/, uma spec por página + reduced-motion)
+bun run check          # typecheck + lint + test + test:e2e — DEVE estar verde antes de fechar fase
 bun run tauri:build    # NSIS em target/release/bundle/nsis (licença na tela, sem assinatura ainda)
 python -I tools/third_party_notices.py   # regenera THIRD_PARTY_NOTICES.md (CARGO_HOME=D:\dev\cargo) — antes de cada release
 ```

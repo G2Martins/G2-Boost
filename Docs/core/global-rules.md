@@ -32,6 +32,8 @@ Versões pinadas (`exact = true`, `minimumReleaseAge` no `bunfig.toml`; `Cargo.l
 - **Integração em sandbox**: criar árvore de arquivos fabricada em pasta temp (inclui junction e symlink) e rodar scan + cleanup nela. **Nunca** contra o `C:` real. CI (GitHub Actions `windows-latest`) roda tudo numa VM descartável.
 - **Segurança por feature destrutiva**: traversal (`..\`), junction para `C:\Windows`, caminho de outro usuário, MCP chamando `execute` sem token, preset com caminho fora do catálogo.
 - Não mockar o filesystem; usar pasta temp real. Rede externa (Cloudflare/Steam) só em teste marcado `#[ignore]`/`integration`.
+- **UI (Playwright, `e2e/`)**: `bun run test:e2e` sobe `bun run dev` e abre o app no Edge instalado (`channel: "msedge"`, sem baixar navegador). Modo navegador = backend devolve `null`; `#/rota/aba` escolhe a página (ajuda de dev só no navegador). Uma spec por página + navegação + **reduced-motion** (nada anima, tudo visível; em movimento normal o card termina com opacidade 1). A fixture falha em qualquer `console.error`/exceção — inclusive warning do React e recurso 404. Faz parte do `bun run check`.
+- **Unit TS (`tests/`, `bun test`)**: só lógica pura (filtro de ações da IA, parser de markdown, fontes confiáveis, formatação).
 
 ## 3. Docs vivas
 `Docs/<área>/<nome>.md` com `**Última revisão:** YYYY-MM-DD` no topo. Código ≠ doc → corrige doc primeiro. `Docs/README.md` indexa tudo. `CLAUDE.md` aponta, não duplica.

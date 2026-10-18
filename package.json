@@ -11,10 +11,11 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check src *.ts && cargo clippy --workspace --all-targets -- -D warnings",
+    "lint": "biome check src e2e *.ts && cargo clippy --workspace --all-targets -- -D warnings",
     "format": "biome check --write src *.ts",
     "test": "bun test tests && cargo test --workspace",
-    "check": "bun run typecheck && bun run lint && bun run test"
+    "test:e2e": "playwright test",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run test:e2e"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.132.1",
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "@playwright/test": "1.64.0",
     "@tauri-apps/cli": "^2",
     "@types/d3-hierarchy": "3.1.7",
     "@types/react": "^19.1.8",
