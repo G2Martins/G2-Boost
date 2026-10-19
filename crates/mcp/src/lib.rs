@@ -445,6 +445,87 @@ Read-only; uninstalling is done in G2 Boost > Desinstalar apps, which also remov
         .await
     }
 
+    #[tool(description = "Installed games from every launcher (Steam, Epic, EA app, Riot, Battle.net, Ubisoft, GOG, \
+Rockstar, added by hand), which are running now, which have Game Mode on, and the Game Mode session in progress \
+(what was applied: power plan, priority, RAM). Read-only; the user turns Game Mode on in G2 Boost > Jogos.")]
+    async fn get_games(&self) -> Result<String, String> {
+        blocking(|| {
+            let s = g2boost_core::settings::load();
+            let games = g2boost_core::games::installed(&s.game_exes);
+            let running = g2boost_core::games::running(&games, &g2boost_core::procs::list_paths(), g2boost_core::games::steam_running_app());
+            json!({
+                "games": games.iter().map(|g| json!({
+                    "id": g.id, "name": g.name, "launcher": g.launcher,
+                    "running": running.iter().any(|r| r.id == g.id),
+                    "game_mode": s.game_mode_games.contains(&g.id),
+                })).collect::<Vec<_>>(),
+                "game_mode_options": s.game_mode,
+                "session": g2boost_core::gamemode::session(),
+            })
+        })
+        .await
+    }
+
+    #[tool(description = "Health of every drive: NVMe health log (temperature, wear %, spare, data written, power-on \
+hours, unsafe shutdowns, media errors) and SATA S.M.A.R.T. attributes (need G2 Boost elevated), verdict \
+good/caution/bad and findings. Read-only.")]
+    async fn get_disk_health(&self) -> Result<String, String> {
+        blocking(g2boost_core::smart::health).await
+    }
+
+    #[tool(description = "Connected Wi-Fi: security (open/WEP/TKIP/WPA1 flagged), signal, band, channel, link speed, \
+issues, and how busy each nearby channel is with the least busy one. `no_service` = this PC has no Wi-Fi; \
+`location_denied` = Windows hides network names until location access is allowed for desktop apps. Read-only.")]
+    async fn get_wifi(&self) -> Result<String, String> {
+        blocking(|| match g2boost_core::wlan::status() {
+            Err(e) => json!({ "error": e.to_string() }),
+            Ok(status) => {
+                let nets = g2boost_core::wlan::scan(false).unwrap_or_default();
+                let band = status.as_ref().and_then(|s| s.band).unwrap_or(g2boost_core::wlan::Band::Ghz2_4);
+                json!({
+                    "issues": status.as_ref().map(|s| g2boost_core::wlan::security_issues(s, &nets)).unwrap_or_default(),
+                    "status": status,
+                    "networks_seen": nets.len(),
+                    "channels": g2boost_core::wlan::congestion(&nets, band),
+                    "best_channel": g2boost_core::wlan::best_channel(&nets, band),
+                })
+            }
+        })
+        .await
+    }
+
+    #[tool(description = "Which programs are using the network right now: active TCP connections, distinct internet \
+servers, open (listening) ports and UDP endpoints per program. No DNS lookups. Read-only.")]
+    async fn get_network_usage(&self) -> Result<String, String> {
+        blocking(|| g2boost_core::netconns::by_process(&g2boost_core::netconns::connections())).await
+    }
+
+    #[tool(description = "Which apps used the camera, microphone and location, and when (Windows' own consent log). \
+`in_use` can be stale after a crash. Read-only; blocking an app is done in Windows Settings.")]
+    async fn get_privacy_access(&self) -> Result<String, String> {
+        blocking(|| {
+            g2boost_core::consent::history()
+                .into_iter()
+                .take(150)
+                .map(|mut r| {
+                    r.path = g2boost_core::winevents::redact_here(&r.path);
+                    r
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+    }
+
+    #[tool(description = "Boot time over the last 30 days and what slowed it (apps, drivers, services), from Windows' \
+boot performance log. Needs G2 Boost elevated; otherwise returns needs_admin. Read-only.")]
+    async fn get_boot_report(&self) -> Result<String, String> {
+        blocking(|| match g2boost_core::boottime::report(30) {
+            Ok(r) => json!(r),
+            Err(e) => json!({ "error": e.to_string() }),
+        })
+        .await
+    }
+
     #[tool(description = "Power plans: every plan (name, active, built-in) and whether the PC has a battery, plus \
 the main settings of the active plan (CPU min/max state, boost mode, PCIe link power, USB suspend, sleep, disk \
 timeout) on AC and battery. Read-only; the user changes them in G2 Boost > PC Boost > Energia.")]

@@ -80,7 +80,7 @@ export const en = {
   "dash.monitor.gpu_temp": "GPU temp.",
   "dash.monitor.cpu_temp": "CPU temp.",
   "dash.monitor.cpu_temp_value": "CPU at {temp} °C",
-  "dash.monitor.cpu_temp.na": "CPU temp: run HWiNFO or LibreHardwareMonitor",
+  "dash.monitor.cpu_temp.na": "CPU temp: open HWiNFO (free) in sensors mode with Shared Memory on",
   "dash.monitor.vram": "VRAM",
   "dash.monitor.disk_rate": "disk",
   "dash.monitor.net_rate": "↓ {rx}/s · ↑ {tx}/s",
@@ -582,7 +582,8 @@ export const en = {
     "Stopped at {secs} s: at least {size} GB in {files} files (partial).",
   "console.note.apps": "{shown} of {total} apps.",
   "console.note.errors": "Last {days} days, {scanned} events read. Ask Luli to explain.",
-  "console.note.no_sensors": "No sensors: open HWiNFO (sensors mode) or LibreHardwareMonitor.",
+  "console.note.no_sensors":
+    "No sensors: Windows does not show CPU temperature without a driver. Open HWiNFO (free) in sensors mode with Shared Memory on; G2 Boost reads from it.",
   "console.col.seq": "#",
   "console.col.from": "reply from",
   "console.col.ms": "ms",

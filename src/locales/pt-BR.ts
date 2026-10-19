@@ -77,7 +77,8 @@ export const ptBR = {
   "dash.monitor.gpu_temp": "temp. GPU",
   "dash.monitor.cpu_temp": "temp. CPU",
   "dash.monitor.cpu_temp_value": "CPU a {temp} °C",
-  "dash.monitor.cpu_temp.na": "temp. CPU: abra o HWiNFO ou LibreHardwareMonitor",
+  "dash.monitor.cpu_temp.na":
+    "temp. CPU: abra o HWiNFO (grátis) em modo sensores, com Memória compartilhada ligada",
   "dash.monitor.vram": "VRAM",
   "dash.monitor.disk_rate": "disco",
   "dash.monitor.net_rate": "↓ {rx}/s · ↑ {tx}/s",
@@ -585,7 +586,7 @@ export const ptBR = {
   "console.note.apps": "{shown} de {total} apps.",
   "console.note.errors": "Últimos {days} dias, {scanned} eventos lidos. Peça à Luli para explicar.",
   "console.note.no_sensors":
-    "Sem sensores: abra o HWiNFO (modo sensores) ou o LibreHardwareMonitor.",
+    "Sem sensores: o Windows não mostra a temperatura do processador sem um driver. Abra o HWiNFO (grátis) em modo sensores com Memória compartilhada ligada; o G2 Boost lê de lá.",
   "console.col.seq": "#",
   "console.col.from": "resposta de",
   "console.col.ms": "ms",
