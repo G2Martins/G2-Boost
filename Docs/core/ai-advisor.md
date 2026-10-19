@@ -129,7 +129,7 @@ Instruções do servidor: ler `get_knowledge` antes de aconselhar; para investig
 
 ### 5.0a O Claude faz o que o G2 Boost faz (2026-10-18, pedido do dono)
 
-Ferramentas de ação no MCP (45 ferramentas no total; + `get_unowned_folders` e `remove_unowned_folders`, ver [app-uninstall.md](../cleanup/app-uninstall.md)), cada uma validada no core e **confirmada por uma janela nativa do Windows** que o G2 Boost abre no PC (`actions.rs`):
+Ferramentas de ação no MCP (51 ferramentas no total; + `get_unowned_folders` e `remove_unowned_folders`, ver [app-uninstall.md](../cleanup/app-uninstall.md); + leitura de `get_games`, `get_disk_health`, `get_wifi`, `get_network_usage`, `get_privacy_access`, `get_boot_report`, ver [privacy-health.md](../boost/privacy-health.md)), cada uma validada no core e **confirmada por uma janela nativa do Windows** que o G2 Boost abre no PC (`actions.rs`):
 
 | Ferramenta | Faz | Admin |
 |---|---|---|

@@ -24,12 +24,14 @@ Decisões: **sem PawnIO e sem driver próprio** (temperatura só por software gr
 
 | Frente | Estado |
 |---|---|
-| Jogos: lista multi-launcher (Steam, Epic, EA, Riot, Battle.net, Ubisoft, GOG + exe à mão) com chave Modo Jogo | em andamento |
-| Modo Jogo de um clique (energia, RAM, prioridade, pausar rotinas e avisos, tudo volta ao fechar) | em andamento |
-| Diagrama da rota real até o servidor do jogo · Reotimizar honesto (DNS, Wi-Fi, bufferbloat, região) · prioridade do jogo na rede (QoS) | planejado ([../network/game-routes.md](../network/game-routes.md)) |
-| Histórico de câmera/microfone · quem usa a rede · Wi-Fi (segurança + canais) · saúde do disco (SMART) com alerta | em andamento (módulos do core) |
-| Limpeza: mais navegadores, launchers e caches de GPU · apps pouco usados · duplicados · tempo de boot por app · regras de prioridade por processo | em andamento |
-| Temperatura da CPU por software gratuito de terceiros | pesquisa em andamento |
+| Jogos: lista multi-launcher (Steam, Epic, EA, Riot, Battle.net, Ubisoft, GOG + exe à mão) com chave Modo Jogo | ✅ ([../boost/games.md](../boost/games.md)) |
+| Modo Jogo de um clique (energia, prioridade, RAM, pausar rotinas; tudo volta ao fechar, ao sair e após travamento) | ✅ |
+| Diagrama da rota real até o servidor do jogo · Reotimizar honesto (DNS, Wi-Fi, roteador, onde piora, bufferbloat) | ✅ |
+| Prioridade do jogo na rede (QoS por exe, `MSFT_NetQosPolicy`, admin) | pendente |
+| Histórico de câmera/microfone · quem usa a rede · Wi-Fi (segurança + canais) · saúde do disco com alerta · tempo de boot | ✅ ([../boost/privacy-health.md](../boost/privacy-health.md)) |
+| Limpeza +16 categorias · apps pouco usados · duplicados · regras de prioridade por processo | ✅ |
+| Temperatura da CPU por software gratuito de terceiros | ✅ decidido: HWiNFO (grátis, memória compartilhada) e LHM se já rodam; Core Temp/Afterburner fora (drivers flagrados) |
+| Bytes por processo na rede (ETW, admin) · Wi-Fi testado em PC com adaptador · SMART SATA com admin | pendente (verificação) |
 
 ## Feito (2026-10-16 — "finalize tudo")
 - **Sensores sem driver próprio:** pesquisa de opções ([../security/kernel-driver-options.md](../security/kernel-driver-options.md)) → v1 `sensors.rs` (HWiNFO shared memory / LibreHardwareMonitor WMI quando o usuário roda); temp. da CPU no monitor, no contexto da IA e no achado `cpu_hot`. WinRing0 proibido; PawnIO = v2 opt-in; driver próprio = v3 só se preciso.

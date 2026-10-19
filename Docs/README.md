@@ -36,6 +36,8 @@ comportamento.
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [disk/analyzer.md](./disk/analyzer.md) | Varredura, treemap, filtros (`*.mp4 >1gb >6m`), mostrar na pasta, Lixeira com guarda, essenciais grandes. |
 | [network/network.md](./network/network.md) | Monitor (gateway/DNS/jogos), speedtest + bufferbloat, ping Steam, MTR/Ping/TCPing, DNS Optimizer com aplicar/restaurar. |
+| [boost/games.md](./boost/games.md) | Jogos: biblioteca de todos os launchers, Modo Jogo (energia, prioridade, RAM, rotinas; desfaz sozinho), rota até o servidor com análise honesta e Reotimizar. |
+| [boost/privacy-health.md](./boost/privacy-health.md) | Privacidade (câmera/microfone), saúde dos discos, uso de rede por app, Wi-Fi, tempo de boot, prioridade fixa, apps pouco usados, duplicados. |
 | [network/game-routes.md](./network/game-routes.md) | Jogos e conexões estilo ExitLag: o que dá sem servidores (lista de jogos, Modo Jogo, diagrama MTR, reotimizar honesto, QoS) e o que exigiria relays. Proposta. |
 
 ## release/ e security/

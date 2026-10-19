@@ -1,6 +1,6 @@
 # Jogos e conexões (estilo ExitLag) — viabilidade e arquitetura
 
-**Última revisão:** 2026-10-18 · Status: **proposta, nada implementado** (aguarda decisão do dono) · Referência: [../references/exitlag.md](../references/exitlag.md), prints do dono de 2026-10-18 (Conexões, diagrama de rota do CS2, Rotas Multipath, Reotimizar, "Analisando rotas 2/3 (Routes 55/103)").
+**Última revisão:** 2026-10-18 · Status: **seção 2 implementada** (decisão do dono: "siga"), menos QoS; implementação em [../boost/games.md](../boost/games.md) · Referência: [../references/exitlag.md](../references/exitlag.md), prints do dono de 2026-10-18 (Conexões, diagrama de rota do CS2, Rotas Multipath, Reotimizar, "Analisando rotas 2/3 (Routes 55/103)").
 
 ## 1. O que o ExitLag faz e por que depende de servidores
 

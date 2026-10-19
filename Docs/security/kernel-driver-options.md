@@ -102,6 +102,8 @@ Critérios (5 = melhor): segurança, licença p/ app fechado, esforço (5 = pouc
 - **v3 (driver próprio, só se necessário):** C/KMDF minimalista seguindo o design da seção 4; EV + Partner Center attestation; teste em Win10/11 com HVCI, Secure Boot, blocklist ligada; fuzz + revisão externa; submeter a amostra ao Kaspersky/MS antes do release; sem suporte a Windows Server (attestation não carrega lá).
 
 > **Decisão do dono (2026-10-18, mais tarde):** **nem PawnIO nem driver próprio**, para não ter problema no futuro. Temperatura só por software gratuito de outra empresa que o usuário já roda (G2 Boost lê a interface que ele expõe; não carrega nem distribui driver). As seções abaixo ficam como registro.
+>
+> **Pesquisa de fontes de terceiros (2026-10-18):** sem driver nenhum não existe temperatura confiável de CPU Intel em desktop (a zona ACPI desta máquina é fixa em 28/17 °C). Toda fonte grátis depende do driver de outra empresa: **HWiNFO** (driver assinado, sem CVE conhecido; versão grátis desliga a memória compartilhada a cada 12 h) = **recomendada**, já integrada; **LibreHardwareMonitor** lido se já roda (usa PawnIO, não recomendamos instalar por nós); **Core Temp** (`ALSysIO64.sys` detectado como `RiskWare.ALSysIO.VulnDriver`) e **MSI Afterburner** (`RTCore64.sys`, CVE-2019-16098, usado em BYOVD) = **não recomendados**; AIDA64 é pago; Ryzen Master SDK só AMD e com CVEs; Intel Power Gadget descontinuado e Intel PCM exige test-signing. UI e base da Luli orientam só o HWiNFO.
 
 ## 7.1 Revisão 2026-10-18 (pedido do dono: "conseguimos desenvolver um driver?")
 
