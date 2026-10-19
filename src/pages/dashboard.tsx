@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdvisorCard } from "@/components/advisor-card";
+import { DiskHealthCard } from "@/components/disk-health";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
@@ -102,6 +103,7 @@ export function DashboardPage() {
                 ]}
               />
               <MyPc elevated={info?.elevated ?? false} />
+              <DiskHealthCard elevated={info?.elevated ?? false} />
             </PageBody>
           </TabsContent>
         </Tabs>

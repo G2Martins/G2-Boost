@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { PowerTab } from "@/components/boost/power-tab";
+import { BootCard, PrivacyTab } from "@/components/boost/privacy-boot";
 import { ProcsTab } from "@/components/boost/procs-tab";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
@@ -121,7 +122,13 @@ export function BoostPage() {
       </TabsContent>
       <TabsContent value="startup">
         <PageBody className="px-0 pb-0">
+          <BootCard elevated={elevated} />
           <StartupTab elevated={elevated} />
+        </PageBody>
+      </TabsContent>
+      <TabsContent value="privacy">
+        <PageBody className="px-0 pb-0">
+          <PrivacyTab />
         </PageBody>
       </TabsContent>
       <TabsContent value="power">
@@ -148,7 +155,7 @@ function PageHeaderWithTabs({ children }: { children: React.ReactNode }) {
       tabs={
         <Tabs
           defaultValue={
-            ["ram", "dns", "startup", "power", "procs"].includes(boot.startTab ?? "")
+            ["ram", "dns", "startup", "privacy", "power", "procs"].includes(boot.startTab ?? "")
               ? (boot.startTab as string)
               : "tweaks"
           }
@@ -158,6 +165,7 @@ function PageHeaderWithTabs({ children }: { children: React.ReactNode }) {
             <TabsTrigger value="ram">{t("boost.tab.ram")}</TabsTrigger>
             <TabsTrigger value="dns">{t("boost.tab.dns")}</TabsTrigger>
             <TabsTrigger value="startup">{t("boost.tab.startup")}</TabsTrigger>
+            <TabsTrigger value="privacy">{t("boost.tab.privacy")}</TabsTrigger>
             <TabsTrigger value="power">{t("boost.tab.power")}</TabsTrigger>
             <TabsTrigger value="procs">{t("boost.tab.procs")}</TabsTrigger>
           </TabsList>

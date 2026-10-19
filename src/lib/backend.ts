@@ -213,6 +213,116 @@ export type Settings = {
   game_mode: GameModeOptions;
 };
 
+/* ---- network usage, Wi-Fi ---- */
+export type ProcNet = {
+  process: string;
+  exe_path: string;
+  established: number;
+  public_remotes: number;
+  listening_ports: number[];
+  udp_endpoints: number;
+};
+export type NetUsage = { processes: ProcNet[]; tcp: number; udp: number };
+export type WifiBand = "ghz_2_4" | "ghz_5" | "ghz_6";
+export type WifiStatus = {
+  ssid: string;
+  bssid: string;
+  auth: string;
+  cipher: string;
+  signal_quality: number;
+  rssi_dbm: number | null;
+  channel: number | null;
+  band: WifiBand | null;
+  phy: string;
+  rx_mbps: number;
+  tx_mbps: number;
+};
+export type WifiNetwork = {
+  ssid: string;
+  bssid: string;
+  rssi_dbm: number;
+  signal_quality: number;
+  channel: number | null;
+  band: WifiBand | null;
+  phy: string;
+  auth: string | null;
+  cipher: string | null;
+  connected: boolean;
+};
+export type WifiIssue = {
+  kind: "open_network" | "wep" | "tkip" | "wpa1" | "weak_signal" | "band24_with5_available";
+  severity: "info" | "warning" | "critical";
+};
+export type ChannelLoad = { channel: number; networks: number; load: number };
+export type WifiView = {
+  status: WifiStatus | null;
+  issues: WifiIssue[];
+  networks: WifiNetwork[];
+  channels: ChannelLoad[];
+  best_channel: number | null;
+  /** `location_denied`, `no_service`, `api_<code>`. */
+  error: string | null;
+};
+
+/* ---- disk health ---- */
+export type HealthStatus = "unknown" | "good" | "caution" | "bad";
+export type NvmeHealth = {
+  critical_warning: number;
+  temperature_c: number | null;
+  available_spare: number;
+  spare_threshold: number;
+  percentage_used: number;
+  data_read_bytes: number;
+  data_written_bytes: number;
+  power_cycles: number;
+  power_on_hours: number;
+  unsafe_shutdowns: number;
+  media_errors: number;
+  error_log_entries: number;
+};
+export type AtaAttr = { id: number; flags: number; current: number; worst: number; raw: number };
+export type DiskHealth = {
+  index: number;
+  model: string;
+  bus: string;
+  key: string;
+  needs_admin: boolean;
+  nvme: NvmeHealth | null;
+  ata: AtaAttr[];
+  status: HealthStatus;
+  findings: { severity: HealthStatus; code: string; value: number }[];
+  /** Worse since the last saved sample. */
+  changes: { code: string; from: number; to: number }[];
+};
+
+/* ---- privacy, app usage, boot ---- */
+export type AccessRecord = {
+  capability: "webcam" | "microphone" | "location";
+  app: string;
+  path: string;
+  packaged: boolean;
+  last_start: number;
+  last_stop: number;
+  in_use: boolean;
+};
+export type AppUsage = { id: string; last_used: number | null };
+export type BootReport = {
+  days: number;
+  boots: { at: number; total_ms: number; main_ms: number; post_ms: number }[];
+  slow: {
+    kind: "application" | "driver" | "service" | "background_optimization" | "device";
+    name: string;
+    friendly: string;
+    seen: number;
+    avg_degradation_ms: number;
+    last_seen: number;
+  }[];
+};
+
+/* ---- duplicates ---- */
+export type DupGroup = { size: number; paths: string[]; wasted: number };
+export type DupProgress = { candidates: number; hashed_bytes: number; errors: number };
+
 export type GameModeOptions = {
   power_plan: boolean;
   high_priority: boolean;
@@ -661,6 +771,15 @@ export const backend = {
   gamesIcon: (id: string) => call<string | null>("games_icon", { id }),
   gameModeStatus: () => call<GameModeSession | null>("game_mode_status"),
   gameModeStop: () => call<GameModeSession | null>("game_mode_stop"),
+  netUsage: () => call<NetUsage>("net_usage"),
+  wifiReport: (refresh = false) => call<WifiView>("wifi_report", { refresh }),
+  diskHealth: () => call<DiskHealth[]>("disk_health"),
+  privacyAccess: () => call<AccessRecord[]>("privacy_access"),
+  appsUsage: () => call<AppUsage[]>("apps_usage"),
+  bootReport: () => callOrThrow<BootReport>("boot_report"),
+  dupesStart: () => callOrThrow<void>("dupes_start"),
+  dupesCancel: () => call<void>("dupes_cancel"),
+  dupesRecycle: (paths: string[]) => callOrThrow<RecycleOutcome>("dupes_recycle", { paths }),
 
   systemProfile: (refresh = false) => call<Profile>("system_profile", { refresh }),
   recommendations: (refresh = false) => call<Recommendations>("recommendations", { refresh }),

@@ -2,6 +2,7 @@ import { Activity, Gamepad2, Loader2, Play, Power, Route, Square } from "lucide-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuliCard } from "@/components/luli-card";
 import { DevicesTab } from "@/components/network/devices-tab";
+import { NetUsageTab, WifiTab } from "@/components/network/usage-wifi";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
 import {
@@ -33,7 +34,9 @@ import { cn, formatBytes, formatMbps, formatMs } from "@/lib/utils";
 
 export function NetworkPage() {
   const { t } = useI18n();
-  const initial = ["monitor", "scanner", "games", "devices", "tools"].includes(boot.startTab ?? "")
+  const initial = ["monitor", "scanner", "games", "usage", "wifi", "devices", "tools"].includes(
+    boot.startTab ?? "",
+  )
     ? (boot.startTab as string)
     : "monitor";
   return (
@@ -46,6 +49,8 @@ export function NetworkPage() {
             <TabsTrigger value="monitor">{t("network.tab.monitor")}</TabsTrigger>
             <TabsTrigger value="scanner">{t("network.tab.scanner")}</TabsTrigger>
             <TabsTrigger value="games">{t("network.tab.games")}</TabsTrigger>
+            <TabsTrigger value="usage">{t("network.tab.usage")}</TabsTrigger>
+            <TabsTrigger value="wifi">{t("network.tab.wifi")}</TabsTrigger>
             <TabsTrigger value="devices">{t("network.tab.devices")}</TabsTrigger>
             <TabsTrigger value="tools">{t("network.tab.tools")}</TabsTrigger>
           </TabsList>
@@ -68,6 +73,16 @@ export function NetworkPage() {
           <TabsContent value="games">
             <PageBody className="px-0 pb-0">
               <Games />
+            </PageBody>
+          </TabsContent>
+          <TabsContent value="usage">
+            <PageBody className="px-0 pb-0">
+              <NetUsageTab />
+            </PageBody>
+          </TabsContent>
+          <TabsContent value="wifi">
+            <PageBody className="px-0 pb-0">
+              <WifiTab />
             </PageBody>
           </TabsContent>
           <TabsContent value="devices">

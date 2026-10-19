@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, claude_connect, console, context, devices, dns, firmware, gamemode, games, luli, power, procs, registry, secrets, startup};
+use g2boost_core::{advisor, apps, boottime, claude_connect, consent, console, context, devices, dns, dupes, firmware, gamemode, games, luli, netconns, power, procs, registry, secrets, smart, startup, userassist, wlan};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -415,6 +415,241 @@ struct Routines {
     game: Mutex<Option<Game>>,
     ran_since_start: AtomicBool,
     running: AtomicBool,
+}
+
+/* ---------------- network usage, Wi-Fi ---------------- */
+
+#[derive(serde::Serialize)]
+struct NetUsage {
+    processes: Vec<netconns::ProcNet>,
+    tcp: usize,
+    udp: usize,
+}
+
+/// Who is using the network right now: connections per program (no admin, no DNS lookups).
+#[tauri::command]
+async fn net_usage() -> Result<NetUsage, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let conns = netconns::connections();
+        let tcp = conns.iter().filter(|c| matches!(c.protocol, netconns::Protocol::Tcp)).count();
+        NetUsage { processes: netconns::by_process(&conns), tcp, udp: conns.len() - tcp }
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+struct WifiView {
+    status: Option<wlan::WifiStatus>,
+    issues: Vec<wlan::WifiIssue>,
+    networks: Vec<wlan::WifiNetwork>,
+    channels: Vec<wlan::ChannelLoad>,
+    best_channel: Option<u32>,
+    /// `location_denied`, `no_service` or `api_<code>`.
+    error: Option<String>,
+}
+
+fn wlan_code(e: &wlan::WlanError) -> String {
+    match e {
+        wlan::WlanError::LocationDenied => "location_denied".into(),
+        wlan::WlanError::NoService => "no_service".into(),
+        wlan::WlanError::Api(c) => format!("api_{c}"),
+    }
+}
+
+#[tauri::command]
+async fn wifi_report(refresh: bool) -> Result<WifiView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let status = match wlan::status() {
+            Ok(s) => s,
+            Err(e) => {
+                return WifiView { status: None, issues: vec![], networks: vec![], channels: vec![], best_channel: None, error: Some(wlan_code(&e)) };
+            }
+        };
+        let (networks, error) = match wlan::scan(refresh) {
+            Ok(n) => (n, None),
+            Err(e) => (Vec::new(), Some(wlan_code(&e))),
+        };
+        let band = status.as_ref().and_then(|s| s.band).unwrap_or(wlan::Band::Ghz2_4);
+        WifiView {
+            issues: status.as_ref().map(|s| wlan::security_issues(s, &networks)).unwrap_or_default(),
+            channels: wlan::congestion(&networks, band),
+            best_channel: wlan::best_channel(&networks, band),
+            status,
+            networks,
+            error,
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/* ---------------- disk health, privacy, app usage, boot ---------------- */
+
+#[derive(serde::Serialize)]
+struct DiskHealthView {
+    #[serde(flatten)]
+    health: smart::DriveHealth,
+    /// What got worse since the last saved sample (alert).
+    changes: Vec<smart::Change>,
+}
+
+/// S.M.A.R.T./NVMe health of every drive; one sample a day is kept to spot a drive getting worse.
+#[tauri::command]
+async fn disk_health() -> Result<Vec<DiskHealthView>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let now = g2boost_core::registry::now_unix();
+        let drives = smart::health();
+        let views = drives
+            .iter()
+            .map(|d| DiskHealthView {
+                changes: smart::last_sample(&d.key).map(|prev| smart::worsened(&prev, d)).unwrap_or_default(),
+                health: d.clone(),
+            })
+            .collect();
+        smart::record(now, &drives);
+        views
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Which apps used the camera, microphone and location, and when (read from Windows' own log).
+#[tauri::command]
+async fn privacy_access() -> Result<Vec<consent::AccessRecord>, String> {
+    tauri::async_runtime::spawn_blocking(consent::history).await.map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+struct AppUsage {
+    id: String,
+    /// Last time a program inside the app's folder was started from Explorer/Start (unix s).
+    last_used: Option<u64>,
+}
+
+/// Last use of each installed app, from the Explorer's launch log (UserAssist). A hint, not proof:
+/// apps started by other programs or at logon are not counted.
+#[tauri::command]
+async fn apps_usage(state: State<'_, AppsState>) -> Result<Vec<AppUsage>, String> {
+    let list = state.apps.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let usage = userassist::usage();
+        list.into_iter()
+            .map(|a| AppUsage {
+                last_used: a.install_location.as_deref().filter(|d| d.len() > 3).and_then(|d| userassist::last_used_under(&usage, d)),
+                id: a.id,
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Boot time and what slowed it (Windows' boot performance log; needs admin to read).
+#[tauri::command]
+async fn boot_report() -> Result<boottime::BootReport, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        boottime::report(30).map_err(|e| match e {
+            boottime::BootError::NeedsAdmin => "needs_admin".to_string(),
+            other => other.to_string(),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/* ---------------- duplicates (over the last disk scan) ---------------- */
+
+#[derive(Default)]
+struct DupState {
+    running: AtomicBool,
+    cancel: Arc<AtomicBool>,
+    result: Mutex<Option<Vec<dupes::DupGroup>>>,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct DupProgressEvent {
+    candidates: u64,
+    hashed_bytes: u64,
+    errors: u64,
+}
+
+/// Look for duplicate files (≥ 1 MB) in the last disk scan; progress events, result kept here.
+#[tauri::command]
+fn dupes_start(app: AppHandle, disk: State<'_, DiskState>, dup: State<'_, DupState>) -> Result<(), String> {
+    if disk.running.load(Ordering::SeqCst) {
+        return Err("scan_running".into());
+    }
+    let tree = disk.tree.lock().unwrap().clone().ok_or("no_scan")?;
+    let root = disk.summary.lock().unwrap().as_ref().map(|s| PathBuf::from(&s.root)).ok_or("no_scan")?;
+    if dup.running.swap(true, Ordering::SeqCst) {
+        return Err("dupes_running".into());
+    }
+    dup.cancel.store(false, Ordering::SeqCst);
+    let cancel = dup.cancel.clone();
+    std::thread::spawn(move || {
+        let progress = Arc::new(dupes::DupProgress::default());
+        let done = Arc::new(AtomicBool::new(false));
+        let reporter = {
+            let (progress, done, app) = (progress.clone(), done.clone(), app.clone());
+            std::thread::spawn(move || {
+                while !done.load(Ordering::Relaxed) {
+                    std::thread::sleep(Duration::from_millis(300));
+                    let _ = app.emit(
+                        "dupes:progress",
+                        DupProgressEvent {
+                            candidates: progress.candidates.load(Ordering::Relaxed),
+                            hashed_bytes: progress.hashed_bytes.load(Ordering::Relaxed),
+                            errors: progress.errors.load(Ordering::Relaxed),
+                        },
+                    );
+                }
+            })
+        };
+        let files = dupes::files_from_tree(&tree, &root, 1 << 20);
+        let groups = dupes::find(files, &cancel, &progress);
+        done.store(true, Ordering::Relaxed);
+        let _ = reporter.join();
+        let st = app.state::<DupState>();
+        *st.result.lock().unwrap() = Some(groups.clone());
+        st.running.store(false, Ordering::SeqCst);
+        let _ = app.emit("dupes:done", groups);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn dupes_cancel(dup: State<'_, DupState>) {
+    dup.cancel.store(true, Ordering::SeqCst);
+}
+
+/// Copies the user picked, to the Recycle Bin. Only paths that are in the last duplicate result
+/// (never a path invented by the caller), then the disk map's guard (`validate_recycle`).
+#[tauri::command]
+async fn dupes_recycle(dup: State<'_, DupState>, paths: Vec<String>) -> Result<disk::RecycleOutcome, String> {
+    let known: std::collections::HashSet<String> = dup.result.lock().unwrap().as_ref().ok_or("no_result")?.iter().flat_map(|g| g.paths.iter().cloned()).collect();
+    if paths.is_empty() || paths.iter().any(|p| !known.contains(p)) {
+        return Err("unknown_item".into());
+    }
+    // Never every copy of a group: one always stays.
+    for g in dup.result.lock().unwrap().iter().flatten() {
+        if g.paths.iter().all(|p| paths.contains(p)) {
+            return Err("keeps_none".into());
+        }
+    }
+    let out = tauri::async_runtime::spawn_blocking(move || {
+        let checked = disk::validate_recycle(&paths).map_err(|e| e.to_string())?;
+        Ok::<_, String>(disk::recycle_validated(&checked, "dupes"))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    if let Some(groups) = dup.result.lock().unwrap().as_mut() {
+        for g in groups.iter_mut() {
+            g.paths.retain(|p| std::path::Path::new(p).exists());
+        }
+        groups.retain(|g| g.paths.len() > 1);
+    }
+    Ok(out)
 }
 
 /* ---------------- games + Game Mode ---------------- */
@@ -1460,6 +1695,7 @@ pub fn run() {
         .manage(TokenStore::default())
         .manage(Dashboard::default())
         .manage(GamesState::default())
+        .manage(DupState::default())
         .manage(Routines {
             settings: Mutex::new(settings::load()),
             state: Mutex::new(routines::load_state()),
@@ -1613,7 +1849,16 @@ pub fn run() {
             games_list,
             games_icon,
             game_mode_status,
-            game_mode_stop
+            game_mode_stop,
+            net_usage,
+            wifi_report,
+            disk_health,
+            privacy_access,
+            apps_usage,
+            boot_report,
+            dupes_start,
+            dupes_cancel,
+            dupes_recycle
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

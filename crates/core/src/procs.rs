@@ -98,6 +98,11 @@ fn snapshot() -> HashMap<u32, Snap> {
     out
 }
 
+/// `(pid, created, lowercase exe name, session, image path)` of every readable process (for `prio`).
+pub(crate) fn list() -> Vec<(u32, u64, String, u32, String)> {
+    snapshot().into_iter().map(|(pid, s)| (pid, s.created, s.name, s.session, s.path)).collect()
+}
+
 fn cores() -> f64 {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1) as f64
 }
@@ -225,7 +230,7 @@ pub enum ProcError {
 }
 
 /// Open `pid` with `access` and prove it is still the process created at `created`.
-fn open_exact(pid: u32, created: u64, access: PROCESS_ACCESS_RIGHTS) -> Result<(HANDLE, String), ProcError> {
+pub(crate) fn open_exact(pid: u32, created: u64, access: PROCESS_ACCESS_RIGHTS) -> Result<(HANDLE, String), ProcError> {
     if pid == 0 || pid == 4 || pid == std::process::id() {
         return Err(ProcError::Protected);
     }

@@ -100,6 +100,23 @@ pub const CATALOG: &[Category] = &[
     cat("edge_cache", Group::Monthly, Risk::Low, false, &["msedge.exe"], true, Action::DirContents),
     cat("discord_cache", Group::Monthly, Risk::Low, false, &["discord.exe"], true, Action::DirContents),
     cat("spotify_cache", Group::Monthly, Risk::Low, false, &["spotify.exe"], false, Action::DirContents),
+    cat("firefox_cache", Group::Monthly, Risk::Low, false, &["firefox.exe"], true, Action::DirContents),
+    cat("brave_cache", Group::Monthly, Risk::Low, false, &["brave.exe"], true, Action::DirContents),
+    cat("opera_cache", Group::Monthly, Risk::Low, false, &["opera.exe"], true, Action::DirContents),
+    cat("vivaldi_cache", Group::Monthly, Risk::Low, false, &["vivaldi.exe"], true, Action::DirContents),
+    cat("steam_cache", Group::Monthly, Risk::Low, false, &["steam.exe", "steamwebhelper.exe"], true, Action::DirContents),
+    cat("epic_cache", Group::Monthly, Risk::Low, false, &["epicgameslauncher.exe"], true, Action::DirContents),
+    cat("battlenet_cache", Group::Monthly, Risk::Low, false, &["battle.net.exe"], true, Action::DirContents),
+    cat("ea_cache", Group::Monthly, Risk::Low, false, &["eadesktop.exe"], true, Action::DirContents),
+    cat("ubisoft_cache", Group::Monthly, Risk::Low, false, &["upc.exe"], true, Action::DirContents),
+    cat("teams_cache", Group::Monthly, Risk::Low, false, &["teams.exe"], true, Action::DirContents),
+    cat("slack_cache", Group::Monthly, Risk::Low, false, &["slack.exe"], true, Action::DirContents),
+    cat("vscode_cache", Group::Monthly, Risk::Low, false, &["code.exe"], true, Action::DirContents),
+    // Developer caches: re-downloaded on the next install/restore, so medium risk and opt-in.
+    cat("dev_npm", Group::Advanced, Risk::Medium, false, &[], false, Action::DirContents),
+    cat("dev_pip", Group::Advanced, Risk::Medium, false, &[], false, Action::DirContents),
+    cat("dev_nuget", Group::Advanced, Risk::Medium, false, &[], false, Action::DirContents),
+    cat("dev_yarn", Group::Advanced, Risk::Medium, false, &[], false, Action::DirContents),
     cat("dism", Group::Monthly, Risk::Medium, true, &[], false, Action::ComponentCleanup),
     cat("logs_windows", Group::Advanced, Risk::Medium, true, &[], false, Action::TopFiles(&["*.log", "*.etl"])),
     cat("dumps", Group::Advanced, Risk::Medium, true, &[], false, Action::DirContents),
@@ -117,24 +134,45 @@ fn under(base: Option<PathBuf>, rel: &str) -> Option<PathBuf> {
     base.map(|b| b.join(rel))
 }
 
-/// Chromium "User Data" profiles: `Default`, `Profile N`, `Guest Profile`.
+/// Real (non-reparse) child directories of `base` whose name passes `keep`. Profile folders that
+/// are junctions/symlinks are skipped so a cache path never routes through one.
+fn child_dirs(base: Option<PathBuf>, keep: impl Fn(&str) -> bool) -> Vec<PathBuf> {
+    let Some(Ok(rd)) = base.map(fs::read_dir) else {
+        return Vec::new();
+    };
+    rd.flatten()
+        .filter(|e| e.metadata().is_ok_and(|md| md.is_dir() && !is_reparse(&md)))
+        .filter(|e| keep(&e.file_name().to_string_lossy()))
+        .map(|e| e.path())
+        .collect()
+}
+
+/// Chromium "User Data" profiles: `Default`, `Profile N`, `Guest Profile`. Only the cache
+/// folders inside them; never `Cookies`, `Login Data`, `Preferences` or `Local State`.
 fn chromium_caches(user_data: Option<PathBuf>) -> Vec<PathBuf> {
-    let Some(ud) = user_data else {
-        return Vec::new();
-    };
-    let Ok(rd) = fs::read_dir(&ud) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for e in rd.flatten() {
-        let name = e.file_name().to_string_lossy().into_owned();
-        if name == "Default" || name.starts_with("Profile ") || name == "Guest Profile" {
-            for sub in ["Cache\\Cache_Data", "Code Cache", "GPUCache"] {
-                out.push(e.path().join(sub));
-            }
-        }
-    }
-    out
+    let profiles = child_dirs(user_data, |n| n == "Default" || n.starts_with("Profile ") || n == "Guest Profile");
+    profiles.iter().flat_map(|p| ["Cache\\Cache_Data", "Code Cache", "GPUCache"].map(|s| p.join(s))).collect()
+}
+
+/// Firefox keeps profile data in Roaming; the Local `Profiles\*` folders hold only `cache2`.
+fn firefox_caches(profiles: Option<PathBuf>) -> Vec<PathBuf> {
+    child_dirs(profiles, |_| true).into_iter().map(|p| p.join("cache2")).collect()
+}
+
+/// Opera / Opera GX: cache folders under the Local channel folder (flat layout and the newer
+/// `Default\` layout). The profile itself lives in Roaming and is never listed.
+fn opera_caches(opera_software: Option<PathBuf>) -> Vec<PathBuf> {
+    let channels = child_dirs(opera_software, |n| n == "Opera Stable" || n == "Opera GX Stable");
+    channels
+        .iter()
+        .flat_map(|c| [c.clone(), c.join("Default")])
+        .flat_map(|r| ["Cache", "Code Cache", "GPUCache"].map(|s| r.join(s)))
+        .collect()
+}
+
+/// Epic Games Launcher web caches: `Saved\webcache`, `webcache_4147`, ... (one per CEF version).
+fn epic_caches(saved: Option<PathBuf>) -> Vec<PathBuf> {
+    child_dirs(saved, |n| n.to_ascii_lowercase().starts_with("webcache"))
 }
 
 /// Resolved candidate directories for a category (may not exist yet; filtered later).
@@ -178,6 +216,44 @@ pub fn paths(id: &str) -> Vec<PathBuf> {
         "inetcache" => vec![under(local(), r"Microsoft\Windows\INetCache")],
         "chrome_cache" => return chromium_caches(under(local(), r"Google\Chrome\User Data")),
         "edge_cache" => return chromium_caches(under(local(), r"Microsoft\Edge\User Data")),
+        "firefox_cache" => return firefox_caches(under(local(), r"Mozilla\Firefox\Profiles")),
+        "brave_cache" => return chromium_caches(under(local(), r"BraveSoftware\Brave-Browser\User Data")),
+        "opera_cache" => return opera_caches(under(local(), "Opera Software")),
+        "vivaldi_cache" => return chromium_caches(under(local(), r"Vivaldi\User Data")),
+        // Steam's `htmlcache` is a Chromium user-data root (cookies, logins): only its cache folders.
+        "steam_cache" => return chromium_caches(under(local(), r"Steam\htmlcache")),
+        "epic_cache" => return epic_caches(under(local(), r"EpicGamesLauncher\Saved")),
+        "battlenet_cache" => vec![
+            under(program_data(), r"Battle.net\Agent\data\cache"),
+            under(local(), r"Battle.net\Cache"),
+            under(local(), r"Battle.net\BrowserCache"),
+        ],
+        "ea_cache" => vec![
+            under(local(), r"Electronic Arts\EA Desktop\cache"),
+            under(local(), r"Electronic Arts\EA Desktop\CEF\BrowserCache"),
+        ],
+        "ubisoft_cache" => vec![under(local(), r"Ubisoft Game Launcher\cache")],
+        // Classic Teams only; new Teams (MSTeams package, EBWebView) is left alone on purpose.
+        "teams_cache" => vec![
+            under(roaming(), r"Microsoft\Teams\Cache"),
+            under(roaming(), r"Microsoft\Teams\Code Cache"),
+            under(roaming(), r"Microsoft\Teams\GPUCache"),
+        ],
+        "slack_cache" => vec![
+            under(roaming(), r"Slack\Cache"),
+            under(roaming(), r"Slack\Code Cache"),
+            under(roaming(), r"Slack\GPUCache"),
+        ],
+        "vscode_cache" => vec![
+            under(roaming(), r"Code\Cache"),
+            under(roaming(), r"Code\CachedData"),
+            under(roaming(), r"Code\Code Cache"),
+            under(roaming(), r"Code\GPUCache"),
+        ],
+        "dev_npm" => vec![under(local(), "npm-cache")],
+        "dev_pip" => vec![under(local(), r"pip\cache")],
+        "dev_nuget" => vec![under(local(), r"NuGet\v3-cache")],
+        "dev_yarn" => vec![under(local(), r"Yarn\Cache")],
         "discord_cache" => vec![
             under(roaming(), r"discord\Cache"),
             under(roaming(), r"discord\Code Cache"),
@@ -686,6 +762,114 @@ pub(crate) mod tests {
         assert!(dir.join("victim/keep.txt").exists(), "junction target untouched");
         assert!(dir.join("cache").exists(), "root dir itself stays");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Fabricated profile tree: cache folders plus files that must survive.
+    fn fake_profile(root: &Path, caches: &[&str], keep: &[&str]) {
+        for c in caches {
+            fs::create_dir_all(root.join(c)).unwrap();
+            fs::write(root.join(c).join("data_0"), vec![0u8; 100]).unwrap();
+        }
+        for k in keep {
+            fs::create_dir_all(root.join(k).parent().unwrap()).unwrap();
+            fs::write(root.join(k), b"precious").unwrap();
+        }
+    }
+
+    fn tmp_tree(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("g2boost-cleanup-{}-{tag}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn multi_profile_patterns_find_only_cache_folders() {
+        let dir = tmp_tree("profiles");
+        let keep = ["Cookies", "Login Data", "Preferences", "History", "Network\\Cookies"];
+        // Chromium (Chrome/Edge/Brave/Vivaldi/Steam htmlcache): Default, Profile N, Guest.
+        let ud = dir.join("User Data");
+        let chrome_caches = ["Cache\\Cache_Data", "Code Cache", "GPUCache"];
+        for prof in ["Default", "Profile 2", "Guest Profile", "System Profile"] {
+            fake_profile(&ud.join(prof), &chrome_caches, &keep);
+        }
+        fs::write(ud.join("Local State"), b"precious").unwrap();
+        let found = chromium_caches(Some(ud.clone()));
+        assert_eq!(found.len(), 9, "System Profile is not a listed profile");
+        for f in &found {
+            assert!(f.exists() && f.starts_with(&ud), "{}", f.display());
+            assert!(!f.starts_with(ud.join("System Profile")));
+        }
+        // Firefox: only `cache2` per profile.
+        let ff = dir.join("Profiles");
+        fake_profile(&ff.join("abc.default-release"), &["cache2"], &["prefs.js", "cookies.sqlite"]);
+        fake_profile(&ff.join("def.dev-edition"), &["cache2"], &["places.sqlite"]);
+        let found = firefox_caches(Some(ff));
+        assert_eq!(found.len(), 2);
+        assert!(found.iter().all(|p| p.file_name().unwrap() == "cache2"));
+        // Opera: both channels and layouts; channel roots and other channels never returned.
+        let op = dir.join("Opera Software");
+        fake_profile(&op.join("Opera Stable"), &["Cache", "Code Cache"], &["Preferences", "Cookies"]);
+        fake_profile(&op.join("Opera GX Stable"), &["Default\\Cache", "GPUCache"], &["Local State"]);
+        fake_profile(&op.join("Opera Crypto Stable"), &["Cache"], &[]);
+        let found = opera_caches(Some(op.clone()));
+        assert_eq!(found.len(), 12);
+        assert!(!found.contains(&op.join("Opera Stable")));
+        assert!(!found.iter().any(|p| p.starts_with(op.join("Opera Crypto Stable"))));
+        // Epic: webcache, webcache_4147 only.
+        let ep = dir.join("Saved");
+        fake_profile(&ep, &["webcache", "webcache_4147", "Config", "Logs"], &[]);
+        let found = epic_caches(Some(ep));
+        assert_eq!(found.len(), 2);
+        assert!(found.iter().all(|p| p.file_name().unwrap().to_string_lossy().starts_with("webcache")));
+
+        // Deleting through the resolved paths: caches go, profile data and Local State survive.
+        let mut t = Tally::default();
+        for p in chromium_caches(Some(ud.clone())) {
+            delete_dir_contents(&p, &mut t);
+        }
+        assert_eq!(t.files, 9);
+        for prof in ["Default", "Profile 2", "Guest Profile"] {
+            for k in keep {
+                assert!(ud.join(prof).join(k).exists(), "{prof}/{k}");
+            }
+        }
+        assert!(ud.join("Local State").exists());
+        assert!(ud.join("System Profile/Cache/Cache_Data/data_0").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn junction_profile_and_junction_inside_cache_are_not_followed() {
+        let dir = tmp_tree("pjunction");
+        let victim = dir.join("victim");
+        fs::create_dir_all(victim.join("cache2")).unwrap();
+        fs::write(victim.join("cache2/keep.bin"), b"x").unwrap();
+        let ff = dir.join("Profiles");
+        fake_profile(&ff.join("real"), &["cache2"], &[]);
+        make_junction(&ff.join("linked"), &victim);
+        assert_eq!(firefox_caches(Some(ff.clone())), vec![ff.join("real").join("cache2")], "junction profile skipped");
+        // A junction inside a cache folder: contents deleted, target untouched.
+        make_junction(&ff.join("real/cache2/trap"), &victim);
+        let mut t = Tally::default();
+        delete_dir_contents(&ff.join("real/cache2"), &mut t);
+        assert_eq!(t.files, 1);
+        assert!(victim.join("cache2/keep.bin").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Read-only: bytes per new category on this PC.
+    /// `cargo test -p g2boost-core -- --ignored measure_new --nocapture`
+    #[test]
+    #[ignore]
+    fn measure_new_categories() {
+        let ids = [
+            "firefox_cache", "brave_cache", "opera_cache", "vivaldi_cache", "steam_cache", "epic_cache", "battlenet_cache",
+            "ea_cache", "ubisoft_cache", "teams_cache", "slack_cache", "vscode_cache", "dev_npm", "dev_pip", "dev_nuget", "dev_yarn",
+        ];
+        for i in preview(&ids.map(String::from)) {
+            println!("{:<16} bytes={:<12} files={:<7} missing={}", i.id, i.bytes, i.files, i.missing);
+        }
     }
 
     #[test]

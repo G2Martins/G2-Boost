@@ -1,6 +1,6 @@
 # Limpeza — catálogo, prévia, execução, histórico
 
-**Última revisão:** 2026-10-14 · Código: `crates/core/src/cleanup.rs`, `tasksched.rs`, `safety.rs` · UI: `src/pages/cleanup.tsx` · Origem: [legacy-bat-scripts.md](../references/legacy-bat-scripts.md).
+**Última revisão:** 2026-10-18 · Código: `crates/core/src/cleanup.rs`, `tasksched.rs`, `safety.rs` · UI: `src/pages/cleanup.tsx` · Origem: [legacy-bat-scripts.md](../references/legacy-bat-scripts.md).
 
 ## Fluxo
 
@@ -29,11 +29,31 @@ Categorias com `admin` retornam `needs_admin` sem elevação; a UI mostra "Eleva
 | `edge_cache` | mensal | baixo | não | idem em `Microsoft\Edge\User Data` | conteúdo | Edge |
 | `discord_cache` | mensal | baixo | não | `%APPDATA%\discord\{Cache, Code Cache, GPUCache}` | conteúdo | Discord |
 | `spotify_cache` | mensal | baixo | não | `%LOCALAPPDATA%\Spotify\Data`, `Packages\SpotifyAB.SpotifyMusic_*\LocalCache\Spotify\Data` | conteúdo | Spotify |
+| `firefox_cache` | mensal | baixo | não | `%LOCALAPPDATA%\Mozilla\Firefox\Profiles\*\cache2` (o perfil fica no Roaming, intocado) | conteúdo | Firefox |
+| `brave_cache` | mensal | baixo | não | `BraveSoftware\Brave-Browser\User Data\{Default, Profile *, Guest Profile}\{Cache\Cache_Data, Code Cache, GPUCache}` | conteúdo | Brave |
+| `opera_cache` | mensal | baixo | não | `Opera Software\{Opera Stable, Opera GX Stable}\{Cache, Code Cache, GPUCache}` e o mesmo dentro de `Default\` (layout novo) | conteúdo | Opera |
+| `vivaldi_cache` | mensal | baixo | não | `Vivaldi\User Data\{Default, Profile *, Guest Profile}\{Cache\Cache_Data, Code Cache, GPUCache}` | conteúdo | Vivaldi |
+| `steam_cache` | mensal | baixo | não | `%LOCALAPPDATA%\Steam\htmlcache\{Default, Profile *}\{Cache\Cache_Data, Code Cache, GPUCache}` (a raiz `htmlcache` guarda cookies/login da loja: só as pastas de cache) | conteúdo | Steam |
+| `epic_cache` | mensal | baixo | não | `%LOCALAPPDATA%\EpicGamesLauncher\Saved\webcache*` | conteúdo | Epic Games Launcher |
+| `battlenet_cache` | mensal | baixo | não | `%PROGRAMDATA%\Battle.net\Agent\data\cache`, `%LOCALAPPDATA%\Battle.net\{Cache, BrowserCache}` | conteúdo (sem permissão = pulado) | Battle.net |
+| `ea_cache` | mensal | baixo | não | `%LOCALAPPDATA%\Electronic Arts\EA Desktop\{cache, CEF\BrowserCache}` | conteúdo | EA app |
+| `ubisoft_cache` | mensal | baixo | não | `%LOCALAPPDATA%\Ubisoft Game Launcher\cache` | conteúdo | Ubisoft Connect |
+| `teams_cache` | mensal | baixo | não | Teams clássico: `%APPDATA%\Microsoft\Teams\{Cache, Code Cache, GPUCache}` | conteúdo | Teams |
+| `slack_cache` | mensal | baixo | não | `%APPDATA%\Slack\{Cache, Code Cache, GPUCache}` | conteúdo | Slack |
+| `vscode_cache` | mensal | baixo | não | `%APPDATA%\Code\{Cache, CachedData, Code Cache, GPUCache}` | conteúdo | VS Code |
+| `dev_npm` | avançado | médio | não | `%LOCALAPPDATA%\npm-cache` | conteúdo (baixa de novo no próximo `npm install`) | — |
+| `dev_pip` | avançado | médio | não | `%LOCALAPPDATA%\pip\cache` | conteúdo | — |
+| `dev_nuget` | avançado | médio | não | `%LOCALAPPDATA%\NuGet\v3-cache` | conteúdo | — |
+| `dev_yarn` | avançado | médio | não | `%LOCALAPPDATA%\Yarn\Cache` | conteúdo | — |
 | `dism` | mensal | médio | sim | — | roda a tarefa do Windows `\Microsoft\Windows\Servicing\StartComponentCleanup` (sem `/ResetBase`, sem `DISM.exe`) | — |
 | `logs_windows` | avançado | médio | sim | `%SystemRoot%\Logs\{CBS, WindowsUpdate, DISM}` | só `*.log`, `*.etl` | — |
 | `dumps` | avançado | médio | sim | `%LOCALAPPDATA%\CrashDumps`, `%SystemRoot%\Minidump` | conteúdo | — |
 
-**Fora, de propósito:** `prefetch` (0 MB com SysMain off; só piora; anti-forense), `spool` (`System32\spool\PRINTERS` fica atrás da barreira do `SafePath`; ganho ~0), `memory.dmp` na raiz do Windows (arquivo solto no `%SystemRoot%`, que o `SafePath` bloqueia como raiz — fica para quando houver seleção explícita no treemap).
+Perfis multi-pasta (Chromium, Firefox, Opera, Epic) são resolvidos com `read_dir` (`child_dirs`): só diretórios reais, pasta de perfil que seja junction/symlink é ignorada, e só as subpastas de cache entram na lista; `Cookies`, `Login Data`, `Preferences`, `Local State` nunca. Caches de desenvolvimento são opt-in (baixam de novo). Cargo e Bun ficam de fora (cache em D:).
+
+**Já cobertos, não duplicados:** cache de shaders NVIDIA/AMD/Intel (`shaders`) e o cache do Delivery Optimization (dentro de `wu_cache`, mesma checagem de `SafePath`). Steam `steamapps\shadercache` fica com a Steam.
+
+**Fora, de propósito:** Riot Client (layout incerto), Zoom (sem pasta de cache clara), Teams novo (`MSTeams_8wekyb3d8bbwe`, EBWebView: layout não garantido), `prefetch` (0 MB com SysMain off; só piora; anti-forense), `spool` (`System32\spool\PRINTERS` fica atrás da barreira do `SafePath`; ganho ~0), `memory.dmp` na raiz do Windows (arquivo solto no `%SystemRoot%`, que o `SafePath` bloqueia como raiz — fica para quando houver seleção explícita no treemap).
 
 Bug de precedência dos scripts (`$L+'\x|'+$L+'\y'`) não foi portado: cada caminho é um item da lista.
 
@@ -44,6 +64,8 @@ Bug de precedência dos scripts (`$L+'\x|'+$L+'\y'`) não foi portado: cada cami
 ## Testes (`cleanup.rs`)
 
 - Sandbox real em `%TEMP%` com **junction NTFS criada no teste** (`FSCTL_SET_REPARSE_POINT`): mede e apaga o que é da pasta, remove subpastas esvaziadas, mantém a raiz, **não atravessa a junction** (o arquivo-alvo sobrevive).
+- Árvore fabricada de perfis: cada padrão multi-perfil (Chromium/Brave/Vivaldi/Steam, Firefox, Opera, Epic) acha só as pastas de cache; apagar por elas preserva `Cookies`, `Login Data`, `Preferences`, `Local State`; perfil que é junction é ignorado e junction dentro do cache não é seguida.
+- Medição read-only na máquina (`measure_new_categories`, `#[ignore]`).
 - Glob dos top-files (`thumbcache_*.db`, `*.log`, case-insensitive) e arquivo aberto sem compartilhamento = pulado, não erro.
 - Raízes fora da allowlist recusadas: `System32\spool`, perfil de outro usuário, UNC, `..`. Todo caminho do catálogo classifica sem cair em área crítica.
 - Prévia de todas as categorias sem apagar; token de uso único amarrado à seleção; execução sem admin devolve `needs_admin` por categoria e grava histórico.

@@ -30,6 +30,7 @@ pub mod network;
 pub mod netconns;
 pub mod nvml;
 pub mod power;
+pub mod prio;
 pub mod procs;
 pub mod recommend;
 pub mod registry;
