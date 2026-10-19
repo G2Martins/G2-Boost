@@ -42,6 +42,7 @@ import {
   type OrphanApp,
   type UndoRecord,
 } from "@/lib/backend";
+import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { sizeText, usePageData } from "@/lib/luli";
 import { APPS_REMOVED, onDrop, onOpenOrphans, takeDrop, takeOpenOrphans } from "@/lib/nav";
@@ -62,7 +63,12 @@ const SWEEP_ID = "sweep:unowned";
 export function AppsPage() {
   const { t } = useI18n();
   const [autoScan, setAutoScan] = useState(() => takeOpenOrphans());
-  const [tab, setTab] = useState(autoScan ? "orphans" : "installed");
+  // Dev aid: G2BOOST_START_TAB=orphans (or `unowned`, which also starts the every-drive sweep).
+  const [tab, setTab] = useState(
+    autoScan || boot.startTab === "orphans" || boot.startTab === "unowned"
+      ? "orphans"
+      : "installed",
+  );
   const [drop, setDrop] = useState<string | null>(() => takeDrop());
   useEffect(
     () =>
@@ -502,7 +508,9 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
   const { t, locale } = useI18n();
   const [list, setList] = useState<OrphanApp[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null);
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(() =>
+    boot.startTab === "unowned" ? { id: SWEEP_ID, name: t("apps.unowned.title") } : null,
+  );
   const [reload, setReload] = useState(0);
 
   const scan = useCallback(async () => {

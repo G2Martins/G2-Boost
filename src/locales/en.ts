@@ -704,11 +704,9 @@ export const en = {
   "disk.hint.open":
     "Double-click a folder to enter it; use the trail above to go back. Hover to see size and share.",
   "disk.progress": "{files} files · {size}",
+  "disk.left": "about {size} to go",
   "disk.live.hint":
     "The map builds up while the disk is read. Colored border: folder still being read.",
-  "disk.eta": "about {time} left",
-  "disk.eta.seconds": "{n} s",
-  "disk.eta.minutes": "{n} min",
   "disk.summary": "{files} files · {size} · {seconds} s",
   "disk.skipped": "{count} folders without permission",
   "disk.error": "Scan failed: {error}",

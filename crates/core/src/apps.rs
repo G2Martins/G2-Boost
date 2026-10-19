@@ -1227,7 +1227,12 @@ fn unowned_in(owners: &Owners, ctx: &Ctx, roots: &SweepRoots, now: u64) -> Vec<L
         let Some(real) = fs_allowed(path, ctx, install_dir) else {
             return;
         };
-        let needs_admin = !starts_with_dir(&lower(&real), &lower(&ctx.profile));
+        // ProgramData and the system drive's Program Files need admin; a Steam library or a games
+        // folder on another drive is usually the user's to delete.
+        let lr = lower(&real);
+        let needs_admin = !starts_with_dir(&lr, &lower(&ctx.profile))
+            && (SafePath::classify(&real, &ctx.windows, &ctx.profile).is_ok_and(|c| c.class() == PathClass::System)
+                || ctx.program_files.iter().any(|pf| starts_with_dir(&lr, &lower(pf))));
         if f.push(LeftoverKind::Folder, Target::Fs(real.clone()), real.to_string_lossy().into_owned(), (confidence, reason), needs_admin, bytes)
             && let Some(l) = f.0.last_mut()
         {

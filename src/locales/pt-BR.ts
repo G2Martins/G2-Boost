@@ -704,11 +704,9 @@ export const ptBR = {
   "disk.hint.open":
     "Duplo clique numa pasta para entrar; use a trilha acima para voltar. Passe o mouse para ver tamanho e participação.",
   "disk.progress": "{files} arquivos · {size}",
+  "disk.left": "faltam cerca de {size}",
   "disk.live.hint":
     "O mapa vai se montando enquanto o disco é lido. Borda colorida: pasta ainda sendo lida.",
-  "disk.eta": "faltam cerca de {time}",
-  "disk.eta.seconds": "{n} s",
-  "disk.eta.minutes": "{n} min",
   "disk.summary": "{files} arquivos · {size} · {seconds} s",
   "disk.skipped": "{count} pastas sem permissão",
   "disk.error": "Falha na varredura: {error}",

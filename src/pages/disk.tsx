@@ -61,7 +61,6 @@ export function DiskPage() {
   const errorText = useErrorText();
   const scanning = progress !== null;
   const started = useRef(false);
-  const startedAt = useRef(0);
 
   // While scanning: the root's direct children growing, as a one-level treemap.
   const live = useMemo(() => {
@@ -106,7 +105,6 @@ export function DiskPage() {
     setView(null);
     setFolderPick(null);
     setFolderMsg(null);
-    startedAt.current = Date.now();
     setProgress({ files: 0, dirs: 0, bytes: 0, errors: 0, current: root, expected: 0, top: [] });
     try {
       await backend.diskScanStart(root.endsWith("\\") ? root : `${root}\\`);
@@ -235,7 +233,6 @@ export function DiskPage() {
                 current={current}
                 progress={progress}
                 summary={summary}
-                startedAt={startedAt.current}
               />
               <LuliCard
                 style={rise(1)}
@@ -407,7 +404,6 @@ function DriveBar({
   current,
   progress,
   summary,
-  startedAt,
 }: {
   drives: DriveInfo[];
   selected: string;
@@ -415,16 +411,15 @@ function DriveBar({
   current?: DriveInfo;
   progress: ScanProgressEvent | null;
   summary: ScanSummary | null;
-  startedAt: number;
 }) {
   const { t, locale } = useI18n();
   // Bytes read over the drive's used space. Capped at 99 % until done: shadow copies and
   // protected folders are counted in "used" but cannot be read.
   const ratio =
     progress && progress.expected > 0 ? Math.min(0.99, progress.bytes / progress.expected) : null;
-  const elapsed = (Date.now() - startedAt) / 1000;
-  const eta =
-    ratio !== null && ratio > 0.05 && elapsed > 3 ? (elapsed * (1 - ratio)) / ratio : null;
+  // What is left to read, not a time: big files go first and the profile's millions of small
+  // files come last, so a time estimate from the rate so far is wildly optimistic.
+  const left = ratio !== null && progress ? Math.max(0, progress.expected - progress.bytes) : 0;
   const list = drives.length
     ? drives
     : [{ letter: "C:", kind: "fixed", total_bytes: 0, free_bytes: 0 } as DriveInfo];
@@ -473,15 +468,9 @@ function DriveBar({
                   size: formatBytes(progress.bytes, locale, 1),
                 })}
               </span>
-              {eta !== null ? (
+              {left > 0 ? (
                 <span className="num">
-                  ·{" "}
-                  {t("disk.eta", {
-                    time:
-                      eta < 60
-                        ? t("disk.eta.seconds", { n: Math.max(1, Math.round(eta)) })
-                        : t("disk.eta.minutes", { n: Math.round(eta / 60) }),
-                  })}
+                  · {t("disk.left", { size: formatBytes(left, locale, 1) })}
                 </span>
               ) : null}
             </span>
