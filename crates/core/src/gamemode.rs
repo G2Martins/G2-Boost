@@ -171,6 +171,77 @@ mod tests {
         assert_eq!(decide(Some("steam:730"), &[], &enabled), Decision::Stop);
     }
 
+    /// End to end on this machine (`--ignored`): a fake game (`G2BOOST_FAKE_GAME` = path of a
+    /// sleeping exe) in a temp "install folder" → Game Mode on → plan switched + priority high (+ RAM
+    /// purged when elevated) → stop → previous plan back. Also written to %TEMP%\g2boost-live.
+    #[test]
+    #[ignore]
+    fn live_session_switches_plan_and_priority_then_restores() {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::{GetPriorityClass, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+        let mut log = String::new();
+        let Some(src) = std::env::var_os("G2BOOST_FAKE_GAME").map(PathBuf::from).filter(|p| p.is_file()) else {
+            println!("G2BOOST_FAKE_GAME not set: skipped");
+            return;
+        };
+        // SAFETY: same override every data-dir test in this crate uses.
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
+        let dir = std::env::temp_dir().join(format!("g2boost-fakegame-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let exe = dir.join("fakegame.exe");
+        std::fs::copy(&src, &exe).unwrap();
+        let mut child = std::process::Command::new(&exe).arg("120").spawn().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let game = InstalledGame {
+            id: "exe:fakegame.exe".into(),
+            name: "Fake Game".into(),
+            launcher: crate::games::Launcher::Custom,
+            install_dir: Some(dir.to_string_lossy().into_owned()),
+            main_exe: Some(exe.to_string_lossy().into_owned()),
+            size_bytes: None,
+        };
+        let procs = crate::procs::list_paths();
+        let running = crate::games::running(std::slice::from_ref(&game), &procs, None);
+        log += &format!("detected running: {running:?}\n");
+        assert_eq!(running.first().and_then(|r| r.pid), Some(child.id()), "running detection by install folder");
+        // Start from Balanced so the switch is visible; the user's own plan comes back at the end.
+        let original = active_plan();
+        const BALANCED: &str = "381b4222-f694-41f0-9685-ff5bb260df2e";
+        crate::power::set_active(BALANCED).unwrap();
+        let before = active_plan();
+        assert_eq!(before.as_deref(), Some(BALANCED));
+        let s = start(&game, Some(child.id()), &Options::default());
+        let during = active_plan();
+        let class = {
+            // SAFETY: query-only handle, closed below.
+            let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, child.id()) }.unwrap();
+            let c = unsafe { GetPriorityClass(h) };
+            let _ = unsafe { CloseHandle(h) };
+            c
+        };
+        log += &format!("before={before:?} during={during:?} applied={:?} skipped={:?} ram_freed={} priority_class=0x{class:x}\n", s.applied, s.skipped, s.ram_freed);
+        assert!(s.applied.contains(&"power_plan".to_string()), "{log}");
+        assert!(s.applied.contains(&"priority".to_string()), "{log}");
+        assert_eq!(class, 0x80, "HIGH_PRIORITY_CLASS\n{log}");
+        assert_eq!(session().map(|x| x.game_id), Some("exe:fakegame.exe".into()));
+        assert!(stop().is_some());
+        let after = active_plan();
+        log += &format!("after={after:?}\n");
+        assert_ne!(during, before, "the plan switched while playing\n{log}");
+        assert_eq!(after, before, "previous plan restored\n{log}");
+        assert!(session().is_none());
+        if let Some(o) = &original {
+            crate::power::set_active(o).unwrap(); // the user's own plan, as it was
+        }
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_dir_all(&dir);
+        let out = std::env::temp_dir().join("g2boost-live");
+        let _ = std::fs::create_dir_all(&out);
+        let _ = std::fs::write(out.join("gamemode.txt"), format!("elevated={}\n{log}OK\n", crate::system::is_elevated()));
+        println!("{log}");
+    }
+
     #[test]
     fn session_file_is_validated_and_removed_on_stop() {
         // SAFETY: same override every data-dir test in this crate uses (process-wide env var).

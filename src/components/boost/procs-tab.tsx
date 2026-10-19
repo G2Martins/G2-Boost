@@ -2,6 +2,7 @@ import { FolderOpen, Gauge, Lock, Pause, Play, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { rise } from "@/components/shell/page-header";
+import { ExeIcon } from "@/components/ui/exe-icon";
 import {
   Badge,
   Button,
@@ -154,6 +155,7 @@ export function ProcsTab({ elevated }: { elevated: boolean }) {
               className="grid grid-cols-[1fr_70px_80px_96px_76px] items-center gap-3 px-1 py-2"
             >
               <span className="flex min-w-0 items-center gap-2" title={p.path}>
+                <ExeIcon path={p.path} name={p.name} />
                 <span className="truncate text-sm font-medium">{p.name}</span>
                 {p.protected ? (
                   <Badge tone="neutral">{t(`procs.kind.${p.protected}` as I18nKey)}</Badge>

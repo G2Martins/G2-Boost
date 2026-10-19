@@ -308,6 +308,10 @@ export type AccessRecord = {
   last_start: number;
   last_stop: number;
   in_use: boolean;
+  /** Where the program is now (icon), when it still exists. */
+  icon_path: string | null;
+  /** Desktop app no longer on the PC. */
+  gone: boolean;
 };
 export type AppUsage = { id: string; last_used: number | null };
 export type BootReport = {
@@ -778,6 +782,7 @@ export const backend = {
   gameServers: (id: string) =>
     call<{ ip: string; port: number; connections: number }[]>("game_servers", { id }),
   netUsage: () => call<NetUsage>("net_usage"),
+  exeIcon: (path: string) => call<string | null>("exe_icon", { path }),
   wifiReport: (refresh = false) => call<WifiView>("wifi_report", { refresh }),
   diskHealth: () => call<DiskHealth[]>("disk_health"),
   privacyAccess: () => call<AccessRecord[]>("privacy_access"),

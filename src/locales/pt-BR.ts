@@ -1188,6 +1188,7 @@ export const ptBR = {
   "privacy.col.start": "Último uso",
   "privacy.col.stop": "Até",
   "privacy.store": "Loja",
+  "privacy.gone": "Desinstalado",
   "privacy.maybe_now": "Pode estar em uso",
   "privacy.empty": "Nenhum app usou isto ainda.",
   "privacy.note":

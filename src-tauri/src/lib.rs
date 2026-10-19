@@ -419,6 +419,45 @@ struct Routines {
     prio: Mutex<prio::Enforcer>,
 }
 
+/* ---------------- program icons by path ---------------- */
+
+/// Icons already extracted (path → PNG data URL or none). Cleared when it grows past 1000.
+#[derive(Default)]
+struct IconCache(Mutex<std::collections::HashMap<String, Option<String>>>);
+
+/// A program's icon by its .exe path (processes, network usage, privacy history). The path comes
+/// from the webview: only a local, existing `.exe` is read, never a UNC path (no network access,
+/// no credentials sent to a share); nothing is executed.
+#[tauri::command]
+async fn exe_icon(cache: State<'_, IconCache>, path: String) -> Result<Option<String>, String> {
+    let key = path.to_ascii_lowercase();
+    if let Some(hit) = cache.0.lock().unwrap().get(&key) {
+        return Ok(hit.clone());
+    }
+    let p = PathBuf::from(&path);
+    let ok = path.len() <= 520
+        && !path.starts_with("\\\\")
+        && !path.starts_with("//")
+        && p.is_absolute()
+        && key.ends_with(".exe")
+        && std::fs::metadata(&p).is_ok_and(|m| m.is_file());
+    let icon = if ok {
+        tauri::async_runtime::spawn_blocking(move || {
+            g2boost_core::icons::png_from_resource(&p, 0).map(|png| g2boost_core::icons::data_url(&png))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    } else {
+        None
+    };
+    let mut c = cache.0.lock().unwrap();
+    if c.len() > 1000 {
+        c.clear();
+    }
+    c.insert(key, icon.clone());
+    Ok(icon)
+}
+
 /* ---------------- network usage, Wi-Fi ---------------- */
 
 #[derive(serde::Serialize)]
@@ -516,10 +555,58 @@ async fn disk_health() -> Result<Vec<DiskHealthView>, String> {
     .map_err(|e| e.to_string())
 }
 
+#[derive(serde::Serialize)]
+struct AccessView {
+    #[serde(flatten)]
+    record: consent::AccessRecord,
+    /// Where the program is now (for its icon): the recorded path, or the same exe in a newer
+    /// version folder (Discord's `app-1.0.x`).
+    icon_path: Option<String>,
+    /// A desktop app whose program no longer exists anywhere near: uninstalled.
+    gone: bool,
+}
+
+/// The recorded exe, or the same file name in a sibling version folder (newest), if the recorded
+/// one is gone. Only looks one level around the recorded path; never follows links.
+fn current_exe(recorded: &str) -> Option<String> {
+    let p = std::path::Path::new(recorded);
+    if p.is_file() {
+        return Some(recorded.to_string());
+    }
+    let name = p.file_name()?;
+    let grand = p.parent()?.parent()?;
+    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    for e in std::fs::read_dir(grand).ok()?.flatten().take(200) {
+        if !e.file_type().is_ok_and(|t| t.is_dir() && !t.is_symlink()) {
+            continue;
+        }
+        let cand = e.path().join(name);
+        if let Ok(m) = std::fs::metadata(&cand)
+            && m.is_file()
+        {
+            let t = m.modified().unwrap_or(std::time::UNIX_EPOCH);
+            if best.as_ref().is_none_or(|(bt, _)| t > *bt) {
+                best = Some((t, cand));
+            }
+        }
+    }
+    best.map(|(_, p)| p.to_string_lossy().into_owned())
+}
+
 /// Which apps used the camera, microphone and location, and when (read from Windows' own log).
 #[tauri::command]
-async fn privacy_access() -> Result<Vec<consent::AccessRecord>, String> {
-    tauri::async_runtime::spawn_blocking(consent::history).await.map_err(|e| e.to_string())
+async fn privacy_access() -> Result<Vec<AccessView>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        consent::history()
+            .into_iter()
+            .map(|r| {
+                let icon_path = if r.packaged { None } else { current_exe(&r.path) };
+                AccessView { gone: !r.packaged && icon_path.is_none(), icon_path, record: r }
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[derive(serde::Serialize)]
@@ -1738,6 +1825,7 @@ pub fn run() {
         .manage(Dashboard::default())
         .manage(GamesState::default())
         .manage(DupState::default())
+        .manage(IconCache::default())
         .manage(Routines {
             settings: Mutex::new(settings::load()),
             state: Mutex::new(routines::load_state()),
@@ -1895,6 +1983,7 @@ pub fn run() {
             game_mode_stop,
             game_servers,
             net_usage,
+            exe_icon,
             wifi_report,
             disk_health,
             privacy_access,

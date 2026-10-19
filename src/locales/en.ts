@@ -1184,6 +1184,7 @@ export const en = {
   "privacy.col.start": "Last use",
   "privacy.col.stop": "Until",
   "privacy.store": "Store",
+  "privacy.gone": "Uninstalled",
   "privacy.maybe_now": "May be in use",
   "privacy.empty": "No app has used this yet.",
   "privacy.note":

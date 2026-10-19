@@ -1,6 +1,7 @@
 import { Camera, Clock, MapPin, Mic, RefreshCw, Timer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ElevateButton } from "@/components/elevate-button";
+import { ExeIcon } from "@/components/ui/exe-icon";
 import { Badge, Button, Card, CardTitle, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { type AccessRecord, type BootReport, backend, inTauri } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
@@ -100,10 +101,12 @@ export function PrivacyTab() {
                 >
                   <td className="max-w-96 py-1.5">
                     <span className="flex items-center gap-2">
+                      <ExeIcon path={r.icon_path} name={r.app} />
                       <span className="truncate font-semibold" title={r.path}>
                         {r.app}
                       </span>
                       {r.packaged ? <Badge tone="neutral">{t("privacy.store")}</Badge> : null}
+                      {r.gone ? <Badge tone="neutral">{t("privacy.gone")}</Badge> : null}
                       {recentStart(r) ? (
                         <Badge tone="warning">{t("privacy.maybe_now")}</Badge>
                       ) : null}

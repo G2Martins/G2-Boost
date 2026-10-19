@@ -1,5 +1,6 @@
 import { Activity, RefreshCw, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { ExeIcon } from "@/components/ui/exe-icon";
 import { Badge, Button, Card, CardTitle, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { backend, inTauri, type NetUsage, type WifiView } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
@@ -65,10 +66,16 @@ export function NetUsageTab() {
                   className="border-b border-border/60 last:border-0"
                 >
                   <td className="max-w-80 py-1.5">
-                    <span className="block truncate font-semibold" title={p.exe_path || p.process}>
-                      {/^pid \d+$/.test(p.process)
-                        ? t("net.usage.protected", { pid: p.process.slice(4) })
-                        : p.process}
+                    <span className="flex items-center gap-2">
+                      <ExeIcon path={p.exe_path} name={p.process} />
+                      <span
+                        className="block truncate font-semibold"
+                        title={p.exe_path || p.process}
+                      >
+                        {/^pid \d+$/.test(p.process)
+                          ? t("net.usage.protected", { pid: p.process.slice(4) })
+                          : p.process}
+                      </span>
                     </span>
                   </td>
                   <td className="num py-1.5 text-right">{p.established || "—"}</td>
