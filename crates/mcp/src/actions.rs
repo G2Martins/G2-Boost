@@ -310,6 +310,35 @@ pub fn remove_app_leftovers(id: &str) -> Value {
     }
 }
 
+/* ---------------- folders nobody owns ---------------- */
+
+fn unowned_now() -> Vec<apps::Leftover> {
+    apps::unowned(&apps::list(&settings::load().protected_apps))
+}
+
+pub fn unowned_folders() -> Value {
+    let found = unowned_now();
+    json!({
+        "folders": found.iter().map(|l| json!({ "path": g2boost_core::winevents::redact_here(&l.path), "bytes": l.bytes, "idle_days": l.idle_days, "confidence": l.confidence, "reason": l.reason, "precious": l.precious, "needs_admin": l.needs_admin })).collect::<Vec<_>>(),
+        "note": "remove_unowned_folders takes only high-confidence folders that are not the user's own data; the app's screen (Desinstalar apps › Sobras) can take the rest.",
+    })
+}
+
+/// The sweep runs again here: only folders it still offers, High and not precious, are taken.
+pub fn remove_unowned_folders(paths: Vec<String>) -> Value {
+    let wanted = |l: &apps::Leftover| paths.iter().any(|p| p.eq_ignore_ascii_case(&l.path) || p.eq_ignore_ascii_case(&g2boost_core::winevents::redact_here(&l.path)));
+    let items: Vec<apps::Leftover> = unowned_now().into_iter().filter(|l| l.confidence == apps::Confidence::High && !l.precious && wanted(l)).collect();
+    if items.is_empty() {
+        return json!({ "error": "nothing_to_remove", "note": "Only high-confidence folders from get_unowned_folders that are not the user's own data." });
+    }
+    let total: u64 = items.iter().map(|l| l.bytes).sum();
+    let details: Vec<String> = items.iter().map(|l| g2boost_core::winevents::redact_here(&l.path)).collect();
+    if !confirm((&format!("enviar {} pasta(s) sem dono para a Lixeira ({})", items.len(), gb(total)), &format!("send {} folder(s) nobody owns to the Recycle Bin ({})", items.len(), gb(total))), &details) {
+        return declined();
+    }
+    json!({ "done": true, "outcome": apps::remove_unowned(&items, apps::SWEEP_ID) })
+}
+
 /* ---------------- files ---------------- */
 
 pub fn recycle_paths(paths: Vec<String>) -> Value {

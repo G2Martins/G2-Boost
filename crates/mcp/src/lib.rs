@@ -615,6 +615,20 @@ first). Never takes the user's own data or low-confidence guesses. Native confir
         blocking(move || actions::remove_app_leftovers(&a.app_id)).await
     }
 
+    #[tool(description = "Folders nobody owns on every fixed drive (AppData, ProgramData, Program Files, game \
+folders, Steam libraries): no installed app, running program or service uses them and nothing changed in them \
+for 90+ days. With size, days untouched, confidence and whether it is the user's own data. Read-only; can take \
+a minute.")]
+    async fn get_unowned_folders(&self) -> Result<String, String> {
+        blocking(actions::unowned_folders).await
+    }
+
+    #[tool(description = "Send folders from get_unowned_folders to the Recycle Bin (undo in the app). Only \
+high-confidence folders that are not the user's own data; the sweep runs again first. Native confirmation first.")]
+    async fn remove_unowned_folders(&self, Parameters(a): Parameters<PathsArgs>) -> Result<String, String> {
+        blocking(move || actions::remove_unowned_folders(a.paths)).await
+    }
+
     #[tool(description = "Send files or folders to the Recycle Bin (restorable). The same guard as the app's \
 disk map: never Windows, Program Files, other users' profiles, drive or profile roots, links. Native \
 confirmation first, listing every path.")]

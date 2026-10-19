@@ -3,6 +3,7 @@ import {
   Database,
   File as FileIcon,
   Folder,
+  HardDrive,
   Link2,
   Lock,
   PackageX,
@@ -55,6 +56,8 @@ const KIND_ICON = {
 } as const;
 
 const CONF_TONE = { high: "success", medium: "warning", low: "neutral" } as const;
+/** The core's placeholder id for the folder-first sweep (`apps::SWEEP_ID`). */
+const SWEEP_ID = "sweep:unowned";
 
 export function AppsPage() {
   const { t } = useI18n();
@@ -473,7 +476,10 @@ function UndoButton() {
         <Button
           variant="outline"
           size="sm"
-          title={t("apps.undo.hint", { app: rec.app, n: rec.files.length + rec.keys.length })}
+          title={t("apps.undo.hint", {
+            app: rec.app === SWEEP_ID ? t("apps.unowned.title") : rec.app,
+            n: rec.files.length + rec.keys.length,
+          })}
           onClick={async () => {
             try {
               const o = await backend.appsUndo();
@@ -485,7 +491,7 @@ function UndoButton() {
           }}
         >
           <RotateCcw className="size-4" />
-          {t("apps.undo", { app: rec.app })}
+          {t("apps.undo", { app: rec.app === SWEEP_ID ? t("apps.unowned.title") : rec.app })}
         </Button>
       ) : null}
     </span>
@@ -496,7 +502,7 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
   const { t, locale } = useI18n();
   const [list, setList] = useState<OrphanApp[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [selected, setSelected] = useState<OrphanApp | null>(null);
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null);
   const [reload, setReload] = useState(0);
 
   const scan = useCallback(async () => {
@@ -526,6 +532,27 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
           {t("apps.orphans.scan")}
         </Button>
       </Card>
+      <Card className="animate-rise flex flex-wrap items-center gap-3 py-4" style={rise(1)}>
+        <HardDrive className="size-5 text-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-wide">
+            {t("apps.unowned.title")}
+            <HelpHint text={t("apps.unowned.help")} />
+          </span>
+          <span className="block text-xs text-muted-foreground">{t("apps.unowned.body")}</span>
+        </span>
+        <Button
+          variant="outline"
+          disabled={!inTauri}
+          onClick={() => {
+            setSelected({ id: SWEEP_ID, name: t("apps.unowned.title") });
+            setReload((r) => r + 1);
+          }}
+        >
+          <Search className="size-4" />
+          {t("apps.unowned.scan")}
+        </Button>
+      </Card>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,420px)_1fr]">
         <Card className="animate-rise min-w-0 py-2" style={rise(1)}>
           {busy ? [0, 1, 2].map((k) => <Skeleton key={k} className="my-2 h-12 w-full" />) : null}
@@ -544,11 +571,11 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
               <li key={o.app.id}>
                 <button
                   type="button"
-                  onClick={() => setSelected(o)}
-                  aria-pressed={selected?.app.id === o.app.id}
+                  onClick={() => setSelected({ id: o.app.id, name: o.app.name })}
+                  aria-pressed={selected?.id === o.app.id}
                   className={cn(
                     "press flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors duration-200 ease-out-expo",
-                    selected?.app.id === o.app.id ? "bg-foreground/7" : "hover:bg-foreground/4",
+                    selected?.id === o.app.id ? "bg-foreground/7" : "hover:bg-foreground/4",
                   )}
                 >
                   <span className="min-w-0 flex-1">
@@ -568,9 +595,9 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
         <div className="min-w-0">
           {selected ? (
             <LeftoversPanel
-              key={`${selected.app.id}:${reload}`}
-              appId={selected.app.id}
-              appName={selected.app.name}
+              key={`${selected.id}:${reload}`}
+              appId={selected.id}
+              appName={selected.name}
               installed={false}
               recheck={reload}
               onRemoved={() => setReload((r) => r + 1)}
@@ -757,6 +784,9 @@ function LeftoversPanel({
                     {t(`apps.conf.${x.confidence}` as I18nKey)}
                   </Badge>
                   {t(`apps.reason.${x.reason}` as I18nKey)}
+                  {x.idle_days !== undefined ? (
+                    <span>{t("apps.idle", { n: x.idle_days })}</span>
+                  ) : null}
                   {x.precious ? <Badge tone="warning">{t("apps.precious")}</Badge> : null}
                   {x.needs_admin ? (
                     <Badge tone="neutral">{t("common.admin_required")}</Badge>

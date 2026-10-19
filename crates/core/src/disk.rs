@@ -9,7 +9,7 @@ use std::collections::BinaryHeap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Instant, UNIX_EPOCH};
 
 use rayon::prelude::*;
@@ -38,6 +38,41 @@ pub struct ScanProgress {
     pub bytes: AtomicU64,
     pub errors: AtomicU64,
     pub current: Mutex<String>,
+    /// The root's direct children, growing while their subtrees are walked (live treemap).
+    pub top: Mutex<Vec<Arc<LiveItem>>>,
+}
+
+/// One direct child of the scan root, readable while the scan runs.
+pub struct LiveItem {
+    pub name: String,
+    pub is_dir: bool,
+    pub bytes: AtomicU64,
+    pub done: AtomicBool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LiveView {
+    pub name: String,
+    pub is_dir: bool,
+    pub bytes: u64,
+    pub done: bool,
+}
+
+/// The `max` largest direct children of the root so far.
+pub fn live_top(progress: &ScanProgress, max: usize) -> Vec<LiveView> {
+    let Ok(top) = progress.top.lock() else { return Vec::new() };
+    let mut v: Vec<LiveView> = top
+        .iter()
+        .map(|i| LiveView {
+            name: i.name.clone(),
+            is_dir: i.is_dir,
+            bytes: i.bytes.load(Ordering::Relaxed),
+            done: i.done.load(Ordering::Relaxed),
+        })
+        .collect();
+    v.sort_by_key(|x| std::cmp::Reverse(x.bytes));
+    v.truncate(max);
+    v
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,7 +104,7 @@ pub fn scan(root: &Path, progress: &ScanProgress, cancel: &AtomicBool) -> Result
     }
     let t0 = Instant::now();
     let name = root.to_string_lossy().trim_end_matches('\\').to_string();
-    let mut node = walk(root, name, progress, cancel);
+    let mut node = walk(root, name, progress, cancel, None, true);
     sort_tree(&mut node);
     let summary = ScanSummary {
         root: root.to_string_lossy().into_owned(),
@@ -83,7 +118,8 @@ pub fn scan(root: &Path, progress: &ScanProgress, cancel: &AtomicBool) -> Result
     Ok((node, summary))
 }
 
-fn walk(dir: &Path, name: String, progress: &ScanProgress, cancel: &AtomicBool) -> Node {
+/// `acc` is the live counter of the root child this subtree belongs to; `top` marks the root.
+fn walk(dir: &Path, name: String, progress: &ScanProgress, cancel: &AtomicBool, acc: Option<&AtomicU64>, top: bool) -> Node {
     let mut node = Node { name, size: 0, is_dir: true, files: 0, mtime: 0, children: Vec::new() };
     if cancel.load(Ordering::Relaxed) {
         return node;
@@ -124,13 +160,35 @@ fn walk(dir: &Path, name: String, progress: &ScanProgress, cancel: &AtomicBool) 
             let mtime = md.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
             progress.files.fetch_add(1, Ordering::Relaxed);
             progress.bytes.fetch_add(size, Ordering::Relaxed);
+            if let Some(a) = acc {
+                a.fetch_add(size, Ordering::Relaxed);
+            }
+            if top && let Ok(mut t) = progress.top.lock() {
+                t.push(Arc::new(LiveItem { name: fname.clone(), is_dir: false, bytes: AtomicU64::new(size), done: AtomicBool::new(true) }));
+            }
             node.children.push(Node { name: fname, size, is_dir: false, files: 1, mtime, children: Vec::new() });
         }
     }
-    let dir_nodes: Vec<Node> = subdirs
-        .into_par_iter()
-        .map(|(p, n)| walk(&p, n, progress, cancel))
-        .collect();
+    let dir_nodes: Vec<Node> = if top {
+        let live: Vec<Arc<LiveItem>> = subdirs
+            .iter()
+            .map(|(_, n)| Arc::new(LiveItem { name: n.clone(), is_dir: true, bytes: AtomicU64::new(0), done: AtomicBool::new(false) }))
+            .collect();
+        if let Ok(mut t) = progress.top.lock() {
+            t.extend(live.iter().cloned());
+        }
+        subdirs
+            .into_par_iter()
+            .zip(live)
+            .map(|((p, n), item)| {
+                let node = walk(&p, n, progress, cancel, Some(&item.bytes), false);
+                item.done.store(true, Ordering::Relaxed);
+                node
+            })
+            .collect()
+    } else {
+        subdirs.into_par_iter().map(|(p, n)| walk(&p, n, progress, cancel, acc, false)).collect()
+    };
     node.children.extend(dir_nodes);
     for c in &node.children {
         node.size += c.size;
@@ -736,6 +794,11 @@ mod tests {
         assert_eq!(top.len(), 2);
         assert!(top[0].path.ends_with("a\\deep\\two.bin"));
         assert_eq!(top[1].size, 3000);
+        // The live view of the root's children ends equal to the final tree, all done.
+        let live = live_top(&p, 10);
+        assert_eq!(live.iter().map(|i| (i.name.as_str(), i.bytes)).collect::<Vec<_>>(), vec![("a", 8000), ("b", 1000), ("root.bin", 100)]);
+        assert!(live.iter().all(|i| i.done));
+        assert_eq!(live_top(&p, 1).len(), 1);
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -169,40 +169,40 @@ export const en = {
   "boost.preset.restore_skipped": "Restore point skipped by Windows (a recent one exists).",
   "boost.tweak.show_extensions": "Show file extensions",
   "boost.tweak.show_extensions.desc":
-    "Explorer shows .exe, .jpg, .txt. Helps identify files and scams like 'photo.jpg.exe'.",
+    "File Explorer shows every file's extension (.exe, .jpg, .txt), so you can tell file types apart and spot tricks like 'photo.jpg.exe'.",
   "boost.tweak.show_extensions.warn": "you prefer clean names in Explorer.",
   "boost.tweak.widgets_off": "Turn off Widgets",
   "boost.tweak.widgets_off.desc":
-    "Removes the news and interests panel from the taskbar (it loads content in the background).",
+    "Removes the news and weather panel from the taskbar. It loads web content in the background even when closed.",
   "boost.tweak.widgets_off.warn": "you use the Widgets panel.",
   "boost.tweak.search_highlights_off": "No search highlights",
   "boost.tweak.search_highlights_off.desc":
-    "Removes cloud highlights from the Start search box and asks Windows not to mix in Bing results. Some Windows 11 builds ignore that second request.",
+    "Keeps Start search about what is on the PC: no daily highlights and no web results mixed with your files. Some Windows 11 builds still show web results.",
   "boost.tweak.search_highlights_off.warn": "you use web search from Start.",
   "boost.tweak.silent_apps_off": "No silently installed apps",
   "boost.tweak.silent_apps_off.desc":
-    "Stops Windows from installing promoted and pre-installed apps in the background.",
+    "Stops Windows from silently downloading and installing sponsored apps and games in the background.",
   "boost.tweak.silent_apps_off.warn": "you want Microsoft's suggested apps.",
   "boost.tweak.advertising_id_off": "Advertising ID off",
   "boost.tweak.advertising_id_off.desc":
-    "Apps stop using your advertising ID for personalized ads.",
+    "Apps stop receiving an identifier for you to show personalized ads.",
   "boost.tweak.advertising_id_off.warn": "you want personalized ads in apps.",
   "boost.tweak.compat_telemetry_off": "Disable compatibility telemetry",
   "boost.tweak.compat_telemetry_off.desc":
-    "Disables the Compatibility Appraiser (CompatTelRunner) and CEIP scheduled tasks, which spike CPU and disk.",
+    "Turns off the scheduled tasks that assess your PC's compatibility and send reports to Microsoft. They run at random times and cause CPU and disk spikes.",
   "boost.tweak.compat_telemetry_off.warn":
     "you take part in the Customer Experience Improvement Program.",
   "boost.tweak.svc_dps": "Disable Diagnostic Policy Service",
   "boost.tweak.svc_dps.desc":
-    "Stops DPS. Windows troubleshooters stop working. Low gain; Galdino recommends it, Microsoft warns.",
+    "Stops the service that detects problems and feeds Windows troubleshooters. Frees very little; in exchange, troubleshooters stop working.",
   "boost.tweak.svc_dps.warn": "you use the Windows troubleshooters.",
   "boost.tweak.svc_geolocation": "Disable the location service",
   "boost.tweak.svc_geolocation.desc":
-    "Stops lfsvc. Apps lose location (maps, weather). The Location switch in Settings does not change; this turns off the service beneath it. Privacy, not performance.",
+    "Stops the Windows location service. Maps, weather and other apps no longer know where you are, even with Location on in Settings. A privacy setting, not a performance one.",
   "boost.tweak.svc_geolocation.warn": "some app needs your location.",
   "boost.tweak.hvci_off": "Turn off Core Isolation (memory integrity)",
   "boost.tweak.hvci_off.desc":
-    "The only lever with measured FPS (~5 %, Tom's Hardware). Lowers protection against malicious drivers. Takes effect after reboot.",
+    "Turns off memory integrity. The only tweak here with an FPS gain measured in independent tests (about 5 % in some games), but it lowers protection against malicious drivers. Takes effect after a restart.",
   "boost.tweak.hvci_off.warn":
     "you want Windows' protection against kernel malware (Microsoft's default recommendation).",
   "settings.restore_before_preset": "Restore point before presets",
@@ -645,7 +645,7 @@ export const en = {
     "Required by Windows 11 and some anti-cheats. Enable fTPM/PTT in the BIOS.",
   "advisor.hvci_on.title": "Memory integrity (HVCI) is on",
   "advisor.hvci_on.body":
-    "Protects against malicious drivers and costs ~5% FPS in some games (Tom's Hardware). Turning it off is an option in PC Boost › Custom and trades security for performance.",
+    "Protects against malicious drivers and costs about 5 % FPS in some games, according to independent tests. Turning it off is an option in PC Boost › Custom and trades security for performance.",
   "advisor.cpu_hot.title": "CPU running hot ({temp} °C)",
   "advisor.cpu_hot.body":
     "Above ~90 °C the CPU throttles and FPS drops. Clean the dust, check the cooler and thermal paste, use the Balanced plan outside games and cap FPS at the monitor refresh rate: less heat without losing smoothness.",
@@ -704,6 +704,11 @@ export const en = {
   "disk.hint.open":
     "Double-click a folder to enter it; use the trail above to go back. Hover to see size and share.",
   "disk.progress": "{files} files · {size}",
+  "disk.live.hint":
+    "The map builds up while the disk is read. Colored border: folder still being read.",
+  "disk.eta": "about {time} left",
+  "disk.eta.seconds": "{n} s",
+  "disk.eta.minutes": "{n} min",
   "disk.summary": "{files} files · {size} · {seconds} s",
   "disk.skipped": "{count} folders without permission",
   "disk.error": "Scan failed: {error}",
@@ -977,73 +982,75 @@ export const en = {
     "Every tweak saves the previous value before changing it and restores the original when turned off, never a guessed 'default'.",
   "boost.tweak.visual_fx": "Windows visual effects",
   "boost.tweak.visual_fx.desc":
-    "The 17 items of 'Performance Options' as levels. Minimal removes only the heavy ones; Balanced is the middle ground; Maximum keeps only smooth fonts. Applies instantly, no logoff.",
+    "Tunes Windows animations, shadows and transparency in levels. Minimum removes only the heavy ones; Medium is the balance; Maximum keeps only smooth fonts. Applies at once, no sign-out.",
   "boost.tweak.visual_fx.warn":
     "you like the animations. This changes how the desktop feels, not fullscreen FPS.",
   "boost.tweak.game_mode": "Game Mode and Game DVR",
   "boost.tweak.game_mode.desc":
-    "Game Mode on; background recording (Game DVR) and Xbox Game Bar capture off.",
+    "Turns on Windows Game Mode, which prioritizes the game you are playing, and turns off the Xbox Game Bar's background recording, which uses GPU and disk.",
   "boost.tweak.game_mode.warn": "you use the Xbox Game Bar to record clips.",
   "boost.tweak.input_lag": "Reduce input lag",
   "boost.tweak.input_lag.desc":
-    "Turns off Windows fullscreen optimizations for every game (FSE), which delay frame presentation.",
+    "Turns off Windows fullscreen optimizations for all games. Many go back to true exclusive fullscreen, and frames reach the screen sooner.",
   "boost.tweak.input_lag.warn": "you rely on overlays that need optimized windowed mode.",
   "boost.tweak.windowed_optimizations": "Optimizations for windowed games",
   "boost.tweak.windowed_optimizations.desc":
-    "DirectX 10/11 games in windowed or borderless mode use the flip model: lower latency plus VRR/Auto HDR support. Same switch as Settings › Display › Graphics (Windows 11).",
+    "DirectX 10 and 11 games in windowed or borderless mode present frames the modern way: less delay plus variable refresh rate (VRR) and Auto HDR support. Same option as Settings › Display › Graphics on Windows 11.",
   "boost.tweak.windowed_optimizations.warn":
     "an old game starts flickering or stuttering in windowed mode. You can turn it off for that game alone in Settings › Display › Graphics.",
   "boost.tweak.keyboard": "Reduce keyboard input delay",
   "boost.tweak.keyboard.desc":
-    "Shorter repeat delay and faster repeat rate (SystemParametersInfo).",
+    "Shortens the wait before a held key starts repeating and speeds up the repeat. Held movement and commands respond faster.",
   "boost.tweak.keyboard.warn": "you have motor difficulties and use Filter Keys.",
   "boost.tweak.tips": "No tips and suggestions",
   "boost.tweak.tips.desc":
-    "Turns off tips, Start menu suggestions and promoted content (ContentDeliveryManager).",
+    "Turns off tips, Start suggestions and Microsoft promoted content in Settings.",
   "boost.tweak.tips.warn": "you want Microsoft's app suggestions.",
   "boost.tweak.mouse": "Mouse without acceleration",
-  "boost.tweak.mouse.desc": "Pointer precision off: mousepad movement becomes 1:1 screen movement.",
+  "boost.tweak.mouse.desc":
+    "Turns off pointer acceleration: the same distance on the mousepad always becomes the same distance on screen. Aim gets more consistent.",
   "boost.tweak.mouse.warn": "you got used to acceleration.",
   "boost.tweak.svc_sysmain": "Disable SysMain (Superfetch)",
   "boost.tweak.svc_sysmain.desc":
-    "Stops the service that preloads apps into RAM and feeds Prefetch. On an SSD its gain is ~0; stopping it removes background disk reads.",
+    "Stops the service that preloads your most used apps into memory. On an SSD its gain is close to zero and it reads the disk in the background.",
   "boost.tweak.svc_sysmain.warn":
     "Windows runs on a mechanical HDD. In that case SysMain helps launch programs.",
   "boost.tweak.svc_telemetry": "Disable telemetry",
   "boost.tweak.svc_telemetry.desc":
-    "Stops the DiagTrack and dmwappushservice services (Connected User Experiences and Telemetry).",
+    "Stops the services that collect and send usage and diagnostic data to Microsoft (Connected User Experiences and Telemetry).",
   "boost.tweak.svc_telemetry.warn": "you are in the Windows Insider Program.",
   "boost.tweak.power_plan": "Ultimate Performance power plan",
   "boost.tweak.power_plan.desc":
-    "Activates the Ultimate Performance scheme: no core parking or aggressive power saving. Turning it off returns to the previous plan.",
+    "Turns on the Ultimate Performance plan: cores always ready, no aggressive power saving. Turning it off brings back the plan you had.",
   "boost.tweak.power_plan.warn": "it is a laptop on battery.",
   "boost.tweak.hags": "Hardware-accelerated GPU scheduling",
   "boost.tweak.hags.desc":
-    "Lets the GPU manage its own video memory (HAGS). Lowers latency on recent cards.",
+    "Lets the graphics card manage its own memory without relying on the CPU. Slightly lowers latency on recent cards and is required by NVIDIA Frame Generation.",
   "boost.tweak.hags.warn": "the GPU is older than 2018 or the driver crashes.",
   "boost.tweak.mmcss": "Multimedia priority for games",
   "boost.tweak.mmcss.desc":
-    "MMCSS Games category with high CPU/GPU/IO priority and SystemResponsiveness at 10% (default 20%).",
+    "Makes the Windows multimedia scheduler prioritize games (CPU, GPU and disk) and reserve less time for background work: 10 % instead of 20 %.",
   "boost.tweak.mmcss.warn": "you record or stream while playing and the encoder drops frames.",
   "boost.tweak.network_latency": "Network latency for games",
   "boost.tweak.network_latency.desc":
-    "Immediate ACK and no Nagle on every interface (TcpAckFrequency/TCPNoDelay/TcpDelAckTicks).",
+    "Windows acknowledges every packet at once and sends small data without waiting to batch it. Can shave a few milliseconds in games that use TCP; UDP games, most of them, do not change.",
   "boost.tweak.network_latency.warn": "the connection is satellite or very lossy.",
   "boost.tweak.svc_search": "Disable Search indexing",
   "boost.tweak.svc_search.desc":
-    "Stops Windows Search (WSearch). Without it, file search in Start and Outlook gets slow or empty.",
+    "Stops Windows file indexing, which reads the disk in the background. Without it, file search in Start and Outlook gets slow or empty.",
   "boost.tweak.svc_search.warn": "you use Windows or Outlook search every day.",
   "boost.tweak.svc_xbox": "Disable Xbox services",
-  "boost.tweak.svc_xbox.desc": "Stops XblAuthManager, XblGameSave, XboxNetApiSvc and XboxGipSvc.",
+  "boost.tweak.svc_xbox.desc":
+    "Stops the Xbox sign-in, cloud save, networking and controller services. Frees resources if you do not play through the Microsoft Store or Game Pass.",
   "boost.tweak.svc_xbox.warn": "you use Game Pass, the Xbox app or Microsoft Store games.",
   "boost.tweak.priority_sep": "Foreground priority",
   "boost.tweak.priority_sep.desc":
-    "Win32PrioritySeparation = 0x26: short fixed quanta, 3:1 for the foreground window. Unproven gain.",
+    "Gives the foreground window (the game) bigger CPU time slices than background programs. The gain is small and has no reliable measurement.",
   "boost.tweak.priority_sep.warn":
     "you run an encoder, a build or a server in the background while playing.",
   "boost.tweak.perf_counters": "Disable Windows performance counters",
   "boost.tweak.perf_counters.desc":
-    "Turns off the counter collection (Perflib) that burns CPU in the background.",
+    "Turns off Windows performance counter collection, which uses a little CPU in the background. Tools that read those counters lose data.",
   "boost.tweak.perf_counters.warn":
     "you use Performance Monitor, the detailed Task Manager or the G2 Boost Dashboard monitor, which reads these same counters.",
   "boost.fx.level.appearance": "Appearance",
@@ -1272,6 +1279,15 @@ export const en = {
   "apps.orphans.help":
     "Apps G2 Boost saw installed that are gone now (uninstalled elsewhere). Looks for what they left.",
   "apps.orphans.scan": "Find leftovers",
+  "apps.unowned.title": "Folders nobody owns, on every drive",
+  "apps.unowned.body":
+    "Looks through AppData, ProgramData, Program Files, game folders on other drives and Steam libraries for what no installed app uses.",
+  "apps.unowned.help":
+    "A folder only shows up when no installed app matches it by name, publisher or install folder, no open program or service runs from it, and nothing changed in it for at least 90 days. Folders with programs inside get low confidence and are not ticked. Everything goes to the Recycle Bin and can be undone.",
+  "apps.unowned.scan": "Search every drive",
+  "apps.idle": "untouched for {n} days",
+  "apps.reason.unowned": "No installed app uses this folder",
+  "apps.reason.steam_orphan": "Steam game uninstalled, files stayed",
   "apps.orphans.none": "No leftovers from removed apps.",
   "apps.orphans.start": "Click Find leftovers.",
   "apps.orphans.items": "{n} items",

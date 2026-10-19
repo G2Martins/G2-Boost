@@ -167,39 +167,39 @@ export const ptBR = {
     "Ponto de restauração pulado pelo Windows (já existe um recente).",
   "boost.tweak.show_extensions": "Mostrar extensões dos arquivos",
   "boost.tweak.show_extensions.desc":
-    "O Explorer exibe .exe, .jpg, .txt. Ajuda a identificar arquivos e golpes como 'foto.jpg.exe'.",
+    "O Explorer passa a mostrar a extensão de cada arquivo (.exe, .jpg, .txt). Fica fácil saber o tipo de cada um e perceber golpes como 'foto.jpg.exe'.",
   "boost.tweak.show_extensions.warn": "você prefere nomes limpos no Explorer.",
   "boost.tweak.widgets_off": "Desligar os Widgets",
   "boost.tweak.widgets_off.desc":
-    "Remove o painel de notícias e interesses da barra de tarefas (carrega conteúdo em segundo plano).",
+    "Tira o painel de notícias e clima da barra de tarefas. Ele carrega conteúdo da internet em segundo plano, mesmo fechado.",
   "boost.tweak.widgets_off.warn": "você usa o painel de Widgets.",
   "boost.tweak.search_highlights_off": "Sem destaques na pesquisa",
   "boost.tweak.search_highlights_off.desc":
-    "Tira os destaques da nuvem da caixa de pesquisa do Iniciar e pede ao Windows para não misturar resultados do Bing. Algumas versões do Windows 11 ignoram esse segundo pedido.",
+    "Deixa a pesquisa do Iniciar só com o que está no PC: sem destaques do dia e sem resultados da web misturados aos seus arquivos. Algumas versões do Windows 11 ainda mostram a web.",
   "boost.tweak.search_highlights_off.warn": "você usa a busca na web pelo Iniciar.",
   "boost.tweak.silent_apps_off": "Sem apps instalados sozinhos",
   "boost.tweak.silent_apps_off.desc":
-    "Impede que o Windows instale apps promovidos e pré-instalados em segundo plano.",
+    "Impede o Windows de baixar e instalar sozinho apps e jogos patrocinados em segundo plano.",
   "boost.tweak.silent_apps_off.warn": "você quer os apps sugeridos pela Microsoft.",
   "boost.tweak.advertising_id_off": "ID de publicidade desligado",
   "boost.tweak.advertising_id_off.desc":
-    "Apps deixam de usar seu ID de publicidade para anúncios personalizados.",
+    "Os apps deixam de receber um identificador seu para mostrar anúncios personalizados.",
   "boost.tweak.advertising_id_off.warn": "você quer anúncios personalizados nos apps.",
   "boost.tweak.compat_telemetry_off": "Desligar telemetria de compatibilidade",
   "boost.tweak.compat_telemetry_off.desc":
-    "Desativa as tarefas agendadas do Compatibility Appraiser (CompatTelRunner) e do CEIP, que dão picos de CPU e disco.",
+    "Desliga as tarefas agendadas que avaliam a compatibilidade do PC e enviam relatórios à Microsoft. Elas rodam em horários aleatórios e causam picos de CPU e disco.",
   "boost.tweak.compat_telemetry_off.warn": "você participa do Programa de Melhoria da Experiência.",
   "boost.tweak.svc_dps": "Desligar Serviço de Política de Diagnóstico",
   "boost.tweak.svc_dps.desc":
-    "Para o DPS. Os solucionadores de problemas do Windows deixam de funcionar. Ganho baixo; o Galdino recomenda, a Microsoft avisa.",
+    "Para o serviço que detecta problemas e alimenta os solucionadores do Windows. Libera pouco; em troca, os solucionadores de problemas param de funcionar.",
   "boost.tweak.svc_dps.warn": "você usa os solucionadores de problemas do Windows.",
   "boost.tweak.svc_geolocation": "Desligar o serviço de localização",
   "boost.tweak.svc_geolocation.desc":
-    "Para o serviço lfsvc. Apps perdem localização (mapas, clima). A chave Localização em Configurações não muda; este ajuste desliga o serviço por baixo dela. Privacidade, não desempenho.",
+    "Para o serviço de localização do Windows. Mapas, clima e outros apps deixam de saber onde você está, mesmo com Localização ligada em Configurações. É ajuste de privacidade, não de desempenho.",
   "boost.tweak.svc_geolocation.warn": "algum app precisa da sua localização.",
   "boost.tweak.hvci_off": "Desligar Isolamento de Núcleo (integridade de memória)",
   "boost.tweak.hvci_off.desc":
-    "Única alavanca com FPS medido (~5 %, Tom's Hardware). Reduz a proteção contra drivers maliciosos. Vale após reiniciar.",
+    "Desliga a integridade de memória. É o único ajuste desta lista com ganho de FPS medido em testes independentes (cerca de 5 % em alguns jogos), mas reduz a proteção contra drivers maliciosos. Vale depois de reiniciar.",
   "boost.tweak.hvci_off.warn":
     "você quer manter a proteção do Windows contra malware de kernel (recomendação padrão da Microsoft).",
   "settings.restore_before_preset": "Ponto de restauração antes de preset",
@@ -646,7 +646,7 @@ export const ptBR = {
     "Exigido pelo Windows 11 e por alguns anti-cheats. Ative o fTPM/PTT na BIOS.",
   "advisor.hvci_on.title": "Integridade de memória (HVCI) ligada",
   "advisor.hvci_on.body":
-    "Protege contra drivers maliciosos e custa ~5% de FPS em alguns jogos (Tom's Hardware). Desligar é opção no PC Boost › Personalizado e troca segurança por desempenho.",
+    "Protege contra drivers maliciosos e custa cerca de 5 % de FPS em alguns jogos, segundo testes independentes. Desligar é opção no PC Boost › Personalizado e troca segurança por desempenho.",
   "advisor.cpu_hot.title": "Processador quente ({temp} °C)",
   "advisor.cpu_hot.body":
     "Acima de ~90 °C o processador reduz o clock (throttling) e o FPS cai. Limpe a poeira, confira o cooler e a pasta térmica, use o plano Equilibrado fora dos jogos e limite o FPS ao refresh do monitor: menos calor sem perder fluidez.",
@@ -704,6 +704,11 @@ export const ptBR = {
   "disk.hint.open":
     "Duplo clique numa pasta para entrar; use a trilha acima para voltar. Passe o mouse para ver tamanho e participação.",
   "disk.progress": "{files} arquivos · {size}",
+  "disk.live.hint":
+    "O mapa vai se montando enquanto o disco é lido. Borda colorida: pasta ainda sendo lida.",
+  "disk.eta": "faltam cerca de {time}",
+  "disk.eta.seconds": "{n} s",
+  "disk.eta.minutes": "{n} min",
   "disk.summary": "{files} arquivos · {size} · {seconds} s",
   "disk.skipped": "{count} pastas sem permissão",
   "disk.error": "Falha na varredura: {error}",
@@ -976,74 +981,75 @@ export const ptBR = {
     "Cada ajuste salva o valor anterior antes de mudar e volta ao original ao desligar, nunca a um 'padrão' chutado.",
   "boost.tweak.visual_fx": "Efeitos visuais do Windows",
   "boost.tweak.visual_fx.desc":
-    "Os 17 itens de 'Opções de Desempenho' em níveis. Mínima tira só o pesado; Média é a configuração equilibrada; Máxima deixa só as fontes suavizadas. Aplica na hora, sem logoff.",
+    "Ajusta animações, sombras e transparências do Windows em níveis. Mínima tira só o que pesa; Média é o equilíbrio; Máxima deixa só as fontes suavizadas. Aplica na hora, sem sair da conta.",
   "boost.tweak.visual_fx.warn":
     "você gosta das animações. Isso muda a sensação do desktop, não o FPS em tela cheia.",
   "boost.tweak.game_mode": "Modo de jogo e Game DVR",
   "boost.tweak.game_mode.desc":
-    "Game Mode ligado; gravação em segundo plano (Game DVR) e captura da Xbox Game Bar desligadas.",
+    "Liga o Modo de Jogo do Windows, que dá prioridade ao jogo aberto, e desliga a gravação automática em segundo plano da Xbox Game Bar, que gasta GPU e disco.",
   "boost.tweak.game_mode.warn": "você usa a Xbox Game Bar para gravar clipes.",
   "boost.tweak.input_lag": "Reduzir input lag",
   "boost.tweak.input_lag.desc":
-    "Desliga as otimizações de tela cheia do Windows para todos os jogos (FSE), que atrasam a exibição do quadro.",
+    "Desliga as otimizações de tela cheia do Windows em todos os jogos. Muitos voltam a usar a tela cheia exclusiva, e o quadro chega mais rápido à tela.",
   "boost.tweak.input_lag.warn": "você depende de overlays que exigem o modo janela otimizado.",
   "boost.tweak.windowed_optimizations": "Otimizações para jogos em janela",
   "boost.tweak.windowed_optimizations.desc":
-    "Jogos DirectX 10/11 em janela ou sem borda passam a usar o modelo flip: menos latência e suporte a VRR/Auto HDR. A mesma opção de Configurações › Tela › Gráficos (Windows 11).",
+    "Jogos DirectX 10 e 11 em janela ou sem borda passam a exibir quadros do jeito moderno: menos atraso e suporte a taxa variável (VRR) e Auto HDR. É a mesma opção de Configurações › Tela › Gráficos no Windows 11.",
   "boost.tweak.windowed_optimizations.warn":
     "algum jogo antigo passou a piscar ou travar em janela. Dá para desligar só para ele em Configurações › Tela › Gráficos.",
   "boost.tweak.keyboard": "Reduzir tempo de entrada do teclado",
   "boost.tweak.keyboard.desc":
-    "Menor atraso e maior taxa de repetição de teclas (SystemParametersInfo).",
+    "Diminui a espera antes de uma tecla segurada começar a repetir e acelera a repetição. Movimentos e comandos segurados respondem mais rápido.",
   "boost.tweak.keyboard.warn": "você tem dificuldade motora e usa as teclas de filtro.",
   "boost.tweak.tips": "Sem dicas e sugestões",
   "boost.tweak.tips.desc":
-    "Desliga dicas, sugestões no Iniciar e conteúdo promovido (ContentDeliveryManager).",
+    "Desliga dicas, sugestões no Iniciar e conteúdo promovido pela Microsoft nas Configurações.",
   "boost.tweak.tips.warn": "você quer as sugestões de apps da Microsoft.",
   "boost.tweak.mouse": "Mouse sem aceleração",
   "boost.tweak.mouse.desc":
-    "Precisão do ponteiro desligada: o movimento no mousepad vira movimento 1:1 na tela.",
+    "Desliga a aceleração do ponteiro: a mesma distância no mousepad vira sempre a mesma distância na tela. A mira fica mais consistente.",
   "boost.tweak.mouse.warn": "você se acostumou com a aceleração.",
   "boost.tweak.svc_sysmain": "Desligar SysMain (Superfetch)",
   "boost.tweak.svc_sysmain.desc":
-    "Para o serviço que pré-carrega apps na RAM e alimenta o Prefetch. Em SSD o ganho dele é ~0; parar tira leitura de disco em segundo plano.",
+    "Para o serviço que pré-carrega na memória os apps que você mais usa. Em SSD o ganho dele é quase zero e ele lê o disco em segundo plano.",
   "boost.tweak.svc_sysmain.warn":
     "o Windows está num HD mecânico. Nesse caso o SysMain ajuda a abrir programas.",
   "boost.tweak.svc_telemetry": "Desligar telemetria",
   "boost.tweak.svc_telemetry.desc":
-    "Para os serviços DiagTrack e dmwappushservice (Experiências do Usuário Conectado e Telemetria).",
+    "Para os serviços que coletam e enviam dados de uso e diagnóstico à Microsoft (Experiências do Usuário Conectado e Telemetria).",
   "boost.tweak.svc_telemetry.warn": "você participa do Programa Windows Insider.",
   "boost.tweak.power_plan": "Plano de energia Desempenho máximo",
   "boost.tweak.power_plan.desc":
-    "Ativa o esquema Desempenho máximo (Ultimate Performance): sem estacionamento de núcleos nem economia agressiva. Ao desligar, volta ao plano anterior.",
+    "Ativa o plano Desempenho máximo: núcleos sempre prontos, sem economia agressiva de energia. Ao desligar, volta o plano que você usava.",
   "boost.tweak.power_plan.warn": "é um notebook na bateria.",
   "boost.tweak.hags": "Agendamento de GPU acelerado por hardware",
   "boost.tweak.hags.desc":
-    "Deixa a GPU gerenciar a própria memória de vídeo (HAGS). Reduz latência em placas recentes.",
+    "Deixa a placa de vídeo organizar a própria memória, sem depender do processador. Reduz um pouco o atraso em placas recentes e é exigido pelo Frame Generation da NVIDIA.",
   "boost.tweak.hags.warn": "a GPU é anterior a 2018 ou o driver apresenta travamentos.",
   "boost.tweak.mmcss": "Prioridade multimídia para jogos",
   "boost.tweak.mmcss.desc":
-    "Categoria Jogos do MMCSS com prioridade alta de CPU/GPU/E/S e SystemResponsiveness em 10 % (padrão 20 %).",
+    "Faz o agendador multimídia do Windows priorizar jogos (processador, placa de vídeo e disco) e reservar menos tempo para tarefas de fundo: 10 % em vez de 20 %.",
   "boost.tweak.mmcss.warn": "você grava ou faz streaming enquanto joga e o encoder perde quadros.",
   "boost.tweak.network_latency": "Latência de rede para jogos",
   "boost.tweak.network_latency.desc":
-    "ACK imediato e sem algoritmo de Nagle em todas as interfaces (TcpAckFrequency/TCPNoDelay/TcpDelAckTicks).",
+    "O Windows passa a confirmar cada pacote na hora e a enviar dados pequenos sem esperar juntar mais. Pode tirar alguns milissegundos em jogos que usam TCP; jogos em UDP, a maioria, não mudam.",
   "boost.tweak.network_latency.warn": "a conexão é por satélite ou com muita perda de pacotes.",
   "boost.tweak.svc_search": "Desligar indexação da Pesquisa",
   "boost.tweak.svc_search.desc":
-    "Para o Windows Search (WSearch). Sem ele, a busca de arquivos no Iniciar e no Outlook fica lenta ou vazia.",
+    "Para a indexação de arquivos do Windows, que lê o disco em segundo plano. Sem ela, a busca de arquivos no Iniciar e no Outlook fica lenta ou vazia.",
   "boost.tweak.svc_search.warn": "você usa a busca do Windows ou do Outlook todo dia.",
   "boost.tweak.svc_xbox": "Desligar serviços Xbox",
-  "boost.tweak.svc_xbox.desc": "Para XblAuthManager, XblGameSave, XboxNetApiSvc e XboxGipSvc.",
+  "boost.tweak.svc_xbox.desc":
+    "Para os serviços de login, salvamento na nuvem, rede e controle do Xbox. Libera recursos se você não joga pela Microsoft Store nem pelo Game Pass.",
   "boost.tweak.svc_xbox.warn": "você usa Game Pass, o app Xbox ou jogos da Microsoft Store.",
   "boost.tweak.priority_sep": "Prioridade de primeiro plano",
   "boost.tweak.priority_sep.desc":
-    "Win32PrioritySeparation = 0x26: fatias curtas e fixas, 3:1 para a janela em primeiro plano. Ganho não comprovado.",
+    "Dá à janela em primeiro plano (o jogo) fatias de tempo do processador maiores que as dos programas de fundo. O ganho é pequeno e não tem medição confiável.",
   "boost.tweak.priority_sep.warn":
     "você roda encoder, compilação ou servidor em segundo plano enquanto joga.",
   "boost.tweak.perf_counters": "Desligar contadores de desempenho do Windows",
   "boost.tweak.perf_counters.desc":
-    "Desativa a coleta de contadores (Perflib) que consome CPU em segundo plano.",
+    "Desliga a coleta de contadores de desempenho do Windows, que gasta um pouco de processador em segundo plano. Ferramentas que leem esses contadores perdem dados.",
   "boost.tweak.perf_counters.warn":
     "você usa Monitor de Desempenho, Gerenciador de Tarefas detalhado ou o monitor do Painel do G2 Boost, que lê esses mesmos contadores.",
   "boost.fx.level.appearance": "Aparência",
@@ -1273,6 +1279,15 @@ export const ptBR = {
   "apps.orphans.help":
     "Apps que o G2 Boost viu instalados e que já não estão mais (desinstalados por fora). Procura o que eles deixaram.",
   "apps.orphans.scan": "Procurar sobras",
+  "apps.unowned.title": "Pastas sem dono em todos os discos",
+  "apps.unowned.body":
+    "Procura em AppData, ProgramData, Program Files, pastas de jogos dos outros discos e bibliotecas da Steam o que nenhum app instalado usa.",
+  "apps.unowned.help":
+    "Uma pasta só aparece se nenhum app instalado casa com ela pelo nome, fabricante ou pasta de instalação, nenhum programa aberto ou serviço roda dali, e nada mudou nela há pelo menos 90 dias. Pastas com programas dentro ficam com confiança baixa e não vêm marcadas. Tudo vai para a Lixeira e dá para desfazer.",
+  "apps.unowned.scan": "Procurar em todos os discos",
+  "apps.idle": "parada há {n} dias",
+  "apps.reason.unowned": "Nenhum app instalado usa esta pasta",
+  "apps.reason.steam_orphan": "Jogo da Steam desinstalado, arquivos ficaram",
   "apps.orphans.none": "Nenhuma sobra de app removido.",
   "apps.orphans.start": "Clique em Procurar sobras.",
   "apps.orphans.items": "{n} itens",

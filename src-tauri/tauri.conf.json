@@ -31,7 +31,7 @@
     "targets": [
       "nsis"
     ],
-    "publisher": "Grovic Data",
+    "publisher": "Gustavo Martins Gripaldi",
     "shortDescription": "G2 Boost",
     "longDescription": "Hardware diagnostics, Windows cleanup, disk analyzer, network tools and reversible game-performance tweaks.",
     "icon": [
@@ -51,7 +51,7 @@
         "installMode": "currentUser"
       }
     },
-    "copyright": "© 2026 Grovic Data. Todos os direitos reservados.",
+    "copyright": "© 2026 Gustavo Martins Gripaldi. Todos os direitos reservados.",
     "category": "Utility"
   }
 }

@@ -3,7 +3,7 @@
 ## Reportar uma vulnerabilidade
 
 Não abra issue pública. Use **Security › Report a vulnerability** (relato privado) no repositório
-do GitHub ou fale diretamente com a Grovic Data. Inclua versão, passos para reproduzir e impacto.
+do GitHub ou fale diretamente com o autor, Gustavo Martins Gripaldi. Inclua versão, passos para reproduzir e impacto.
 Resposta inicial em até 5 dias úteis; correções de severidade alta saem em release próprio.
 
 Versões suportadas: a última release publicada.

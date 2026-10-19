@@ -685,6 +685,23 @@ struct ScanProgressEvent {
     bytes: u64,
     errors: u64,
     current: String,
+    /// Used bytes of the volume when the root is a whole drive (0 = unknown): the percentage base.
+    expected: u64,
+    /// The root's direct children so far (live treemap).
+    top: Vec<disk::LiveView>,
+}
+
+/// Used bytes of the drive when `root` is a drive root like `C:\` (a folder has no known total).
+fn drive_used(root: &std::path::Path) -> u64 {
+    let r = root.to_string_lossy();
+    let r = r.trim_end_matches('\\');
+    if r.len() != 2 || !r.ends_with(':') {
+        return 0;
+    }
+    system::list_drives()
+        .into_iter()
+        .find(|d| d.letter.eq_ignore_ascii_case(r))
+        .map_or(0, |d| d.total_bytes.saturating_sub(d.free_bytes))
 }
 
 #[tauri::command]
@@ -696,6 +713,7 @@ fn disk_scan_start(app: AppHandle, state: State<'_, DiskState>, root: String) ->
     state.cancel.store(false, Ordering::SeqCst);
     let cancel = state.cancel.clone();
     std::thread::spawn(move || {
+        let expected = drive_used(&root);
         let progress = Arc::new(ScanProgress::default());
         let reporter = {
             let progress = progress.clone();
@@ -711,6 +729,8 @@ fn disk_scan_start(app: AppHandle, state: State<'_, DiskState>, root: String) ->
                         bytes: progress.bytes.load(Ordering::Relaxed),
                         errors: progress.errors.load(Ordering::Relaxed),
                         current: progress.current.lock().map(|c| c.clone()).unwrap_or_default(),
+                        expected,
+                        top: disk::live_top(&progress, 60),
                     };
                     let _ = app.emit("disk:progress", ev);
                 }
@@ -1079,7 +1099,22 @@ async fn apps_orphans(state: State<'_, AppsState>) -> Result<Vec<OrphanView>, St
 
 /// Leftovers of one app; kept server-side until the user confirms (or picks another app).
 #[tauri::command]
-async fn apps_leftovers(state: State<'_, AppsState>, id: String) -> Result<Vec<apps::Leftover>, String> {
+async fn apps_leftovers(state: State<'_, AppsState>, r: State<'_, Routines>, id: String) -> Result<Vec<apps::Leftover>, String> {
+    if id == apps::SWEEP_ID {
+        // Folder-first sweep on every fixed drive, against the installed list (loaded if needed).
+        let mut installed = state.apps.lock().unwrap().clone();
+        let protected = r.settings.lock().unwrap().protected_apps.clone();
+        let items = tauri::async_runtime::spawn_blocking(move || {
+            if installed.is_empty() {
+                installed = apps::list(&protected);
+            }
+            apps::unowned(&installed)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        *state.pending.lock().unwrap() = Some(apps::Pending { app: apps::sweep_app(), items: items.clone() });
+        return Ok(items);
+    }
     let app = state.find(&id).ok_or("unknown_app")?;
     let probe = app.clone();
     let items = tauri::async_runtime::spawn_blocking(move || apps::leftovers(&probe)).await.map_err(|e| e.to_string())?;
@@ -1115,6 +1150,9 @@ async fn apps_remove(state: State<'_, AppsState>, tokens: State<'_, TokenStore>,
         (p.app.clone(), apps::pick(p, &ids))
     };
     let out = tauri::async_runtime::spawn_blocking(move || {
+        if app.id == apps::SWEEP_ID {
+            return Ok(apps::remove_unowned(&items, apps::SWEEP_ID));
+        }
         let out = apps::remove(&app, &items)?;
         if apps::leftovers(&app).is_empty() {
             apps::forget(&app.id); // nothing left: drop it from the orphan sweep

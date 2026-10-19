@@ -148,6 +148,10 @@ export type ScanProgressEvent = {
   bytes: number;
   errors: number;
   current: string;
+  /** Used bytes of the drive when scanning a whole drive (0 = unknown): the percentage base. */
+  expected: number;
+  /** The root's direct children so far, largest first (live treemap). */
+  top: { name: string; is_dir: boolean; bytes: number; done: boolean }[];
 };
 
 export type TweakStatus = "on" | "off" | "partial" | "unavailable";
@@ -503,8 +507,13 @@ export type Leftover = {
     | "name_match"
     | "publisher_folder"
     | "crash_dump"
-    | "service_binary_gone";
+    | "service_binary_gone"
+    | "companion"
+    | "unowned"
+    | "steam_orphan";
   needs_admin: boolean;
+  /** Days since anything inside changed (folder-first sweep). */
+  idle_days?: number;
   /** Saves, profiles, vaults: never preselected, extra warning. */
   precious: boolean;
 };

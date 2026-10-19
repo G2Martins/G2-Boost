@@ -6,7 +6,7 @@ exclude = ["tools/vswhom-sys-stub"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-authors = ["Grovic Data"]
+authors = ["Gustavo Martins Gripaldi"]
 license = "UNLICENSED"
 publish = false
 

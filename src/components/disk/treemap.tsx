@@ -39,10 +39,13 @@ export function Treemap({
   root,
   onOpen,
   locale,
+  pending,
 }: {
   root: NodeView;
   onOpen: (node: NodeView) => void;
   locale: string;
+  /** Names of top-level folders still being read (live map while scanning). */
+  pending?: Set<string>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -96,6 +99,7 @@ export function Treemap({
       border: token("--border"),
       text: token("--foreground"),
       muted: token("--muted-foreground"),
+      primary: token("--primary"),
       cls: Object.fromEntries(
         ["video", "audio", "image", "archive", "code", "binary", "document", "other"].map((c) => [
           c,
@@ -114,10 +118,11 @@ export function Treemap({
           ? colors.dir1
           : colors.dir2
         : (colors.cls[classOf(r.node.name)] ?? "#444");
-      if (!isDir && r.depth === 2) ctx.globalAlpha = 0.85;
+      const reading = r.depth === 1 && pending?.has(r.node.name);
+      if ((!isDir && r.depth === 2) || reading) ctx.globalAlpha = reading ? 0.55 : 0.85;
       ctx.fillRect(r.x0, r.y0, w, hgt);
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = colors.border;
+      ctx.strokeStyle = reading ? colors.primary : colors.border;
       ctx.lineWidth = 1;
       ctx.strokeRect(r.x0 + 0.5, r.y0 + 0.5, w - 1, hgt - 1);
       if (w > 48 && hgt > 14) {
@@ -130,12 +135,16 @@ export function Treemap({
         ctx.fillText(label, r.x0 + 5, r.y0 + 11);
         if (hgt > 30 && w > 70) {
           ctx.fillStyle = colors.muted;
-          ctx.fillText(formatBytes(r.node.size, locale, 1), r.x0 + 5, r.y0 + 24);
+          ctx.fillText(
+            `${formatBytes(r.node.size, locale, 1)}${reading ? " …" : ""}`,
+            r.x0 + 5,
+            r.y0 + 24,
+          );
         }
         ctx.restore();
       }
     }
-  }, [rects, size, locale]);
+  }, [rects, size, locale, pending]);
 
   const hit = (x: number, y: number): Rect | null => {
     // deepest rect containing the point wins

@@ -61,6 +61,36 @@ export function DiskPage() {
   const errorText = useErrorText();
   const scanning = progress !== null;
   const started = useRef(false);
+  const startedAt = useRef(0);
+
+  // While scanning: the root's direct children growing, as a one-level treemap.
+  const live = useMemo(() => {
+    const items = (progress?.top ?? []).filter((i) => i.bytes > 0);
+    if (items.length === 0) return null;
+    const children: NodeView[] = items.map((i, k) => ({
+      name: i.name,
+      size: i.bytes,
+      is_dir: i.is_dir,
+      files: 0,
+      mtime: 0,
+      ids: [k],
+      children: [],
+      others_size: 0,
+      others_count: 0,
+    }));
+    const root: NodeView = {
+      name: "",
+      size: children.reduce((a, c) => a + c.size, 0),
+      is_dir: true,
+      files: 0,
+      mtime: 0,
+      ids: [],
+      children,
+      others_size: 0,
+      others_count: 0,
+    };
+    return { root, pending: new Set(items.filter((i) => !i.done).map((i) => i.name)) };
+  }, [progress]);
 
   const loadRoot = useCallback(async () => {
     const v = await backend.diskTree([], 2, 80);
@@ -76,7 +106,8 @@ export function DiskPage() {
     setView(null);
     setFolderPick(null);
     setFolderMsg(null);
-    setProgress({ files: 0, dirs: 0, bytes: 0, errors: 0, current: root });
+    startedAt.current = Date.now();
+    setProgress({ files: 0, dirs: 0, bytes: 0, errors: 0, current: root, expected: 0, top: [] });
     try {
       await backend.diskScanStart(root.endsWith("\\") ? root : `${root}\\`);
     } catch (e) {
@@ -204,6 +235,7 @@ export function DiskPage() {
                 current={current}
                 progress={progress}
                 summary={summary}
+                startedAt={startedAt.current}
               />
               <LuliCard
                 style={rise(1)}
@@ -319,6 +351,19 @@ export function DiskPage() {
                     <Treemap root={view} onOpen={open} locale={locale} />
                     <p className="mt-2 text-[11px] text-muted-foreground">{t("disk.hint.open")}</p>
                   </>
+                ) : live ? (
+                  <>
+                    <Treemap
+                      root={live.root}
+                      pending={live.pending}
+                      onOpen={() => undefined}
+                      locale={locale}
+                    />
+                    <p className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="size-2.5 rounded-sm border border-primary" aria-hidden />
+                      {t("disk.live.hint")}
+                    </p>
+                  </>
                 ) : (
                   <EmptyState
                     icon={
@@ -362,6 +407,7 @@ function DriveBar({
   current,
   progress,
   summary,
+  startedAt,
 }: {
   drives: DriveInfo[];
   selected: string;
@@ -369,8 +415,16 @@ function DriveBar({
   current?: DriveInfo;
   progress: ScanProgressEvent | null;
   summary: ScanSummary | null;
+  startedAt: number;
 }) {
   const { t, locale } = useI18n();
+  // Bytes read over the drive's used space. Capped at 99 % until done: shadow copies and
+  // protected folders are counted in "used" but cannot be read.
+  const ratio =
+    progress && progress.expected > 0 ? Math.min(0.99, progress.bytes / progress.expected) : null;
+  const elapsed = (Date.now() - startedAt) / 1000;
+  const eta =
+    ratio !== null && ratio > 0.05 && elapsed > 3 ? (elapsed * (1 - ratio)) / ratio : null;
   const list = drives.length
     ? drives
     : [{ letter: "C:", kind: "fixed", total_bytes: 0, free_bytes: 0 } as DriveInfo];
@@ -405,15 +459,49 @@ function DriveBar({
       </div>
       <span className="ml-auto text-right text-xs text-muted-foreground">
         {progress ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="size-3.5 animate-spin text-primary" />
-            <span className="num">
-              {t("disk.progress", {
-                files: progress.files.toLocaleString(locale),
-                size: formatBytes(progress.bytes, locale, 1),
-              })}
+          <span className="flex flex-col items-end gap-1.5">
+            <span className="flex items-center gap-2">
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+              {ratio !== null ? (
+                <span className="num font-display text-base font-semibold text-foreground">
+                  {Math.floor(ratio * 100)}%
+                </span>
+              ) : null}
+              <span className="num">
+                {t("disk.progress", {
+                  files: progress.files.toLocaleString(locale),
+                  size: formatBytes(progress.bytes, locale, 1),
+                })}
+              </span>
+              {eta !== null ? (
+                <span className="num">
+                  ·{" "}
+                  {t("disk.eta", {
+                    time:
+                      eta < 60
+                        ? t("disk.eta.seconds", { n: Math.max(1, Math.round(eta)) })
+                        : t("disk.eta.minutes", { n: Math.round(eta / 60) }),
+                  })}
+                </span>
+              ) : null}
             </span>
-            <span className="max-w-80 truncate">{progress.current}</span>
+            <span
+              className="relative block h-1.5 w-72 overflow-hidden rounded-full bg-border"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={ratio !== null ? Math.floor(ratio * 100) : undefined}
+            >
+              {ratio !== null ? (
+                <span
+                  className="block h-full rounded-full bg-primary transition-[width] duration-300"
+                  style={{ width: `${ratio * 100}%` }}
+                />
+              ) : (
+                <span className="absolute inset-y-0 w-1/3 animate-sweep rounded-full bg-primary/70" />
+              )}
+            </span>
+            <span className="max-w-80 truncate text-[11px]">{progress.current}</span>
           </span>
         ) : summary ? (
           <span className="num">

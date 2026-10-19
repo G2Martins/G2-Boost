@@ -64,6 +64,27 @@ pub(crate) fn parse_manifest(text: &str, library: &str) -> Option<Game> {
     Some(Game { appid, name, size_bytes: get("SizeOnDisk").and_then(|s| s.parse().ok()).unwrap_or(0), library: library.to_string() })
 }
 
+/// Each library's `steamapps\common` with the folder names its manifests claim (`installdir`).
+pub fn library_folders() -> Vec<(PathBuf, Vec<String>)> {
+    let Some(root) = steam_root() else {
+        return Vec::new();
+    };
+    libraries(&root)
+        .into_iter()
+        .filter_map(|lib| {
+            let rd = std::fs::read_dir(lib.join("steamapps")).ok()?;
+            let dirs = rd
+                .flatten()
+                .filter(|e| e.file_name().to_string_lossy().starts_with("appmanifest_"))
+                .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+                .filter_map(|t| vdf_pairs(&t).into_iter().find(|(k, _)| k.eq_ignore_ascii_case("installdir")).map(|(_, v)| v))
+                .collect();
+            let common = lib.join(r"steamapps\common");
+            common.is_dir().then_some((common, dirs))
+        })
+        .collect()
+}
+
 pub fn installed() -> Vec<Game> {
     let Some(root) = steam_root() else {
         return Vec::new();

@@ -629,6 +629,11 @@ pub enum Reason {
     /// Folder of a separate product the app's installer added (`Parsec Virtual Display Driver`)
     /// that is no longer installed: High when only its uninstaller is left.
     Companion,
+    /// Folder-first sweep: no installed app, process or service owns it and nothing changed in it
+    /// for months.
+    Unowned,
+    /// A Steam library game folder with no manifest: the game was uninstalled, files stayed.
+    SteamOrphan,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -651,6 +656,12 @@ pub struct Leftover {
     /// Saves, browser/app profiles, vaults, backups: the user's own data (never preselected,
     /// extra warning before removal — AppCleaner's "you are about to remove your user data").
     pub precious: bool,
+    /// Days since anything inside changed (folder-first sweep only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub idle_days: Option<u32>,
+    /// Found where apps install (Program Files, another drive): re-checked the same way on removal.
+    #[serde(skip)]
+    install_dir: bool,
     #[serde(skip)]
     target: Target,
 }
@@ -788,6 +799,8 @@ fn install_dir_ok(l: &str, ctx: &Ctx) -> bool {
         || programs.clone().any(|b| below(&b))
         // Another drive: at least two levels deep (D:\Games\X, never D:\ or D:\Games).
         || (!l.starts_with(&lower(&ctx.windows)[..2]) && l.matches('\\').count() >= 2)
+        // A game folder inside a Steam library, wherever the library is (never `common` itself).
+        || l.split_once(r"\steamapps\common\").is_some_and(|(_, game)| !game.is_empty())
 }
 
 /// Final gate for any filesystem leftover (shown or removed). `p` must already exist.
@@ -894,26 +907,31 @@ pub(crate) fn service_exe(image: &str) -> String {
 struct Found(Vec<Leftover>);
 
 impl Found {
-    fn push(&mut self, kind: LeftoverKind, target: Target, path: String, (confidence, reason): (Confidence, Reason), needs_admin: bool, bytes: u64) {
+    fn push(&mut self, kind: LeftoverKind, target: Target, path: String, (confidence, reason): (Confidence, Reason), needs_admin: bool, bytes: u64) -> bool {
         if self.0.iter().any(|l| l.target == target) {
-            return;
+            return false;
         }
         // A folder already listed covers what is inside it.
         if let Target::Fs(p) = &target
             && self.0.iter().any(|l| matches!(&l.target, Target::Fs(q) if starts_with_dir(&lower(p), &lower(q))))
         {
-            return;
+            return false;
         }
         let id = self.0.len() as u32;
         let precious = matches!(&target, Target::Fs(p) if is_precious(p));
-        self.0.push(Leftover { id, kind, path, bytes, confidence, reason, needs_admin, precious, target });
+        self.0.push(Leftover { id, kind, path, bytes, confidence, reason, needs_admin, precious, idle_days: None, install_dir: false, target });
+        true
     }
 
     fn fs(&mut self, p: &Path, ctx: &Ctx, kind: LeftoverKind, confidence: Confidence, reason: Reason, install_dir: bool) {
         if let Some(real) = fs_allowed(p, ctx, install_dir) {
             let needs_admin = !starts_with_dir(&lower(&real), &lower(&ctx.profile));
             let bytes = measure(&real);
-            self.push(kind, Target::Fs(real.clone()), real.to_string_lossy().into_owned(), (confidence, reason), needs_admin, bytes);
+            if self.push(kind, Target::Fs(real.clone()), real.to_string_lossy().into_owned(), (confidence, reason), needs_admin, bytes)
+                && let Some(l) = self.0.last_mut()
+            {
+                l.install_dir = install_dir;
+            }
         }
     }
 }
@@ -1075,6 +1093,208 @@ fn finish(mut v: Vec<Leftover>) -> Vec<Leftover> {
         l.id = i as u32;
     }
     v
+}
+
+/* ---------------- folders nobody owns (every drive) ---------------- */
+
+/// Nothing changed inside for this long: a folder nobody owns is offered (tools in use change).
+const IDLE_DAYS: u64 = 90;
+/// Steam leaves a game folder behind on uninstall; two weeks without changes rules out a download.
+const STEAM_IDLE_DAYS: u64 = 14;
+/// Shared stores and runtime caches that no uninstall entry owns but Windows or many apps use.
+const SWEEP_DENY: &[&str] = &[
+    "apps", "deployment", "isolatedstorage", "assembly", "elevateddiagnostics", "peerdistrepub", "squirreltemp",
+    "certificates", "crypto", "credentials", "protect", "vault", "systemcertificates", "speech", "speech graphics",
+    "usoshared", "usoprivate", "softwaredistribution", "windowsholographicdevices", "device metadata", "g2 boost",
+    "dolby", "realtek", "waves", "nahimic", "steam", "steamapps", "common", "downloaded installations", "identities",
+    "common files", "internet explorer", "reference assemblies", "dotnet", "msbuild", "uninstall information",
+    "modifiablewindowsapps", "windowsapps", "vulkanrt", "diagnostics", "inethistory", "dbg", "digitalentitlements",
+    "toastnotificationmanagercompat", "boost_interprocess",
+];
+/// Install folders on drives other than Windows': `D:\Program Files`, `D:\Games` and similar.
+const INSTALL_ROOTS: &[&str] = &["Program Files", "Program Files (x86)", "Games", "Jogos", "Programs", "Programas"];
+
+/// Who owns a folder: installed apps (by name, publisher, companion, install folder), running
+/// programs and services (by the folders their executables live in).
+struct Owners {
+    matchers: Vec<Matcher>,
+    dirs: Vec<String>,
+}
+
+impl Owners {
+    fn new(installed: &[App], windows: &Path) -> Self {
+        let win = lower(windows);
+        let mut dirs: Vec<String> = installed.iter().filter_map(|a| a.install_location.as_deref()).map(|l| lower(Path::new(l))).collect();
+        dirs.extend(crate::system::running_process_paths().iter().filter_map(|p| Path::new(p).parent()).map(lower));
+        const SERVICES: &str = r"SYSTEM\CurrentControlSet\Services";
+        for svc in registry::subkeys(Root::Hklm, SERVICES).unwrap_or_default() {
+            if let Some(image) = read_str(Root::Hklm, &format!(r"{SERVICES}\{svc}"), "ImagePath") {
+                dirs.extend(Path::new(&service_exe(&image)).parent().map(lower));
+            }
+        }
+        dirs.retain(|d| d.len() > 3 && !starts_with_dir(d, &win));
+        dirs.sort();
+        dirs.dedup();
+        Owners { matchers: installed.iter().filter(|a| a.hive != Hive::Store).map(Matcher::new).collect(), dirs }
+    }
+
+    fn owns(&self, name: &str, l: &str) -> bool {
+        self.dirs.iter().any(|d| starts_with_dir(d, l) || starts_with_dir(l, d))
+            || self.matchers.iter().any(|m| m.folder(name).is_some() || m.is_publisher(name) || m.companion(name))
+    }
+}
+
+/// Size, newest change (s since epoch) and whether a program file is inside. Bounded, no reparse.
+fn folder_stats(p: &Path) -> (u64, u64, bool) {
+    use std::os::windows::fs::MetadataExt;
+    let secs = |m: &fs::Metadata| m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+    let mut newest = fs::metadata(p).map(|m| secs(&m)).unwrap_or(0);
+    let (mut bytes, mut program, mut seen) = (0u64, false, 0usize);
+    let mut stack = vec![p.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let Ok(rd) = fs::read_dir(&d) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            seen += 1;
+            if seen > 300_000 {
+                return (bytes, newest, program); // ponytail: cap a huge folder; size is then a floor
+            }
+            let Ok(md) = e.metadata() else {
+                continue;
+            };
+            if md.file_attributes() & 0x400 != 0 {
+                continue;
+            }
+            newest = newest.max(secs(&md));
+            if md.is_dir() {
+                stack.push(e.path());
+            } else {
+                bytes += md.len();
+                let n = e.file_name().to_string_lossy().to_ascii_lowercase();
+                program |= n.ends_with(".exe") || n.ends_with(".dll") || n.ends_with(".sys");
+            }
+        }
+    }
+    (bytes, newest, program)
+}
+
+/// Where the folder-first sweep looks, besides `ctx`: install roots on other fixed drives and
+/// Steam libraries (game folder → names in the manifests).
+pub(crate) struct SweepRoots {
+    pub(crate) install: Vec<PathBuf>,
+    pub(crate) steam: Vec<(PathBuf, Vec<String>)>,
+}
+
+impl SweepRoots {
+    fn live(ctx: &Ctx) -> Self {
+        let sys = lower(&ctx.windows).chars().next();
+        let install = crate::system::list_drives()
+            .into_iter()
+            .filter(|d| matches!(d.kind, crate::system::DriveKind::Fixed) && d.letter.to_ascii_lowercase().chars().next() != sys)
+            .flat_map(|d| INSTALL_ROOTS.iter().map(move |r| PathBuf::from(format!(r"{}\{r}", d.letter))))
+            .filter(|p| p.is_dir())
+            .collect();
+        SweepRoots { install, steam: crate::steam::library_folders() }
+    }
+}
+
+/// Folders nobody owns anymore, on every fixed drive: leftovers of apps removed long ago or
+/// before G2 Boost existed. Only offered (Recycle Bin, undo); High when it is clearly dead.
+pub fn unowned(installed: &[App]) -> Vec<Leftover> {
+    let ctx = Ctx::live();
+    let roots = SweepRoots::live(&ctx);
+    let owners = Owners::new(installed, &ctx.windows);
+    unowned_in(&owners, &ctx, &roots, registry::now_unix())
+}
+
+fn unowned_in(owners: &Owners, ctx: &Ctx, roots: &SweepRoots, now: u64) -> Vec<Leftover> {
+    let mut f = Found(Vec::new());
+    let idle = |newest: u64| now.saturating_sub(newest) / 86_400;
+    let offer = |f: &mut Found, path: &Path, install_dir: bool, reason: Reason, min_idle: u64, locallow: bool| {
+        let (bytes, newest, program) = folder_stats(path);
+        let days = idle(newest);
+        if days < min_idle {
+            return; // something still writes here
+        }
+        // Program files inside may be a manual install still played (game files never change when
+        // played): those are only Low. No programs: Steam leftovers and year-old folders are High.
+        let confidence = if only_uninstaller(path) || (!program && (reason == Reason::SteamOrphan || days >= 365)) {
+            Confidence::High
+        } else {
+            Confidence::Low // never preselected: the user looks first
+        };
+        let Some(real) = fs_allowed(path, ctx, install_dir) else {
+            return;
+        };
+        let needs_admin = !starts_with_dir(&lower(&real), &lower(&ctx.profile));
+        if f.push(LeftoverKind::Folder, Target::Fs(real.clone()), real.to_string_lossy().into_owned(), (confidence, reason), needs_admin, bytes)
+            && let Some(l) = f.0.last_mut()
+        {
+            l.install_dir = install_dir;
+            l.idle_days = Some(days.min(u64::from(u32::MAX)) as u32);
+            l.precious |= locallow; // LocalLow is where games keep saves
+        }
+    };
+    let skip = |name: &str| {
+        let n = name.to_ascii_lowercase();
+        // Windows and Microsoft components rarely have an uninstall entry: never offered.
+        n.starts_with('.') || n.starts_with("windows") || n.starts_with("microsoft") || DENY_FOLDERS.contains(&n.as_str()) || SWEEP_DENY.contains(&n.as_str())
+    };
+    let locallow = lower(&ctx.profile.join(r"AppData\LocalLow"));
+    for base in &ctx.data {
+        let in_locallow = lower(base) == locallow;
+        for (name, path) in dirs(base) {
+            if !skip(&name) && !owners.owns(&name, &lower(&path)) {
+                offer(&mut f, &path, false, Reason::Unowned, IDLE_DAYS, in_locallow);
+            }
+        }
+    }
+    for base in ctx.program_files.iter().chain(&roots.install) {
+        for (name, path) in dirs(base) {
+            if !skip(&name) && !owners.owns(&name, &lower(&path)) && !ctx.installed_dirs.contains(&lower(&path)) {
+                offer(&mut f, &path, true, Reason::Unowned, IDLE_DAYS, false);
+            }
+        }
+    }
+    for (common, wanted) in &roots.steam {
+        for (name, path) in dirs(common) {
+            if !wanted.iter().any(|w| w.eq_ignore_ascii_case(&name)) {
+                offer(&mut f, &path, true, Reason::SteamOrphan, STEAM_IDLE_DAYS, false);
+            }
+        }
+    }
+    finish(f.0)
+}
+
+/// Id of the placeholder "app" that carries the sweep through the leftover flow (preview,
+/// token, removal, undo label).
+pub const SWEEP_ID: &str = "sweep:unowned";
+
+pub fn sweep_app() -> App {
+    App {
+        id: SWEEP_ID.into(),
+        hive: Hive::User,
+        key: String::new(),
+        name: SWEEP_ID.into(),
+        publisher: String::new(),
+        version: String::new(),
+        install_location: None,
+        exe: None,
+        icon_source: None,
+        size_bytes: None,
+        install_date: None,
+        uninstall: String::new(),
+        msi: false,
+        needs_admin: false,
+        protected: None,
+    }
+}
+
+/// Remove picked folders of the sweep (confirmed by the caller with a token). Same re-checks,
+/// Recycle Bin and undo as an app's leftovers.
+pub fn remove_unowned(items: &[Leftover], label: &str) -> RemoveOutcome {
+    remove_in(items, label, &Ctx::live(), crate::system::is_elevated())
 }
 
 /* ---------------- uninstall ---------------- */
@@ -1240,7 +1460,7 @@ pub(crate) fn remove_in(items: &[Leftover], app_name: &str, ctx: &Ctx, elevated:
             continue;
         }
         match &l.target {
-            Target::Fs(p) => match fs_allowed(p, ctx, l.reason == Reason::InstallFolder) {
+            Target::Fs(p) => match fs_allowed(p, ctx, l.install_dir) {
                 Some(real) if real == *p => paths.push((real, l.bytes)),
                 _ => out.failed += 1,
             },
@@ -1651,6 +1871,74 @@ mod tests {
         assert!(Matcher::new(&app("Parsec", "Parsec Cloud, Inc.", None, None)).companion("Parsec Virtual Display Driver"));
         assert!(!Matcher::new(&app("Parsec", "", None, None)).companion("Parsec 2"));
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn program_files_leftovers_can_be_removed() {
+        // Regression: found with the install-folder rule, the removal re-check must use it too.
+        let (root, ctx) = sandbox("pfremove");
+        let a = app("Acme Widget", "AcmeCorp", None, None);
+        let found = leftovers_in(&a, &ctx);
+        let drv = found.iter().find(|l| l.path.ends_with("Acme Widget Display Driver")).cloned().expect("companion");
+        let out = remove_in(std::slice::from_ref(&drv), "Acme Widget", &ctx, false);
+        assert_eq!((out.recycled, out.failed), (1, 0), "{out:?}");
+        assert!(!root.join(r"Program Files\Acme Widget Display Driver").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn unowned_folders_need_no_owner_and_months_of_silence() {
+        let (root, ctx) = sandbox("unowned");
+        let roaming = &ctx.data[0];
+        for d in ["Old Tool", "Live Tool", "Owned Thing"] {
+            fs::create_dir_all(roaming.join(d)).unwrap();
+        }
+        fs::write(roaming.join(r"Old Tool\settings.json"), b"{}").unwrap();
+        fs::write(roaming.join(r"Live Tool\log.txt"), b"x").unwrap();
+        let lib = root.join(r"SteamLibrary\steamapps\common");
+        for d in ["Kept Game", "Gone Game"] {
+            fs::create_dir_all(lib.join(d)).unwrap();
+            fs::write(lib.join(d).join("data.pak"), [0u8; 512]).unwrap();
+        }
+        let owners = Owners {
+            matchers: vec![Matcher::new(&app("Owned Thing", "Someone", None, None)), Matcher::new(&app("Acme Widget", "AcmeCorp", None, None))],
+            dirs: vec![lower(&root.join(r"Program Files\Other App"))],
+        };
+        let roots = SweepRoots { install: vec![], steam: vec![(lib.clone(), vec!["Kept Game".into()])] };
+        // "now" a year and a half after the files were written: everything is idle.
+        let later = registry::now_unix() + 540 * 86_400;
+        let found = unowned_in(&owners, &ctx, &roots, later);
+        let by = |suffix: &str| found.iter().find(|l| l.path.to_ascii_lowercase().ends_with(&suffix.to_ascii_lowercase()));
+        let old = by(r"Roaming\Old Tool").expect("unowned and idle");
+        assert_eq!((old.reason, old.confidence), (Reason::Unowned, Confidence::High), "no program inside, idle > 1 year");
+        assert!(old.idle_days.unwrap() >= 500);
+        assert!(by("Owned Thing").is_none(), "an installed app owns it by name");
+        assert!(by(r"Roaming\Acme Widget").is_none(), "owned by Acme Widget");
+        assert!(by(r"Roaming\Microsoft").is_none(), "shared store");
+        assert!(by(r"Program Files\Other App").is_none(), "a running program/service lives there");
+        assert!(by(r"Program Files\Acme Widget Bridge").is_none(), "install folder of an installed app");
+        let gone = by(r"common\Gone Game").expect("steam folder without manifest");
+        assert_eq!((gone.reason, gone.confidence), (Reason::SteamOrphan, Confidence::High));
+        assert!(by(r"common\Kept Game").is_none(), "has a manifest");
+        // Today nothing is idle: the sweep offers nothing.
+        assert!(unowned_in(&owners, &ctx, &roots, registry::now_unix()).is_empty());
+        // And what it offers can be removed (Recycle Bin), re-checked like any leftover.
+        let out = remove_in(std::slice::from_ref(gone), "sweep", &ctx, false);
+        assert_eq!((out.recycled, out.failed), (1, 0), "{out:?}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Read-only: what the sweep would offer on this machine (`--ignored --nocapture`).
+    #[test]
+    #[ignore]
+    fn unowned_live() {
+        let installed = list(&[]);
+        let t0 = std::time::Instant::now();
+        let found = unowned(&installed);
+        for l in &found {
+            println!("{:?} {:?} {:>12} {:>5}d precious={} {}", l.confidence, l.reason, l.bytes, l.idle_days.unwrap_or(0), l.precious, l.path);
+        }
+        println!("{} folders in {:?}", found.len(), t0.elapsed());
     }
 
     #[test]

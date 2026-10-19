@@ -42,7 +42,7 @@ Detalhes e como reportar vulnerabilidades: [SECURITY.md](SECURITY.md).
 
 1. Baixe o instalador `G2 Boost_<versão>_x64-setup.exe` na página de releases.
 2. Execute: instala para o seu usuário, sem pedir administrador. Requer Windows 10 22H2 ou 11 (x64) e WebView2 (já vem no Windows 11; o instalador cuida no Windows 10).
-3. Enquanto o certificado de assinatura constrói reputação, o SmartScreen pode mostrar "O Windows protegeu o computador" — confira o editor **Grovic Data** em "Mais informações".
+3. Enquanto o certificado de assinatura constrói reputação, o SmartScreen pode mostrar "O Windows protegeu o computador" — confira o editor **Gustavo Martins Gripaldi** em "Mais informações".
 
 Para desinstalar: Configurações › Aplicativos. Antes, desligue em Configurações do app as rotinas que quiser remover; ajustes podem ser revertidos na própria tela do PC Boost.
 
@@ -83,5 +83,5 @@ Roadmap: [Docs/core/next-steps.md](Docs/core/next-steps.md). Release e assinatur
 
 ## Licença
 
-Software proprietário — © 2026 Grovic Data. Todos os direitos reservados. Ver [LICENSE](LICENSE).
+Software proprietário — © 2026 Gustavo Martins Gripaldi. Todos os direitos reservados. Ver [LICENSE](LICENSE).
 Componentes de código aberto e as suas licenças: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
