@@ -270,6 +270,12 @@ export const ptBR = {
     "Esvazia a memória em espera do Windows. Precisa do G2 Boost aberto como administrador.",
   "games.options.pause_routines": "Pausar as rotinas do G2 Boost",
   "games.options.pause_routines.desc": "A limpeza agendada espera o jogo fechar.",
+  "games.options.network_priority": "Prioridade do jogo na rede (QoS)",
+  "games.options.network_priority.desc":
+    "Marca o tráfego do jogo como urgente (DSCP 46). Só ajuda quando o roteador respeita essa marca; some sozinha ao reiniciar. Precisa do G2 Boost como administrador.",
+  "games.applied.qos": "Prioridade na rede",
+  "games.skipped.qos_needs_admin": "Prioridade na rede precisa de administrador",
+  "games.skipped.qos_failed": "Não deu para criar a prioridade na rede",
   "games.options.notifications":
     "Para silenciar as notificações do Windows durante o jogo, ligue em Configurações › Sistema › Notificações › Ativar não perturbe automaticamente › Ao jogar um jogo.",
   "games.list.title": "Seus jogos",
@@ -434,9 +440,11 @@ export const ptBR = {
   "net.usage.col.internet": "Servidores na internet",
   "net.usage.col.listening": "Portas abertas",
   "net.usage.col.udp": "UDP",
+  "net.usage.col.down": "Baixando",
+  "net.usage.col.up": "Enviando",
   "net.usage.protected": "Processo protegido (pid {pid})",
   "net.usage.note":
-    "Jogos online costumam aparecer em UDP. Quanto cada programa baixa e envia exige o G2 Boost como administrador (próxima versão).",
+    "Jogos online costumam aparecer em UDP. Para ver quanto cada programa baixa e envia, abra o G2 Boost como administrador.",
   "wifi.title": "Sua rede Wi-Fi",
   "wifi.help": "Segurança, sinal e velocidade da conexão sem fio, lidos do Windows.",
   "wifi.rescan": "Procurar redes",

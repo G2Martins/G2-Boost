@@ -1,8 +1,9 @@
 import { Copy, Loader2, Square, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
 import { Badge, Button, Card, CardTitle, EmptyState, Modal } from "@/components/ui/primitives";
 import { backend, type DupGroup, type DupProgress, inTauri } from "@/lib/backend";
+import { boot } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ export function DupesTab({ hasScan }: { hasScan: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const running = progress !== null;
+  const autoStarted = useRef(false);
 
   useEffect(() => {
     const offs = [
@@ -42,6 +44,14 @@ export function DupesTab({ hasScan }: { hasScan: boolean }) {
       setMsg(errorText(e));
     }
   };
+  // Dev aid (screenshots): G2BOOST_START_TAB=dupes + autorun searches right after the scan.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires once when the scan is ready
+  useEffect(() => {
+    if (boot.autorun && boot.startTab === "dupes" && hasScan && !autoStarted.current) {
+      autoStarted.current = true;
+      void start();
+    }
+  }, [hasScan]);
   const wasted = useMemo(() => (groups ?? []).reduce((a, g) => a + g.wasted, 0), [groups]);
   const pickedBytes = useMemo(
     () =>

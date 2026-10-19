@@ -23,11 +23,14 @@ pub struct Options {
     pub purge_ram: bool,
     /// G2 Boost's scheduled cleanup waits until the game closes.
     pub pause_routines: bool,
+    /// Mark the game's outbound traffic as high priority (QoS DSCP 46, ActiveStore: a reboot
+    /// clears it). Needs the app elevated; helps only where the router honors DSCP.
+    pub network_priority: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { power_plan: true, high_priority: true, purge_ram: true, pause_routines: true }
+        Self { power_plan: true, high_priority: true, purge_ram: true, pause_routines: true, network_priority: true }
     }
 }
 
@@ -44,8 +47,12 @@ pub struct Session {
     /// What was actually applied: `power_plan`, `priority`, `ram`.
     pub applied: Vec<String>,
     pub ram_freed: u64,
-    /// Why an option did not apply (`needs_admin`, `plan_failed`, `priority_denied`).
+    /// Why an option did not apply (`needs_admin`, `plan_failed`, `priority_denied`,
+    /// `qos_needs_admin`, `qos_failed`).
     pub skipped: Vec<String>,
+    /// QoS policy created for this session (removed at the end).
+    #[serde(default)]
+    pub qos_policy: Option<String>,
 }
 
 fn file() -> PathBuf {
@@ -99,6 +106,7 @@ pub fn start(game: &InstalledGame, pid: Option<u32>, opts: &Options) -> Session 
         applied: Vec::new(),
         ram_freed: 0,
         skipped: Vec::new(),
+        qos_policy: None,
     };
     if opts.power_plan {
         s.prev_plan = active_plan();
@@ -131,11 +139,27 @@ pub fn start(game: &InstalledGame, pid: Option<u32>, opts: &Options) -> Session 
             s.skipped.push("needs_admin".into());
         }
     }
+    if opts.network_priority {
+        // The running exe's file name (a launcher-started game can live in a subfolder).
+        let exe = pid
+            .and_then(|p| crate::procs::list_paths().into_iter().find(|(x, _)| *x == p).map(|(_, path)| path))
+            .or_else(|| game.main_exe.clone())
+            .and_then(|p| std::path::Path::new(&p).file_name().map(|n| n.to_string_lossy().into_owned()));
+        match exe.map(|e| crate::qos::set_game(&e)) {
+            Some(Ok(policy)) => {
+                s.qos_policy = Some(policy);
+                s.applied.push("qos".into());
+            }
+            Some(Err(crate::qos::QosError::NeedsAdmin)) => s.skipped.push("qos_needs_admin".into()),
+            Some(Err(_)) | None => s.skipped.push("qos_failed".into()),
+        }
+    }
     save(&s);
     s
 }
 
 /// Undo the session (if any): previous power plan back, normal priority if the game still runs.
+/// The QoS policy is removed too (it lives in the ActiveStore: a reboot would clear it anyway).
 pub fn stop() -> Option<Session> {
     let s = session()?;
     if let Some(plan) = &s.prev_plan
@@ -147,6 +171,9 @@ pub fn stop() -> Option<Session> {
         && let (Some(pid), Some(dir)) = (s.pid, s.install_dir.as_deref())
     {
         let _ = crate::procs::normal_priority(pid, dir); // fails harmlessly once the game exited
+    }
+    if let Some(policy) = &s.qos_policy {
+        let _ = crate::qos::clear(policy);
     }
     let _ = std::fs::remove_file(file());
     Some(s)
@@ -256,6 +283,7 @@ mod tests {
             applied: vec![],
             ram_freed: 0,
             skipped: vec![],
+            qos_policy: None,
         };
         save(&s);
         assert_eq!(session().as_ref().map(|x| x.game_id.as_str()), Some("steam:730"));

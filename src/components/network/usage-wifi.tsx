@@ -1,30 +1,44 @@
 import { Activity, RefreshCw, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { ElevateButton } from "@/components/elevate-button";
 import { ExeIcon } from "@/components/ui/exe-icon";
 import { Badge, Button, Card, CardTitle, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { backend, inTauri, type NetUsage, type WifiView } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 
 /* ================= Who is using the network ================= */
 
 export function NetUsageTab() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [data, setData] = useState<NetUsage | null>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     setBusy(true);
-    setData((await backend.netUsage()) ?? { processes: [], tcp: 0, udp: 0 });
+    setData(
+      (await backend.netUsage()) ?? { processes: [], tcp: 0, udp: 0, bytes_available: false },
+    );
     setBusy(false);
   }, []);
   useEffect(() => {
     void load();
-    const id = setInterval(() => void load(), 10_000);
-    return () => clearInterval(id);
+    // Rates are per interval: refresh faster when they are available (elevated).
+    const id = setInterval(() => void load(), 3_000);
+    return () => {
+      clearInterval(id);
+      void backend.netUsageStop(); // stop the ETW session with the tab
+    };
   }, [load]);
-  const rows = (data?.processes ?? []).filter(
-    (p) => p.established + p.listening_ports.length + p.udp_endpoints > 0,
-  );
+  const rates = !!data?.bytes_available;
+  const rows = (data?.processes ?? [])
+    .filter(
+      (p) =>
+        p.established + p.listening_ports.length + p.udp_endpoints > 0 || (p.down_bps ?? 0) > 0,
+    )
+    .sort((a, b) =>
+      rates ? (b.down_bps ?? 0) + (b.up_bps ?? 0) - ((a.down_bps ?? 0) + (a.up_bps ?? 0)) : 0,
+    );
+  const rate = (v: number | null) => (v ? `${formatBytes(v, locale, 1)}/s` : "—");
   return (
     <Card className="animate-rise">
       <CardTitle
@@ -53,6 +67,12 @@ export function NetUsageTab() {
             <thead className="text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="py-2 text-left font-medium">{t("net.usage.col.app")}</th>
+                {rates ? (
+                  <>
+                    <th className="py-2 text-right font-medium">{t("net.usage.col.down")}</th>
+                    <th className="py-2 text-right font-medium">{t("net.usage.col.up")}</th>
+                  </>
+                ) : null}
                 <th className="py-2 text-right font-medium">{t("net.usage.col.active")}</th>
                 <th className="py-2 text-right font-medium">{t("net.usage.col.internet")}</th>
                 <th className="py-2 text-right font-medium">{t("net.usage.col.listening")}</th>
@@ -78,6 +98,12 @@ export function NetUsageTab() {
                       </span>
                     </span>
                   </td>
+                  {rates ? (
+                    <>
+                      <td className="num py-1.5 text-right font-semibold">{rate(p.down_bps)}</td>
+                      <td className="num py-1.5 text-right">{rate(p.up_bps)}</td>
+                    </>
+                  ) : null}
                   <td className="num py-1.5 text-right">{p.established || "—"}</td>
                   <td className="num py-1.5 text-right">{p.public_remotes || "—"}</td>
                   <td className="num py-1.5 text-right">
@@ -97,7 +123,12 @@ export function NetUsageTab() {
           </table>
         </div>
       )}
-      <p className="mt-3 text-[11px] text-muted-foreground">{t("net.usage.note")}</p>
+      {rates ? null : (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+          {t("net.usage.note")}
+          <ElevateButton route="network" />
+        </div>
+      )}
     </Card>
   );
 }

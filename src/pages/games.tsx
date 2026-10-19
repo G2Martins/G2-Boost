@@ -20,6 +20,7 @@ const OPTIONS: (keyof GameModeOptions)[] = [
   "power_plan",
   "high_priority",
   "purge_ram",
+  "network_priority",
   "pause_routines",
 ];
 
@@ -335,7 +336,9 @@ export function GamesPage() {
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     {t(`games.options.${k}` as I18nKey)}
-                    {k === "purge_ram" && !elevated ? <ElevateButton route="games" /> : null}
+                    {(k === "purge_ram" || k === "network_priority") && !elevated ? (
+                      <ElevateButton route="games" />
+                    ) : null}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {t(`games.options.${k}.desc` as I18nKey)}

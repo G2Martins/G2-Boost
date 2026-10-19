@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, boottime, claude_connect, consent, console, context, devices, dns, dupes, firmware, gamemode, games, luli, netconns, power, prio, procs, registry, secrets, smart, startup, userassist, wlan};
+use g2boost_core::{advisor, apps, boottime, claude_connect, consent, console, context, devices, dns, dupes, firmware, gamemode, games, luli, netconns, netetw, power, prio, procs, qos, registry, secrets, smart, startup, userassist, wlan};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -461,22 +461,83 @@ async fn exe_icon(cache: State<'_, IconCache>, path: String) -> Result<Option<St
 /* ---------------- network usage, Wi-Fi ---------------- */
 
 #[derive(serde::Serialize)]
-struct NetUsage {
-    processes: Vec<netconns::ProcNet>,
-    tcp: usize,
-    udp: usize,
+struct UsageRow {
+    #[serde(flatten)]
+    net: netconns::ProcNet,
+    /// Bytes/s since the previous call (ETW, elevated only).
+    down_bps: Option<f64>,
+    up_bps: Option<f64>,
 }
 
-/// Who is using the network right now: connections per program (no admin, no DNS lookups).
+#[derive(serde::Serialize)]
+struct NetUsage {
+    processes: Vec<UsageRow>,
+    tcp: usize,
+    udp: usize,
+    /// Per-program download/upload rates are available (the ETW session runs: needs admin).
+    bytes_available: bool,
+}
+
+/// The ETW session behind per-program rates: started when the usage tab asks (elevated only),
+/// stopped when it closes, so no tracing runs in the background otherwise.
+#[derive(Default)]
+struct NetEtwState {
+    monitor: Mutex<Option<netetw::Monitor>>,
+    prev: Mutex<Option<(std::time::Instant, Vec<netetw::ProcBytes>)>>,
+}
+
+/// Who is using the network right now: connections per program (no admin, no DNS lookups), plus
+/// download/upload rates per program when elevated.
 #[tauri::command]
-async fn net_usage() -> Result<NetUsage, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+async fn net_usage(app: AppHandle) -> Result<NetUsage, String> {
+    tauri::async_runtime::spawn_blocking(move || {
         let conns = netconns::connections();
         let tcp = conns.iter().filter(|c| matches!(c.protocol, netconns::Protocol::Tcp)).count();
-        NetUsage { processes: netconns::by_process(&conns), tcp, udp: conns.len() - tcp }
+        let st = app.state::<NetEtwState>();
+        let mut mon = st.monitor.lock().unwrap();
+        if mon.is_none() && system::is_elevated() {
+            *mon = netetw::Monitor::start().ok();
+        }
+        // Per-exe rates: pid → image path, summed by path (lowercase).
+        let mut by_exe: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+        if let Some(m) = mon.as_ref() {
+            let now = m.snapshot();
+            let mut prev = st.prev.lock().unwrap();
+            if let Some((t, p)) = prev.as_ref() {
+                let paths: std::collections::HashMap<u32, String> = procs::list_paths().into_iter().collect();
+                for r in netetw::rates(p, &now, t.elapsed().as_secs_f64()) {
+                    if let Some(path) = paths.get(&r.pid) {
+                        let e = by_exe.entry(path.to_ascii_lowercase()).or_default();
+                        e.0 += r.down_bytes_per_sec;
+                        e.1 += r.up_bytes_per_sec;
+                    }
+                }
+            }
+            *prev = Some((std::time::Instant::now(), now));
+        }
+        let available = mon.is_some();
+        let processes = netconns::by_process(&conns)
+            .into_iter()
+            .map(|net| {
+                let rate = by_exe.get(&net.exe_path.to_ascii_lowercase()).copied();
+                UsageRow {
+                    down_bps: available.then(|| rate.map_or(0.0, |r| r.0)),
+                    up_bps: available.then(|| rate.map_or(0.0, |r| r.1)),
+                    net,
+                }
+            })
+            .collect();
+        NetUsage { processes, tcp, udp: conns.len() - tcp, bytes_available: available }
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// The usage tab closed: stop the ETW session.
+#[tauri::command]
+fn net_usage_stop(st: State<'_, NetEtwState>) {
+    *st.monitor.lock().unwrap() = None; // Drop stops the session
+    *st.prev.lock().unwrap() = None;
 }
 
 #[derive(serde::Serialize)]
@@ -884,7 +945,16 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
         gamemode::Decision::Start(i) => {
             let rg = &running[i];
             if let Some(g) = list.iter().find(|g| g.id == rg.id) {
-                let session = gamemode::start(g, rg.pid, &s.game_mode);
+                // A game added by hand has no install folder: use the running exe's own folder, so
+                // the priority check ("process inside the game's folder") still holds.
+                let mut g = g.clone();
+                if g.install_dir.is_none()
+                    && let Some(pid) = rg.pid
+                    && let Some((_, path)) = procs::list_paths().into_iter().find(|(p, _)| *p == pid)
+                {
+                    g.install_dir = std::path::Path::new(&path).parent().map(|d| d.to_string_lossy().into_owned());
+                }
+                let session = gamemode::start(&g, rg.pid, &s.game_mode);
                 let _ = app.emit("gamemode:changed", Some(session));
                 return true;
             }
@@ -1826,6 +1896,7 @@ pub fn run() {
         .manage(GamesState::default())
         .manage(DupState::default())
         .manage(IconCache::default())
+        .manage(NetEtwState::default())
         .manage(Routines {
             settings: Mutex::new(settings::load()),
             state: Mutex::new(routines::load_state()),
@@ -1837,6 +1908,9 @@ pub fn run() {
         .setup(|app| {
             // A Game Mode session left by a crash or a forced exit: put the power plan back first.
             gamemode::stop();
+            if system::is_elevated() {
+                let _ = qos::clear_all_ours(); // orphaned QoS policies (non-elevated: a reboot clears them)
+            }
             watch_uninstalls(app.handle().clone());
             // Tray: left click opens, menu has Open / Quit. Labels follow the default locale (pt-BR).
             let open = MenuItem::with_id(app, "open", "Abrir", true, None::<&str>)?;
@@ -1983,6 +2057,7 @@ pub fn run() {
             game_mode_stop,
             game_servers,
             net_usage,
+            net_usage_stop,
             exe_icon,
             wifi_report,
             disk_health,

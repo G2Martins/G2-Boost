@@ -272,6 +272,12 @@ export const en = {
     "Empties Windows standby memory. Needs G2 Boost running as administrator.",
   "games.options.pause_routines": "Pause G2 Boost routines",
   "games.options.pause_routines.desc": "Scheduled cleanup waits for the game to close.",
+  "games.options.network_priority": "Game priority on the network (QoS)",
+  "games.options.network_priority.desc":
+    "Marks the game's traffic as urgent (DSCP 46). Helps only when the router honors the mark; clears itself on reboot. Needs G2 Boost as administrator.",
+  "games.applied.qos": "Network priority",
+  "games.skipped.qos_needs_admin": "Network priority needs administrator",
+  "games.skipped.qos_failed": "Could not set network priority",
   "games.options.notifications":
     "To silence Windows notifications while playing, turn on Settings › System › Notifications › Turn on do not disturb automatically › When playing a game.",
   "games.list.title": "Your games",
@@ -433,9 +439,11 @@ export const en = {
   "net.usage.col.internet": "Internet servers",
   "net.usage.col.listening": "Open ports",
   "net.usage.col.udp": "UDP",
+  "net.usage.col.down": "Download",
+  "net.usage.col.up": "Upload",
   "net.usage.protected": "Protected process (pid {pid})",
   "net.usage.note":
-    "Online games usually show up as UDP. How much each program downloads and uploads needs G2 Boost as administrator (next version).",
+    "Online games usually show up as UDP. To see how much each program downloads and uploads, run G2 Boost as administrator.",
   "wifi.title": "Your Wi-Fi",
   "wifi.help": "Security, signal and link speed of the wireless connection, read from Windows.",
   "wifi.rescan": "Scan networks",

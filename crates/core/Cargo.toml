@@ -59,6 +59,8 @@ features = [
   "Win32_Graphics_Imaging",
   "Wdk_Graphics_Direct3D",
   "Win32_System_EventLog",
+  "Win32_System_Time",
+  "Win32_System_Diagnostics_Etw",
   "Win32_Globalization",
   "Win32_System_Com_StructuredStorage",
   "Management_Deployment",

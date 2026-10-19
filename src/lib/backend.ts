@@ -225,8 +225,11 @@ export type ProcNet = {
   public_remotes: number;
   listening_ports: number[];
   udp_endpoints: number;
+  /** Bytes/s (elevated only). */
+  down_bps: number | null;
+  up_bps: number | null;
 };
-export type NetUsage = { processes: ProcNet[]; tcp: number; udp: number };
+export type NetUsage = { processes: ProcNet[]; tcp: number; udp: number; bytes_available: boolean };
 export type WifiBand = "ghz_2_4" | "ghz_5" | "ghz_6";
 export type WifiStatus = {
   ssid: string;
@@ -336,6 +339,7 @@ export type GameModeOptions = {
   high_priority: boolean;
   purge_ram: boolean;
   pause_routines: boolean;
+  network_priority: boolean;
 };
 export type Launcher =
   | "steam"
@@ -783,6 +787,7 @@ export const backend = {
     call<{ ip: string; port: number; connections: number }[]>("game_servers", { id }),
   netUsage: () => call<NetUsage>("net_usage"),
   exeIcon: (path: string) => call<string | null>("exe_icon", { path }),
+  netUsageStop: () => call<void>("net_usage_stop"),
   wifiReport: (refresh = false) => call<WifiView>("wifi_report", { refresh }),
   diskHealth: () => call<DiskHealth[]>("disk_health"),
   privacyAccess: () => call<AccessRecord[]>("privacy_access"),
