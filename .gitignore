@@ -56,3 +56,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Isolated agent worktrees (Claude Code)
+.claude/worktrees/

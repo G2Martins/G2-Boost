@@ -85,6 +85,41 @@ pub fn library_folders() -> Vec<(PathBuf, Vec<String>)> {
         .collect()
 }
 
+/// Installed games with their install folder (`steamapps\common\<installdir>`), one per appid.
+pub fn installs() -> Vec<(Game, Option<PathBuf>)> {
+    let Some(root) = steam_root() else {
+        return Vec::new();
+    };
+    let mut games: Vec<(Game, Option<PathBuf>)> = Vec::new();
+    for lib in libraries(&root) {
+        let Ok(rd) = std::fs::read_dir(lib.join("steamapps")) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if !(name.starts_with("appmanifest_") && name.ends_with(".acf")) {
+                continue;
+            }
+            if let Ok(text) = std::fs::read_to_string(e.path())
+                && let Some(g) = parse_manifest(&text, &lib.to_string_lossy())
+            {
+                let dir = vdf_pairs(&text)
+                    .into_iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("installdir"))
+                    .map(|(_, v)| v)
+                    .filter(|v| !v.is_empty() && !v.contains("..") && !v.contains('\\') && !v.contains('/'))
+                    .map(|v| lib.join("steamapps").join("common").join(v))
+                    .filter(|p| p.is_dir());
+                games.push((g, dir));
+            }
+        }
+    }
+    games.sort_by_key(|(g, _)| std::cmp::Reverse(g.size_bytes));
+    let mut seen = std::collections::HashSet::new();
+    games.retain(|(g, _)| seen.insert(g.appid));
+    games
+}
+
 pub fn installed() -> Vec<Game> {
     let Some(root) = steam_root() else {
         return Vec::new();

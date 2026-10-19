@@ -229,7 +229,7 @@ pub fn list(user_protected: &[String]) -> Vec<App> {
 }
 
 /// Desktop apps only (Uninstall keys), deduplicated by name + version.
-fn desktop_list(user_protected: &[String]) -> Vec<App> {
+pub(crate) fn desktop_list(user_protected: &[String]) -> Vec<App> {
     let mut out: Vec<App> = Vec::new();
     for hive in [Hive::Machine, Hive::Machine32, Hive::User] {
         for key in registry::subkeys(hive.root(), hive.base()).unwrap_or_default() {
