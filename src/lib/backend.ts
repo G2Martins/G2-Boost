@@ -775,6 +775,8 @@ export const backend = {
   gamesIcon: (id: string) => call<string | null>("games_icon", { id }),
   gameModeStatus: () => call<GameModeSession | null>("game_mode_status"),
   gameModeStop: () => call<GameModeSession | null>("game_mode_stop"),
+  gameServers: (id: string) =>
+    call<{ ip: string; port: number; connections: number }[]>("game_servers", { id }),
   netUsage: () => call<NetUsage>("net_usage"),
   wifiReport: (refresh = false) => call<WifiView>("wifi_report", { refresh }),
   diskHealth: () => call<DiskHealth[]>("disk_health"),

@@ -1,6 +1,7 @@
 import { Gamepad2, Plus, RefreshCw, Square, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ElevateButton } from "@/components/elevate-button";
+import { RoutePanel } from "@/components/games/route-panel";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, Skeleton, Switch } from "@/components/ui/primitives";
 import {
@@ -11,6 +12,7 @@ import {
   inTauri,
   type Settings,
 } from "@/lib/backend";
+import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -64,6 +66,11 @@ export function GamesPage() {
   const [adding, setAdding] = useState(false);
   const [exe, setExe] = useState("");
   const [exeError, setExeError] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  // Dev aid: G2BOOST_START_TAB=route opens the first game's route (and traces it with autorun).
+  useEffect(() => {
+    if (boot.startTab === "route" && games?.[0] && selected === null) setSelected(games[0].id);
+  }, [games, selected]);
 
   const load = useCallback(async (refresh = false) => {
     setBusy(refresh);
@@ -233,10 +240,17 @@ export function GamesPage() {
                         : g.enabled
                           ? "border-border-strong"
                           : "border-border hover:border-border-strong",
+                      selected === g.id && "ring-1 ring-primary/50",
                     )}
                   >
                     <GameIcon game={g} />
-                    <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelected((cur) => (cur === g.id ? null : g.id))}
+                      aria-expanded={selected === g.id}
+                      title={t("route.open")}
+                      className="min-w-0 flex-1 text-left"
+                    >
                       <p className="truncate text-sm font-semibold" title={g.name}>
                         {g.name}
                       </p>
@@ -249,7 +263,7 @@ export function GamesPage() {
                           </span>
                         ) : null}
                       </p>
-                    </div>
+                    </button>
                     <Switch
                       checked={g.enabled}
                       onCheckedChange={(on) => toggleGame(g, on)}
@@ -307,6 +321,10 @@ export function GamesPage() {
             <p className="mt-3 text-xs text-muted-foreground">{t("games.list.empty")}</p>
           ) : null}
         </Card>
+
+        {selected && games?.find((g) => g.id === selected) ? (
+          <RoutePanel game={games.find((g) => g.id === selected) as GameEntry} />
+        ) : null}
 
         {/* ---------------- what Game Mode does ---------------- */}
         <Card className="animate-rise" style={rise(2)}>

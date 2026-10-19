@@ -275,6 +275,48 @@ export const en = {
   "games.options.notifications":
     "To silence Windows notifications while playing, turn on Settings › System › Notifications › Turn on do not disturb automatically › When playing a game.",
   "games.list.title": "Your games",
+  "route.open": "See the route to the server",
+  "route.title": "Route to the server: {game}",
+  "route.help":
+    "The real path of packets from your PC to the server, hop by hop (traceroute without administrator). Without servers of its own nobody changes that path; you can see where it gets worse and fix what is yours: home network, Wi-Fi, DNS and server choice.",
+  "route.target.placeholder": "Server IP or address",
+  "route.relay.find": "Find the nearest Steam relay",
+  "route.relay.finding": "Measuring relays {step}",
+  "route.relay": "Steam relay {name} ({ms} ms)",
+  "route.trace": "Trace route",
+  "route.servers.found": "{n} servers the game is using now (TCP). Pick one from the field's list.",
+  "route.servers.udp":
+    "The game is open but talks over UDP: Windows does not show the server. Use the Steam relay or type the address.",
+  "route.servers.not_running": "Open the game to see the servers it uses, or type an address.",
+  "route.you": "You",
+  "route.zone.home": "Your network",
+  "route.zone.isp": "Provider",
+  "route.zone.internet": "Internet",
+  "route.verdict.clean": "Clean path: no hop adds real delay.",
+  "route.verdict.loss":
+    "Packet loss from hop {hop} to the destination: that is what causes stutter.",
+  "route.verdict.worst_home":
+    "The delay starts in your network (hop {hop}, +{ms} ms): router or Wi-Fi.",
+  "route.verdict.worst_isp":
+    "The delay starts at your provider (hop {hop}, +{ms} ms). Worth a support ticket with this screen.",
+  "route.verdict.worst_internet":
+    "The delay shows up past your provider (hop {hop}, +{ms} ms): try another server or region in the game.",
+  "route.reoptimize": "Re-optimize",
+  "route.check.dns": "Fastest DNS right now: {name} ({ms} ms). Apply it in the DNS Optimizer.",
+  "route.check.wifi_bad": "Weak Wi-Fi or on 2.4 GHz with 5 GHz available: see the Wi-Fi tab.",
+  "route.check.wifi_ok": "Wi-Fi has no signal or band issues.",
+  "route.check.cable": "Wired connection: the best for gaming.",
+  "route.check.home_bad":
+    "Your router answers in {ms} ms with {loss}% loss: restart the router or use a cable.",
+  "route.check.home_ok": "Home network stable ({ms} ms to the router).",
+  "route.check.worst_home": "The worst stretch is in your network: router or Wi-Fi.",
+  "route.check.worst_isp": "The worst stretch is at the provider: open a ticket with the route.",
+  "route.check.worst_internet":
+    "The worst stretch is past the provider: pick another region in the game.",
+  "route.check.bufferbloat":
+    "Test the router queue (bufferbloat) in the Network Scanner: a low grade explains spikes while downloading.",
+  "route.go.boost": "Open PC Boost",
+  "route.go.network": "Open Network",
   "games.list.help":
     "Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG and Rockstar, read from each launcher's own files. Nothing is opened or installed.",
   "games.list.empty": "No games found. Add a game's executable with the + button.",

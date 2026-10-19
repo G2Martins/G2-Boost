@@ -717,6 +717,43 @@ async fn games_icon(state: State<'_, GamesState>, id: String) -> Result<Option<S
     Ok(icon)
 }
 
+#[derive(serde::Serialize)]
+struct GameServer {
+    ip: String,
+    port: u16,
+    connections: usize,
+}
+
+/// Internet servers the running game talks to over TCP right now (processes inside its install
+/// folder). UDP game traffic has no remote address in Windows' tables, so those are not listed.
+#[tauri::command]
+async fn game_servers(state: State<'_, GamesState>, id: String) -> Result<Vec<GameServer>, String> {
+    let Some(dir) = state.list.lock().unwrap().iter().find(|g| g.id == id).and_then(|g| g.install_dir.clone()) else {
+        return Ok(Vec::new());
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let prefix = format!("{}\\", dir.trim_end_matches('\\').to_ascii_lowercase());
+        let mut out: Vec<GameServer> = Vec::new();
+        for c in netconns::connections() {
+            let (Some(ip), true) = (c.remote_addr, c.exe_path.to_ascii_lowercase().starts_with(&prefix)) else {
+                continue;
+            };
+            if !matches!(c.remote_scope, netconns::Scope::Public) || !matches!(c.state, Some(netconns::TcpState::Established)) {
+                continue;
+            }
+            match out.iter_mut().find(|s| s.ip == ip.to_string() && s.port == c.remote_port) {
+                Some(s) => s.connections += 1,
+                None => out.push(GameServer { ip: ip.to_string(), port: c.remote_port, connections: 1 }),
+            }
+        }
+        out.sort_by_key(|s| std::cmp::Reverse(s.connections));
+        out.truncate(10);
+        out
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn game_mode_status() -> Option<gamemode::Session> {
     gamemode::session()
@@ -1856,6 +1893,7 @@ pub fn run() {
             games_icon,
             game_mode_status,
             game_mode_stop,
+            game_servers,
             net_usage,
             wifi_report,
             disk_health,

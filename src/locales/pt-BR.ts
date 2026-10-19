@@ -272,6 +272,50 @@ export const ptBR = {
   "games.options.notifications":
     "Para silenciar as notificações do Windows durante o jogo, ligue em Configurações › Sistema › Notificações › Ativar não perturbe automaticamente › Ao jogar um jogo.",
   "games.list.title": "Seus jogos",
+  "route.open": "Ver rota até o servidor",
+  "route.title": "Rota até o servidor: {game}",
+  "route.help":
+    "O caminho real dos pacotes do seu PC até o servidor, salto por salto (traceroute sem administrador). Sem servidores próprios ninguém muda esse caminho; dá para ver onde ele piora e corrigir o que é seu: rede de casa, Wi-Fi, DNS e escolha de servidor.",
+  "route.target.placeholder": "IP ou endereço do servidor",
+  "route.relay.find": "Achar o relay da Steam mais próximo",
+  "route.relay.finding": "Medindo relays {step}",
+  "route.relay": "Relay da Steam {name} ({ms} ms)",
+  "route.trace": "Traçar rota",
+  "route.servers.found":
+    "{n} servidores que o jogo está usando agora (TCP). Escolha na lista do campo.",
+  "route.servers.udp":
+    "O jogo está aberto, mas fala por UDP: o Windows não mostra o servidor. Use o relay da Steam ou digite o endereço.",
+  "route.servers.not_running":
+    "Abra o jogo para ver os servidores que ele usa, ou digite um endereço.",
+  "route.you": "Você",
+  "route.zone.home": "Sua rede",
+  "route.zone.isp": "Provedor",
+  "route.zone.internet": "Internet",
+  "route.verdict.clean": "Caminho limpo: nenhum salto acrescenta atraso de verdade.",
+  "route.verdict.loss":
+    "Perda de pacotes a partir do salto {hop} até o destino: é isso que causa travadas.",
+  "route.verdict.worst_home":
+    "O atraso começa na sua rede (salto {hop}, +{ms} ms): roteador ou Wi-Fi.",
+  "route.verdict.worst_isp":
+    "O atraso começa no seu provedor (salto {hop}, +{ms} ms). Vale abrir um chamado com esse print.",
+  "route.verdict.worst_internet":
+    "O atraso aparece depois do seu provedor (salto {hop}, +{ms} ms): tente outro servidor ou região do jogo.",
+  "route.reoptimize": "Reotimizar",
+  "route.check.dns": "DNS mais rápido agora: {name} ({ms} ms). Aplique no DNS Optimizer.",
+  "route.check.wifi_bad": "Wi-Fi fraco ou em 2,4 GHz com 5 GHz disponível: veja a aba Wi-Fi.",
+  "route.check.wifi_ok": "Wi-Fi sem problemas de sinal ou banda.",
+  "route.check.cable": "Conexão por cabo: o melhor para jogar.",
+  "route.check.home_bad":
+    "Seu roteador responde em {ms} ms com {loss}% de perda: reinicie o roteador ou use cabo.",
+  "route.check.home_ok": "Rede de casa estável ({ms} ms até o roteador).",
+  "route.check.worst_home": "O pior trecho está na sua rede: roteador ou Wi-Fi.",
+  "route.check.worst_isp": "O pior trecho está no provedor: abra um chamado com a rota.",
+  "route.check.worst_internet":
+    "O pior trecho está depois do provedor: escolha outra região no jogo.",
+  "route.check.bufferbloat":
+    "Teste a fila do roteador (bufferbloat) no Scanner da aba Rede: nota baixa explica picos ao baixar algo.",
+  "route.go.boost": "Abrir PC Boost",
+  "route.go.network": "Abrir Rede",
   "games.list.help":
     "Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG e Rockstar, lidos dos arquivos de cada launcher. Nada é aberto nem instalado.",
   "games.list.empty": "Nenhum jogo encontrado. Adicione o executável de um jogo pelo botão +.",
