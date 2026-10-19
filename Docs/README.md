@@ -36,6 +36,7 @@ comportamento.
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [disk/analyzer.md](./disk/analyzer.md) | Varredura, treemap, filtros (`*.mp4 >1gb >6m`), mostrar na pasta, Lixeira com guarda, essenciais grandes. |
 | [network/network.md](./network/network.md) | Monitor (gateway/DNS/jogos), speedtest + bufferbloat, ping Steam, MTR/Ping/TCPing, DNS Optimizer com aplicar/restaurar. |
+| [network/game-routes.md](./network/game-routes.md) | Jogos e conexões estilo ExitLag: o que dá sem servidores (lista de jogos, Modo Jogo, diagrama MTR, reotimizar honesto, QoS) e o que exigiria relays. Proposta. |
 
 ## release/ e security/
 

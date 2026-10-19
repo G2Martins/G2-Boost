@@ -1,6 +1,6 @@
 # Driver de kernel para sensores — opções e decisão
 
-**Última revisão:** 2026-10-16 · **v1 implementada** (`crates/core/src/sensors.rs`)
+**Última revisão:** 2026-10-18 (§7.1 arquitetura de driver próprio, requisitos para pessoa física, FACEIT × PawnIO) · **v1 implementada** (`crates/core/src/sensors.rs`)
 
 > Pesquisa web feita em 2026-10-15. Legenda: **[V]** verificado em fonte primária citada; **[C]** relato de comunidade/terceiros; **[?]** não verificado — confirmar antes de decidir. Nada foi executado na máquina.
 
@@ -100,6 +100,35 @@ Critérios (5 = melhor): segurança, licença p/ app fechado, esforço (5 = pouc
   4. Carregar apenas módulos de leitura necessários (IntelMSR/AMDFamily17/RyzenSMU leitura, SmbusI801/PIIX4 leitura, LpcIO leitura); nunca chamar IOCTL de escrita; nunca edição "unrestricted".
   5. Testes de segurança: helper rejeita qualquer comando fora da lista, tolera driver ausente, tratar saída do módulo como não confiável.
 - **v3 (driver próprio, só se necessário):** C/KMDF minimalista seguindo o design da seção 4; EV + Partner Center attestation; teste em Win10/11 com HVCI, Secure Boot, blocklist ligada; fuzz + revisão externa; submeter a amostra ao Kaspersky/MS antes do release; sem suporte a Windows Server (attestation não carrega lá).
+
+## 7.1 Revisão 2026-10-18 (pedido do dono: "conseguimos desenvolver um driver?")
+
+Fatos novos (pesquisa web + análise estática do Speccy, ver [speccy-cpuz.md §1.1](../references/speccy-cpuz.md)):
+
+- **Speccy faz exatamente o modelo cpuz:** driver da CPUID (`cpuz149/152/158`, assinado CPUID EV) embutido e instalado como serviço pela `cpuidsdk.dll`; sem admin, sem temperatura. Não há licença para reusar.
+- **Quem pode assinar driver:** o Hardware Developer Program (Partner Center) pede **certificado EV + dados de empresa** (contato legal, D-U-N-S ou cadastro manual) **[V]** [registro](https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/hardware-program-register). Pessoa física sem CNPJ: provavelmente barrada **[?]**; **MEI/CNPJ** destrava. EV ~US$ 300–500/ano **[?]**.
+- **Rust em driver:** `windows-drivers-rs` segue "não pronto para produção" (The Register, set/2025) **[C]** → C/KMDF.
+- **PawnIO:** LibreHardwareMonitor, Fan Control (v238+) e OpenRGB já usam **[C]**; instalado à parte pelo usuário. **O anti-cheat FACEIT bloqueia o PawnIO** **[C]**: relevante para o público gamer (aviso obrigatório na UI). Redistribuir o instalador continua sem termo explícito: perguntar a `admin@namazso.eu` **[?]**.
+
+**Arquitetura se formos de driver próprio (v3):**
+
+```text
+G2 Boost.exe (usuário comum)
+   │  named pipe local, ACL só do usuário interativo, mensagens fixas ("cpu_temp", "pkg_power")
+   ▼
+G2BoostSensor (serviço Windows, LocalService, SID de serviço)   ← instalado pelo NSIS (admin uma vez)
+   │  DeviceIoControl METHOD_BUFFERED, saídas de tamanho fixo
+   ▼
+g2bsens.sys (KMDF em C, ~600 linhas)  device ACL: SYSTEM + SID do serviço; nada para Users
+   └─ só leitura: MSR 0x19C/0x1B1/0x1A2/0x198/0xCE/APERF/MPERF (Intel), SMN Tctl 0x59800 (AMD 17h/19h)
+```
+
+- O app nunca fala com o driver; o serviço é o único cliente (SID de serviço na ACL do device). Usuário comum vê temperatura **sem UAC** a cada vez; admin só na instalação.
+- Driver sob demanda (`SERVICE_DEMAND_START`), carregado pelo serviço quando a UI pede sensores, descarregado depois de 60 s sem uso.
+- Fluxo de assinatura: CNPJ → EV (token/HSM) → Partner Center → CAB → **attestation** (Win10/11 cliente; não carrega em Windows Server) → teste em VM Win11 limpa com HVCI + Secure Boot + blocklist + Kaspersky → submissão ao Kaspersky/Microsoft antes do release.
+- Esforço: driver + serviço + testes ~2–3 semanas de dev; burocracia (CNPJ, EV, Partner Center) semanas e US$ 300–500/ano. Risco permanente: blocklist trimestral, anti-cheats (Vanguard/FACEIT) e AV tratando driver novo como suspeito.
+
+**Recomendação (2026-10-18):** (1) já: seguir lendo HWiNFO/LHM e **usar o PawnIO quando o usuário já o tiver instalado** (detectar o device; só leitura via IOCTL dos módulos oficiais IntelMSR/AMDFamily17; sem redistribuir nada; com admin; aviso do FACEIT); (2) driver próprio só depois de CNPJ + EV, se a v2 não bastar.
 
 ## 8. Pendências a verificar
 

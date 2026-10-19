@@ -1,6 +1,6 @@
 # Distribuição, assinatura e confiança do Windows
 
-**Última revisão:** 2026-10-16 (§8 = estado real do repositório e como instalar em outro PC hoje)
+**Última revisão:** 2026-10-18 (§6.1 autor pessoa física, Store individual grátis, Artifact Signing fora do Brasil; §8 = estado real do repositório)
 
 > Pesquisa web (não testada na prática). Legenda: **[V]** = confirmado em doc oficial da Microsoft/Tauri; **[C]** = fonte comunitária/revendedor; **[?]** = não verificado, confirmar antes de decidir. Preços em USD, de revendedores, variam.
 
@@ -162,9 +162,28 @@ Checklist de teste: instalar per-user sem admin; abrir; elevar; aplicar/reverter
 
 **Linha do tempo realista:** 2-4 semanas até primeiro build assinado e distribuível; **reputação SmartScreen limpa leva semanas após** (sem prazo garantido) [V]. **Custo ano 1:** ~US$ 400-800 (OV + HSM) + 0 de infra (GitHub). Store: possível taxa de conta [?].
 
+## 6.1 Revisão 2026-10-18: autor pessoa física
+
+**Decisão do dono (2026-10-18):** o autor do software é **Gustavo Martins Gripaldi** (`bundle.publisher`, `bundle.copyright`, `authors` do Cargo, README, SECURITY). O `identifier` `com.grovicdata.g2boost` fica (mudar apagaria os dados locais do WebView).
+
+Fatos revisados (pesquisa de 2026-10-18):
+
+- **SmartScreen** [V] [Microsoft, 2026-08](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation): reputação = assinatura do editor + hash; EV **não** dá reputação instantânea; OV/EV avisam até acumular (semanas e centenas de instalações limpas). Só a Store não tem aviso. Trocar de certificado enfraquece o sinal.
+- **Artifact Signing** (ex-Trusted Signing, US$ 9,99/mês): pessoa física **só EUA e Canadá**; organizações numa lista de países **sem o Brasil** [V] [quickstart, 2026-10-08](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart). Fora para o dono, com ou sem CNPJ.
+- **OV para pessoa física:** Certum (SimplySign em nuvem, ~€ 170–190/ano), SSL.com (IV/sole proprietor), Sectigo por revenda (~US$ 210/ano) [?]. Chave em token/HSM obrigatória desde 06/2023.
+- **Microsoft Store:** conta de desenvolvedor **individual gratuita** desde 2025-09-10 (verificação por documento + selfie) [V] [blog Windows](https://blogs.windows.com/windowsdeveloper/2025/09/10/free-developer-registration-for-individual-developers-on-microsoft-store/). Duas rotas: **EXE/MSI** (a Store baixa nosso instalador de uma URL https fixa; "recomenda fortemente" assinatura por CA confiável e exige declarar drivers/serviços) ou **MSIX** (a Store re-assina: sem aviso, e de quebra resolve a identidade de pacote do winget COM), mas capabilities restritas (`allowElevation`, escrita fora da virtualização) têm aprovação difícil para um otimizador [?].
+- **Kaspersky Allowlist Program** pede endereço legal da empresa [V] [Kaspersky](https://www.kaspersky.com/partners/allowlist-program): com pessoa física pode haver atrito; o portal da Microsoft ([WDSI](https://www.microsoft.com/en-us/wdsi/filesubmission)) aceita qualquer um.
+
+**Arquitetura recomendada para baixar sem susto:**
+
+1. **Agora (grátis):** publicar na **Microsoft Store pela rota EXE** (conta individual gratuita): quem instala pela Store não passa pelo SmartScreen do navegador. Pré-requisito: instalador assinado (passo 2) e URL https estável (GitHub Releases).
+2. **Certificado OV em nome de Gustavo Martins Gripaldi** (Certum SimplySign, sem token físico): `bundle.windows.signCommand` assina o exe, o instalador NSIS e o desinstalador; mesma identidade em todas as versões. Download direto do site ainda avisa nas primeiras semanas; some com reputação.
+3. **Cada release:** enviar o instalador ao WDSI (Microsoft) e ao Kaspersky; winget (`winget install` não marca o arquivo como baixado da internet).
+4. **Depois, se valer:** MEI/CNPJ (abre Allowlist da Kaspersky e Partner Center para o driver) e avaliar MSIX na Store.
+
 ## 7. O que o dono precisa decidir
 
-1. **Publisher:** assinar como Grovic Data (CNPJ) — nome que aparecerá no UAC/SmartScreen. Reunir documentos da empresa; ter telefone/e-mail em diretório público verificável.
+1. **Publisher:** ~~Grovic Data (CNPJ)~~ → **Gustavo Martins Gripaldi** (pessoa física, decidido em 2026-10-18; ver §6.1). Certificado OV no mesmo nome exato.
 2. **Orçamento:** OV ~US$ 130-550/ano + cloud signing, ou token USB (entregue por courier ao Brasil, atraso/aduana [?]).
 3. **Repo público?** Facilita updater via GitHub e winget; repo privado exige hospedar `latest.json` e instalador em outro lugar.
 4. **Aceitar aviso inicial** durante a fase de reputação (comunicar em README) ou investir em Store depois.
