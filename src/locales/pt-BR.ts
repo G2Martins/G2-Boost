@@ -434,6 +434,7 @@ export const ptBR = {
   "net.usage.col.internet": "Servidores na internet",
   "net.usage.col.listening": "Portas abertas",
   "net.usage.col.udp": "UDP",
+  "net.usage.protected": "Processo protegido (pid {pid})",
   "net.usage.note":
     "Jogos online costumam aparecer em UDP. Quanto cada programa baixa e envia exige o G2 Boost como administrador (próxima versão).",
   "wifi.title": "Sua rede Wi-Fi",

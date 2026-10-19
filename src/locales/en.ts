@@ -433,6 +433,7 @@ export const en = {
   "net.usage.col.internet": "Internet servers",
   "net.usage.col.listening": "Open ports",
   "net.usage.col.udp": "UDP",
+  "net.usage.protected": "Protected process (pid {pid})",
   "net.usage.note":
     "Online games usually show up as UDP. How much each program downloads and uploads needs G2 Boost as administrator (next version).",
   "wifi.title": "Your Wi-Fi",

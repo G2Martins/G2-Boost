@@ -24,10 +24,18 @@ export function PrivacyTab() {
   useEffect(() => {
     void load();
   }, [load]);
-  const shown = useMemo(
-    () => (rows ?? []).filter((r) => r.capability === cap && (r.last_start || r.last_stop)),
-    [rows, cap],
-  );
+  // One row per app: each version of an app (Discord's app-1.0.x folders) has its own entry.
+  const shown = useMemo(() => {
+    const seen = new Set<string>();
+    return (rows ?? [])
+      .filter((r) => r.capability === cap && (r.last_start || r.last_stop))
+      .filter((r) => {
+        const k = r.app.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+  }, [rows, cap]);
   const counts = useMemo(() => {
     const c = { webcam: 0, microphone: 0, location: 0 };
     for (const r of rows ?? []) if (r.last_start || r.last_stop) c[r.capability] += 1;

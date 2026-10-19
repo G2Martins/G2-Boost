@@ -66,7 +66,9 @@ export function NetUsageTab() {
                 >
                   <td className="max-w-80 py-1.5">
                     <span className="block truncate font-semibold" title={p.exe_path || p.process}>
-                      {p.process}
+                      {/^pid \d+$/.test(p.process)
+                        ? t("net.usage.protected", { pid: p.process.slice(4) })
+                        : p.process}
                     </span>
                   </td>
                   <td className="num py-1.5 text-right">{p.established || "—"}</td>
