@@ -13,8 +13,9 @@ use windows::Win32::Foundation::{CloseHandle, FILETIME, HANDLE};
 use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
-    GetProcessTimes, IsProcessCritical, OpenProcess, PROCESS_ACCESS_RIGHTS, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE, QueryFullProcessImageNameW, TerminateProcess,
+    GetPriorityClass, GetProcessTimes, HIGH_PRIORITY_CLASS, IsProcessCritical, NORMAL_PRIORITY_CLASS, OpenProcess,
+    PROCESS_ACCESS_RIGHTS, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE,
+    QueryFullProcessImageNameW, SetPriorityClass, TerminateProcess,
 };
 use windows::core::{BOOL, PWSTR};
 
@@ -265,6 +266,54 @@ pub fn end(pid: u32, created: u64) -> Result<(), ProcError> {
         }
     })();
     // SAFETY: handle from open_exact.
+    let _ = unsafe { CloseHandle(h) };
+    result
+}
+
+/// Every process this user can see, as (pid, image path); unreadable paths are left out.
+pub fn list_paths() -> Vec<(u32, String)> {
+    snapshot().into_iter().filter(|(_, s)| !s.path.is_empty()).map(|(pid, s)| (pid, s.path)).collect()
+}
+
+/// Raise a game to high priority (never realtime). Only a process whose image lives under
+/// `inside` (the game's install folder) and that is a normal user-session process: the pid comes
+/// from a detection a few seconds old and could have been reused.
+pub fn raise_priority(pid: u32, inside: &str) -> Result<(), ProcError> {
+    set_priority(pid, inside, HIGH_PRIORITY_CLASS)
+}
+
+/// Back to normal priority (Game Mode turned off while the game still runs).
+pub fn normal_priority(pid: u32, inside: &str) -> Result<(), ProcError> {
+    set_priority(pid, inside, NORMAL_PRIORITY_CLASS)
+}
+
+fn set_priority(pid: u32, inside: &str, class: windows::Win32::System::Threading::PROCESS_CREATION_FLAGS) -> Result<(), ProcError> {
+    if pid == 0 || pid == 4 || pid == std::process::id() || inside.len() < 4 {
+        return Err(ProcError::Protected);
+    }
+    // SAFETY: handle closed below.
+    let h = unsafe { OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.map_err(|e| {
+        if e.code().0 as u32 == 0x8007_0005 { ProcError::NeedsAdmin } else { ProcError::Gone }
+    })?;
+    let result = (|| {
+        let (path, _, _) = query(h);
+        let dir = format!("{}\\", inside.trim_end_matches('\\').to_ascii_lowercase());
+        if !path.to_ascii_lowercase().starts_with(&dir) {
+            return Err(ProcError::Gone);
+        }
+        let mut session = 0u32;
+        // SAFETY: valid handle and out-param.
+        unsafe {
+            if ProcessIdToSessionId(pid, &mut session).is_err() || session == 0 {
+                return Err(ProcError::Protected);
+            }
+            if GetPriorityClass(h) == class.0 {
+                return Ok(());
+            }
+            SetPriorityClass(h, class).map_err(|e| ProcError::Win32(e.message()))
+        }
+    })();
+    // SAFETY: handle from OpenProcess above.
     let _ = unsafe { CloseHandle(h) };
     result
 }

@@ -25,7 +25,7 @@ App desktop **Windows 10/11** (x64) que junta, numa interface no estilo ExitLag 
 
 **DECIDIDO 2026-10-14: Tauri 2.** Toolchain e downloads em **D:/G:**, nunca no C: (`RUSTUP_HOME`/`CARGO_HOME` em `D:\dev`, VS Build Tools em `D:\dev\VS2022BuildTools`; Windows SDK o instalador força em C:). Detalhe em [architecture.md](Docs/core/architecture.md):
 
-- Tauri 2 — core em **Rust** (scan, Win32, rede, limpeza) + UI **React 19 / TypeScript / Vite / Tailwind 4 / shadcn** + MCP em Rust (`rmcp`) compartilhando o crate core + bundle NSIS **assinado**.
+- Tauri 2 — core em **Rust** (scan, Win32, rede, limpeza) + UI **React 19 / TypeScript / Vite / Tailwind 4 / shadcn** + MCP em Rust (`rmcp`) compartilhando o crate core + bundle NSIS (assinatura de código fora do roadmap por decisão do dono, 2026-10-18).
 - Alternativas avaliadas: Electron + FFI (zero toolchain nova, binário ~200 MB, spawn de shell tentador) · .NET 8 WinUI 3 (nativo, UI custom cara, skills de web não transferem).
 - **Precedente interno:** `Grovic-Components/ValeriumDesktop` já é Tauri 2 (wrapper web com tray/deep-link/updater assinado) — referência de config, não base de produto.
 

@@ -15,6 +15,7 @@ import { CleanupPage } from "@/pages/cleanup";
 import { ConsolePage } from "@/pages/console";
 import { DashboardPage } from "@/pages/dashboard";
 import { DiskPage } from "@/pages/disk";
+import { GamesPage } from "@/pages/games";
 import { NetworkPage } from "@/pages/network";
 import { SettingsPage } from "@/pages/settings";
 
@@ -24,6 +25,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   cleanup: CleanupPage,
   apps: AppsPage,
   network: NetworkPage,
+  games: GamesPage,
   boost: BoostPage,
   console: ConsolePage,
   ai: AiPage,

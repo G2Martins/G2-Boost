@@ -1,8 +1,8 @@
 # Roadmap — fases e backlog
 
-**Última revisão:** 2026-10-16
+**Última revisão:** 2026-10-18 (rodada 6 aberta; assinatura/SmartScreen e PawnIO/driver próprio fora do roadmap por decisão do dono)
 
-**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). **9 IA + MCP ✅** (conselheiro local, assistente no app com 3 provedores, `g2boost-mcp.exe` só leitura). **2026-10-16:** disco (filtros, Lixeira, mostrar na pasta, essenciais) ✅, rede (TCPing, gateway, DNS Optimizer) ✅, BIOS/firmware + sensores externos ✅, inicialização + processos ✅, IA endurecida ✅, licença/READMEs/avisos de terceiros ✅, MCP no próprio exe (`--mcp`) ✅, instalador NSIS com licença ✅ (sem assinatura). Próximas: **release** (certificado OV, CI, updater, AV), PawnIO opt-in (sensores sem HWiNFO), MFT. Planejamento GSD em `.planning/`.
+**Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). **9 IA + MCP ✅** (conselheiro local, assistente no app com 3 provedores, `g2boost-mcp.exe` só leitura). **2026-10-16:** disco (filtros, Lixeira, mostrar na pasta, essenciais) ✅, rede (TCPing, gateway, DNS Optimizer) ✅, BIOS/firmware + sensores externos ✅, inicialização + processos ✅, IA endurecida ✅, licença/READMEs/avisos de terceiros ✅, MCP no próprio exe (`--mcp`) ✅, instalador NSIS com licença ✅ (sem assinatura). Próximas: **rodada 6** (abaixo), MFT. Planejamento GSD em `.planning/`.
 
 Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat estão bloqueados pelo Kaspersky — disco e limpeza primeiro; rede e boost depois; MCP quando o core estiver estável.
 
@@ -16,7 +16,20 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 | **6 — Painel, Meu PC e Monitor** ✅ 2026-10-15 | KPIs (pontuação por hardware, pontos de restauração, bytes para limpar, RAM) · Boost agora · monitor CPU/GPU/RAM/disco/rede 1 s · Meu PC (SMBIOS/DXGI/IOCTL/TPM/Secure Boot) · recomendações por hardware · tweaks privacidade/aparência · `hvci_off` beta | painel abre sem admin em < 2 s com dados reais (verificado por screenshot) |
 | **5 — Rotinas** ✅ 2026-10-15 | iniciar com o Windows (tarefa de logon `--tray`, Highest se elevado) · limpeza agendada (ao ligar / a cada N h / diária / semanal) com categorias · limpar RAM ao abrir jogo (Steam `RunningAppID` + exes + `steamapps\common`) · bandeja · Configurações | app vive na bandeja e limpa sozinho; tudo visível no histórico (verificar logon real + Highest pelo dono) |
 | **8 — MCP local** ✅ só leitura (13 tools, `G2 Boost.exe --mcp`); destrutivas com token = backlog | `g2boost-mcp.exe` (stdio) · tools read-only + destrutivas com token · registro no Claude Desktop/Code · doc de uso | Claude da máquina analisa o scan e propõe limpeza; humano confirma na UI |
-| **9 — Release** (NSIS + licença + avisos ✅ 2026-10-16; falta assinar, CI, updater) | assinatura de código · instalador NSIS · auto-update · VirusTotal + submissão de falso positivo (Kaspersky/Microsoft) · README público | exe assinado instala limpo numa VM com Kaspersky |
+| **9 — Release** (NSIS ✅ 2026-10-16; **assinatura de código / "baixar sem aviso do Windows" fora do roadmap**, decisão do dono 2026-10-18; pesquisa guardada em [../release/distribution-and-trust.md](../release/distribution-and-trust.md)) | instalador NSIS · auto-update · submissão de falso positivo (Kaspersky/Microsoft) · README público | instala numa VM com Kaspersky sem bloqueio |
+
+## Rodada 6 (2026-10-18, pedido do dono: "siga com essas frentes")
+
+Decisões: **sem PawnIO e sem driver próprio** (temperatura só por software gratuito de terceiros que o usuário já roda: HWiNFO, LibreHardwareMonitor e os que a pesquisa indicar); assinatura de código fora do roadmap.
+
+| Frente | Estado |
+|---|---|
+| Jogos: lista multi-launcher (Steam, Epic, EA, Riot, Battle.net, Ubisoft, GOG + exe à mão) com chave Modo Jogo | em andamento |
+| Modo Jogo de um clique (energia, RAM, prioridade, pausar rotinas e avisos, tudo volta ao fechar) | em andamento |
+| Diagrama da rota real até o servidor do jogo · Reotimizar honesto (DNS, Wi-Fi, bufferbloat, região) · prioridade do jogo na rede (QoS) | planejado ([../network/game-routes.md](../network/game-routes.md)) |
+| Histórico de câmera/microfone · quem usa a rede · Wi-Fi (segurança + canais) · saúde do disco (SMART) com alerta | em andamento (módulos do core) |
+| Limpeza: mais navegadores, launchers e caches de GPU · apps pouco usados · duplicados · tempo de boot por app · regras de prioridade por processo | em andamento |
+| Temperatura da CPU por software gratuito de terceiros | pesquisa em andamento |
 
 ## Feito (2026-10-16 — "finalize tudo")
 - **Sensores sem driver próprio:** pesquisa de opções ([../security/kernel-driver-options.md](../security/kernel-driver-options.md)) → v1 `sensors.rs` (HWiNFO shared memory / LibreHardwareMonitor WMI quando o usuário roda); temp. da CPU no monitor, no contexto da IA e no achado `cpu_hot`. WinRing0 proibido; PawnIO = v2 opt-in; driver próprio = v3 só se preciso.

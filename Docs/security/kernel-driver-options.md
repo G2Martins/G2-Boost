@@ -101,6 +101,8 @@ Critérios (5 = melhor): segurança, licença p/ app fechado, esforço (5 = pouc
   5. Testes de segurança: helper rejeita qualquer comando fora da lista, tolera driver ausente, tratar saída do módulo como não confiável.
 - **v3 (driver próprio, só se necessário):** C/KMDF minimalista seguindo o design da seção 4; EV + Partner Center attestation; teste em Win10/11 com HVCI, Secure Boot, blocklist ligada; fuzz + revisão externa; submeter a amostra ao Kaspersky/MS antes do release; sem suporte a Windows Server (attestation não carrega lá).
 
+> **Decisão do dono (2026-10-18, mais tarde):** **nem PawnIO nem driver próprio**, para não ter problema no futuro. Temperatura só por software gratuito de outra empresa que o usuário já roda (G2 Boost lê a interface que ele expõe; não carrega nem distribui driver). As seções abaixo ficam como registro.
+
 ## 7.1 Revisão 2026-10-18 (pedido do dono: "conseguimos desenvolver um driver?")
 
 Fatos novos (pesquisa web + análise estática do Speccy, ver [speccy-cpuz.md §1.1](../references/speccy-cpuz.md)):

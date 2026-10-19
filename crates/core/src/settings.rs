@@ -40,6 +40,10 @@ pub struct Settings {
     pub ai_web_always: bool,
     /// The user's own instructions for Luli (tone, level, preferences), sent with every question.
     pub luli_instructions: String,
+    /// Games (ids from `games::installed`) with Game Mode on.
+    pub game_mode_games: Vec<String>,
+    /// What Game Mode does while one of those games runs.
+    pub game_mode: crate::gamemode::Options,
 }
 
 impl Default for Settings {
@@ -58,6 +62,8 @@ impl Default for Settings {
             protected_apps: Vec::new(),
             ai_web_always: false,
             luli_instructions: String::new(),
+            game_mode_games: Vec::new(),
+            game_mode: crate::gamemode::Options::default(),
         }
     }
 }
@@ -99,6 +105,13 @@ pub fn sanitize(mut s: Settings) -> Settings {
         .collect::<String>()
         .trim()
         .to_string();
+    // Game ids are made by `games.rs` (`steam:730`, `app:m64:{GUID}`, `exe:name.exe`): bounded, no
+    // control characters, deduplicated.
+    let mut seen = std::collections::HashSet::new();
+    s.game_mode_games.retain(|id| {
+        id.len() <= 200 && id.contains(':') && !id.chars().any(char::is_control) && seen.insert(id.clone())
+    });
+    s.game_mode_games.truncate(200);
     s.schedule = match s.schedule {
         Schedule::EveryHours { hours } => Schedule::EveryHours { hours: hours.clamp(1, 168) },
         Schedule::Daily { hour } => Schedule::Daily { hour: hour.min(23) },
@@ -143,6 +156,8 @@ mod tests {
             game_ram_clean: true,
             ai_web_always: false,
             luli_instructions: "  seja direta\u{0}\n".into(),
+            game_mode_games: vec!["steam:730".into(), "steam:730".into(), "bad\u{1}:x".into(), "noprefix".into()],
+            game_mode: crate::gamemode::Options::default(),
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
@@ -167,6 +182,7 @@ mod tests {
         assert!(!d.routine_categories.contains(&"recycle".to_string()));
         assert!(!d.routine_categories.contains(&"temp_windows".to_string()), "admin categories are opt-in");
         assert_eq!(s.luli_instructions, "seja direta", "trimmed, control characters removed");
+        assert_eq!(s.game_mode_games, vec!["steam:730".to_string()], "deduplicated, control chars and bad ids dropped");
     }
 
     #[test]

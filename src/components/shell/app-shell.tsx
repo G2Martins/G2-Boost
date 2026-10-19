@@ -1,5 +1,6 @@
 import {
   Bot,
+  Gamepad2,
   Gauge,
   HardDrive,
   LayoutDashboard,
@@ -22,6 +23,7 @@ export type Route =
   | "cleanup"
   | "apps"
   | "network"
+  | "games"
   | "boost"
   | "console"
   | "ai"
@@ -33,6 +35,7 @@ const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "cleanup", icon: Sparkles, label: "nav.cleanup" },
   { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
+  { route: "games", icon: Gamepad2, label: "nav.games" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
   { route: "console", icon: SquareTerminal, label: "nav.console" },
   { route: "ai", icon: Bot, label: "nav.ai" },

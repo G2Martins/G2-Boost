@@ -209,6 +209,50 @@ export type Settings = {
   restore_before_preset: boolean;
   ai_web_always: boolean;
   luli_instructions: string;
+  game_mode_games: string[];
+  game_mode: GameModeOptions;
+};
+
+export type GameModeOptions = {
+  power_plan: boolean;
+  high_priority: boolean;
+  purge_ram: boolean;
+  pause_routines: boolean;
+};
+export type Launcher =
+  | "steam"
+  | "epic"
+  | "ea"
+  | "riot"
+  | "battlenet"
+  | "ubisoft"
+  | "gog"
+  | "rockstar"
+  | "other"
+  | "custom";
+export type GameEntry = {
+  id: string;
+  name: string;
+  launcher: Launcher;
+  install_dir: string | null;
+  main_exe: string | null;
+  size_bytes: number | null;
+  /** Game Mode is on for this game. */
+  enabled: boolean;
+  running: boolean;
+};
+export type GameModeSession = {
+  game_id: string;
+  game_name: string;
+  pid: number | null;
+  install_dir: string | null;
+  started: number;
+  prev_plan: string | null;
+  /** `power_plan`, `priority`, `ram`. */
+  applied: string[];
+  ram_freed: number;
+  /** `needs_admin`, `plan_failed`, `priority_denied`. */
+  skipped: string[];
 };
 
 export type LuliGroup = { id: string; name: string };
@@ -613,6 +657,10 @@ export const backend = {
   autostartStatus: () => call<AutostartStatus>("autostart_status"),
   autostartSet: (on: boolean) => callOrThrow<AutostartStatus>("autostart_set", { on }),
   routineStatus: () => call<RoutineStatus>("routine_status"),
+  gamesList: (refresh = false) => call<GameEntry[]>("games_list", { refresh }),
+  gamesIcon: (id: string) => call<string | null>("games_icon", { id }),
+  gameModeStatus: () => call<GameModeSession | null>("game_mode_status"),
+  gameModeStop: () => call<GameModeSession | null>("game_mode_stop"),
 
   systemProfile: (refresh = false) => call<Profile>("system_profile", { refresh }),
   recommendations: (refresh = false) => call<Recommendations>("recommendations", { refresh }),

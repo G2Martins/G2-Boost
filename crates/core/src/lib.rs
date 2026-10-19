@@ -14,6 +14,7 @@ pub mod disk;
 pub mod dupes;
 pub mod dns;
 pub mod firmware;
+pub mod gamemode;
 pub mod games;
 pub mod hardware;
 pub mod icons;

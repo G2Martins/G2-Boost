@@ -162,6 +162,8 @@ Checklist de teste: instalar per-user sem admin; abrir; elevar; aplicar/reverter
 
 **Linha do tempo realista:** 2-4 semanas até primeiro build assinado e distribuível; **reputação SmartScreen limpa leva semanas após** (sem prazo garantido) [V]. **Custo ano 1:** ~US$ 400-800 (OV + HSM) + 0 de infra (GitHub). Store: possível taxa de conta [?].
 
+> **Fora do roadmap (decisão do dono, 2026-10-18):** "baixar sem o aviso do Windows" (certificado, Store, SmartScreen) não será feito agora. Esta doc fica como referência.
+
 ## 6.1 Revisão 2026-10-18: autor pessoa física
 
 **Decisão do dono (2026-10-18):** o autor do software é **Gustavo Martins Gripaldi** (`bundle.publisher`, `bundle.copyright`, `authors` do Cargo, README, SECURITY). O `identifier` `com.grovicdata.g2boost` fica (mudar apagaria os dados locais do WebView).

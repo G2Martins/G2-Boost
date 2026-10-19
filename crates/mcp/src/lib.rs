@@ -76,7 +76,7 @@ fn meta(v: Value) -> rmcp::model::MetaObject {
 }
 
 /// Screens `open_in_g2boost` may open (the app's own route allowlist).
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "boost", "console", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings"];
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]

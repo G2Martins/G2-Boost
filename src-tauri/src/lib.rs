@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, claude_connect, console, context, devices, dns, firmware, luli, power, procs, registry, secrets, startup};
+use g2boost_core::{advisor, apps, claude_connect, console, context, devices, dns, firmware, gamemode, games, luli, power, procs, registry, secrets, startup};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -28,7 +28,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "boost", "console", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -417,6 +417,127 @@ struct Routines {
     running: AtomicBool,
 }
 
+/* ---------------- games + Game Mode ---------------- */
+
+/// Installed games (refreshed every 5 min by the routine thread, or on demand), their icons, and
+/// the game whose Game Mode the user ended by hand (not restarted until that game closes).
+#[derive(Default)]
+struct GamesState {
+    list: Mutex<Vec<games::InstalledGame>>,
+    refreshed: Mutex<Option<std::time::Instant>>,
+    icons: Mutex<std::collections::HashMap<String, Option<String>>>,
+    suppressed: Mutex<Option<String>>,
+}
+
+impl GamesState {
+    fn current(&self, custom: &[String], force: bool) -> Vec<games::InstalledGame> {
+        let stale = self.refreshed.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(300));
+        if force || stale {
+            let list = games::installed(custom);
+            *self.list.lock().unwrap() = list;
+            *self.refreshed.lock().unwrap() = Some(std::time::Instant::now());
+        }
+        self.list.lock().unwrap().clone()
+    }
+}
+
+#[derive(serde::Serialize)]
+struct GameView {
+    #[serde(flatten)]
+    game: games::InstalledGame,
+    enabled: bool,
+    running: bool,
+}
+
+#[tauri::command]
+async fn games_list(app: AppHandle, refresh: bool) -> Result<Vec<GameView>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let s = app.state::<Routines>().settings.lock().unwrap().clone();
+        let list = app.state::<GamesState>().current(&s.game_exes, refresh);
+        let running = games::running(&list, &procs::list_paths(), games::steam_running_app());
+        list.into_iter()
+            .map(|g| GameView {
+                enabled: s.game_mode_games.contains(&g.id),
+                running: running.iter().any(|r| r.id == g.id),
+                game: g,
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn games_icon(state: State<'_, GamesState>, id: String) -> Result<Option<String>, String> {
+    if let Some(hit) = state.icons.lock().unwrap().get(&id) {
+        return Ok(hit.clone());
+    }
+    let Some(game) = state.list.lock().unwrap().iter().find(|g| g.id == id).cloned() else {
+        return Ok(None);
+    };
+    let icon = tauri::async_runtime::spawn_blocking(move || games::icon(&game)).await.map_err(|e| e.to_string())?;
+    state.icons.lock().unwrap().insert(id, icon.clone());
+    Ok(icon)
+}
+
+#[tauri::command]
+fn game_mode_status() -> Option<gamemode::Session> {
+    gamemode::session()
+}
+
+/// End Game Mode now (everything restored); it stays off for this game until the game closes.
+#[tauri::command]
+fn game_mode_stop(app: AppHandle) -> Option<gamemode::Session> {
+    let s = gamemode::stop()?;
+    *app.state::<GamesState>().suppressed.lock().unwrap() = Some(s.game_id.clone());
+    let _ = app.emit("gamemode:changed", None::<gamemode::Session>);
+    Some(s)
+}
+
+/// One Game Mode step (routine thread, every 5 s). Returns true while a session is active.
+fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
+    let current = gamemode::session();
+    if s.game_mode_games.is_empty() && current.is_none() {
+        return false;
+    }
+    let gs = app.state::<GamesState>();
+    let list = gs.current(&s.game_exes, false);
+    let mut running = games::running(&list, &procs::list_paths(), games::steam_running_app());
+    {
+        let mut sup = gs.suppressed.lock().unwrap();
+        if sup.as_ref().is_some_and(|id| !running.iter().any(|r| &r.id == id)) {
+            *sup = None; // the game the user stopped by hand closed: next launch gets Game Mode again
+        }
+        if let Some(id) = sup.as_ref() {
+            running.retain(|r| &r.id != id);
+        }
+    }
+    // Turned off for that game while it runs → end the session too.
+    let current_id = current.as_ref().map(|c| c.game_id.clone()).filter(|id| s.game_mode_games.contains(id) || running.iter().all(|r| &r.id != id));
+    let decision = if current.is_some() && current_id.is_none() {
+        gamemode::Decision::Stop
+    } else {
+        gamemode::decide(current_id.as_deref(), &running, &s.game_mode_games)
+    };
+    match decision {
+        gamemode::Decision::Start(i) => {
+            let rg = &running[i];
+            if let Some(g) = list.iter().find(|g| g.id == rg.id) {
+                let session = gamemode::start(g, rg.pid, &s.game_mode);
+                let _ = app.emit("gamemode:changed", Some(session));
+                return true;
+            }
+            false
+        }
+        gamemode::Decision::Stop => {
+            gamemode::stop();
+            let _ = app.emit("gamemode:changed", None::<gamemode::Session>);
+            false
+        }
+        gamemode::Decision::Keep => current.is_some(),
+    }
+}
+
 #[tauri::command]
 fn settings_get(r: State<'_, Routines>) -> Settings {
     r.settings.lock().unwrap().clone()
@@ -634,16 +755,20 @@ fn spawn_routines(app: AppHandle) {
             tick += 1;
             let r = app.state::<Routines>();
             let s = r.settings.lock().unwrap().clone();
+            let playing = game_mode_tick(&app, &s);
             if s.game_ram_clean {
                 let now = routines::detect_game(&s.game_exes);
                 *r.game.lock().unwrap() = now.clone();
-                if let Some(g) = watcher.observe(now) {
-                    on_game_started(&app, g);
+                if let Some(g) = watcher.observe(now)
+                    && !gamemode::session().is_some_and(|x| x.applied.iter().any(|a| a == "ram"))
+                {
+                    on_game_started(&app, g); // Game Mode already purged for this game: once is enough
                 }
             } else {
                 *r.game.lock().unwrap() = None;
             }
-            if tick.is_multiple_of(12) && !s.routine_categories.is_empty() && !r.running.load(Ordering::SeqCst) {
+            let paused = playing && s.game_mode.pause_routines;
+            if tick.is_multiple_of(12) && !paused && !s.routine_categories.is_empty() && !r.running.load(Ordering::SeqCst) {
                 let last = r.state.lock().unwrap().last_run;
                 if routines::due(&s.schedule, Clock::now(), last, r.ran_since_start.load(Ordering::SeqCst)) {
                     r.running.store(true, Ordering::SeqCst);
@@ -1334,6 +1459,7 @@ pub fn run() {
         .manage(AppsState::default())
         .manage(TokenStore::default())
         .manage(Dashboard::default())
+        .manage(GamesState::default())
         .manage(Routines {
             settings: Mutex::new(settings::load()),
             state: Mutex::new(routines::load_state()),
@@ -1342,6 +1468,8 @@ pub fn run() {
             running: AtomicBool::new(false),
         })
         .setup(|app| {
+            // A Game Mode session left by a crash or a forced exit: put the power plan back first.
+            gamemode::stop();
             watch_uninstalls(app.handle().clone());
             // Tray: left click opens, menu has Open / Quit. Labels follow the default locale (pt-BR).
             let open = MenuItem::with_id(app, "open", "Abrir", true, None::<&str>)?;
@@ -1378,7 +1506,7 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let r = window.state::<Routines>();
                 let s = r.settings.lock().unwrap();
-                if s.close_to_tray && (s.schedule != Schedule::Off || s.game_ram_clean) {
+                if s.close_to_tray && (s.schedule != Schedule::Off || s.game_ram_clean || !s.game_mode_games.is_empty()) {
                     api.prevent_close();
                     let _ = window.hide();
                 }
@@ -1481,8 +1609,18 @@ pub fn run() {
             console_confirm,
             devices_scan,
             devices_ports,
-            devices_known
+            devices_known,
+            games_list,
+            games_icon,
+            game_mode_status,
+            game_mode_stop
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            // Quitting from the tray in the middle of a game: undo Game Mode on the way out.
+            if let tauri::RunEvent::Exit = event {
+                gamemode::stop();
+            }
+        });
 }
