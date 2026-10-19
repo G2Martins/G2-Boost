@@ -1,9 +1,25 @@
-import { FolderOpen, Lock, Pause, Play, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FolderOpen, Gauge, Lock, Pause, Play, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { rise } from "@/components/shell/page-header";
-import { Badge, Button, Card, HelpHint, Modal, Skeleton } from "@/components/ui/primitives";
-import { backend, inTauri, type ProcInfo } from "@/lib/backend";
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  HelpHint,
+  Modal,
+  Skeleton,
+  selectClass,
+} from "@/components/ui/primitives";
+import {
+  backend,
+  inTauri,
+  type PriorityClass,
+  type PriorityRule,
+  type ProcInfo,
+  type Settings,
+} from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -118,6 +134,8 @@ export function ProcsTab({ elevated }: { elevated: boolean }) {
         {msg ? <p className="w-full text-xs text-foreground/90">{msg}</p> : null}
       </Card>
 
+      <PriorityRules names={(list ?? []).filter((p) => !p.protected).map((p) => p.name)} />
+
       <Card className="animate-rise min-w-0 py-2" style={rise(1)}>
         <div className="grid grid-cols-[1fr_70px_80px_96px_76px] gap-3 border-b border-border px-1 py-2 text-[11px] font-semibold text-muted-foreground">
           <span>{t("procs.col.name")}</span>
@@ -218,5 +236,130 @@ export function ProcsTab({ elevated }: { elevated: boolean }) {
         </p>
       </Modal>
     </>
+  );
+}
+
+const CLASSES: PriorityClass[] = ["idle", "below_normal", "normal", "above_normal", "high"];
+
+/** Fixed priority per executable, applied by the routine thread (core sanitizes every rule). */
+function PriorityRules({ names }: { names: string[] }) {
+  const { t } = useI18n();
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [exe, setExe] = useState("");
+  const [cls, setCls] = useState<PriorityClass>("above_normal");
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    backend.settingsGet().then((s) => s && setSettings(s));
+  }, []);
+  const save = useCallback(
+    async (rules: PriorityRule[]) => {
+      if (!settings) return false;
+      const saved = await backend.settingsSet({ ...settings, priority_rules: rules });
+      setSettings(saved);
+      return saved.priority_rules.length === rules.length;
+    },
+    [settings],
+  );
+  const add = async () => {
+    const name = exe.trim().toLowerCase();
+    if (!/^[^\\/:*?"<>|]{1,60}\.exe$/.test(name) || !settings) {
+      setError(true);
+      return;
+    }
+    const next = [
+      ...settings.priority_rules.filter((r) => r.exe !== name),
+      { exe: name, class: cls },
+    ];
+    const ok = await save(next);
+    setError(!ok); // the core refused it (system or security program)
+    if (ok) setExe("");
+  };
+  const unique = [...new Set(names)].sort();
+  return (
+    <Card className="animate-rise">
+      <CardTitle help={t("prio.help")}>
+        <Gauge className="size-4" />
+        {t("prio.title")}
+      </CardTitle>
+      {settings && settings.priority_rules.length === 0 ? (
+        <p className="mb-3 text-xs text-muted-foreground">{t("prio.empty")}</p>
+      ) : null}
+      <ul className="mb-3 space-y-1.5">
+        {(settings?.priority_rules ?? []).map((r) => (
+          <li key={r.exe} className="flex items-center gap-3 text-sm">
+            <span className="num min-w-0 flex-1 truncate">{r.exe}</span>
+            <select
+              value={r.class}
+              onChange={(e) =>
+                void save(
+                  (settings?.priority_rules ?? []).map((x) =>
+                    x.exe === r.exe ? { ...x, class: e.target.value as PriorityClass } : x,
+                  ),
+                )
+              }
+              className={cn(selectClass, "h-8 w-44 text-xs")}
+              aria-label={r.exe}
+            >
+              {CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {t(`prio.class.${c}` as I18nKey)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() =>
+                void save((settings?.priority_rules ?? []).filter((x) => x.exe !== r.exe))
+              }
+              aria-label={t("prio.remove", { exe: r.exe })}
+              className="press flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/12 hover:text-destructive"
+            >
+              <X className="size-4" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void add();
+        }}
+      >
+        <input
+          value={exe}
+          onChange={(e) => {
+            setExe(e.target.value);
+            setError(false);
+          }}
+          list="prio-procs"
+          maxLength={64}
+          placeholder={t("prio.exe")}
+          aria-label={t("prio.exe")}
+          className="h-8 min-w-48 flex-1 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none focus:border-ring"
+        />
+        <datalist id="prio-procs">
+          {unique.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+        <select
+          value={cls}
+          onChange={(e) => setCls(e.target.value as PriorityClass)}
+          className={cn(selectClass, "h-8 w-44 text-xs")}
+          aria-label={t("prio.title")}
+        >
+          {CLASSES.map((c) => (
+            <option key={c} value={c}>
+              {t(`prio.class.${c}` as I18nKey)}
+            </option>
+          ))}
+        </select>
+        <Button size="sm" variant="outline" type="submit" disabled={!settings}>
+          {t("prio.add")}
+        </Button>
+      </form>
+      {error ? <p className="mt-2 text-[11px] text-destructive">{t("prio.invalid")}</p> : null}
+    </Card>
   );
 }

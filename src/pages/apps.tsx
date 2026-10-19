@@ -161,7 +161,9 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
   const errorText = useErrorText();
   const [apps, setApps] = useState<AppEntry[] | null>(null);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"name" | "size" | "date">("name");
+  const [sort, setSort] = useState<"name" | "size" | "date" | "use">("name");
+  // Last use per app (Explorer launch log): a hint for "apps you no longer open".
+  const [usage, setUsage] = useState<Record<string, number | null>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [waiting, setWaiting] = useState<string | null>(null);
   // Apps whose uninstaller finished (entry gone): their leftovers may now be removed.
@@ -173,6 +175,8 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
   const load = useCallback(async () => {
     const l = await backend.appsList();
     if (l) setApps(l);
+    const u = await backend.appsUsage();
+    if (u) setUsage(Object.fromEntries(u.map((x) => [x.id, x.last_used])));
   }, []);
   useEffect(() => {
     void load();
@@ -214,8 +218,18 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
     if (sort === "size") l.sort((a, b) => (b.size_bytes ?? 0) - (a.size_bytes ?? 0));
     if (sort === "date")
       l.sort((a, b) => (b.install_date ?? "").localeCompare(a.install_date ?? ""));
+    // Least recently opened first; apps never seen in the launch log after them.
+    if (sort === "use")
+      l.sort(
+        (a, b) =>
+          (usage[a.id] ?? Number.MAX_SAFE_INTEGER) - (usage[b.id] ?? Number.MAX_SAFE_INTEGER),
+      );
     return l;
-  }, [apps, query, sort, locale]);
+  }, [apps, query, sort, locale, usage]);
+  const idleDays = (id: string) => {
+    const u = usage[id];
+    return u ? Math.floor((Date.now() / 1000 - u) / 86_400) : null;
+  };
   const app = apps?.find((a) => a.id === selected) ?? null;
 
   const uninstall = async (a: AppEntry) => {
@@ -278,7 +292,7 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
           />
         </label>
         <div className="flex gap-1">
-          {(["name", "size", "date"] as const).map((k) => (
+          {(["name", "size", "date", "use"] as const).map((k) => (
             <button
               key={k}
               type="button"
@@ -329,6 +343,9 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
                     <span className="block truncate text-[11px] text-muted-foreground">
                       {a.publisher || "—"}
                       {a.version ? ` · ${a.version}` : ""}
+                      {sort === "use" && idleDays(a.id) !== null
+                        ? ` · ${t("apps.used_ago", { n: idleDays(a.id) ?? 0 })}`
+                        : ""}
                     </span>
                   </span>
                   <span className="num shrink-0 text-xs text-muted-foreground">

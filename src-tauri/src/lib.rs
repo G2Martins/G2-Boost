@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
-use g2boost_core::{advisor, apps, boottime, claude_connect, consent, console, context, devices, dns, dupes, firmware, gamemode, games, luli, netconns, power, procs, registry, secrets, smart, startup, userassist, wlan};
+use g2boost_core::{advisor, apps, boottime, claude_connect, consent, console, context, devices, dns, dupes, firmware, gamemode, games, luli, netconns, power, prio, procs, registry, secrets, smart, startup, userassist, wlan};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -415,6 +415,8 @@ struct Routines {
     game: Mutex<Option<Game>>,
     ran_since_start: AtomicBool,
     running: AtomicBool,
+    /// Per-exe priority rules: each process is touched once (prio::Enforcer).
+    prio: Mutex<prio::Enforcer>,
 }
 
 /* ---------------- network usage, Wi-Fi ---------------- */
@@ -991,6 +993,9 @@ fn spawn_routines(app: AppHandle) {
             let r = app.state::<Routines>();
             let s = r.settings.lock().unwrap().clone();
             let playing = game_mode_tick(&app, &s);
+            if !s.priority_rules.is_empty() {
+                r.prio.lock().unwrap().tick(&s.priority_rules);
+            }
             if s.game_ram_clean {
                 let now = routines::detect_game(&s.game_exes);
                 *r.game.lock().unwrap() = now.clone();
@@ -1702,6 +1707,7 @@ pub fn run() {
             game: Mutex::new(None),
             ran_since_start: AtomicBool::new(false),
             running: AtomicBool::new(false),
+            prio: Mutex::new(prio::Enforcer::default()),
         })
         .setup(|app| {
             // A Game Mode session left by a crash or a forced exit: put the power plan back first.

@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DupesTab } from "@/components/disk/dupes-tab";
 import { FILE_CLASSES, Treemap } from "@/components/disk/treemap";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
@@ -175,7 +176,7 @@ export function DiskPage() {
   };
 
   const current = drives.find((d) => d.letter === selected);
-  const initialTab = ["treemap", "largest", "essentials"].includes(boot.startTab ?? "")
+  const initialTab = ["treemap", "largest", "dupes", "essentials"].includes(boot.startTab ?? "")
     ? (boot.startTab as string)
     : "treemap";
 
@@ -222,6 +223,7 @@ export function DiskPage() {
           <TabsList>
             <TabsTrigger value="treemap">{t("disk.tab.treemap")}</TabsTrigger>
             <TabsTrigger value="largest">{t("disk.tab.largest")}</TabsTrigger>
+            <TabsTrigger value="dupes">{t("disk.tab.dupes")}</TabsTrigger>
             <TabsTrigger value="essentials">{t("disk.tab.essentials")}</TabsTrigger>
           </TabsList>
           <TabsContent value="treemap">
@@ -384,6 +386,11 @@ export function DiskPage() {
                 version={version}
                 onRecycled={refreshAfterRecycle}
               />
+            </PageBody>
+          </TabsContent>
+          <TabsContent value="dupes">
+            <PageBody className="px-0 pb-0">
+              <DupesTab hasScan={summary !== null} />
             </PageBody>
           </TabsContent>
           <TabsContent value="essentials">

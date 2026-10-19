@@ -211,7 +211,11 @@ export type Settings = {
   luli_instructions: string;
   game_mode_games: string[];
   game_mode: GameModeOptions;
+  priority_rules: PriorityRule[];
 };
+
+export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";
+export type PriorityRule = { exe: string; class: PriorityClass };
 
 /* ---- network usage, Wi-Fi ---- */
 export type ProcNet = {

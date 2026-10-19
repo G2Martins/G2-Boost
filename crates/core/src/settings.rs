@@ -44,6 +44,8 @@ pub struct Settings {
     pub game_mode_games: Vec<String>,
     /// What Game Mode does while one of those games runs.
     pub game_mode: crate::gamemode::Options,
+    /// Fixed priority per executable, applied by the routine thread (never realtime).
+    pub priority_rules: Vec<crate::prio::Rule>,
 }
 
 impl Default for Settings {
@@ -64,6 +66,7 @@ impl Default for Settings {
             luli_instructions: String::new(),
             game_mode_games: Vec::new(),
             game_mode: crate::gamemode::Options::default(),
+            priority_rules: Vec::new(),
         }
     }
 }
@@ -112,6 +115,7 @@ pub fn sanitize(mut s: Settings) -> Settings {
         id.len() <= 200 && id.contains(':') && !id.chars().any(char::is_control) && seen.insert(id.clone())
     });
     s.game_mode_games.truncate(200);
+    s.priority_rules = crate::prio::sanitize(std::mem::take(&mut s.priority_rules));
     s.schedule = match s.schedule {
         Schedule::EveryHours { hours } => Schedule::EveryHours { hours: hours.clamp(1, 168) },
         Schedule::Daily { hour } => Schedule::Daily { hour: hour.min(23) },
@@ -158,6 +162,7 @@ mod tests {
             luli_instructions: "  seja direta\u{0}\n".into(),
             game_mode_games: vec!["steam:730".into(), "steam:730".into(), "bad\u{1}:x".into(), "noprefix".into()],
             game_mode: crate::gamemode::Options::default(),
+            priority_rules: vec![],
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
