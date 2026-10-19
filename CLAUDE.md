@@ -2,7 +2,7 @@
 
 > **Spec viva.** Porta-de-entrada lida pelo agente toda sessão. Não duplica os docs profundos — **aponta** pra eles. Atualize quando uma regra, comando, módulo ou hurdle mudar.
 >
-> **Última revisão:** 2026-10-18 (fixes R1–R20, UI grafite + motion, Energia + Gerenciador de tarefas, Desinstalador + sobras + Store + desfazer + SmartDelete, Playwright; LICENSE/avisos removidos pelo dono)
+> **Última revisão:** 2026-10-19 (rodada 6 testada ponta a ponta: QoS no Modo Jogo, ETW por processo, hurdles de QoS/DPS/UAC) · 2026-10-18 (fixes R1–R20, UI grafite + motion, Energia + Gerenciador de tarefas, Desinstalador + sobras + Store + desfazer + SmartDelete, Playwright; LICENSE/avisos removidos pelo dono)
 > **Fonte única de regras:** [Docs/core/global-rules.md](Docs/core/global-rules.md) · **Roadmap:** [Docs/core/next-steps.md](Docs/core/next-steps.md) · **Estado/sprints:** `.planning/STATE.md` (local, gitignored — criar com `/gsd-new-project`) · **Índice de docs:** [Docs/README.md](Docs/README.md)
 > **Pasta:** renomeada para `G2 Boost` em 2026-10-14 (memória do Claude na chave `g--1--Projetos-2-Projetos-Programa--o-G2-Boost`).
 > **Projeto-irmão de referência (organização de pastas, Docs, design):** `G:\1. Projetos\6. Grovic Data\Valerium-Portal` (`CLAUDE.md`, `Docs/core/design-system.md`, `Docs/core/global-rules.md`). Mesmas convenções, outro domínio.
@@ -126,6 +126,10 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Temperatura da CPU:** decisão do dono = sem driver nosso e sem PawnIO; só HWiNFO (recomendado) ou LHM se já rodam. Core Temp e Afterburner têm drivers flagrados como vulneráveis: não recomendar.
 - **e2e na partida a frio do Vite:** o primeiro lote de páginas em paralelo pode estourar o `page.goto` (30 s) enquanto o Vite otimiza dependências; rodar `bun run test:e2e` de novo antes de investigar (2026-10-18: 6 falhas → 13/13 na segunda).
 - **Playwright fora do runner:** `bun` trava ao abrir o Edge (e tenta auto-instalar pacote se o script estiver fora do projeto). Script avulso = `.mjs` com `node`, dentro do repo (pasta ignorada `test-results/`).
+- **QoS (`MSFT_NetQosPolicySettingData`) grava o nome em minúsculas:** comparar prefixo ignorando caixa (`qos::PREFIX = "g2boost-"`), senão o app não acha a própria política e ela vaza. Política no `ActiveStore` some ao reiniciar; o app elevado limpa `g2boost-*` ao abrir. Conferir sobras: `Get-NetQosPolicy -PolicyStore ActiveStore`.
+- **Tempo de boot vazio com admin ≠ bug:** com o Serviço de Política de Diagnóstico (`svc_dps`) desligado o Windows para de gravar o evento 100 em `Diagnostics-Performance/Operational` (aqui: último em 10/05/2025). `boottime::report` devolve `last_known`; o shell manda `dps_off`.
+- **Testes elevados:** `Start-Process pwsh -Verb RunAs -ArgumentList '-NoProfile','-File',<script>` com o binário de teste já compilado (`target\debug\deps\g2boost_core-*.exe --ignored`); saída em arquivo (a janela elevada não volta stdout). O primeiro UAC de cada rodada costuma ser cancelado: perguntar e abrir de novo. Scripts em `D:\dev\g2boost-tools\elevated-*.ps1`.
+- **ETW de rede por processo** (`netetw.rs`, sessão `G2Boost-NetUsage`, Kernel-Network keywords 0x30) só abre elevado; uma sessão com o mesmo nome que sobrou de um travamento é parada e reaberta. Fechar ao sair da aba (`net_usage_stop`).
 - **Gemini 2.5 fechado para chave nova de API** (2026-10): padrão do app é `gemini-3.8-flash`. Modelos da NVIDIA: `curl https://integrate.api.nvidia.com/v1/models` (público).
 - **MCP Apps:** UI no Claude Desktop via `_meta.ui.resourceUri` + recurso `text/html;profile=mcp-app` (`crates/mcp/src/panel.html`). `#[tool(meta = ...)]` do rmcp 3.5 recebe `MetaObject` (de `serde_json::Map`).
 - **Efeitos visuais são data-driven:** `HKLM\...\Explorer\VisualEffects\<item>` traz `SPIActionGet/Set` ou `RegPath`. Tabela congelada em `visualfx.rs`; o nível Média bateu com o setup do dono na primeira detecção.
