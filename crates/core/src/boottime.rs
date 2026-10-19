@@ -71,6 +71,9 @@ pub struct BootReport {
     pub boots: Vec<Boot>,
     /// Sorted by total degradation (avg x seen), descending.
     pub slow: Vec<SlowItem>,
+    /// When nothing was measured in the window: the most recent boot ever logged (Windows stops
+    /// measuring when the Diagnostic Policy Service is off).
+    pub last_known: Option<Boot>,
 }
 
 /// One parsed event.
@@ -297,7 +300,24 @@ pub fn report(days: u32) -> Result<BootReport, BootError> {
         }
     }
     boots.sort_by_key(|b| std::cmp::Reverse(b.at));
-    Ok(BootReport { days, boots, slow: aggregate(items) })
+    let last_known = if boots.is_empty() { latest_boot() } else { None };
+    Ok(BootReport { days, boots, slow: aggregate(items), last_known })
+}
+
+/// The newest event 100 of any age (reads at most a handful of events).
+fn latest_boot() -> Option<Boot> {
+    let (wl, wq) = (wide(CHANNEL), wide("*[System[EventID=100]]"));
+    // SAFETY: query handle closed by `Handle`.
+    let rs = Handle(unsafe { EvtQuery(None, PCWSTR(wl.as_ptr()), PCWSTR(wq.as_ptr()), EvtQueryChannelPath.0 | EvtQueryReverseDirection.0) }.ok()?);
+    let mut batch = [0isize; 4];
+    let mut got = 0u32;
+    // SAFETY: up to 4 handles written into `batch`; each closed by `Handle`.
+    unsafe { EvtNext(rs.0, &mut batch, 1000, 0, &mut got) }.ok()?;
+    let events: Vec<Handle> = batch[..got as usize].iter().map(|&h| Handle(EVT_HANDLE(h))).collect();
+    events.iter().find_map(|ev| match render_xml(ev.0).as_deref().and_then(parse_event) {
+        Some(Parsed::Boot(b)) => Some(b),
+        _ => None,
+    })
 }
 
 #[cfg(test)]

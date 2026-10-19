@@ -1203,6 +1203,9 @@ export const en = {
   "boot.needs_admin": "Reading Windows' boot log needs administrator.",
   "boot.unavailable": "The boot log is not available on this PC.",
   "boot.none": "No boot measurements in the last 30 days yet.",
+  "boot.last_known": "Last measurement by Windows: {s} s on {when}.",
+  "boot.dps_off":
+    "Windows has not measured boots since then because the Diagnostic Policy Service is off (a PC Boost tweak). Turn it back on to measure again.",
   "boot.last": "on the last boot ({when})",
   "boot.avg": "average {s} s over {n} boots",
   "boot.split": "{main} s to the desktop, {post} s until the PC is idle",

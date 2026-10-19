@@ -1207,6 +1207,9 @@ export const ptBR = {
   "boot.needs_admin": "Ler o log de inicialização do Windows precisa de administrador.",
   "boot.unavailable": "O log de inicialização não está disponível neste PC.",
   "boot.none": "Ainda não há medições de boot nos últimos 30 dias.",
+  "boot.last_known": "Última medição do Windows: {s} s em {when}.",
+  "boot.dps_off":
+    "O Windows não mede o boot desde então porque o Serviço de Política de Diagnóstico está desligado (ajuste do PC Boost). Religue-o para voltar a medir.",
   "boot.last": "no último boot ({when})",
   "boot.avg": "média {s} s em {n} boots",
   "boot.split": "{main} s até a área de trabalho, {post} s até o PC ficar livre",

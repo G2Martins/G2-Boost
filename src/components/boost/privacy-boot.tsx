@@ -159,7 +159,17 @@ export function BootCard({ elevated }: { elevated: boolean }) {
       ) : !report ? (
         <Skeleton className="h-16 w-full" />
       ) : report.boots.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{t("boot.none")}</p>
+        <div className="space-y-1 text-xs text-muted-foreground">
+          {report.last_known ? (
+            <p>
+              {t("boot.last_known", {
+                s: (report.last_known.total_ms / 1000).toFixed(1),
+                when: when(report.last_known.at, locale),
+              })}
+            </p>
+          ) : null}
+          <p>{report.dps_off ? t("boot.dps_off") : t("boot.none")}</p>
+        </div>
       ) : (
         <>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">

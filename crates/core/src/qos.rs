@@ -32,7 +32,8 @@ use crate::tasksched::Com;
 use crate::wmi::WmiValue;
 
 /// Every policy we create is named `G2Boost-<sanitized exe>`.
-pub const PREFIX: &str = "G2Boost-";
+/// Lowercase: the NetQos provider stores policy names lowercased.
+pub const PREFIX: &str = "g2boost-";
 /// Expedited Forwarding. `DSCPAction` is declared `sint8` (MinValue -1, MaxValue 63);
 /// `put_int` reads the CIMTYPE from the class at runtime and sends it as `VT_I2`.
 const DSCP_EF: i32 = 46;
@@ -87,7 +88,8 @@ pub(crate) fn policy_name(exe: &str) -> String {
 
 /// Only names this module could have produced: `G2Boost-` + 1..=64 chars of `[a-z0-9._-]`.
 pub(crate) fn is_ours(name: &str) -> bool {
-    name.strip_prefix(PREFIX).is_some_and(|t| {
+    // Case-insensitive: the provider lowercases names (`G2Boost-x` comes back as `g2boost-x`).
+    name.to_ascii_lowercase().strip_prefix(PREFIX).is_some_and(|t| {
         (1..=64).contains(&t.len()) && t.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-".contains(c))
     })
 }
@@ -192,6 +194,35 @@ impl Session {
         obj.ok_or_else(|| QosError::Wmi("class not found".into()))
     }
 
+    /// Every row the provider returns (diagnostics): name, InstanceID, app, DSCPAction.
+    #[cfg(test)]
+    fn raw(&self) -> Result<Vec<(String, String, String, WmiValue)>, QosError> {
+        let wql = format!("SELECT * FROM {CLASS}");
+        let flags = WBEM_GENERIC_FLAG_TYPE(WBEM_FLAG_FORWARD_ONLY.0 | WBEM_FLAG_RETURN_IMMEDIATELY.0);
+        let mut out = Vec::new();
+        // SAFETY: standard enumeration; each object is released on drop.
+        unsafe {
+            let rows = self.svc.ExecQuery(&BSTR::from("WQL"), &BSTR::from(wql), flags, &self.ctx).map_err(wmi_err)?;
+            loop {
+                let mut objs: [Option<IWbemClassObject>; 1] = [None];
+                let mut returned = 0u32;
+                let hr = rows.Next(10_000, &mut objs, &mut returned);
+                if hr.is_err() {
+                    return Err(wmi_err(hr.into()));
+                }
+                let Some(obj) = objs[0].take().filter(|_| returned == 1) else {
+                    break;
+                };
+                let s = |k: &str| match get(&obj, k) {
+                    WmiValue::Str(x) => x,
+                    other => format!("{other:?}"),
+                };
+                out.push((s("Name"), s("InstanceID"), s("AppPathNameMatchCondition"), get(&obj, "DSCPAction")));
+            }
+        }
+        Ok(out)
+    }
+
     /// Our policies (`is_ours` names only) with their `InstanceID` key.
     fn list(&self) -> Result<Vec<(QosPolicy, String)>, QosError> {
         let wql = format!("SELECT InstanceID, Name, AppPathNameMatchCondition, DSCPAction FROM {CLASS}");
@@ -228,7 +259,7 @@ impl Session {
 
     /// Deletes every policy of ours named `name` (none = Ok, so it is idempotent).
     fn delete_named(&self, name: &str) -> Result<usize, QosError> {
-        let ids: Vec<String> = self.list()?.into_iter().filter(|(p, _)| p.name == name).map(|(_, id)| id).collect();
+        let ids: Vec<String> = self.list()?.into_iter().filter(|(p, _)| p.name.eq_ignore_ascii_case(name)).map(|(_, id)| id).collect();
         for id in &ids {
             self.delete(id)?;
         }
@@ -337,6 +368,29 @@ pub fn list_ours() -> Result<Vec<QosPolicy>, QosError> {
 mod tests {
     use super::*;
 
+    /// Elevated diagnostics: create a policy and print every row the provider returns (the
+    /// policy is left for the caller's script to inspect and remove).
+    #[test]
+    #[ignore]
+    fn qos_live_diag() {
+        if !crate::system::is_elevated() {
+            println!("not elevated");
+            return;
+        }
+        println!("set_game: {:?}", set_game("g2boost-qos-diag.exe"));
+        let s = Session::open().unwrap();
+        match s.raw() {
+            Ok(rows) => {
+                println!("rows: {}", rows.len());
+                for r in rows {
+                    println!("  name={:?} id={:?} app={:?} dscp={:?}", r.0, r.1, r.2, r.3);
+                }
+            }
+            Err(e) => println!("raw error: {e:?}"),
+        }
+        println!("list_ours: {:?}", list_ours());
+    }
+
     #[test]
     fn qos_exe_validation() {
         for ok in ["cs2.exe", "a.exe", "VALORANT-Win64-Shipping.exe", "Counter Strike 2.exe", "jogo.EXE"] {
@@ -354,13 +408,15 @@ mod tests {
 
     #[test]
     fn qos_policy_name_sanitized() {
-        assert_eq!(policy_name("cs2.exe"), "G2Boost-cs2.exe");
-        assert_eq!(policy_name("Counter Strike 2.EXE"), "G2Boost-counter_strike_2.exe");
-        assert_eq!(policy_name("Jogo-Ção_1.exe"), "G2Boost-jogo-__o_1.exe");
+        assert_eq!(policy_name("cs2.exe"), "g2boost-cs2.exe");
+        assert_eq!(policy_name("Counter Strike 2.EXE"), "g2boost-counter_strike_2.exe");
+        assert_eq!(policy_name("Jogo-Ção_1.exe"), "g2boost-jogo-__o_1.exe");
         for exe in ["cs2.exe", "Counter Strike 2.EXE", "Jogo-Ção_1.exe"] {
             assert!(is_ours(&policy_name(exe)));
         }
-        for foreign in ["", "G2Boost-", "g2boost-cs2.exe", "Other-cs2.exe", "G2Boost-CS2.exe", "G2Boost-a\"b", r"G2Boost-a\b"] {
+        // The provider lowercases names: whatever case comes back is still ours.
+        assert!(is_ours("G2Boost-CS2.exe") && is_ours("g2boost-cs2.exe"));
+        for foreign in ["", "g2boost-", "Other-cs2.exe", "g2boost-a\"b", r"g2boost-a\b", "g2boost-ção.exe", "xg2boost-cs2.exe"] {
             assert!(!is_ours(foreign), "{foreign:?}");
         }
     }

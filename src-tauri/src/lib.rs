@@ -695,14 +695,24 @@ async fn apps_usage(state: State<'_, AppsState>) -> Result<Vec<AppUsage>, String
     .map_err(|e| e.to_string())
 }
 
+#[derive(serde::Serialize)]
+struct BootView {
+    #[serde(flatten)]
+    report: boottime::BootReport,
+    /// The Diagnostic Policy Service is off (PC Boost tweak `svc_dps`): Windows stops measuring.
+    dps_off: bool,
+}
+
 /// Boot time and what slowed it (Windows' boot performance log; needs admin to read).
 #[tauri::command]
-async fn boot_report() -> Result<boottime::BootReport, String> {
+async fn boot_report() -> Result<BootView, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        boottime::report(30).map_err(|e| match e {
+        let report = boottime::report(30).map_err(|e| match e {
             boottime::BootError::NeedsAdmin => "needs_admin".to_string(),
             other => other.to_string(),
-        })
+        })?;
+        let dps_off = boost::find("svc_dps").is_ok_and(|t| matches!(boost::detect(t).status, boost::Status::On));
+        Ok(BootView { report, dps_off })
     })
     .await
     .map_err(|e| e.to_string())?

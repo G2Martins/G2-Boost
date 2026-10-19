@@ -328,6 +328,10 @@ export type BootReport = {
     avg_degradation_ms: number;
     last_seen: number;
   }[];
+  /** Newest boot ever logged, when none in the window. */
+  last_known: { at: number; total_ms: number; main_ms: number; post_ms: number } | null;
+  /** Diagnostic Policy Service off: Windows stopped measuring boots. */
+  dps_off: boolean;
 };
 
 /* ---- duplicates ---- */
