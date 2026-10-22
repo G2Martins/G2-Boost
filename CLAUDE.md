@@ -66,7 +66,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 
 - **Regra zero — todo caller é hostil:** UI, MCP, arquivo de config, nome de arquivo/pasta, snapshot importado. Validação no core (Rust), não na UI. (§1.1)
 - **Destrutivo = prévia + confirmação + allowlist + log.** Nunca `rd /s` cego. Nunca apagar fora do catálogo sem seleção explícita do usuário no treemap. Lixeira antes de delete permanente quando possível. (§1.2)
-- **Nativo, não shell.** Proibido spawnar `cmd`, `powershell`, `reg`, `net`, `sc`, `wevtutil`. É exatamente o padrão que o Kaspersky flagra (§6). Exceção documentada: DISM (via `DismApi`, não `DISM.exe`). (§1.3)
+- **Nativo, não shell.** Proibido spawnar `cmd`, `powershell`, `reg`, `net`, `sc`, `wevtutil`. É exatamente o padrão que o Kaspersky flagra (§6). DISM via `DismApi` (não `DISM.exe`); exceções documentadas: `winget.exe`, `sfc.exe`, `mrt.exe` (exe direto, argumentos fixos, só por clique). (§1.3)
 - **Menor privilégio.** Scan e rede rodam sem admin; limpeza de sistema/tweaks pedem elevação via manifesto/UAC, nunca auto-relançamento por PowerShell. (§1.4)
 - **TDD** — unit (catálogo, filtros, parser, layout do treemap) + integração em **sandbox de filesystem** (árvore fabricada em pasta temp) — nunca testar limpeza no C: real. Segurança dedicada por feature destrutiva (path traversal, junction/reparse, symlink, MCP sem token). (§2)
 - **Docs vivas** — toda feature em `Docs/<área>/<nome>.md` com `**Última revisão:** YYYY-MM-DD`. Ler antes de codar; PR que muda comportamento atualiza doc no MESMO PR. (§3)
