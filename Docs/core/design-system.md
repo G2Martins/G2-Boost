@@ -1,6 +1,6 @@
 # Design system — grafite quente, um accent, motion curto
 
-**Última revisão:** 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
+**Última revisão:** 2026-10-22 (mark G²) · 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
 
 Direção: app de diagnóstico, não "gaming dashboard" genérico. Neutros quentes (grafite, texto cor de papel), **um** accent ("brasa", herdado da marca), status com parcimônia. Cards são **poços** — mais escuros que a página, com um filete de luz de 1px no topo: no hover eles clareiam (vêm à tona), nunca "flutuam". Aplicar com a skill `frontend-design`.
 
@@ -56,6 +56,12 @@ Tokens: `--motion-fast` 200 ms · `--motion-base` 350 ms · `--motion-slow` 550 
 - `src/components/ui/primitives.tsx` — Button, Card/CardTitle, HelpHint, Tabs, Switch, StatusPill, Badge (tons), Skeleton, LoadingScope, MetricRow, Modal, EmptyState, `selectClass`; `count-up.tsx` — `useCountUp`/`CountUp`/`reducedMotion`; `gauge.tsx`, `live-line.tsx`, `kpi-card.tsx`. Reusar antes de criar.
 - `AppShell`: sidebar de ícones (ativo = fundo neutro + marcador accent à esquerda) + topbar fina com a marca e o chip de elevação real (`AppInfo.elevated`). Sem busca/sino de enfeite.
 - `PageHeader`: banner `surface` com brilho do accent a 12% + abas sublinhadas (ativa = borda accent).
+
+### 5.1 Marca: mark "G²" (2026-10-22)
+Linguagem da família Grovic/Valerium (letra geométrica grossa e arredondada, "bola" na ponta da haste como no V do Valerium, hexágono dividido na diagonal em dois tons como o da Grovic). **G** grosso com a ponta superior em bola, barra curta terminando num **núcleo hexagonal** bicolor (accent + accent escurecido) e o **2 em expoente** no accent, recortado do G por um vão (máscara, não cor de fundo, então funciona sem placa). Leitura: "G ao quadrado", potência.
+- Fonte única: [src-tauri/icons/g2boost.svg](../../src-tauri/icons/g2boost.svg) (placa grafite arredondada, 1024). Ícones do app: renderizar o SVG em PNG 1024 (`node tools/render-svg.mjs src-tauri/icons/g2boost.svg <saida.png> 1024`, Edge via Playwright) e `./node_modules/.bin/tauri icon <png> -o src-tauri/icons`. `public/favicon.svg` = cópia do SVG.
+- Na UI: `Logo` em [app-shell.tsx](../../src/components/shell/app-shell.tsx), mesma geometria sem placa, cores por token (`--foreground`, `--primary`, metade escura = `--primary` + `--background` a 38%), máscara com id de `useId`.
+- Em 32 px o mark ainda lê (verificado no `32x32.png`); abaixo disso, só a placa com o G.
 
 ## 6. Regras
 - Estado perigoso = confirmação (inline no card ou `<Modal>`); botão destrutivo só depois da prévia.

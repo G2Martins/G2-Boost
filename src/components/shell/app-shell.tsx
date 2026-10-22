@@ -13,7 +13,7 @@ import {
   Sparkles,
   SquareTerminal,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -153,12 +153,55 @@ function NavButton({
   );
 }
 
-/** G2 mark: two slanted bars (boost chevrons) — same geometry as src-tauri/icons/g2boost.svg. */
+const LOGO_TWO = "M 706 214 A 76 76 0 1 1 842 270 L 712 396 L 884 396";
+const LOGO_HEX = "M 358 560 L 414 463 L 526 463 L 582 560 L 526 657 L 414 657 Z";
+
+/** G2 mark "G²": heavy G with ball terminal, split-hex core, exponent 2 carved out of the G.
+ *  Same geometry as src-tauri/icons/g2boost.svg, without the tile, colored by tokens. */
 export function Logo({ className }: { className?: string }) {
+  const carve = `g2logo${useId().replace(/[^\w-]/g, "")}`;
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden>
-      <path d="M14 46 L30 12 H42 L26 46 Z" fill="hsl(var(--primary))" />
-      <path d="M32 46 L48 12 H56 L40 46 Z" fill="hsl(var(--foreground))" opacity="0.9" />
+    <svg viewBox="80 70 870 870" className={className} aria-hidden>
+      <g transform="translate(-20 26)">
+        <mask id={carve} maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+          <rect width="1024" height="1024" fill="white" />
+          <path
+            d={LOGO_TWO}
+            fill="none"
+            stroke="black"
+            strokeWidth="160"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d={LOGO_HEX} fill="black" />
+        </mask>
+        <g mask={`url(#${carve})`} fill="hsl(var(--foreground))">
+          <path
+            d="M 552.5 365.1 A 225 225 0 1 0 665 560 L 520 560"
+            fill="none"
+            stroke="hsl(var(--foreground))"
+            strokeWidth="160"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="552.5" cy="365.1" r="96" />
+        </g>
+        <path d="M 382 560 L 426 484 L 514 484 L 426 636 Z" fill="hsl(var(--primary))" />
+        <path d="M 514 484 L 558 560 L 514 636 L 426 636 Z" fill="hsl(var(--primary))" />
+        <path
+          d="M 514 484 L 558 560 L 514 636 L 426 636 Z"
+          fill="hsl(var(--background))"
+          opacity="0.38"
+        />
+        <path
+          d={LOGO_TWO}
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth="100"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
     </svg>
   );
 }
