@@ -37,16 +37,23 @@ const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "ga
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
 fn start_route() -> Option<String> {
+    cli_arg("--route").or_else(|| std::env::var("G2BOOST_START_ROUTE").ok()).filter(|r| ROUTES.contains(&r.as_str()))
+}
+
+/// Value after `flag` on our own command line (`--route x`, `--tab y`).
+fn cli_arg(flag: &str) -> Option<String> {
     let mut args = std::env::args().skip(1);
-    let mut from_cli = None;
     while let Some(a) = args.next() {
-        if a == "--route" {
-            from_cli = args.next();
+        if a == flag {
+            return args.next();
         }
     }
-    from_cli
-        .or_else(|| std::env::var("G2BOOST_START_ROUTE").ok())
-        .filter(|r| ROUTES.contains(&r.as_str()))
+    None
+}
+
+/// Tab ids are short lowercase words (`updates`, `mypc`); anything else is dropped.
+fn valid_tab(t: &str) -> bool {
+    (1..=24).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
 }
 
 #[derive(serde::Serialize)]
@@ -78,7 +85,7 @@ fn app_info() -> AppInfo {
         elevated: system::is_elevated(),
         user: std::env::var("USERNAME").unwrap_or_default(),
         start_route: start_route(),
-        start_tab: std::env::var("G2BOOST_START_TAB").ok(),
+        start_tab: cli_arg("--tab").or_else(|| std::env::var("G2BOOST_START_TAB").ok()).filter(|t| valid_tab(t)),
         autorun: std::env::var("G2BOOST_AUTORUN").is_ok_and(|v| v == "1"),
         scan_path: std::env::var("G2BOOST_SCAN_PATH").ok(),
         exe: std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
@@ -139,11 +146,15 @@ async fn ram_purge() -> Result<PurgeResult, String> {
 
 /// Relaunch this exe elevated (UAC) on `route`, then quit this instance.
 #[tauri::command]
-fn relaunch_elevated(app: AppHandle, route: String) -> Result<(), String> {
+fn relaunch_elevated(app: AppHandle, route: String, tab: Option<String>) -> Result<(), String> {
     if !ROUTES.contains(&route.as_str()) {
         return Err("unknown_route".into());
     }
-    boost::relaunch_elevated(&["--route", &route]).map_err(|e| e.to_string())?;
+    let mut args = vec!["--route", route.as_str()];
+    if let Some(t) = tab.as_deref().filter(|t| valid_tab(t)) {
+        args.extend(["--tab", t]);
+    }
+    boost::relaunch_elevated(&args).map_err(|e| e.to_string())?;
     app.exit(0);
     Ok(())
 }

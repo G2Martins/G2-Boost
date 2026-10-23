@@ -346,7 +346,7 @@ export function MyPc({ elevated }: { elevated: boolean }) {
                   {satBusy ? t("mypc.winsat.running") : t("mypc.winsat.run")}
                 </Button>
               ) : (
-                <ElevateButton route="dashboard" />
+                <ElevateButton route="dashboard" tab="mypc" />
               )}
             </div>
           </Card>

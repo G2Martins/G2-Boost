@@ -297,7 +297,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
             </>
           ) : (
             <>
-              <ElevateButton route="boost" />
+              <ElevateButton route="boost" tab="tweaks" />
               <HelpHint text={t("boost.elevate.hint")} />
             </>
           )}
@@ -568,7 +568,7 @@ function RamTab({ elevated }: { elevated: boolean }) {
           help={t("boost.ram.help")}
           right={
             <span className="flex items-center gap-2">
-              {!elevated ? <ElevateButton route="boost" /> : null}
+              {!elevated ? <ElevateButton route="boost" tab="ram" /> : null}
               <Button variant="primary" disabled={busy || !inTauri} onClick={clean}>
                 <Eraser className="size-4" />
                 {t("boost.ram.clean")}
@@ -651,7 +651,7 @@ function RamTab({ elevated }: { elevated: boolean }) {
           {!elevated ? (
             <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-warning">
               {t("settings.game.needs_admin")}
-              <ElevateButton route="boost" />
+              <ElevateButton route="boost" tab="ram" />
             </p>
           ) : null}
           <p className="mt-4 rounded-md border border-chart-1/30 bg-chart-1/10 px-3 py-2.5 text-xs text-foreground/90">
@@ -725,7 +725,7 @@ function DnsTab({ elevated }: { elevated: boolean }) {
           {t("boost.dns.title")}
           <HelpHint text={t("boost.dns.help")} />
         </span>
-        {!elevated ? <ElevateButton route="boost" /> : null}
+        {!elevated ? <ElevateButton route="boost" tab="dns" /> : null}
         <div className="ml-auto flex gap-2">
           <Button
             variant="outline"
@@ -877,7 +877,7 @@ function StartupTab({ elevated }: { elevated: boolean }) {
             {t("boost.startup.count", { on: enabled, total: items.length })}
           </Badge>
         ) : null}
-        {!elevated && items?.some((i) => i.needs_admin) ? <ElevateButton route="boost" /> : null}
+        {!elevated && items?.some((i) => i.needs_admin) ? <ElevateButton route="boost" tab="startup" /> : null}
         <Button
           variant="outline"
           className="ml-auto"

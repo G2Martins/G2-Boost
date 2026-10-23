@@ -619,7 +619,7 @@ function WindowsSection({ elevated }: { elevated: boolean }) {
             </span>
             <span className="text-xs text-muted-foreground">{t("updates.wu.admin.body")}</span>
           </span>
-          <ElevateButton route="apps" size="md" />
+          <ElevateButton route="apps" tab="updates" size="md" />
         </Card>
       ) : null}
 

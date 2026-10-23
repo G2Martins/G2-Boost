@@ -904,7 +904,8 @@ export const backend = {
   boostVisualFxRevert: () => callOrThrow<TweakState>("boost_visual_fx_revert"),
   ramPurge: () => callOrThrow<PurgeResult>("ram_purge"),
   /** Relaunches the app elevated (UAC prompt) on `route`; this instance exits on success. */
-  relaunchElevated: (route: string) => callOrThrow<void>("relaunch_elevated", { route }),
+  relaunchElevated: (route: string, tab?: string) =>
+    callOrThrow<void>("relaunch_elevated", { route, tab: tab ?? null }),
 
   cleanupPreview: (ids: string[]) => callOrThrow<PreviewItem[]>("cleanup_preview", { ids }),
   cleanupConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("cleanup_confirm", { ids }),

@@ -126,7 +126,7 @@ export function NetUsageTab() {
       {rates ? null : (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
           {t("net.usage.note")}
-          <ElevateButton route="network" />
+          <ElevateButton route="network" tab="usage" />
         </div>
       )}
     </Card>

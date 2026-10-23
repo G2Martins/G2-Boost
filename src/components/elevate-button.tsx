@@ -23,8 +23,16 @@ export function useErrorText() {
   );
 }
 
-/** Relaunch the app elevated (UAC) on `route`; this instance exits on success. */
-export function ElevateButton({ route, size = "sm" }: { route: string; size?: "sm" | "md" }) {
+/** Relaunch the app elevated (UAC) on `route` (and `tab`); this instance exits on success. */
+export function ElevateButton({
+  route,
+  tab,
+  size = "sm",
+}: {
+  route: string;
+  tab?: string;
+  size?: "sm" | "md";
+}) {
   const { t } = useI18n();
   const errorText = useErrorText();
   const [err, setErr] = useState<string | null>(null);
@@ -33,7 +41,7 @@ export function ElevateButton({ route, size = "sm" }: { route: string; size?: "s
       <Button
         variant="outline"
         size={size}
-        onClick={() => backend.relaunchElevated(route).catch((e) => setErr(errorText(e)))}
+        onClick={() => backend.relaunchElevated(route, tab).catch((e) => setErr(errorText(e)))}
       >
         <ShieldCheck className="size-4" />
         {t("boost.elevate")}

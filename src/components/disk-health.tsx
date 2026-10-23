@@ -26,7 +26,7 @@ export function DiskHealthCard({ elevated }: { elevated: boolean }) {
     <Card className="animate-rise" style={rise(6)}>
       <CardTitle
         help={t("health.help")}
-        right={needsAdmin ? <ElevateButton route="dashboard" /> : undefined}
+        right={needsAdmin ? <ElevateButton route="dashboard" tab="mypc" /> : undefined}
       >
         <HardDrive className="size-4" />
         {t("health.title")}

@@ -77,7 +77,7 @@ export function BiosGuideCard({ elevated, index }: { elevated: boolean; index: n
                   {t("bios.reboot")}
                 </Button>
               ) : (
-                <ElevateButton route="dashboard" />
+                <ElevateButton route="dashboard" tab="mypc" />
               )
             ) : (
               <span className="text-xs text-muted-foreground">{t("bios.reboot.legacy")}</span>

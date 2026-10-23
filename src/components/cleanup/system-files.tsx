@@ -141,7 +141,7 @@ export function SystemFilesPanel({
         </span>
         {!elevated ? (
           <span className="flex items-center gap-2 text-xs text-warning">
-            <ElevateButton route="cleanup" />
+            <ElevateButton route="cleanup" tab="system" />
             <HelpHint text={t("volcache.needs_admin")} />
           </span>
         ) : null}

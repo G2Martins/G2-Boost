@@ -152,7 +152,7 @@ export function BootCard({ elevated }: { elevated: boolean }) {
       {error === "needs_admin" && !elevated ? (
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {t("boot.needs_admin")}
-          <ElevateButton route="boost" />
+          <ElevateButton route="boost" tab="startup" />
         </div>
       ) : error ? (
         <p className="text-xs text-muted-foreground">{t("boot.unavailable")}</p>

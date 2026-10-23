@@ -110,7 +110,7 @@ export function ProcsTab({ elevated }: { elevated: boolean }) {
             {t("procs.count", { n: list.length, cpu: Math.min(100, totalCpu).toFixed(0) })}
           </Badge>
         ) : null}
-        {!elevated ? <ElevateButton route="boost" /> : null}
+        {!elevated ? <ElevateButton route="boost" tab="procs" /> : null}
         <label className="ml-auto flex h-9 w-64 items-center gap-2 rounded-md border border-border bg-background px-3 text-muted-foreground focus-within:border-ring">
           <Search className="size-4" />
           <input
