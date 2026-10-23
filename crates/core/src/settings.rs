@@ -46,6 +46,9 @@ pub struct Settings {
     pub game_mode: crate::gamemode::Options,
     /// Fixed priority per executable, applied by the routine thread (never realtime).
     pub priority_rules: Vec<crate::prio::Rule>,
+    /// Background check for new exposure (public listener, inbound connection, remote-access
+    /// app, router port forward) every few minutes; alerts in the app.
+    pub exposure_monitor: bool,
 }
 
 impl Default for Settings {
@@ -67,6 +70,7 @@ impl Default for Settings {
             game_mode_games: Vec::new(),
             game_mode: crate::gamemode::Options::default(),
             priority_rules: Vec::new(),
+            exposure_monitor: true,
         }
     }
 }
@@ -163,6 +167,7 @@ mod tests {
             game_mode_games: vec!["steam:730".into(), "steam:730".into(), "bad\u{1}:x".into(), "noprefix".into()],
             game_mode: crate::gamemode::Options::default(),
             priority_rules: vec![],
+            exposure_monitor: true,
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
@@ -199,5 +204,6 @@ mod tests {
         // Unknown/missing fields fall back to defaults instead of failing.
         let partial: Settings = serde_json::from_str(r#"{"game_ram_clean":true}"#).unwrap();
         assert!(partial.game_ram_clean && partial.close_to_tray);
+        assert!(partial.exposure_monitor, "exposure monitor defaults on");
     }
 }

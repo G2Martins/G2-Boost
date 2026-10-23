@@ -97,6 +97,8 @@ pub struct Env {
     pub firmware: Option<Firmware>,
     /// CPU temperature from HWiNFO / LibreHardwareMonitor when one of them is running.
     pub cpu_temp_c: Option<f64>,
+    /// Remote access and exposure (cheap subset, `exposure::quick`).
+    pub exposure: Option<crate::exposure::Report>,
 }
 
 /// Gather everything the rules need for this machine (no admin, ~1 s).
@@ -114,6 +116,7 @@ pub fn env(p: &Profile, sample: Option<Sample>, winsat: Option<WinSat>) -> Env {
         gpu_driver_age_days: gpu_driver.as_deref().and_then(driver_age_days),
         firmware: Some(firmware::read(p)),
         cpu_temp_c,
+        exposure: Some(crate::exposure::quick()),
     }
 }
 
@@ -347,6 +350,10 @@ pub fn analyze(p: &Profile, e: &Env) -> Report {
         {
             f.push(finding("winsat_disk_weakest", Severity::Info, Kind::Upgrade, &[("disk", format!("{disk:.1}"))]));
         }
+    }
+
+    if let Some(x) = &e.exposure {
+        f.extend(crate::exposure::advisor_findings(x));
     }
 
     f.sort_by_key(|x| std::cmp::Reverse(x.severity));
