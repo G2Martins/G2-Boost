@@ -55,13 +55,9 @@ pub fn running_process_paths() -> Vec<String> {
             let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
                 continue;
             };
-            let mut buf = [0u16; 1024];
-            let mut len = buf.len() as u32;
-            let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+            let path = image_path(h);
             let _ = CloseHandle(h);
-            if ok {
-                out.push(String::from_utf16_lossy(&buf[..len as usize]));
-            }
+            out.extend(path);
         }
     }
     out
@@ -71,6 +67,16 @@ pub fn running_process_paths() -> Vec<String> {
 /// `%SystemRoot%` in lower case (`c:\windows` when unset).
 pub(crate) fn system_root() -> String {
     std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_ascii_lowercase()
+}
+
+/// Full Win32 path of an open process (`PROCESS_QUERY_LIMITED_INFORMATION` is enough).
+pub(crate) fn image_path(h: HANDLE) -> Option<String> {
+    let mut buf = [0u16; 1024];
+    let mut len = buf.len() as u32;
+    // SAFETY: valid handle from the caller; the buffer is sized for the call.
+    unsafe { QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len) }
+        .ok()
+        .map(|()| String::from_utf16_lossy(&buf[..(len as usize).min(buf.len())]))
 }
 
 pub fn is_elevated() -> bool {

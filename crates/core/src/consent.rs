@@ -15,10 +15,6 @@ use crate::registry::{Root, subkeys, wide};
 
 const BASE: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore";
 const MAX_STR: usize = 260;
-/// FILETIME ticks (100 ns) between 1601-01-01 and 1970-01-01, in seconds.
-const EPOCH_DIFF_SECS: u64 = 11_644_473_600;
-/// Year 3000: anything later is garbage.
-const MAX_UNIX: u64 = 32_503_680_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,13 +50,7 @@ pub struct AccessRecord {
 }
 
 /// FILETIME (100 ns since 1601) → unix seconds. 0, pre-1970 and absurd values → 0.
-pub fn filetime_to_unix(ft: u64) -> u64 {
-    let secs = ft / 10_000_000;
-    match secs.checked_sub(EPOCH_DIFF_SECS) {
-        Some(u) if u <= MAX_UNIX => u,
-        _ => 0,
-    }
-}
+pub use crate::registry::filetime_to_unix;
 
 /// `C:#Users#me#app.exe` → `C:\Users\me\app.exe`.
 pub fn decode_path(sub: &str) -> String {

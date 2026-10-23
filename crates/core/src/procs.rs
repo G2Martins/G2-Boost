@@ -14,11 +14,11 @@ use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEM
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
     GetPriorityClass, GetProcessTimes, HIGH_PRIORITY_CLASS, IsProcessCritical, NORMAL_PRIORITY_CLASS, OpenProcess,
-    PROCESS_ACCESS_RIGHTS, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE,
-    QueryFullProcessImageNameW, SetPriorityClass, TerminateProcess,
+    PROCESS_ACCESS_RIGHTS, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE,
+    SetPriorityClass, TerminateProcess,
 };
 use windows::Win32::System::Threading::{PROCESS_SET_LIMITED_INFORMATION, SetProcessDefaultCpuSets};
-use windows::core::{BOOL, PWSTR};
+use windows::core::BOOL;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ProcGroup {
@@ -51,15 +51,9 @@ fn ft(f: FILETIME) -> u64 {
 
 /// Image path, CPU time and creation time of an open process.
 fn query(h: HANDLE) -> (String, u64, u64) {
-    let mut buf = [0u16; 1024];
-    let mut len = buf.len() as u32;
-    // SAFETY: buffer sized for the call; FILETIMEs are plain out-structs.
+    let path = crate::system::image_path(h).unwrap_or_default();
+    // SAFETY: FILETIMEs are plain out-structs.
     unsafe {
-        let path = if QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok() {
-            String::from_utf16_lossy(&buf[..len as usize])
-        } else {
-            String::new()
-        };
         let (mut c, mut e, mut k, mut u) = (FILETIME::default(), FILETIME::default(), FILETIME::default(), FILETIME::default());
         let (cpu, created) = if GetProcessTimes(h, &mut c, &mut e, &mut k, &mut u).is_ok() { (ft(k) + ft(u), ft(c)) } else { (0, 0) };
         (path, cpu, created)

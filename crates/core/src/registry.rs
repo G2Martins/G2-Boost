@@ -425,6 +425,18 @@ pub fn delete_backup(tweak: &str) {
     }
 }
 
+/// FILETIME (100 ns ticks since 1601) to Unix seconds; before 1970 or after year 3000 = 0 (garbage).
+pub fn filetime_to_unix(ft: u64) -> u64 {
+    const EPOCH_DIFF_SECS: u64 = 11_644_473_600;
+    const MAX_UNIX: u64 = 32_503_680_000;
+    (ft / 10_000_000).checked_sub(EPOCH_DIFF_SECS).filter(|&u| u <= MAX_UNIX).unwrap_or(0)
+}
+
+/// Unix seconds to FILETIME (100 ns ticks since 1601).
+pub fn unix_to_filetime(secs: u64) -> u64 {
+    (secs + 11_644_473_600) * 10_000_000
+}
+
 pub fn now_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

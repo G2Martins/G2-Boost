@@ -18,8 +18,6 @@ use crate::registry::{Root, Value, read, value_names};
 const BASE: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist";
 const GUIDS: [&str; 2] = ["{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}", "{F4E57C4B-2036-45F0-A9AB-443BCFE33D9F}"];
 const MAX_STR: usize = 520;
-const EPOCH_DIFF_SECS: u64 = 11_644_473_600;
-const MAX_UNIX: u64 = 32_503_680_000;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ExeUsage {
@@ -48,7 +46,7 @@ pub fn parse_record(d: &[u8]) -> Option<(u32, u32, u64)> {
     }
     let u32_at = |o: usize| u32::from_le_bytes([d[o], d[o + 1], d[o + 2], d[o + 3]]);
     let ft = u64::from_le_bytes(d[60..68].try_into().ok()?);
-    let last = (ft / 10_000_000).checked_sub(EPOCH_DIFF_SECS).filter(|&u| u <= MAX_UNIX).unwrap_or(0);
+    let last = crate::registry::filetime_to_unix(ft);
     Some((u32_at(4), u32_at(12), last))
 }
 
@@ -154,7 +152,7 @@ mod tests {
 
     #[test]
     fn parses_records() {
-        let ft = (EPOCH_DIFF_SECS + 1_700_000_000) * 10_000_000;
+        let ft = crate::registry::unix_to_filetime(1_700_000_000);
         assert_eq!(parse_record(&rec(7, 1234, ft)), Some((7, 1234, 1_700_000_000)));
         assert_eq!(parse_record(&rec(1, 0, 0)), Some((1, 0, 0)));
         assert_eq!(parse_record(&rec(1, 0, u64::MAX)), Some((1, 0, 0)));

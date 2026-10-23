@@ -15,10 +15,7 @@ use windows::Win32::NetworkManagement::IpHelper::{
     MIB_UDPROW_OWNER_PID, TCP_TABLE_OWNER_PID_ALL, UDP_TABLE_OWNER_PID,
 };
 use windows::Win32::Networking::WinSock::{AF_INET, AF_INET6};
-use windows::Win32::System::Threading::{
-    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
-};
-use windows::core::PWSTR;
+use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
 
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const MAX_STR: usize = 260;
@@ -155,11 +152,7 @@ fn proc_info(pid: u32) -> (String, String) {
     // SAFETY: limited-information handle, closed below; buffer sized for the call.
     unsafe {
         if let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
-            let mut buf = [0u16; 1024];
-            let mut len = buf.len() as u32;
-            if QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok() {
-                path = String::from_utf16_lossy(&buf[..(len as usize).min(buf.len())]);
-            }
+            path = crate::system::image_path(h).unwrap_or_default();
             let _ = CloseHandle(h);
         }
     }

@@ -1627,7 +1627,7 @@ pub fn undo() -> Result<UndoOutcome, AppsError> {
     let rec = undo_status().ok_or(AppsError::NothingToUndo)?;
     let ctx = Ctx::live();
     let mut out = UndoOutcome::default();
-    let since = (rec.at.saturating_sub(120) + 11_644_473_600) * 10_000_000; // unix s → FILETIME
+    let since = registry::unix_to_filetime(rec.at.saturating_sub(120));
     let bin = if rec.files.is_empty() { Vec::new() } else { recycle_bin() };
     for original in &rec.files {
         let target = PathBuf::from(original);

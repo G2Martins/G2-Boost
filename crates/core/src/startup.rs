@@ -94,8 +94,7 @@ pub(crate) fn approved_blob(enabled: bool, now_filetime: u64) -> Vec<u8> {
 }
 
 fn filetime_now() -> u64 {
-    // FILETIME = 100 ns ticks since 1601-01-01.
-    (registry::now_unix() + 11_644_473_600) * 10_000_000
+    registry::unix_to_filetime(registry::now_unix())
 }
 
 fn state(location: Location, name: &str) -> bool {

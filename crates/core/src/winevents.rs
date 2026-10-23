@@ -194,10 +194,6 @@ fn message(provider: &str, event: EVT_HANDLE) -> Option<String> {
     }
 }
 
-fn filetime_to_unix(ft: u64) -> u64 {
-    (ft / 10_000_000).saturating_sub(11_644_473_600)
-}
-
 /// Errors and critical events of the last `days` (1..=30), newest first, grouped.
 pub fn summary(days: u32) -> Summary {
     let days = days.clamp(1, 30);
@@ -259,7 +255,7 @@ pub fn summary(days: u32) -> Summary {
                         event_id: id,
                         level: level_name(level),
                         count: 1,
-                        last_unix: filetime_to_unix(ft),
+                        last_unix: crate::registry::filetime_to_unix(ft),
                         message: msg.filter(|m| !m.is_empty()),
                     },
                 );
@@ -296,7 +292,7 @@ mod tests {
         assert_eq!(m, "Windows Update falhou em %USERPROFILE%\\x");
         assert_eq!(redact("PCX e PC", "u", "PC", ""), "PCX e %COMPUTERNAME%");
         assert!(clean_message(&"x".repeat(500), "", "", "").chars().count() <= MAX_MESSAGE + 1);
-        assert_eq!(filetime_to_unix(116_444_736_000_000_000), 0);
+        assert_eq!(crate::registry::filetime_to_unix(116_444_736_000_000_000), 0);
     }
 
     #[test]
