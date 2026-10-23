@@ -391,7 +391,7 @@ function Summary({
         <p className="num mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           {(["high", "medium", "low"] as const).map((s) => (
             <span key={s} className="inline-flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-[2px]", DOOR[s])} />
+              <span className={cn("size-2 rounded-xs", DOOR[s])} />
               {count(s)} {t(`security.sev.${s}` as const)}
             </span>
           ))}
