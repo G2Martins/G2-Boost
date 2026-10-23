@@ -455,7 +455,7 @@ fn gpu_driver(name: &str) -> Option<String> {
     None
 }
 
-fn gpus() -> Vec<Gpu> {
+pub fn gpus() -> Vec<Gpu> {
     let mut out: Vec<Gpu> = Vec::new();
     // SAFETY: DXGI factory enumeration; every interface is released by drop.
     unsafe {
