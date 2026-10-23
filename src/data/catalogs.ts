@@ -148,6 +148,10 @@ export const TWEAKS: Tweak[] = [
   { id: "hvci_off", admin: true, beta: true, reboot: true, presets: [] },
   { id: "priority_sep", admin: true, beta: true, presets: [] },
   { id: "perf_counters", admin: true, beta: true, presets: [] },
+  { id: "winsat_task_off", admin: true, presets: ["high"] },
+  { id: "feedback_tasks_off", admin: true, presets: ["default", "high"] },
+  // Turns printing off: custom only, recommended by the core just on PCs without a real printer.
+  { id: "svc_spooler", admin: true, presets: [] },
 ];
 /** Visual-effects level each preset applies. */
 export const PRESET_FX_LEVEL = { default: "balanced", high: "performance" } as const;

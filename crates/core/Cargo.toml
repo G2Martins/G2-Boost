@@ -68,4 +68,7 @@ features = [
   "Management_Deployment",
   "Foundation_Collections",
   "Win32_UI_LegacyWindowsEnvironmentFeatures",
+  "Win32_System_WindowsProgramming",
+  "Win32_System_Shutdown",
+  "Win32_Graphics_Printing",
 ]

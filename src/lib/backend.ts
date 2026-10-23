@@ -212,6 +212,8 @@ export type Settings = {
   game_mode_games: string[];
   game_mode: GameModeOptions;
   priority_rules: PriorityRule[];
+  /** By game id; changed only through `gameTweaksSet` (it also writes the GPU preference). */
+  game_tweaks: Record<string, GameTweaks>;
 };
 
 export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";
@@ -374,10 +376,10 @@ export type GameModeSession = {
   install_dir: string | null;
   started: number;
   prev_plan: string | null;
-  /** `power_plan`, `priority`, `ram`. */
+  /** `power_plan`, `priority`, `ram`, `qos`, `affinity`. */
   applied: string[];
   ram_freed: number;
-  /** `needs_admin`, `plan_failed`, `priority_denied`. */
+  /** `needs_admin`, `plan_failed`, `priority_denied`, `affinity_denied`. */
   skipped: string[];
 };
 
@@ -734,6 +736,39 @@ export type RepairStatus = {
   mrt_present: boolean;
 };
 export type RepairProgress = { tool: RepairTool; percent: number | null };
+/* ---- BIOS guide, per-game tweaks (round 7.1) ---- */
+export type BiosVendor = "asus" | "msi" | "gigabyte" | "asrock" | "generic";
+export type BiosItemId =
+  | "csm"
+  | "xmp"
+  | "rebar"
+  | "secure_boot"
+  | "tpm"
+  | "bios_update"
+  | "virtualization";
+/** `path`: the firmware's own menu labels (English, untranslated), joined with " › ". */
+export type BiosGuideItem = { id: BiosItemId; path: string; optional: boolean };
+export type BiosGuide = {
+  vendor: BiosVendor;
+  enter_key: string;
+  advanced_key: string | null;
+  uefi: boolean;
+  items: BiosGuideItem[];
+};
+export type GameTweaks = {
+  free_core0: boolean;
+  physical_only: boolean;
+  perf_cores_only: boolean;
+  gpu_high_perf: boolean;
+};
+export type CpuSummary = {
+  logical: number;
+  physical: number;
+  smt: boolean;
+  hybrid: boolean;
+  perf_logical: number;
+};
+export type GameTweaksInfo = { cpu: CpuSummary; gpus: number };
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
@@ -920,4 +955,11 @@ export const backend = {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as T;
   },
+
+  biosGuide: () => call<BiosGuide>("bios_guide"),
+  /** Restarts the PC into the firmware setup (after the UI's confirmation). */
+  biosReboot: () => callOrThrow<void>("bios_reboot"),
+  gameTweaksInfo: () => call<GameTweaksInfo>("game_tweaks_info"),
+  gameTweaksSet: (id: string, tweaks: GameTweaks) =>
+    callOrThrow<Settings>("game_tweaks_set", { id, tweaks }),
 };

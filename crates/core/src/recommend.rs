@@ -22,6 +22,9 @@ pub struct Facts {
     pub outlook: bool,
     /// Build 22000+ (the windowed-games optimization only exists there).
     pub windows11: bool,
+    /// A real printer (local or connection, not PDF/XPS/OneNote/Fax) is installed.
+    /// `None` = the list could not be read (the Print Spooler is off, for one).
+    pub printers: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -60,7 +63,37 @@ pub fn facts_for(p: &hardware::Profile) -> Facts {
             registry::read(Root::Hklm, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber"),
             Ok(Value::Str(b)) if b.parse::<u32>().is_ok_and(|n| n >= 22_000)
         ),
+        printers: real_printers(),
     }
+}
+
+/// Printers that print to a file or app, not paper: they need the Spooler but no device.
+pub(crate) fn is_virtual_printer(name: &str) -> bool {
+    let n = name.to_lowercase();
+    ["pdf", "xps", "onenote", "fax"].iter().any(|v| n.contains(v))
+}
+
+/// Local printers and connections through the Spooler (`EnumPrintersW`, level 4).
+fn real_printers() -> Option<bool> {
+    use windows::Win32::Graphics::Printing::{EnumPrintersW, PRINTER_ENUM_CONNECTIONS, PRINTER_ENUM_LOCAL, PRINTER_INFO_4W};
+    use windows::core::PCWSTR;
+    let flags = PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS;
+    let (mut needed, mut count) = (0u32, 0u32);
+    // SAFETY: size probe; succeeds only when there is nothing to list.
+    match unsafe { EnumPrintersW(flags, PCWSTR::null(), 4, None, &mut needed, &mut count) } {
+        Ok(()) => return Some(false),
+        Err(_) if needed == 0 => return None, // Spooler stopped or RPC failure
+        Err(_) => {}
+    }
+    // u64 storage keeps the PRINTER_INFO_4W array pointer-aligned.
+    let mut buf = vec![0u64; (needed as usize).div_ceil(8)];
+    // SAFETY: the byte view covers `needed` bytes of `buf`.
+    let bytes = unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), needed as usize) };
+    // SAFETY: buffer of the size Windows asked for.
+    unsafe { EnumPrintersW(flags, PCWSTR::null(), 4, Some(bytes), &mut needed, &mut count) }.ok()?;
+    // SAFETY: Windows wrote `count` structs at the start of the buffer; their strings live in it.
+    let list = unsafe { std::slice::from_raw_parts(buf.as_ptr().cast::<PRINTER_INFO_4W>(), count as usize) };
+    Some(list.iter().any(|p| !is_virtual_printer(&unsafe { p.pPrinterName.to_string() }.unwrap_or_default())))
 }
 
 /// One entry per catalog tweak, in catalog order.
@@ -83,6 +116,11 @@ pub fn recommend(f: &Facts) -> Vec<Recommendation> {
                 "windowed_optimizations" if !f.windows11 => (false, Some("windows10")),
                 "hvci_off" => (false, Some("security")),
                 "svc_dps" | "svc_geolocation" => (false, Some("preference")),
+                "svc_spooler" => match f.printers {
+                    Some(false) => (true, None),
+                    Some(true) => (false, Some("printer")),
+                    None => (false, Some("unknown")),
+                },
                 _ if t.beta => (false, Some("beta")),
                 _ => (true, None),
             };
@@ -154,6 +192,28 @@ mod tests {
         assert_eq!(by(&r, "svc_search").reason, Some("outlook"));
         assert_eq!(by(&r, "windowed_optimizations").reason, Some("windows10"));
         assert_eq!(recommend(&Facts::default()).iter().find(|r| r.id == "svc_sysmain").unwrap().reason, Some("unknown_disk"));
+    }
+
+    #[test]
+    fn spooler_only_without_real_printers() {
+        let no_printer = Facts { printers: Some(false), ..Default::default() };
+        assert!(by(&recommend(&no_printer), "svc_spooler").recommended);
+        assert_eq!(by(&recommend(&Facts { printers: Some(true), ..Default::default() }), "svc_spooler").reason, Some("printer"));
+        assert_eq!(by(&recommend(&Facts::default()), "svc_spooler").reason, Some("unknown"), "list unreadable (Spooler off)");
+        assert!(by(&recommend(&no_printer), "winsat_task_off").recommended);
+        assert!(by(&recommend(&no_printer), "feedback_tasks_off").recommended);
+        for v in ["Microsoft Print to PDF", "Microsoft XPS Document Writer", "OneNote (Desktop)", "Fax", "Enviar para o OneNote 2016"] {
+            assert!(is_virtual_printer(v), "{v}");
+        }
+        for real in ["HP LaserJet Pro M404", "EPSON L3250 Series", r"\\office\Brother HL-L2350DW"] {
+            assert!(!is_virtual_printer(real), "{real}");
+        }
+    }
+
+    #[test]
+    fn live_printer_probe_answers() {
+        // Any answer is fine (no printer / printer / Spooler off); it must not crash or hang.
+        let _ = real_printers();
     }
 
     #[test]

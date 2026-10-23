@@ -10,6 +10,7 @@ import {
   Tv,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BiosGuideCard } from "@/components/bios-guide";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { rise } from "@/components/shell/page-header";
 import {
@@ -486,6 +487,8 @@ export function MyPc({ elevated }: { elevated: boolean }) {
             />
           </div>
         </Card>
+
+        <BiosGuideCard elevated={elevated} index={7} />
       </div>
     </LoadingScope>
   );

@@ -89,6 +89,9 @@ const ICONS: Record<string, typeof Zap> = {
   svc_xbox: Server,
   priority_sep: Cpu,
   perf_counters: Cpu,
+  winsat_task_off: GaugeIcon,
+  feedback_tasks_off: Shield,
+  svc_spooler: Server,
 };
 
 type StateMap = Record<string, TweakState>;
