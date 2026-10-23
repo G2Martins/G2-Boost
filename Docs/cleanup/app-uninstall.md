@@ -1,8 +1,11 @@
 # Desinstalar apps (AppCleaner para Windows)
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/apps.rs` (+ `registry::export_tree/delete_tree`, `disk::shell_recycle`, `boost::delete_orphan_service`, `cleanup::TokenStore`); shell `src-tauri/src/lib.rs` (`AppsState`, `apps_*`); UI `src/pages/apps.tsx` (rota **Desinstalar apps**), drop em `src/App.tsx` + `src/lib/nav.ts`. Conceito de origem (clean-room): [../references/appcleaner.md](../references/appcleaner.md).
+**Última revisão:** 2026-10-23 (aba Atualizações) · 2026-10-18 · Código: `crates/core/src/apps.rs` (+ `registry::export_tree/delete_tree`, `disk::shell_recycle`, `boost::delete_orphan_service`, `cleanup::TokenStore`); shell `src-tauri/src/lib.rs` (`AppsState`, `apps_*`); UI `src/pages/apps.tsx` (rota **Desinstalar apps**), drop em `src/App.tsx` + `src/lib/nav.ts`. Conceito de origem (clean-room): [../references/appcleaner.md](../references/appcleaner.md).
 
 ## O que faz
+
+A página tem uma terceira aba, **Atualizações** (2026-10-23: apps pelo winget e Windows Update), descrita em [../core/updates.md](../core/updates.md).
+
 0. **Ícones (2026-10-18):** `icons.rs` extrai o ícone do `DisplayIcon` (`caminho[,índice]`, só `.exe/.dll/.ico` absolutos; senão o exe do app) com `ExtractIconExW` e codifica PNG via WIC; apps da Store usam o `Logo` do pacote (variante `scale-100` ou a menor). Nada é executado. O shell guarda em cache por id (`apps_icon`); a UI mostra a inicial num quadrado enquanto carrega.
 1. **Lista** os apps como Configurações > Apps: chaves `Uninstall` (HKLM 64/32 bits, HKCU) + **apps da Store** do usuário (WinRT `PackageManager`, sem PowerShell). Esconde componentes do sistema (`SystemComponent=1`), atualizações (`ParentKeyName`, `ReleaseType`) e entradas sem desinstalador; deduplica por nome + versão.
 2. **Protege** (não desinstala daqui): runtimes/frameworks/drivers (`runtime` — VC++, .NET, Edge/WebView2, SDKs, GameInput, "driver/chipset/firmware/redistributable"), **software de segurança** (`security` — os mesmos marcadores da Inicialização), o próprio G2 Boost (`self`), pacotes da Store essenciais (Store, Instalador de Aplicativo, Segurança do Windows, `Microsoft.Windows.*`) e o que o usuário marcar (`user`, `settings.json → protected_apps`).

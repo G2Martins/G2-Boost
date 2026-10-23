@@ -1,6 +1,6 @@
 # Console G2
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/console.rs`, `winget.rs` (parser + comandos), `disk::usage` (pasta com prazo), `winevents.rs` (erros); shell `src-tauri/src/lib.rs` (`console_commands`, `console_run`); UI `src/pages/console.tsx` (rota **Console**), `src/lib/luli.tsx` (`askOnce`), `src/lib/ai.ts` (`console` no bloco).
+**Última revisão:** 2026-10-23 (atualizar todos na aba Atualizações) · 2026-10-18 · Código: `crates/core/src/console.rs`, `winget.rs` (parser + comandos), `disk::usage` (pasta com prazo), `winevents.rs` (erros); shell `src-tauri/src/lib.rs` (`console_commands`, `console_run`); UI `src/pages/console.tsx` (rota **Console**), `src/lib/luli.tsx` (`askOnce`), `src/lib/ai.ts` (`console` no bloco).
 
 Pedido do dono (2026-10-18): um terminal dentro do G2 Boost para executar comandos, com a IA sugerindo o que rodar (o apelo do Homebrew e do Rune). Decisão: **Console G2 nativo**, não um shell. Ideias de Rune (blocos por comando, sugestões da IA clicáveis) usadas como conceito; o código do Rune é proprietário e não foi copiado. O `homebrew` da pasta de referências é só um tap que instala o Rune; o análogo no Windows é o winget (ver Pendente).
 
@@ -47,6 +47,7 @@ Blocos com borda por estado (rodando, ok, erro), duração, repetir, copiar (TSV
 - **Leitura da saída:** tabela alinhada pelo cabeçalho, traduzida, em UTF-8 (o OEM fica de reserva). Cada linha é decodificada antes e cortada nas colunas do cabeçalho contadas em caracteres (cortar por byte desalinha "Versão"). O spinner reescreve a linha com `\r` e só o que ficou visível conta. O rodapé "N atualizações disponíveis." sai porque o id não é válido.
 - **Instalar/atualizar:** o console mostra a prévia (`winget search --id X --exact`) num bloco de confirmação com token de uso único (2 min, amarrado à ação e ao id). O clique chama `console_confirm`, que roda `install|upgrade --id X --exact --silent --accept-package-agreements` e registra o resultado em `winget-log.json`. O instalador do app pode pedir administrador.
 - **Verificado na máquina do dono:** busca (Valve.Steam), pacote exato, id inexistente, lista de atualizações (Claude, GitHub CLI, .NET Desktop Runtime 8, Terminal). Instalação real fica para o dono confirmar no console.
+- **Atualizar todos (2026-10-23):** a aba **Desinstalar apps › Atualizações** faz o `winget upgrade --all` sem usar `--all`: um `install(id, true)` validado por pacote, com seleção, exclusões salvas, token amarrado à lista, progresso, cancelar entre pacotes e histórico. Ver [updates.md](./updates.md).
 
 ### Por que não a API COM (histórico do teste)
 
