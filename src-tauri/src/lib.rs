@@ -10,6 +10,7 @@ use std::sync::atomic::AtomicU32;
 
 use g2boost_core::boost::{self, PurgeResult, TweakState};
 use g2boost_core::{advisor, apps, boottime, claude_connect, consent, console, context, devices, dns, dupes, firmware, gamemode, games, luli, netconns, netetw, power, prio, procs, qos, registry, secrets, smart, startup, userassist, wlan};
+use g2boost_core::{repair, volcache};
 use g2boost_core::cleanup::{self, ConfirmToken, ExecItem, PreviewItem, RunRecord, TokenStore};
 use g2boost_core::disk::{self, Node, NodeView, ScanProgress, ScanSummary};
 use g2boost_core::hardware::{self, Profile};
@@ -28,7 +29,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "maintenance"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -1885,6 +1886,78 @@ async fn firmware_info(state: State<'_, Dashboard>) -> Result<firmware::Firmware
         .map_err(|e| e.to_string())
 }
 
+/* ---------------- system files (Disk Cleanup handlers) + repair (DISM / SFC / MRT) ---------------- */
+
+#[derive(serde::Serialize, Clone)]
+struct RepairProgress {
+    tool: repair::Tool,
+    percent: Option<u32>,
+}
+
+#[tauri::command]
+async fn volcache_preview(app: AppHandle, ids: Vec<String>) -> Result<Vec<volcache::VcItem>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        volcache::preview(&ids, |done, total| {
+            let _ = app.emit("volcache:progress", CleanupProgress { done, total });
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Same single-use token store as the catalog; the `sys_*` ids never overlap catalog ids.
+#[tauri::command]
+fn volcache_confirm(tokens: State<'_, TokenStore>, ids: Vec<String>) -> Result<ConfirmToken, String> {
+    if !volcache::valid_selection(&ids) {
+        return Err("bad_selection".into());
+    }
+    Ok(tokens.issue(ids))
+}
+
+#[tauri::command]
+async fn volcache_execute(app: AppHandle, tokens: State<'_, TokenStore>, token: u64, ids: Vec<String>) -> Result<RunRecord, String> {
+    if !tokens.consume(token, &ids) {
+        return Err("bad_token".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        volcache::execute(&ids, "manual", |done, total| {
+            let _ = app.emit("volcache:progress", CleanupProgress { done, total });
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// One repair tool, run to the end (the UI confirmed first). Admin only; one job at a time.
+#[tauri::command]
+async fn repair_run(app: AppHandle, tool: repair::Tool) -> Result<repair::Outcome, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        repair::run(tool, &|percent| {
+            let _ = app.emit("maintenance:progress", RepairProgress { tool, percent });
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn repair_cancel() {
+    repair::cancel();
+}
+
+#[tauri::command]
+fn repair_status() -> repair::Status {
+    repair::status()
+}
+
+#[tauri::command]
+fn repair_history() -> Vec<repair::Outcome> {
+    repair::history()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `G2 Boost.exe --mcp`: stdio MCP server for Claude Desktop / Claude Code, no window.
@@ -2076,7 +2149,14 @@ pub fn run() {
             boot_report,
             dupes_start,
             dupes_cancel,
-            dupes_recycle
+            dupes_recycle,
+            volcache_preview,
+            volcache_confirm,
+            volcache_execute,
+            repair_run,
+            repair_cancel,
+            repair_status,
+            repair_history
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
