@@ -964,7 +964,8 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
                 {
                     g.install_dir = std::path::Path::new(&path).parent().map(|d| d.to_string_lossy().into_owned());
                 }
-                let session = gamemode::start(&g, rg.pid, &s.game_mode);
+                let tweaks = s.game_tweaks.get(&g.id).copied().unwrap_or_default();
+                let session = gamemode::start(&g, rg.pid, &s.game_mode, &tweaks);
                 let _ = app.emit("gamemode:changed", Some(session));
                 return true;
             }
@@ -1117,6 +1118,9 @@ fn luli_forget(id: String) -> Result<Vec<luli::MemoryItem>, String> {
 /// Settings come from the UI, get sanitized in the core, and only then replace the live copy.
 #[tauri::command]
 fn settings_set(r: State<'_, Routines>, settings: Settings) -> Result<Settings, String> {
+    // Per-game options mirror the GPU preference in the registry: only `game_tweaks_set` changes
+    // them (a page holding an older copy must not undo them).
+    let settings = Settings { game_tweaks: r.settings.lock().unwrap().game_tweaks.clone(), ..settings };
     let saved = settings::save(&settings).map_err(|e| e.to_string())?;
     *r.settings.lock().unwrap() = saved.clone();
     Ok(saved)
@@ -1885,6 +1889,74 @@ async fn firmware_info(state: State<'_, Dashboard>) -> Result<firmware::Firmware
         .map_err(|e| e.to_string())
 }
 
+/* ---------------- BIOS guide + per-game tweaks (round 7.1) ---------------- */
+
+/// What to change in this PC's BIOS, with the menu paths of its motherboard maker.
+#[tauri::command]
+async fn bios_guide(state: State<'_, Dashboard>) -> Result<firmware::Guide, String> {
+    let cached = state.profile.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = cached.unwrap_or_else(hardware::profile);
+        firmware::guide(&p, &firmware::read(&p))
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Restart into the firmware setup (UEFI `OsIndications`). Only after the UI's confirmation;
+/// admin-only (`needs_admin`), `unsupported` on legacy BIOS.
+#[tauri::command]
+async fn bios_reboot() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| firmware::reboot_to_firmware().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[derive(serde::Serialize)]
+struct GameTweaksInfo {
+    cpu: g2boost_core::cpusets::Summary,
+    gpus: usize,
+}
+
+/// What the per-game options can do here (SMT, hybrid cores, how many GPUs).
+#[tauri::command]
+async fn game_tweaks_info(state: State<'_, Dashboard>) -> Result<GameTweaksInfo, String> {
+    let cached = state.profile.lock().unwrap().clone();
+    tauri::async_runtime::spawn_blocking(move || GameTweaksInfo {
+        cpu: g2boost_core::cpusets::summary(&g2boost_core::cpusets::topology()),
+        gpus: cached.unwrap_or_else(hardware::profile).gpus.len(),
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Save one game's options. The game must be in the installed list; turning the GPU option on or
+/// off writes Windows' graphics preference for its validated main exe (with backup).
+#[tauri::command]
+async fn game_tweaks_set(app: AppHandle, id: String, tweaks: gamemode::GameTweaks) -> Result<Settings, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let exes = app.state::<Routines>().settings.lock().unwrap().game_exes.clone();
+        let game = app.state::<GamesState>().current(&exes, false).into_iter().find(|g| g.id == id).ok_or("unknown_game")?;
+        let r = app.state::<Routines>();
+        let mut s = r.settings.lock().unwrap();
+        let before = s.game_tweaks.get(&id).copied().unwrap_or_default();
+        if tweaks.gpu_high_perf != before.gpu_high_perf {
+            match gamemode::gpu_exe(&game) {
+                Some(exe) => gamemode::set_gpu_high_perf(&exe, tweaks.gpu_high_perf).map_err(|e| e.to_string())?,
+                None if tweaks.gpu_high_perf => return Err("no_exe".to_string()),
+                None => {} // ponytail: exe gone (uninstalled/moved): nothing left to undo by name
+            }
+        }
+        let mut next = s.clone();
+        next.game_tweaks.insert(id, tweaks);
+        let saved = settings::save(&next).map_err(|e| e.to_string())?;
+        *s = saved.clone();
+        Ok(saved)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `G2 Boost.exe --mcp`: stdio MCP server for Claude Desktop / Claude Code, no window.
@@ -2076,7 +2148,11 @@ pub fn run() {
             boot_report,
             dupes_start,
             dupes_cancel,
-            dupes_recycle
+            dupes_recycle,
+            bios_guide,
+            bios_reboot,
+            game_tweaks_info,
+            game_tweaks_set
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

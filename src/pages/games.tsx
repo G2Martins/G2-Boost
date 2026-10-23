@@ -1,6 +1,7 @@
-import { Gamepad2, Plus, RefreshCw, Square, Zap } from "lucide-react";
+import { Gamepad2, Plus, RefreshCw, SlidersHorizontal, Square, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ElevateButton } from "@/components/elevate-button";
+import { GameTweaksDialog, NO_TWEAKS } from "@/components/games/game-tweaks";
 import { RoutePanel } from "@/components/games/route-panel";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, Skeleton, Switch } from "@/components/ui/primitives";
@@ -9,6 +10,7 @@ import {
   type GameEntry,
   type GameModeOptions,
   type GameModeSession,
+  type GameTweaksInfo,
   inTauri,
   type Settings,
 } from "@/lib/backend";
@@ -46,6 +48,41 @@ function GameIcon({ game }: { game: GameEntry }) {
   );
 }
 
+/** Opens the game's own options; tinted with a count when some are on. */
+function TweaksButton({
+  game,
+  active,
+  disabled,
+  onOpen,
+}: {
+  game: GameEntry;
+  active: number;
+  disabled: boolean;
+  onOpen: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={disabled}
+      aria-label={t("gametweaks.open.aria", { game: game.name })}
+      title={active ? t("gametweaks.active", { n: active }) : t("gametweaks.open")}
+      className={cn(
+        "press relative flex size-8 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-foreground/6 disabled:opacity-40",
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      <SlidersHorizontal className="size-4" />
+      {active ? (
+        <span className="num absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+          {active}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 function Minutes({ since }: { since: number }) {
   const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now() / 1000);
@@ -68,6 +105,12 @@ export function GamesPage() {
   const [exe, setExe] = useState("");
   const [exeError, setExeError] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [tweakGame, setTweakGame] = useState<GameEntry | null>(null);
+  const [tweakOpen, setTweakOpen] = useState(false);
+  const [tweakInfo, setTweakInfo] = useState<GameTweaksInfo | null>(null);
+  useEffect(() => {
+    backend.gameTweaksInfo().then(setTweakInfo);
+  }, []);
   // Dev aid: G2BOOST_START_TAB=route opens the first game's route (and traces it with autorun).
   useEffect(() => {
     if (boot.startTab === "route" && games?.[0] && selected === null) setSelected(games[0].id);
@@ -265,6 +308,17 @@ export function GamesPage() {
                         ) : null}
                       </p>
                     </button>
+                    <TweaksButton
+                      game={g}
+                      active={
+                        Object.values(settings?.game_tweaks[g.id] ?? {}).filter(Boolean).length
+                      }
+                      disabled={!settings}
+                      onOpen={() => {
+                        setTweakGame(g);
+                        setTweakOpen(true);
+                      }}
+                    />
                     <Switch
                       checked={g.enabled}
                       onCheckedChange={(on) => toggleGame(g, on)}
@@ -322,6 +376,15 @@ export function GamesPage() {
             <p className="mt-3 text-xs text-muted-foreground">{t("games.list.empty")}</p>
           ) : null}
         </Card>
+
+        <GameTweaksDialog
+          game={tweakGame}
+          open={tweakOpen}
+          current={(tweakGame && settings?.game_tweaks[tweakGame.id]) || NO_TWEAKS}
+          info={tweakInfo}
+          onClose={() => setTweakOpen(false)}
+          onSaved={setSettings}
+        />
 
         {selected && games?.find((g) => g.id === selected) ? (
           <RoutePanel game={games.find((g) => g.id === selected) as GameEntry} />

@@ -52,6 +52,7 @@ pub mod visualfx;
 pub mod winsat;
 pub mod wmi;
 pub mod wlan;
+pub mod cpusets;
 
 /// Crate version, surfaced in the UI "about" footer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -1,6 +1,7 @@
 //! User settings for the routines (`%LOCALAPPDATA%\G2 Boost\settings.json`).
 //! Everything is validated on load and before save: the file is hostile input too.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,9 @@ pub struct Settings {
     pub game_mode: crate::gamemode::Options,
     /// Fixed priority per executable, applied by the routine thread (never realtime).
     pub priority_rules: Vec<crate::prio::Rule>,
+    /// Per-game options (CPU cores while in Game Mode, dedicated GPU), by game id. Changed only
+    /// through `game_tweaks_set` in the shell, which also writes the GPU preference.
+    pub game_tweaks: BTreeMap<String, crate::gamemode::GameTweaks>,
 }
 
 impl Default for Settings {
@@ -67,6 +71,7 @@ impl Default for Settings {
             game_mode_games: Vec::new(),
             game_mode: crate::gamemode::Options::default(),
             priority_rules: Vec::new(),
+            game_tweaks: BTreeMap::new(),
         }
     }
 }
@@ -111,10 +116,13 @@ pub fn sanitize(mut s: Settings) -> Settings {
     // Game ids are made by `games.rs` (`steam:730`, `app:m64:{GUID}`, `exe:name.exe`): bounded, no
     // control characters, deduplicated.
     let mut seen = std::collections::HashSet::new();
-    s.game_mode_games.retain(|id| {
-        id.len() <= 200 && id.contains(':') && !id.chars().any(char::is_control) && seen.insert(id.clone())
-    });
+    s.game_mode_games.retain(|id| valid_game_id(id) && seen.insert(id.clone()));
     s.game_mode_games.truncate(200);
+    s.game_tweaks = std::mem::take(&mut s.game_tweaks)
+        .into_iter()
+        .filter(|(id, t)| t.any() && valid_game_id(id))
+        .take(200)
+        .collect();
     s.priority_rules = crate::prio::sanitize(std::mem::take(&mut s.priority_rules));
     s.schedule = match s.schedule {
         Schedule::EveryHours { hours } => Schedule::EveryHours { hours: hours.clamp(1, 168) },
@@ -123,6 +131,10 @@ pub fn sanitize(mut s: Settings) -> Settings {
         other => other,
     };
     s
+}
+
+fn valid_game_id(id: &str) -> bool {
+    id.len() <= 200 && id.contains(':') && !id.chars().any(char::is_control)
 }
 
 fn file() -> PathBuf {
@@ -163,6 +175,11 @@ mod tests {
             game_mode_games: vec!["steam:730".into(), "steam:730".into(), "bad\u{1}:x".into(), "noprefix".into()],
             game_mode: crate::gamemode::Options::default(),
             priority_rules: vec![],
+            game_tweaks: BTreeMap::from([
+                ("steam:730".to_string(), crate::gamemode::GameTweaks { free_core0: true, ..Default::default() }),
+                ("steam:1".to_string(), crate::gamemode::GameTweaks::default()),
+                ("bad\u{1}:x".to_string(), crate::gamemode::GameTweaks { gpu_high_perf: true, ..Default::default() }),
+            ]),
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
@@ -188,6 +205,7 @@ mod tests {
         assert!(!d.routine_categories.contains(&"temp_windows".to_string()), "admin categories are opt-in");
         assert_eq!(s.luli_instructions, "seja direta", "trimmed, control characters removed");
         assert_eq!(s.game_mode_games, vec!["steam:730".to_string()], "deduplicated, control chars and bad ids dropped");
+        assert_eq!(s.game_tweaks.keys().collect::<Vec<_>>(), vec!["steam:730"], "empty entries and bad ids dropped");
     }
 
     #[test]

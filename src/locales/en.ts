@@ -1680,6 +1680,97 @@ export const en = {
   "settings.privacy":
     "No telemetry. Nothing leaves the PC except the network tests you start and the questions you send to Luli.",
   /* ---- round 7.1: BIOS guide, per-game tweaks, tasks and Spooler ---- */
+  "bios.title": "BIOS guide",
+  "bios.help":
+    "What is worth changing in this PC's BIOS, from what Windows can see, with the menu path for your motherboard. Settings that leave no trace in Windows (fans, power limits) are not covered.",
+  "bios.vendor.asus": "ASUS",
+  "bios.vendor.msi": "MSI",
+  "bios.vendor.gigabyte": "Gigabyte / AORUS",
+  "bios.vendor.asrock": "ASRock",
+  "bios.vendor.generic": "Generic menu",
+  "bios.keys": "To enter: {key} right after turning the PC on",
+  "bios.keys.advanced": "Advanced mode: {key}",
+  "bios.none": "Nothing to change in the BIOS from what Windows can see.",
+  "bios.recommended": "Recommended",
+  "bios.optional": "Optional",
+  "bios.names_vary":
+    "Menus are shown as on the BIOS screen. Names change a little between models and versions; look for the main word.",
+  "bios.item.csm": "Turn CSM off and boot in UEFI",
+  "bios.item.csm.desc":
+    "Windows is booting in legacy mode. UEFI mode is required by Secure Boot, Resizable BAR and Windows 11.",
+  "bios.item.csm.warn":
+    "First convert the system disk to GPT with Windows' MBR2GPT tool; without it Windows will not start after the change.",
+  "bios.item.xmp": "Turn on the memory's XMP / EXPO profile",
+  "bios.item.xmp.desc":
+    "The RAM runs below the speed it was sold for. The profile applies the modules' factory speed and timings.",
+  "bios.item.xmp.warn":
+    "If the PC does not start or freezes afterwards, set the profile back to Auto or clear the CMOS.",
+  "bios.item.rebar": "Turn on Above 4G Decoding and Resizable BAR",
+  "bios.item.rebar.desc":
+    "The graphics card sees only 256 MB of its memory at a time. With Resizable BAR it reaches all of it and some games gain a few frames.",
+  "bios.item.secure_boot": "Turn on Secure Boot",
+  "bios.item.secure_boot.desc":
+    "Required by Windows 11 and by some anti-cheats. Stops unsigned code from loading before Windows.",
+  "bios.item.secure_boot.warn":
+    "If the option is locked, install the default keys (Install default Secure Boot keys) in the same menu.",
+  "bios.item.tpm": "Turn on the processor's TPM",
+  "bios.item.tpm.desc":
+    "The TPM (PTT on Intel, fTPM on AMD) is required by Windows 11 and by some anti-cheats, and keeps the BitLocker and Windows Hello keys.",
+  "bios.item.bios_update": "Update the BIOS",
+  "bios.item.bios_update.desc":
+    "The BIOS is more than 3 years old. Newer versions bring stability, memory compatibility and processor security fixes.",
+  "bios.item.bios_update.warn":
+    "Download it only from the board maker's site, for the exact model, and never turn the PC off while it writes.",
+  "bios.item.virtualization": "Turn on virtualization (VT-x / SVM)",
+  "bios.item.virtualization.desc":
+    "Only matters if you use virtual machines, WSL or Android emulators. It does not change FPS.",
+  "bios.reboot": "Restart into the BIOS",
+  "bios.reboot.legacy": "Restarting straight into the BIOS needs UEFI",
+  "bios.reboot.title": "Restart into the BIOS now?",
+  "bios.reboot.body":
+    "The PC restarts and opens the BIOS setup, no key timing needed. Save what is open: programs with unsaved work may ask to save first.",
+  "bios.reboot.back":
+    "To go back to Windows without changing anything, leave the BIOS without saving (Discard Changes and Exit).",
+  "bios.reboot.confirm": "Restart now",
+  "bios.reboot.cancel": "Cancel",
+  "bios.reboot.unsupported":
+    "This BIOS does not accept the request to open the setup on the next boot. Use the key while the PC starts.",
+  "bios.reboot.started": "Restarting into the BIOS…",
+  "gametweaks.open": "Game options",
+  "gametweaks.open.aria": "Game options: {game}",
+  "gametweaks.active": "Game options: {n} on",
+  "gametweaks.title": "{game} options",
+  "gametweaks.cpu": "This processor: {physical} cores, {logical} threads",
+  "gametweaks.cpu.hybrid": "hybrid, {perf} threads on performance cores",
+  "gametweaks.section.cpu": "Processor cores, in Game Mode",
+  "gametweaks.section.gpu": "Graphics card",
+  "gametweaks.recommended": "Recommended",
+  "gametweaks.advanced": "Advanced",
+  "gametweaks.free_core0": "Free core 0",
+  "gametweaks.free_core0.desc":
+    "Keeps the game off the first core, where Windows handles most interrupts (network, audio, USB). It can smooth stutter on CPUs with many cores; with 4 cores or fewer it usually costs performance.",
+  "gametweaks.physical_only": "Physical cores only (no SMT)",
+  "gametweaks.physical_only.desc":
+    "One thread per core, without each core's second thread (Hyper-Threading / SMT). Some older games gain; modern games that use many threads lose.",
+  "gametweaks.perf_cores_only": "Performance cores only",
+  "gametweaks.perf_cores_only.desc":
+    "Keeps the game on the P-cores, away from the efficiency (E) cores. Helps games that end up on the slow cores; Windows 11 already gets it right most of the time.",
+  "gametweaks.gpu_high_perf": "Use the dedicated graphics card",
+  "gametweaks.gpu_high_perf.desc":
+    "Writes Windows' graphics preference (High performance) for the game's executable. It matters on PCs with two graphics adapters, such as laptops with integrated and dedicated graphics. It stays until you turn it off, and the previous value comes back.",
+  "gametweaks.gpu.no_exe": "The game's main executable was not found.",
+  "gametweaks.mode_off": "Game Mode is off for this game: the core options only apply with it on.",
+  "gametweaks.combine":
+    "The core options combine: the game keeps only the cores that meet all of them. They apply while Game Mode is active and are undone when the game closes.",
+  "gametweaks.honest":
+    "The gain depends on the game and the processor: test with and without. Anti-cheats may block the change; G2 Boost then does not insist.",
+  "gametweaks.none": "None of these options changes anything on this PC.",
+  "gametweaks.save": "Save",
+  "gametweaks.cancel": "Cancel",
+  "gametweaks.error.no_exe": "Could not find this game's main executable.",
+  "gametweaks.error.unknown_game": "Game not found. Refresh the list and try again.",
+  "games.applied.affinity": "Cores picked",
+  "games.skipped.affinity_denied": "The game did not allow picking its cores (anti-cheat)",
   "boost.tweak.winsat_task_off": "Disable Windows' automatic assessment",
   "boost.tweak.winsat_task_off.desc":
     "Turns off the task that runs Windows' performance tests by itself when the PC is idle, with CPU, disk and graphics spikes. The assessment from My PC still runs when you ask for it.",

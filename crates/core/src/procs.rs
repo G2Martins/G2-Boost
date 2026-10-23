@@ -17,6 +17,7 @@ use windows::Win32::System::Threading::{
     PROCESS_ACCESS_RIGHTS, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE,
     QueryFullProcessImageNameW, SetPriorityClass, TerminateProcess,
 };
+use windows::Win32::System::Threading::{PROCESS_SET_LIMITED_INFORMATION, SetProcessDefaultCpuSets};
 use windows::core::{BOOL, PWSTR};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -293,11 +294,34 @@ pub fn normal_priority(pid: u32, inside: &str) -> Result<(), ProcError> {
 }
 
 fn set_priority(pid: u32, inside: &str, class: windows::Win32::System::Threading::PROCESS_CREATION_FLAGS) -> Result<(), ProcError> {
+    with_game_process(pid, inside, PROCESS_SET_INFORMATION, |h| {
+        // SAFETY: valid handle from `with_game_process`.
+        unsafe {
+            if GetPriorityClass(h) == class.0 {
+                return Ok(());
+            }
+            SetPriorityClass(h, class).map_err(|e| ProcError::Win32(e.message()))
+        }
+    })
+}
+
+/// Default CPU Sets of a game's process (`None` = every CPU again), with the same checks as the
+/// priority: image inside `inside`, user session, never G2 Boost or the system.
+pub fn set_cpu_sets(pid: u32, inside: &str, ids: Option<&[u32]>) -> Result<(), ProcError> {
+    with_game_process(pid, inside, PROCESS_SET_LIMITED_INFORMATION, |h| {
+        // SAFETY: valid handle; `ids` outlives the call.
+        unsafe { SetProcessDefaultCpuSets(h, ids) }.ok().map_err(|e| ProcError::Win32(e.message()))
+    })
+}
+
+/// Open `pid` with `access` only if its image lives under `inside` (the pid comes from a
+/// detection a few seconds old and could have been reused) and it runs in a user session.
+fn with_game_process<T>(pid: u32, inside: &str, access: PROCESS_ACCESS_RIGHTS, f: impl FnOnce(HANDLE) -> Result<T, ProcError>) -> Result<T, ProcError> {
     if pid == 0 || pid == 4 || pid == std::process::id() || inside.len() < 4 {
         return Err(ProcError::Protected);
     }
     // SAFETY: handle closed below.
-    let h = unsafe { OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.map_err(|e| {
+    let h = unsafe { OpenProcess(access | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.map_err(|e| {
         if e.code().0 as u32 == 0x8007_0005 { ProcError::NeedsAdmin } else { ProcError::Gone }
     })?;
     let result = (|| {
@@ -307,16 +331,11 @@ fn set_priority(pid: u32, inside: &str, class: windows::Win32::System::Threading
             return Err(ProcError::Gone);
         }
         let mut session = 0u32;
-        // SAFETY: valid handle and out-param.
-        unsafe {
-            if ProcessIdToSessionId(pid, &mut session).is_err() || session == 0 {
-                return Err(ProcError::Protected);
-            }
-            if GetPriorityClass(h) == class.0 {
-                return Ok(());
-            }
-            SetPriorityClass(h, class).map_err(|e| ProcError::Win32(e.message()))
+        // SAFETY: valid out-param.
+        if unsafe { ProcessIdToSessionId(pid, &mut session) }.is_err() || session == 0 {
+            return Err(ProcError::Protected);
         }
+        f(h)
     })();
     // SAFETY: handle from OpenProcess above.
     let _ = unsafe { CloseHandle(h) };
@@ -374,6 +393,48 @@ mod tests {
     #[ignore]
     fn sleep_helper() {
         std::thread::sleep(Duration::from_secs(30));
+    }
+
+    /// CPU Sets on a real child (this test binary running `sleep_helper`, its folder as the "game
+    /// folder"): set, read back with `GetProcessDefaultCpuSets`, cleared; outside the folder = refused.
+    #[test]
+    fn cpu_sets_on_a_child_process() {
+        use windows::Win32::System::Threading::GetProcessDefaultCpuSets;
+        let cpus = crate::cpusets::topology();
+        if cpus.len() < 2 {
+            return; // single logical processor: nothing to pick
+        }
+        let me = std::env::current_exe().unwrap();
+        let dir = me.parent().unwrap().to_string_lossy().into_owned();
+        let mut child = std::process::Command::new(&me)
+            .args(["--ignored", "--exact", "procs::tests::sleep_helper", "--test-threads=1"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        let read = || {
+            // SAFETY: query handle closed below; buffer sized for every CPU Set.
+            unsafe {
+                let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).unwrap();
+                let mut buf = vec![0u32; cpus.len()];
+                let mut n = 0u32;
+                let ok = GetProcessDefaultCpuSets(h, Some(&mut buf), &mut n).as_bool();
+                let _ = CloseHandle(h);
+                assert!(ok);
+                buf.truncate(n as usize);
+                buf
+            }
+        };
+        let ids = vec![cpus[1].id];
+        set_cpu_sets(pid, &dir, Some(&ids)).unwrap();
+        assert_eq!(read(), ids);
+        set_cpu_sets(pid, &dir, None).unwrap();
+        assert!(read().is_empty(), "no default set = every CPU");
+        assert_eq!(set_cpu_sets(pid, r"C:\Some\Other\Game", Some(&ids)), Err(ProcError::Gone), "not inside the game folder");
+        assert_eq!(set_cpu_sets(std::process::id(), &dir, Some(&ids)), Err(ProcError::Protected), "never G2 Boost itself");
+        let _ = child.kill();
+        let _ = child.wait();
     }
 
     /// Real terminate through every check: this test binary relaunches itself running only

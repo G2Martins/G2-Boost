@@ -1685,6 +1685,98 @@ export const ptBR = {
   "settings.privacy":
     "Sem telemetria. Nada sai do PC além dos testes de rede que você inicia e das perguntas que você manda para a Luli.",
   /* ---- rodada 7.1: guia da BIOS, ajustes por jogo, tarefas e Spooler ---- */
+  "bios.title": "Guia da BIOS",
+  "bios.help":
+    "O que vale mudar na BIOS deste PC pelo que o Windows consegue ver, com o caminho no menu da sua placa-mãe. Configurações sem rastro no Windows (ventoinhas, limites de energia) ficam de fora.",
+  "bios.vendor.asus": "ASUS",
+  "bios.vendor.msi": "MSI",
+  "bios.vendor.gigabyte": "Gigabyte / AORUS",
+  "bios.vendor.asrock": "ASRock",
+  "bios.vendor.generic": "Menu genérico",
+  "bios.keys": "Para entrar: {key} logo ao ligar o PC",
+  "bios.keys.advanced": "Modo avançado: {key}",
+  "bios.none": "Nada a mudar na BIOS pelo que o Windows consegue ver.",
+  "bios.recommended": "Recomendado",
+  "bios.optional": "Opcional",
+  "bios.names_vary":
+    "Os menus aparecem como na tela da BIOS, em inglês. Os nomes mudam um pouco entre modelos e versões; procure pela palavra principal.",
+  "bios.item.csm": "Desligar o CSM e iniciar em UEFI",
+  "bios.item.csm.desc":
+    "O Windows está iniciando no modo legado. O modo UEFI é exigido pelo Secure Boot, pelo Resizable BAR e pelo Windows 11.",
+  "bios.item.csm.warn":
+    "Antes, converta o disco do sistema para GPT com a ferramenta MBR2GPT do Windows; sem isso o Windows não inicia depois da mudança.",
+  "bios.item.xmp": "Ligar o perfil XMP / EXPO da memória",
+  "bios.item.xmp.desc":
+    "A RAM está rodando abaixo da velocidade para a qual foi vendida. O perfil aplica a velocidade e as latências de fábrica dos pentes.",
+  "bios.item.xmp.warn":
+    "Se o PC não ligar ou travar depois, volte o perfil para Auto ou limpe a CMOS.",
+  "bios.item.rebar": "Ligar Above 4G Decoding e Resizable BAR",
+  "bios.item.rebar.desc":
+    "A placa de vídeo enxerga só 256 MB da memória dela de cada vez. Com Resizable BAR ela acessa tudo e alguns jogos ganham alguns quadros.",
+  "bios.item.secure_boot": "Ligar o Secure Boot",
+  "bios.item.secure_boot.desc":
+    "Exigido pelo Windows 11 e por alguns anticheats. Impede que código sem assinatura carregue antes do Windows.",
+  "bios.item.secure_boot.warn":
+    "Se a opção estiver travada, instale as chaves padrão (Install default Secure Boot keys) no mesmo menu.",
+  "bios.item.tpm": "Ligar o TPM do processador",
+  "bios.item.tpm.desc":
+    "O TPM (PTT na Intel, fTPM na AMD) é exigido pelo Windows 11 e por alguns anticheats e guarda as chaves do BitLocker e do Windows Hello.",
+  "bios.item.bios_update": "Atualizar a BIOS",
+  "bios.item.bios_update.desc":
+    "A BIOS tem mais de 3 anos. Versões novas trazem correções de estabilidade, de compatibilidade de memória e de segurança do processador.",
+  "bios.item.bios_update.warn":
+    "Baixe só do site do fabricante da placa, para o modelo exato, e não desligue o PC durante a gravação.",
+  "bios.item.virtualization": "Ligar a virtualização (VT-x / SVM)",
+  "bios.item.virtualization.desc":
+    "Só faz diferença se você usa máquinas virtuais, WSL ou emuladores de Android. Não muda o FPS.",
+  "bios.reboot": "Reiniciar na BIOS",
+  "bios.reboot.legacy": "Reiniciar direto na BIOS exige UEFI",
+  "bios.reboot.title": "Reiniciar na BIOS agora?",
+  "bios.reboot.body":
+    "O PC reinicia e abre a configuração da BIOS, sem precisar acertar a tecla. Salve o que estiver aberto: programas com trabalho não salvo podem pedir para salvar antes.",
+  "bios.reboot.back":
+    "Para voltar ao Windows sem mudar nada, saia da BIOS sem salvar (Discard Changes and Exit).",
+  "bios.reboot.confirm": "Reiniciar agora",
+  "bios.reboot.cancel": "Cancelar",
+  "bios.reboot.unsupported":
+    "Esta BIOS não aceita o pedido para abrir a configuração no próximo boot. Use a tecla ao ligar o PC.",
+  "bios.reboot.started": "Reiniciando na BIOS…",
+  "gametweaks.open": "Ajustes do jogo",
+  "gametweaks.open.aria": "Ajustes do jogo: {game}",
+  "gametweaks.active": "Ajustes do jogo: {n} ligados",
+  "gametweaks.title": "Ajustes de {game}",
+  "gametweaks.cpu": "Este processador: {physical} núcleos, {logical} threads",
+  "gametweaks.cpu.hybrid": "híbrido, {perf} threads nos núcleos de desempenho",
+  "gametweaks.section.cpu": "Núcleos do processador, no Modo Jogo",
+  "gametweaks.section.gpu": "Placa de vídeo",
+  "gametweaks.recommended": "Recomendado",
+  "gametweaks.advanced": "Avançado",
+  "gametweaks.free_core0": "Liberar o núcleo 0",
+  "gametweaks.free_core0.desc":
+    "Tira o jogo do primeiro núcleo, onde o Windows atende a maior parte das interrupções (rede, som, USB). Pode suavizar engasgos em processadores com muitos núcleos; com 4 núcleos ou menos costuma perder desempenho.",
+  "gametweaks.physical_only": "Só núcleos físicos (sem SMT)",
+  "gametweaks.physical_only.desc":
+    "Um thread por núcleo, sem o segundo thread de cada um (Hyper-Threading / SMT). Alguns jogos antigos ganham; jogos modernos que usam muitos threads perdem.",
+  "gametweaks.perf_cores_only": "Só núcleos de desempenho",
+  "gametweaks.perf_cores_only.desc":
+    "Mantém o jogo nos núcleos P, longe dos núcleos de eficiência (E). Ajuda jogos que acabam nos núcleos lentos; o Windows 11 já acerta na maior parte dos casos.",
+  "gametweaks.gpu_high_perf": "Usar a placa de vídeo dedicada",
+  "gametweaks.gpu_high_perf.desc":
+    "Grava a preferência de gráficos do Windows (Alto desempenho) para o executável do jogo. Faz diferença em PCs com duas placas, como notebooks com vídeo integrado e dedicado. Fica gravado até você desligar, e o valor anterior volta.",
+  "gametweaks.gpu.no_exe": "Executável principal do jogo não encontrado.",
+  "gametweaks.mode_off":
+    "O Modo Jogo está desligado para este jogo: os ajustes de núcleo só valem com ele ligado.",
+  "gametweaks.combine":
+    "As opções de núcleo se combinam: o jogo fica só nos núcleos que atendem a todas. Valem enquanto o Modo Jogo está ativo e voltam ao normal quando o jogo fecha.",
+  "gametweaks.honest":
+    "O ganho depende do jogo e do processador: teste com e sem. Anticheats podem bloquear a mudança; nesse caso o G2 Boost não insiste.",
+  "gametweaks.none": "Nenhum destes ajustes muda algo neste PC.",
+  "gametweaks.save": "Salvar",
+  "gametweaks.cancel": "Cancelar",
+  "gametweaks.error.no_exe": "Não foi possível achar o executável principal deste jogo.",
+  "gametweaks.error.unknown_game": "Jogo não encontrado. Atualize a lista e tente de novo.",
+  "games.applied.affinity": "Núcleos escolhidos",
+  "games.skipped.affinity_denied": "O jogo não deixou escolher os núcleos (anti-cheat)",
   "boost.tweak.winsat_task_off": "Desligar a avaliação automática do Windows",
   "boost.tweak.winsat_task_off.desc":
     "Desliga a tarefa que roda sozinha os testes de desempenho do Windows quando o PC fica ocioso, com picos de CPU, disco e placa de vídeo. A avaliação pelo Meu PC continua funcionando quando você pedir.",

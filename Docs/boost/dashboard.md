@@ -1,6 +1,6 @@
 # Painel, Meu PC e Monitor
 
-**Última revisão:** 2026-10-16 · Código: `crates/core/src/hardware.rs`, `monitor.rs`, `firmware.rs`, `sensors.rs`, `restore.rs`, `recommend.rs`; shell `src-tauri/src/lib.rs` (`Dashboard`); UI `src/pages/dashboard.tsx`, `src/components/ui/kpi-card.tsx`, `live-line.tsx` · Origem da ideia: [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
+**Última revisão:** 2026-10-22 (guia da BIOS + Reiniciar na BIOS; Spooler na recomendação) · 2026-10-16 · Código: `crates/core/src/hardware.rs`, `monitor.rs`, `firmware.rs`, `sensors.rs`, `restore.rs`, `recommend.rs`; shell `src-tauri/src/lib.rs` (`Dashboard`); UI `src/pages/dashboard.tsx`, `src/components/ui/kpi-card.tsx`, `live-line.tsx` · Origem da ideia: [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
 
 ## Painel (rota inicial)
 
@@ -15,7 +15,7 @@
 
 ## Recomendação por hardware (`recommend.rs`)
 
-`Facts` = SSD do sistema (seek penalty), notebook (chassi SMBIOS ou bateria), vendor da GPU, `HwSchMode` presente, Game Pass/Xbox app (pacotes em `%LOCALAPPDATA%\Packages`), Outlook (registro). Regras:
+`Facts` = impressoras reais (`EnumPrintersW` local + conexões, sem PDF/XPS/OneNote/Fax), SSD do sistema (seek penalty), notebook (chassi SMBIOS ou bateria), vendor da GPU, `HwSchMode` presente, Game Pass/Xbox app (pacotes em `%LOCALAPPDATA%\Packages`), Outlook (registro). Regras:
 
 | Tweak | Não recomendado quando | Motivo (i18n `boost.reason.*`) |
 |---|---|---|
@@ -25,6 +25,7 @@
 | `svc_xbox` | sempre (já Manual; Game Pass) | `game_pass` / `preference` |
 | `svc_search` | Outlook instalado | `outlook` |
 | `mouse`, `svc_dps`, `svc_geolocation` | sempre (preferência) | `preference` |
+| `svc_spooler` | impressora real instalada / lista ilegível (Spooler já parado) | `printer` / `unknown` |
 | `hvci_off` | sempre (segurança) | `security` |
 | betas | sempre | `beta` |
 
@@ -82,6 +83,12 @@ Tudo sem admin.
 | Inicialização rápida, hibernação | `HiberbootEnabled`, `HibernateEnabled` |
 
 Viram achados do conselheiro (`legacy_boot`, `rebar_off`, `bios_old`). **Não visíveis pelo Windows:** C-states, limites de potência, curvas de ventoinha, overclock — a UI diz isso. Na máquina do dono: UEFI, Secure Boot, TPM 2.0, VBS ativo, ReBAR **desligado** (256 MB numa RTX 3050), XMP ok, BIOS F10 de 3,4 anos.
+
+### Guia da BIOS (`firmware::guide`, card "Guia da BIOS" no Meu PC)
+
+Checklist só com o que se aplica a este PC, na ordem de fazer, a partir do `Firmware` lido acima: `csm` (boot legado; avisa converter o disco com MBR2GPT antes), `xmp` (RAM abaixo do nominal), `rebar` (BAR1 de 256 MB em GPU RTX 30+/RX 6000+/Arc, mesma lista do achado `rebar_off`), `secure_boot`, `tpm` (sem TPM), `bios_update` (> 3 anos, como `bios_old`), `virtualization` (opcional: VMs/WSL/emuladores). Cada item traz o caminho do menu **do fabricante da placa** (SMBIOS tipo 2: ASUS, MSI, Gigabyte/AORUS, ASRock; notebook ou outro fabricante = caminho genérico), variante Intel/AMD pelo vendor do CPUID, e a tecla de entrada/modo avançado. Os caminhos são **dado** (`firmware::PATHS`, rótulos da BIOS em inglês, sem tradução; o texto explicativo é i18n `bios.item.*`). Teste: toda combinação item × fabricante tem caminho; o guia só lista o que se aplica; Intel × AMD.
+
+**Reiniciar na BIOS** (`firmware::reboot_to_firmware`, comando `bios_reboot`): o que o `shutdown /r /fw` faz, sem chamar o `shutdown.exe`. Só UEFI (`GetFirmwareType`; legado = `unsupported`) e só elevado (`needs_admin` + botão Elevar). Habilita `SeSystemEnvironmentPrivilege`, lê `OsIndicationsSupported` da variável global EFI `{8BE4DF61-93CA-11D2-AA0D-00E098032B8C}` e, se tiver o bit `EFI_OS_INDICATIONS_BOOT_TO_FW_UI` (0x1), grava `OsIndications` com esse bit **somado aos que já estavam** (atributos preservados; NV+BS+RT se não existia) por `SetFirmwareEnvironmentVariableExW`; depois `SeShutdownPrivilege` + `InitiateShutdownW(SHUTDOWN_RESTART)` (programas abertos ainda podem pedir para salvar). Se o reinício não começar, o `OsIndications` anterior volta (o próximo boot normal não cai na BIOS). Confirmação explícita na UI (modal avisa para salvar o trabalho e como sair sem salvar). Teste: lógica pura do bit (`with_boot_to_fw_ui`); sem admin é recusado antes de qualquer escrita; o reinício nunca roda em teste (o teste pula a checagem quando elevado).
 
 **Não fazemos sem sensor externo (exigem driver de kernel, como o `cpuz.sys` de CPU-Z/Speccy):** VID/multiplicador/bus, tabela SPD/XMP e timings reais de RAM, registradores de chipset; temperatura/ventoinhas/tensões só via HWiNFO/LHM abertos. Bench próprio de CPU e S.M.A.R.T. (elevado) = backlog.
 
