@@ -1,6 +1,6 @@
 # Luli (IA no app) + MCP local + conselheiro local (Fases 9 e 18)
 
-**Última revisão:** 2026-10-18 · Status: **implementado** (v1.3: histórico de conversas com grupos, memória e personalização em §4.2; v1.2: a assistente virou **Luli**, presente em todas as telas, com base de conhecimento própria em `knowledge/`, pendências e próximas perguntas no fim de cada resposta, pesquisa na web só com permissão). Código: `src/lib/luli.tsx` (sessão global), `src/lib/knowledge.ts`, `src/components/luli-card.tsx`, `knowledge/*.md`; `crates/core/src/advisor.rs`, `context.rs`, `firmware.rs`, `sensors.rs`, `startup.rs`, `procs.rs`, `steam.rs`, `secrets.rs`; `crates/mcp/src/lib.rs`; shell `src-tauri/src/lib.rs` (`advisor_report`, `ai_context`, `ai_key_*`, `--mcp`); UI `src/lib/ai.ts`, `src/pages/ai.tsx`, `src/components/safe-markdown.tsx`, `src/components/advisor-card.tsx`; teste `tests/ai.test.ts`.
+**Última revisão:** 2026-10-22 (achados de exposição + `get_exposure_report`, ver [exposure-audit.md](../security/exposure-audit.md)) · 2026-10-18 · Status: **implementado** (v1.3: histórico de conversas com grupos, memória e personalização em §4.2; v1.2: a assistente virou **Luli**, presente em todas as telas, com base de conhecimento própria em `knowledge/`, pendências e próximas perguntas no fim de cada resposta, pesquisa na web só com permissão). Código: `src/lib/luli.tsx` (sessão global), `src/lib/knowledge.ts`, `src/components/luli-card.tsx`, `knowledge/*.md`; `crates/core/src/advisor.rs`, `context.rs`, `firmware.rs`, `sensors.rs`, `startup.rs`, `procs.rs`, `steam.rs`, `secrets.rs`; `crates/mcp/src/lib.rs`; shell `src-tauri/src/lib.rs` (`advisor_report`, `ai_context`, `ai_key_*`, `--mcp`); UI `src/lib/ai.ts`, `src/pages/ai.tsx`, `src/components/safe-markdown.tsx`, `src/components/advisor-card.tsx`; teste `tests/ai.test.ts`.
 
 Pedido do dono (2026-10-14/15): IA (Claude, Gemini, ChatGPT) dentro do G2 Boost entendendo a situação do Windows, recomendando ações com prós e contras, analisando temperaturas, sugerindo upgrades, estimando FPS e buscando em fontes confiáveis.
 
@@ -38,6 +38,12 @@ Regras puras sobre `Profile` + `Env` (espaço do disco do sistema, HVCI via `Win
 | `secure_boot_off`, `tpm_missing` | anti-cheat/Windows 11 | segurança |
 | `hvci_on` | integridade de memória ligada (~5 % FPS, Tom's Hardware) | segurança (informativo) |
 | `winsat_stale` / `winsat_never` / `winsat_disk_weakest` | estado/nota do WinSAT | manutenção/upgrade |
+| `rdp_open` / `nla_off` | Área de Trabalho Remota ligada (porta) / sem NLA (`exposure::quick`, campo `Env.exposure`) | segurança |
+| `firewall_off` | Firewall do Windows desligado num perfil (sem outro firewall ativo no perfil em uso) | segurança |
+| `smb1_on` | servidor SMBv1 ligado | segurança |
+| `upnp_open` | mapeamentos UPnP do roteador apontando para este PC (da última consulta, < 15 min) | segurança |
+| `remote_inbound` | conexões TCP vindas de IP público numa porta em escuta, agora | segurança |
+| `av_off` | nenhum antivírus ligado, ou ligado com definições velhas | segurança |
 
 **Classe para jogos** (`gaming_class`): heurística pelo nome da GPU (RTX/GTX/RX/Arc/integrada) → `entry` / `mainstream` / `high` / `enthusiast`, alvo típico (1080p/1440p/4K) e gargalo provável (CPU com < 6 núcleos). **Sem números de FPS** — esses vêm do assistente com fonte.
 
@@ -122,6 +128,7 @@ Histórico na sessão: Claude guarda o histórico nativo e append-only (o turno 
 | `get_disk_usage(path?, max_seconds?)` | Varredura com prazo (5 a 110 s, padrão 40; parcial avisado), 2 níveis de pastas (25 por nível), arquivos > 100 MB, essenciais explicados. Pasta do perfil sob `Users` vira `%USERNAME%`; caminhos redigidos. UNC/relativo recusados pelo `disk::scan`. |
 | `get_installed_apps` | Lista de Configurações › Apps (desktop + Store) com tamanho, data e proteção. |
 | `get_power_plans` | Planos (nome, ativo, nativo), bateria e os ajustes principais do plano ativo. |
+| `get_exposure_report` | (2026-10-22) Auditoria de exposição completa ([exposure-audit.md](../security/exposure-audit.md)): RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall, UPnP, apps de acesso remoto, escutas, conexões de entrada, sessões, tarefas/serviços suspeitos, Convidado, antivírus. Só leitura; sem caminhos de perfil, IPs remotos nem nomes de computador cliente. |
 
 O pacote de contexto (app e `get_pc_context`) ganhou `windows_errors`: os 12 grupos mais frequentes dos últimos 7 dias, sem o ruído DCOM.
 

@@ -49,6 +49,7 @@ comportamento.
 | --- | --- |
 | [release/distribution-and-trust.md](./release/distribution-and-trust.md) | Assinatura de código e SmartScreen/Smart App Control, Tauri (signCommand, updater), Store e winget, falso positivo de antivírus, teste em máquina limpa, checklist até a v1, **estado atual e como instalar em outro PC**. |
 | [security/kernel-driver-options.md](./security/kernel-driver-options.md) | Sensores de CPU sem driver próprio: v1 lê HWiNFO/LibreHardwareMonitor (feito), v2 PawnIO opt-in, v3 driver KMDF só leitura; WinRing0 proibido. |
+| [security/exposure-audit.md](./security/exposure-audit.md) | Segurança › Exposição: RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall, portas abertas no roteador (UPnP), apps de acesso remoto, escutas e conexões de entrada, sessões, tarefas/serviços sem assinatura; correções com backup e desfazer; monitor no laço de rotinas. Não é antivírus. |
 | [security/kaspersky-false-positive.md](./security/kaspersky-false-positive.md) | Por que antivírus marcaram os scripts antigos e como o app evita os mesmos padrões. |
 
 ## references/ — Pesquisa

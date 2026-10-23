@@ -21,6 +21,7 @@ use g2boost_core::restore::{self, CreateOutcome, RestoreStatus};
 use g2boost_core::routines::{self, Clock, Game, GameWatcher, RoutineState};
 use g2boost_core::settings::{self, Schedule, Settings};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
+use g2boost_core::exposure;
 use g2boost_core::tasksched;
 use g2boost_core::{adlx, nvapi};
 use g2boost_core::visualfx::Level;
@@ -30,7 +31,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "maintenance", "gpu"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "maintenance", "gpu", "security"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -1231,6 +1232,10 @@ fn spawn_routines(app: AppHandle) {
                     let _ = app.emit("routine:done", rec);
                 }
             }
+            // Exposure monitor: first pass ~10 s after start (records the baseline), then every 5 min.
+            if (tick == 2 || tick.is_multiple_of(60)) && s.exposure_monitor && !paused {
+                exposure_tick(&app);
+            }
         }
     });
 }
@@ -2102,6 +2107,72 @@ async fn gpu_amd_set(index: u32, changes: Vec<adlx::Change>) -> Result<Vec<adlx:
         .map_err(|e| e.to_string())?
 }
 
+/* ---------------- exposure (Segurança) ---------------- */
+
+#[derive(Default)]
+struct ExposureState {
+    /// New things the monitor saw since the user last looked (badge on the sidebar).
+    alerts: Mutex<Vec<exposure::Alert>>,
+    running: AtomicBool,
+}
+
+/// One monitor pass on its own thread (the router may take seconds); never two at once.
+fn exposure_tick(app: &AppHandle) {
+    if app.state::<ExposureState>().running.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let fresh = exposure::monitor_tick();
+        let st = app.state::<ExposureState>();
+        st.running.store(false, Ordering::SeqCst);
+        if fresh.is_empty() {
+            return;
+        }
+        let mut alerts = st.alerts.lock().unwrap();
+        alerts.extend(fresh);
+        let skip = alerts.len().saturating_sub(50);
+        alerts.drain(..skip);
+        let _ = app.emit("exposure:alerts", alerts.clone());
+    });
+}
+
+#[tauri::command]
+async fn exposure_report() -> Result<exposure::Report, String> {
+    tauri::async_runtime::spawn_blocking(exposure::report).await.map_err(|e| e.to_string())
+}
+
+/// The fix comes from the UI (hostile): the core re-validates it against the live state.
+#[tauri::command]
+async fn exposure_fix(fix: exposure::Fix) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || exposure::apply(&fix).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn exposure_revert(fix: exposure::Fix) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || exposure::revert(&fix).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
+}
+
+/// Only paths the last report showed.
+#[tauri::command]
+async fn exposure_reveal(path: String) -> Result<(), String> {
+    if path.len() > 1024 {
+        return Err("not_applicable".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || exposure::reveal(&path).map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn exposure_alerts(state: State<'_, ExposureState>) -> Vec<exposure::Alert> {
+    state.alerts.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn exposure_alerts_clear(app: AppHandle, state: State<'_, ExposureState>) {
+    state.alerts.lock().unwrap().clear();
+    let _ = app.emit("exposure:alerts", Vec::<exposure::Alert>::new());
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `G2 Boost.exe --gpu-helper <json>`: one ADLX request in a throwaway process (crash isolation).
@@ -2128,6 +2199,7 @@ pub fn run() {
         .manage(DupState::default())
         .manage(IconCache::default())
         .manage(NetEtwState::default())
+        .manage(ExposureState::default())
         .manage(Routines {
             settings: Mutex::new(settings::load()),
             state: Mutex::new(routines::load_state()),
@@ -2315,7 +2387,13 @@ pub fn run() {
             gpu_nv_revert,
             gpu_nv_recommended,
             gpu_amd_read,
-            gpu_amd_set
+            gpu_amd_set,
+            exposure_report,
+            exposure_fix,
+            exposure_revert,
+            exposure_reveal,
+            exposure_alerts,
+            exposure_alerts_clear
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

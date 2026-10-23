@@ -9,6 +9,7 @@ import {
   PackageX,
   Radar,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   ShieldHalf,
   Sparkles,
@@ -31,7 +32,8 @@ export type Route =
   | "ai"
   | "settings"
   | "maintenance"
-  | "gpu";
+  | "gpu"
+  | "security";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
@@ -40,6 +42,7 @@ const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "maintenance", icon: Wrench, label: "maintenance.nav" },
   { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
+  { route: "security", icon: ShieldAlert, label: "security.nav" },
   { route: "games", icon: Gamepad2, label: "nav.games" },
   { route: "gpu", icon: MonitorCog, label: "gpu.nav" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
@@ -52,6 +55,7 @@ export function AppShell({
   onNavigate,
   version,
   elevated,
+  badges,
   children,
 }: {
   route: Route;
@@ -59,6 +63,8 @@ export function AppShell({
   version: string;
   /** null until the app info arrives. */
   elevated: boolean | null;
+  /** Small count on a nav icon (new exposure alerts on Segurança). */
+  badges?: Partial<Record<Route, number>>;
   children: ReactNode;
 }) {
   const { t } = useI18n();
@@ -80,6 +86,7 @@ export function AppShell({
               active={route === item.route}
               icon={item.icon}
               label={t(item.label)}
+              badge={badges?.[item.route]}
               onClick={() => onNavigate(item.route)}
             />
           ))}
@@ -130,11 +137,13 @@ function NavButton({
   active,
   icon: Icon,
   label,
+  badge,
   onClick,
 }: {
   active: boolean;
   icon: LucideIcon;
   label: string;
+  badge?: number;
   onClick: () => void;
 }) {
   return (
@@ -155,6 +164,11 @@ function NavButton({
         <span className="absolute -left-2.5 h-6 w-0.5 rounded-full bg-primary" aria-hidden />
       ) : null}
       <Icon className="size-5" strokeWidth={2} />
+      {badge ? (
+        <span className="num absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-background">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      ) : null}
     </button>
   );
 }

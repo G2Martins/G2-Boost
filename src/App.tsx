@@ -19,6 +19,7 @@ import { GamesPage } from "@/pages/games";
 import { GpuPage } from "@/pages/gpu";
 import { MaintenancePage } from "@/pages/maintenance";
 import { NetworkPage } from "@/pages/network";
+import { SecurityPage } from "@/pages/security";
 import { SettingsPage } from "@/pages/settings";
 
 const PAGES: Record<Route, () => React.JSX.Element> = {
@@ -34,6 +35,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   settings: SettingsPage,
   maintenance: MaintenancePage,
   gpu: GpuPage,
+  security: SecurityPage,
 };
 
 const isRoute = (r: string | null | undefined): r is Route => !!r && r in PAGES;
@@ -124,12 +126,27 @@ export default function App() {
       void off.then((f) => f());
     };
   }, []);
+  // New exposure seen by the background monitor → count on the Segurança icon.
+  const [exposureAlerts, setExposureAlerts] = useState(0);
+  useEffect(() => {
+    backend.exposureAlerts().then((a) => a && setExposureAlerts(a.length));
+    const off = backend.on<unknown[]>("exposure:alerts", (a) => setExposureAlerts(a.length));
+    return () => {
+      void off.then((f) => f());
+    };
+  }, []);
   const Page = PAGES[route];
   return (
     <I18nProvider>
       <LuliProvider>
         <TooltipProvider>
-          <AppShell route={route} onNavigate={setRoute} version={version} elevated={elevated}>
+          <AppShell
+            route={route}
+            onNavigate={setRoute}
+            version={version}
+            elevated={elevated}
+            badges={{ security: exposureAlerts }}
+          >
             {removed ? (
               <RemovedBanner
                 name={removed}

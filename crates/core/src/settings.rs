@@ -50,6 +50,9 @@ pub struct Settings {
     /// Per-game options (CPU cores while in Game Mode, dedicated GPU), by game id. Changed only
     /// through `game_tweaks_set` in the shell, which also writes the GPU preference.
     pub game_tweaks: BTreeMap<String, crate::gamemode::GameTweaks>,
+    /// Background check for new exposure (public listener, inbound connection, remote-access
+    /// app, router port forward) every few minutes; alerts in the app.
+    pub exposure_monitor: bool,
 }
 
 impl Default for Settings {
@@ -72,6 +75,7 @@ impl Default for Settings {
             game_mode: crate::gamemode::Options::default(),
             priority_rules: Vec::new(),
             game_tweaks: BTreeMap::new(),
+            exposure_monitor: true,
         }
     }
 }
@@ -180,6 +184,7 @@ mod tests {
                 ("steam:1".to_string(), crate::gamemode::GameTweaks::default()),
                 ("bad\u{1}:x".to_string(), crate::gamemode::GameTweaks { gpu_high_perf: true, ..Default::default() }),
             ]),
+            exposure_monitor: true,
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),
@@ -217,5 +222,6 @@ mod tests {
         // Unknown/missing fields fall back to defaults instead of failing.
         let partial: Settings = serde_json::from_str(r#"{"game_ram_clean":true}"#).unwrap();
         assert!(partial.game_ram_clean && partial.close_to_tray);
+        assert!(partial.exposure_monitor, "exposure monitor defaults on");
     }
 }
