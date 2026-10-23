@@ -601,6 +601,30 @@ fn record(o: &Outcome) {
 
 #[cfg(test)]
 mod tests {
+    /// Elevated, real actions, gated by `G2BOOST_LIVE_ACTIONS=1`: online scan + ReTrim of the
+    /// system drive and an Analyze of every drive Windows can't classify (no defrag, no SpotFix).
+    #[test]
+    #[ignore]
+    fn live_actions_elevated() {
+        if std::env::var("G2BOOST_LIVE_ACTIONS").as_deref() != Ok("1") || !crate::system::is_elevated() {
+            println!("skip: needs G2BOOST_LIVE_ACTIONS=1 and admin");
+            return;
+        }
+        let vols = super::list().unwrap();
+        let progress = |p: Option<u32>| eprintln!("  {p:?}%");
+        for v in &vols {
+            let ops: &[super::Op] = if v.letter.eq_ignore_ascii_case("C:") {
+                &[super::Op::Scan, super::Op::Retrim]
+            } else {
+                &[super::Op::Analyze]
+            };
+            for &op in ops {
+                let t0 = std::time::Instant::now();
+                let r = super::run(op, &v.id, &progress);
+                println!("{} {op:?}: {r:?} in {} s", v.letter, t0.elapsed().as_secs());
+            }
+        }
+    }
     use super::*;
 
     #[test]

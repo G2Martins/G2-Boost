@@ -861,6 +861,35 @@ fn record(b: &Batch) {
 
 #[cfg(test)]
 mod tests {
+    /// Elevated, real installs, gated by `G2BOOST_LIVE_ACTIONS=1`: upgrades one small app
+    /// (`G2BOOST_LIVE_APP`, default GitHub CLI) and installs the pending Windows updates found in
+    /// the local cache. Never restarts.
+    #[test]
+    #[ignore]
+    fn live_actions_elevated() {
+        if std::env::var("G2BOOST_LIVE_ACTIONS").as_deref() != Ok("1") || !crate::system::is_elevated() {
+            println!("skip: needs G2BOOST_LIVE_ACTIONS=1 and admin");
+            return;
+        }
+        let app = std::env::var("G2BOOST_LIVE_APP").unwrap_or_else(|_| "GitHub.cli".into());
+        let list = super::app_updates(&[]).unwrap();
+        if let Some(a) = list.iter().find(|a| a.id.eq_ignore_ascii_case(&app) && a.skip.is_none()) {
+            let ids = vec![a.id.clone()];
+            let tok = super::apps_confirm(&ids).unwrap();
+            let r = super::apps_run(tok.token, &ids, |p| eprintln!("  app {p:?}"));
+            println!("app {}: {r:?}", a.id);
+        } else {
+            println!("app {app}: no upgrade pending");
+        }
+        let scan = super::wu_search(false).unwrap();
+        println!("windows pending: {}", scan.updates.len());
+        let ids: Vec<String> = scan.updates.iter().map(|u| u.id.clone()).collect();
+        if !ids.is_empty() {
+            let tok = super::wu_confirm(&ids).unwrap();
+            let r = super::wu_install(tok.token, &ids, |p| eprintln!("  wu {p:?}"));
+            println!("windows install: {r:?}");
+        }
+    }
     use super::*;
 
     fn pkg(id: &str, name: &str, v: &str, a: &str) -> winget::Package {
