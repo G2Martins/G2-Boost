@@ -699,6 +699,42 @@ export type LeftoverOutcome = {
 };
 export type OrphanApp = { app: AppEntry; count: number; bytes: number };
 
+/** System files: one Windows Disk Cleanup handler, measured (`volcache.rs`). */
+export type VolCacheItem = {
+  id: string;
+  bytes: number;
+  available: boolean;
+  needs_admin: boolean;
+  error: string | null;
+};
+export type RepairTool = "dism_scan" | "dism_restore" | "sfc" | "mrt_quick" | "mrt_full";
+export type RepairVerdict =
+  | "healthy"
+  | "repairable"
+  | "non_repairable"
+  | "repaired"
+  | "clean"
+  | "threats"
+  | "failed"
+  | "cancelled"
+  | "unknown";
+export type RepairOutcome = {
+  tool: RepairTool;
+  at: number;
+  duration_ms: number;
+  verdict: RepairVerdict;
+  code: number;
+  repaired: number;
+  unrepaired: number;
+  threats: string[];
+};
+export type RepairStatus = {
+  running: RepairTool | null;
+  percent: number | null;
+  mrt_present: boolean;
+};
+export type RepairProgress = { tool: RepairTool; percent: number | null };
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -863,6 +899,14 @@ export const backend = {
   firmwareInfo: () => call<Firmware>("firmware_info"),
   traceHost: (host: string, maxHops: number, probes: number, timeoutMs: number) =>
     callOrThrow<Hop[]>("trace_host", { host, maxHops, probes, timeoutMs }),
+  volcachePreview: (ids: string[]) => callOrThrow<VolCacheItem[]>("volcache_preview", { ids }),
+  volcacheConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("volcache_confirm", { ids }),
+  volcacheExecute: (token: number, ids: string[]) =>
+    callOrThrow<RunRecord>("volcache_execute", { token, ids }),
+  repairRun: (tool: RepairTool) => callOrThrow<RepairOutcome>("repair_run", { tool }),
+  repairCancel: () => call<void>("repair_cancel"),
+  repairStatus: () => call<RepairStatus>("repair_status"),
+  repairHistory: () => call<RepairOutcome[]>("repair_history"),
 
   /** Subscribe to a Rust-emitted event; no-op outside Tauri. */
   on: async <T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> => {

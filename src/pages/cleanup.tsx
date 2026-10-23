@@ -1,5 +1,6 @@
 import { Eye, History, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SystemFilesPanel } from "@/components/cleanup/system-files";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
@@ -53,7 +54,12 @@ export function CleanupPage() {
   const [on, setOn] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(CLEANUP_CATALOG.map((c) => [c.id, c.defaultOn])),
   );
-  const [group, setGroup] = useState<CleanupGroup>("daily");
+  // "system" = Windows' own cleanup handlers; opened directly from the disk's big-items list.
+  const [group, setGroup] = useState<CleanupGroup | "system">(() => {
+    if (boot.startTab !== "system") return "daily";
+    boot.startTab = undefined;
+    return "system";
+  });
   const [preview, setPreview] = useState<Record<string, PreviewItem>>({});
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<CleanupProgress | null>(null);
@@ -143,15 +149,17 @@ export function CleanupPage() {
         title={t("cleanup.title")}
         subtitle={t("cleanup.subtitle")}
         tabs={
-          <Tabs value={group} onValueChange={(v) => setGroup(v as CleanupGroup)}>
+          <Tabs value={group} onValueChange={(v) => setGroup(v as CleanupGroup | "system")}>
             <TabsList>
               <TabsTrigger value="daily">{t("cleanup.tab.daily")}</TabsTrigger>
               <TabsTrigger value="monthly">{t("cleanup.tab.monthly")}</TabsTrigger>
               <TabsTrigger value="advanced">{t("cleanup.tab.advanced")}</TabsTrigger>
+              <TabsTrigger value="system">{t("volcache.tab")}</TabsTrigger>
             </TabsList>
             <TabsContent value="daily" />
             <TabsContent value="monthly" />
             <TabsContent value="advanced" />
+            <TabsContent value="system" />
           </Tabs>
         }
       />
@@ -163,7 +171,15 @@ export function CleanupPage() {
             { label: "luli.ask.cleanup.often" },
           ]}
         />
-        <Card className="animate-rise flex flex-wrap items-center gap-4 py-4">
+        {group === "system" ? (
+          <SystemFilesPanel elevated={elevated} onHistory={setHistory} />
+        ) : null}
+        <Card
+          className={cn(
+            "animate-rise flex flex-wrap items-center gap-4 py-4",
+            group === "system" && "hidden",
+          )}
+        >
           <span className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-wide">
             {t("cleanup.selected_total", {
               count: selected.length,
@@ -203,7 +219,7 @@ export function CleanupPage() {
           {error ? <p className="w-full text-xs text-destructive">{error}</p> : null}
         </Card>
 
-        {phase === "confirm" ? (
+        {phase === "confirm" && group !== "system" ? (
           <Card className="animate-rise border-warning/40">
             <CardTitle>
               <Trash2 className="size-4 text-warning" />
@@ -248,7 +264,7 @@ export function CleanupPage() {
           </Card>
         ) : null}
 
-        {result ? (
+        {result && group !== "system" ? (
           <Card className="animate-rise">
             <CardTitle>
               {t("cleanup.result.title")}
