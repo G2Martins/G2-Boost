@@ -1,6 +1,6 @@
 # Analisador de rede e DNS Optimizer
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), UI `src/components/network/devices-tab.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
+**Última revisão:** 2026-10-23 (Reparar conexão) · 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), `netrepair.rs`, UI `src/components/network/devices-tab.tsx`, `src/components/network/repair-connection.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`, `net_dhcp_adapters`, `net_renew`, `net_flush_dns`, `net_open_reset`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
 
 ## Monitor de conexão
 
@@ -40,6 +40,20 @@ Na máquina do dono (2026-10-18): 4 aparelhos em 7,2 s (roteador ZTE via UPnP IG
 
 Toda entrada é limitada no Rust (`clamp`), resolução só IPv4 por enquanto.
 
+### Reparar conexão (`netrepair.rs`, cartão na aba Ferramentas; 2026-10-23)
+
+Do mais leve ao mais forte, sem `ipconfig`/`netsh`:
+
+| Ação | Como | Admin |
+| --- | --- | --- |
+| Limpar cache DNS | `DnsFlushResolverCache` (o mesmo `cleanup::dns_flush` do catálogo). Não derruba a conexão. | não |
+| Renovar IP | `IpReleaseAddress` + `IpRenewAddress` (iphlpapi) no `IP_ADAPTER_INDEX_MAP` que o `GetInterfaceInfo` devolveu. Release que falha (sem concessão) não para: o renew decide. Bloqueia até o roteador responder. | sim (como o `ipconfig /release`; `needs_admin` antes de chamar) |
+| Redefinição de rede | Abre a página do próprio Windows por `ShellExecuteExW("open")` com URI fixa: `ms-settings:network-advancedsettings` no 11, `ms-settings:network-status` no 10. O reset de winsock/pilha IP não tem API pública; o app não roda nada. | não (a página pede) |
+
+- **Adaptadores** (`netrepair::adapters`): `GetAdaptersAddresses(AF_INET)` com `IfOperStatusUp`, sem loopback, com `IP_ADAPTER_DHCP_ENABLED` e presentes no `GetInterfaceInfo` (estático não tem o que renovar). Ao contrário do DNS, entra também adaptador sem gateway (é justamente o caso de IP 169.254 que o renew conserta). O principal (`GetBestInterface`) vem primeiro.
+- **Validação**: `renew(index)` exige o índice na lista ao vivo (`unknown_adapter`); a UI confirma avisando que a conexão cai por alguns segundos (inclusive downloads e partidas). Volta o IP novo.
+- **Testes**: URI fixa por versão, sem admin = `needs_admin` e elevado com índice inexistente = `unknown_adapter` (nunca libera nada), nomes `\DEVICE\TCPIP_{GUID}` do `GetInterfaceInfo`. `#[ignore]` só leitura: `live_dhcp_adapters`. Na máquina do dono (2026-10-23): 1 adaptador DHCP, Ethernet 2.5GbE (#16, 192.168.0.34, principal).
+
 ## DNS Optimizer (`dns.rs`, PC Boost › DNS)
 
 - **Catálogo no core** (10 provedores: Cloudflare, Quad9, Google, NextDNS, OpenDNS, Control D, AdGuard, Verisign, Comodo, Neustar). A UI só manda o **id** — nunca um IP arbitrário.
@@ -54,7 +68,9 @@ Toda entrada é limitada no Rust (`clamp`), resolução só IPv4 por enquanto.
 
 ## Testes
 
-Pacote DNS e validação de resposta, adaptadores ao vivo, `NeedsAdmin` sem elevação, adaptador desconhecido recusado, ranking ao vivo (ignorado), TCPing contra listener local, estatísticas de latência.
+Pacote DNS e validação de resposta, adaptadores ao vivo, `NeedsAdmin` sem elevação, adaptador desconhecido recusado, ranking ao vivo (ignorado), TCPing contra listener local, estatísticas de latência, Reparar conexão (acima).
+
+**Verificação elevada pendente (Reparar conexão):** no app elevado, Rede › Ferramentas › Renovar IP no adaptador principal (a conexão cai alguns segundos; o cartão mostra o IP novo) e Limpar cache DNS; Abrir no Windows abre a página certa no 11.
 
 ## Fora de escopo (v1)
 
