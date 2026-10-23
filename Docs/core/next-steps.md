@@ -1,6 +1,6 @@
 # Roadmap — fases e backlog
 
-**Última revisão:** 2026-10-22 (rodada 7 planejada: BIOS, ajustes por jogo, limpeza do sistema + reparo, auditoria de exposição, configurações 3D do driver) · 2026-10-19 (rodada 6 fechada com testes ponta a ponta, só Wi-Fi sem hardware para testar; assinatura/SmartScreen e PawnIO/driver próprio fora do roadmap por decisão do dono)
+**Última revisão:** 2026-10-23 (rodada 8: atualizações de apps e do Windows, Manutenção+, sempre abrir como administrador, monitor, auditoria ponytail) · 2026-10-22 (rodada 7 planejada: BIOS, ajustes por jogo, limpeza do sistema + reparo, auditoria de exposição, configurações 3D do driver) · 2026-10-19 (rodada 6 fechada com testes ponta a ponta, só Wi-Fi sem hardware para testar; assinatura/SmartScreen e PawnIO/driver próprio fora do roadmap por decisão do dono)
 
 **Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). **9 IA + MCP ✅** (conselheiro local, assistente no app com 3 provedores, `g2boost-mcp.exe` só leitura). **2026-10-16:** disco (filtros, Lixeira, mostrar na pasta, essenciais) ✅, rede (TCPing, gateway, DNS Optimizer) ✅, BIOS/firmware + sensores externos ✅, inicialização + processos ✅, IA endurecida ✅, licença/READMEs/avisos de terceiros ✅, MCP no próprio exe (`--mcp`) ✅, instalador NSIS com licença ✅ (sem assinatura). Próximas: **rodada 6** (abaixo), MFT. Planejamento GSD em `.planning/`.
 
@@ -17,6 +17,18 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 | **5 — Rotinas** ✅ 2026-10-15 | iniciar com o Windows (tarefa de logon `--tray`, Highest se elevado) · limpeza agendada (ao ligar / a cada N h / diária / semanal) com categorias · limpar RAM ao abrir jogo (Steam `RunningAppID` + exes + `steamapps\common`) · bandeja · Configurações | app vive na bandeja e limpa sozinho; tudo visível no histórico (verificar logon real + Highest pelo dono) |
 | **8 — MCP local** ✅ só leitura (13 tools, `G2 Boost.exe --mcp`); destrutivas com token = backlog | `g2boost-mcp.exe` (stdio) · tools read-only + destrutivas com token · registro no Claude Desktop/Code · doc de uso | Claude da máquina analisa o scan e propõe limpeza; humano confirma na UI |
 | **9 — Release** (NSIS ✅ 2026-10-16; **assinatura de código / "baixar sem aviso do Windows" fora do roadmap**, decisão do dono 2026-10-18; pesquisa guardada em [../release/distribution-and-trust.md](../release/distribution-and-trust.md)) | instalador NSIS · auto-update · submissão de falso positivo (Kaspersky/Microsoft) · README público | instala numa VM com Kaspersky sem bloqueio |
+
+## Rodada 8 (2026-10-23, pedido do dono: "winget upgrade --all", cheatsheet de comandos, ponytail, sempre admin)
+
+| Frente | Como | Estado |
+|---|---|---|
+| Atualizar todos os apps | Apps › Atualizações: `winget::upgrades()` + `install(id, true)` por pacote (nunca `--all`), token preso à lista ordenada, excluídos, parar entre pacotes, histórico (`updates.rs`) | ✅ |
+| Windows Update | WUA COM (`IUpdateSession`): busca sem admin (cache ou online), baixar + instalar com admin, histórico, reiniciar só se pendente | ✅ |
+| Do cheatsheet | verificar disco (`MSFT_Volume.Repair` Scan/SpotFix), otimizar unidades (`Optimize` Analyze/ReTrim/Defrag por tipo), reiniciar nas Opções avançadas (`SHUTDOWN_RESTART_BOOTOPTIONS`), renovar IP + limpar DNS + abrir a redefinição de rede do Windows (`volumes.rs`, `netrepair.rs`) | ✅ |
+| Fora (de propósito) | `net user /add` e admin novo (risco), `bcdedit`/`bootrec` (pode impedir o boot), `netsh winsock reset` (sem API: o app abre a página do Windows) | — |
+| Sempre abrir como administrador | Configurações: um UAC por abertura normal (como o ExitLag), nunca no `--mcp`/`--tray`; recusar mantém a cópia sem elevação. Sem UAC só com tarefa agendada = desvio de UAC com exe em pasta gravável: recusado | ✅ |
+| Monitor em tempo real | cadência fixa de 1 s, disco = tempo ativo, gráfico que rola, gauge que desliza | ✅ |
+| Auditoria ponytail | 3 lotes: helpers duplicados unificados (`is_reparse`, `system_root`, FILETIME, caminho de processo, `blocking()` nos comandos), 12 chaves i18n e 2 deps JS mortas, lib só `rlib`. Rejeitados após checagem: remover `windows-core` (a macro `#[implement]` precisa), unificar FNV (mudaria chaves gravadas) | ✅ |
 
 ## Rodada 7 (2026-10-22, mapeamento do dono: prints de concorrente + ideias)
 
