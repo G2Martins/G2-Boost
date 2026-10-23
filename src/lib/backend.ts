@@ -962,4 +962,57 @@ export const backend = {
   gameTweaksInfo: () => call<GameTweaksInfo>("game_tweaks_info"),
   gameTweaksSet: (id: string, tweaks: GameTweaks) =>
     callOrThrow<Settings>("game_tweaks_set", { id, tweaks }),
+  /* GPU driver settings. `game` = a games_list id (its exe picks the profile); null = global. */
+  gpuInfo: () => call<GpuOverview>("gpu_info"),
+  gpuNvRead: (game: string | null) => callOrThrow<NvProfile>("gpu_nv_read", { game }),
+  gpuNvApply: (game: string | null, id: NvSettingId, value: string) =>
+    callOrThrow<NvProfile>("gpu_nv_apply", { game, id, value }),
+  gpuNvRevert: (game: string | null, id: NvSettingId) =>
+    callOrThrow<NvProfile>("gpu_nv_revert", { game, id }),
+  gpuNvRecommended: (game: string | null) => callOrThrow<NvProfile>("gpu_nv_recommended", { game }),
+  gpuAmdRead: () => callOrThrow<AmdGpu[]>("gpu_amd_read"),
+  gpuAmdSet: (index: number, changes: AmdChange[]) =>
+    callOrThrow<AmdGpu[]>("gpu_amd_set", { index, changes }),
 };
+
+export type GpuOverview = {
+  gpus: Gpu[];
+  /** Which section the GPU page shows (discrete vendor first); null = none supported. */
+  section: "nvidia" | "amd" | "intel" | null;
+  nvidia: { version: string; branch: string } | null;
+};
+export type NvSettingId =
+  | "low_latency"
+  | "power"
+  | "fps_limit"
+  | "vsync"
+  | "shader_cache"
+  | "texture_quality"
+  | "threaded";
+export type NvSetting = {
+  id: NvSettingId;
+  /** Option key, the frame cap as a number string, or null for a value no option uses. */
+  value: string | null;
+  /** Raw driver dwords in hex. */
+  raw: string;
+  /** Option keys; empty for the frame cap. */
+  options: string[];
+  recommended: string | null;
+  /** At the recommended value or another one that counts as good. */
+  good: boolean;
+  user_set: boolean;
+  /** G2 Boost changed it and holds the previous value. */
+  backed_up: boolean;
+};
+export type NvProfile = { profile: string | null; settings: NvSetting[] };
+export type AmdFeatureId = "anti_lag" | "chill" | "boost" | "sharpening" | "enhanced_sync" | "frtc";
+export type AmdFeature = {
+  feature: AmdFeatureId;
+  supported: boolean;
+  enabled: boolean;
+  value: number | null;
+  range: [number, number] | null;
+  recommended: boolean | null;
+};
+export type AmdGpu = { index: number; name: string; discrete: boolean; features: AmdFeature[] };
+export type AmdChange = { feature: AmdFeatureId; enabled?: boolean; value?: number };

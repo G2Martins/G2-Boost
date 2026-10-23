@@ -55,6 +55,9 @@ pub mod wlan;
 pub mod repair;
 pub mod volcache;
 pub mod cpusets;
+pub mod nvapi;
+pub mod adlx;
+pub mod gpu;
 
 /// Crate version, surfaced in the UI "about" footer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

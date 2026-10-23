@@ -58,6 +58,7 @@ const SCREENS: &[(&[&str], &str)] = &[
     (&["boost", "pcboost", "ajustes"], "boost"),
     (&["luli", "ia", "ai"], "ai"),
     (&["configuracoes", "configurações", "settings"], "settings"),
+    (&["gpu", "placa", "video", "vídeo"], "gpu"),
 ];
 
 /// A message the UI translates (`console.<key>` with params).

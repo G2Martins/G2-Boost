@@ -41,6 +41,7 @@ comportamento.
 | [boost/games.md](./boost/games.md) | Jogos: biblioteca de todos os launchers, Modo Jogo (energia, prioridade, RAM, rotinas; desfaz sozinho), rota até o servidor com análise honesta e Reotimizar. |
 | [boost/privacy-health.md](./boost/privacy-health.md) | Privacidade (câmera/microfone), saúde dos discos, uso de rede por app, Wi-Fi, tempo de boot, prioridade fixa, apps pouco usados, duplicados. |
 | [network/game-routes.md](./network/game-routes.md) | Jogos e conexões estilo ExitLag: o que dá sem servidores (lista de jogos, Modo Jogo, diagrama MTR, reotimizar honesto, QoS) e o que exigiria relays. Proposta. |
+| [boost/gpu.md](./boost/gpu.md) | Página GPU: configurações 3D do driver NVIDIA (NVAPI DRS, global e por jogo, backup e desfazer, ids e valores verificados nesta placa) e AMD em beta (ADLX num processo auxiliar isolado); Intel em breve. |
 
 ## release/ e security/
 
