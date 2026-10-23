@@ -320,7 +320,6 @@ fn privilege(name: &str) -> Result<(), FwError> {
 /// sets the "boot to firmware UI" bit of `OsIndications` (other bits kept) and restarts. Apps
 /// still get the chance to save. If the restart cannot start, the variable is put back.
 pub fn reboot_to_firmware() -> Result<(), FwError> {
-    use windows::Win32::System::Shutdown::{InitiateShutdownW, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OTHER, SHTDN_REASON_MINOR_OTHER, SHUTDOWN_RESTART};
     if boot_mode() != Some("uefi") {
         return Err(FwError::Unsupported);
     }
@@ -333,15 +332,40 @@ pub fn reboot_to_firmware() -> Result<(), FwError> {
     let next = with_boot_to_fw_ui(supported, current.map_or(0, |c| c.0)).ok_or(FwError::Unsupported)?;
     let attrs = current.map_or(NV_BS_RT, |c| c.1);
     efi_write(Some(next), attrs)?;
-    let restart = privilege("SeShutdownPrivilege").and_then(|()| {
-        // SAFETY: local restart, no message, no grace period.
-        let rc = unsafe { InitiateShutdownW(PCWSTR::null(), PCWSTR::null(), 0, SHUTDOWN_RESTART, SHTDN_REASON_MAJOR_OTHER | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED) };
-        if rc == 0 { Ok(()) } else { Err(FwError::Win32(format!("error {rc}"))) }
-    });
+    let restart = restart(windows::Win32::System::Shutdown::SHUTDOWN_RESTART);
     if restart.is_err() {
         let _ = efi_write(current.map(|c| c.0), attrs); // the next normal restart must not land in the BIOS
     }
     restart
+}
+
+/// Local planned restart now (no message, no grace period); apps still get the chance to save.
+fn restart(flags: windows::Win32::System::Shutdown::SHUTDOWN_FLAGS) -> Result<(), FwError> {
+    use windows::Win32::System::Shutdown::{InitiateShutdownW, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_OTHER, SHTDN_REASON_MINOR_OTHER};
+    privilege("SeShutdownPrivilege")?;
+    // SAFETY: local machine, no message, no grace period.
+    let rc = unsafe { InitiateShutdownW(PCWSTR::null(), PCWSTR::null(), 0, flags, SHTDN_REASON_MAJOR_OTHER | SHTDN_REASON_MINOR_OTHER | SHTDN_REASON_FLAG_PLANNED) };
+    match rc {
+        0 => Ok(()),
+        5 | 1314 => Err(FwError::NeedsAdmin),
+        c => Err(FwError::Win32(format!("error {c}"))),
+    }
+}
+
+/// `shutdown /r /o`: restart into Windows' advanced startup options (Safe Mode, Startup Repair,
+/// System Restore, UEFI settings...). Restart only, never a forced logoff or power-off.
+pub(crate) fn boot_options_flags() -> windows::Win32::System::Shutdown::SHUTDOWN_FLAGS {
+    use windows::Win32::System::Shutdown::{SHUTDOWN_RESTART, SHUTDOWN_RESTART_BOOTOPTIONS};
+    SHUTDOWN_RESTART | SHUTDOWN_RESTART_BOOTOPTIONS
+}
+
+/// Restart into the advanced startup options menu, without running `shutdown.exe`. Admin only
+/// (as `shutdown /o` is); the UI confirms first.
+pub fn reboot_to_boot_options() -> Result<(), FwError> {
+    if !crate::system::is_elevated() {
+        return Err(FwError::NeedsAdmin);
+    }
+    restart(boot_options_flags())
 }
 
 #[cfg(test)]
@@ -382,6 +406,16 @@ mod tests {
         // Never reaches the restart: elevated runs skip this check on purpose.
         if !crate::system::is_elevated() {
             assert!(matches!(reboot_to_firmware(), Err(FwError::NeedsAdmin | FwError::Unsupported)));
+        }
+    }
+
+    #[test]
+    fn boot_options_restart_flags() {
+        // 0x4 restart + 0x400 boot options; never force (0x1/0x2), power-off (0x8) or hybrid (0x200).
+        assert_eq!(boot_options_flags().0, 0x404);
+        assert_eq!(boot_options_flags().0 & (0x1 | 0x2 | 0x8 | 0x10 | 0x200), 0);
+        if !crate::system::is_elevated() {
+            assert_eq!(reboot_to_boot_options(), Err(FwError::NeedsAdmin), "refused before any restart");
         }
     }
 

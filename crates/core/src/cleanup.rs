@@ -408,7 +408,7 @@ pub fn flush_dns_cache() {
 }
 
 /// `DnsFlushResolverCache` is exported by dnsapi.dll but not declared in the SDK headers.
-fn dns_flush() -> Result<(), String> {
+pub(crate) fn dns_flush() -> Result<(), String> {
     type Flush = unsafe extern "system" fn() -> i32;
     let lib = wide("dnsapi.dll");
     // SAFETY: well-known system DLL; the export has the documented-by-practice signature.

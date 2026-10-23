@@ -2,6 +2,7 @@ import { Activity, Gamepad2, Loader2, Play, Power, Route, Square } from "lucide-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuliCard } from "@/components/luli-card";
 import { DevicesTab } from "@/components/network/devices-tab";
+import { RepairConnectionCard } from "@/components/network/repair-connection";
 import { NetUsageTab, WifiTab } from "@/components/network/usage-wifi";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
@@ -1081,6 +1082,7 @@ function Tools() {
           />
         )}
       </Card>
+      <RepairConnectionCard index={2} />
     </>
   );
 }

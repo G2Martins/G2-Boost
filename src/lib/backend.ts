@@ -1060,6 +1060,74 @@ export const backend = {
   updatesHistory: () => call<UpdateBatch[]>("updates_history"),
   /** Restarts the PC (after the UI's confirmation); refused when no restart is pending. */
   updatesReboot: () => callOrThrow<void>("updates_reboot"),
+  /* Manutenção+: disk check, optimize drives, boot options, connection repair. */
+  volumesList: () => call<Volume[]>("volumes_list"),
+  /** Stop = repairCancel (one servicing slot for the whole app). */
+  volumesRun: (op: VolumeOp, volume: string) =>
+    callOrThrow<VolumeOutcome>("volumes_run", { op, volume }),
+  volumesStatus: () => call<VolumeRunning | null>("volumes_status"),
+  volumesHistory: () => call<VolumeOutcome[]>("volumes_history"),
+  /** Restarts the PC into the advanced startup options (after the UI's confirmation). */
+  bootOptionsReboot: () => callOrThrow<void>("boot_options_reboot"),
+  netDhcpAdapters: () => call<DhcpAdapter[]>("net_dhcp_adapters"),
+  netRenew: (index: number) => callOrThrow<string | null>("net_renew", { index }),
+  netFlushDns: () => callOrThrow<void>("net_flush_dns"),
+  netOpenReset: () => callOrThrow<void>("net_open_reset"),
+};
+
+export type VolumeOp = "scan" | "spot_fix" | "analyze" | "retrim" | "defrag";
+export type VolumeVerdict =
+  | "healthy"
+  | "fixed"
+  | "needs_spot_fix"
+  | "needs_offline"
+  | "retry"
+  | "optimized"
+  | "failed"
+  | "cancelled";
+export type Volume = {
+  /** `\\?\Volume{GUID}\`: the id every operation names. */
+  id: string;
+  letter: string;
+  label: string;
+  fs: string;
+  size: number;
+  free: number;
+  health: "healthy" | "warning" | "unhealthy" | "unknown";
+  /** What Windows itself flagged. */
+  needs: "scan" | "spot_fix" | "full_repair" | null;
+  media: "ssd" | "hdd" | "unknown";
+  system: boolean;
+  fragmentation: number | null;
+  last_optimized: string | null;
+  /** What the core allows on this volume (enforced there too). */
+  ops: VolumeOp[];
+};
+export type VolumeOutcome = {
+  op: VolumeOp;
+  volume: string;
+  letter: string;
+  at: number;
+  duration_ms: number;
+  verdict: VolumeVerdict;
+  code: number;
+  output: number | null;
+  fragmentation: number | null;
+  prompted: boolean;
+};
+export type VolumeRunning = {
+  op: VolumeOp;
+  volume: string;
+  letter: string;
+  percent: number | null;
+};
+export type VolumeProgress = { op: VolumeOp; volume: string; percent: number | null };
+export type DhcpAdapter = {
+  index: number;
+  name: string;
+  description: string;
+  ipv4: string | null;
+  primary: boolean;
 };
 
 export type GpuOverview = {
