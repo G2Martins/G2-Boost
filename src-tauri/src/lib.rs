@@ -2181,6 +2181,81 @@ fn exposure_alerts_clear(app: AppHandle, state: State<'_, ExposureState>) {
     let _ = app.emit("exposure:alerts", Vec::<exposure::Alert>::new());
 }
 
+/* ---------------- Manutenção+: disk check, optimize drives, boot options, connection repair ---------------- */
+
+use g2boost_core::{netrepair, volumes};
+
+#[derive(serde::Serialize, Clone)]
+struct VolumeProgress {
+    op: volumes::Op,
+    volume: String,
+    percent: Option<u32>,
+}
+
+#[tauri::command]
+async fn volumes_list() -> Result<Vec<volumes::Volume>, String> {
+    tauri::async_runtime::spawn_blocking(|| volumes::list().map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
+}
+
+/// One scan / spot fix / analyze / retrim / defrag, run to the end (the UI confirmed first).
+/// The core re-validates `volume` and `op` against the live list. Stop = `repair_cancel`.
+#[tauri::command]
+async fn volumes_run(app: AppHandle, op: volumes::Op, volume: String) -> Result<volumes::Outcome, String> {
+    if volume.len() > 64 {
+        return Err("unknown_volume".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let id = volume.clone();
+        volumes::run(op, &volume, &|percent| {
+            let _ = app.emit("maintenance:volume-progress", VolumeProgress { op, volume: id.clone(), percent });
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn volumes_status() -> Option<volumes::Running> {
+    volumes::status()
+}
+
+#[tauri::command]
+fn volumes_history() -> Vec<volumes::Outcome> {
+    volumes::history()
+}
+
+/// Restart into the advanced startup options (Safe Mode, Startup Repair...). UI confirms first.
+#[tauri::command]
+async fn boot_options_reboot() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| firmware::reboot_to_boot_options().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn net_dhcp_adapters() -> Vec<netrepair::DhcpAdapter> {
+    tauri::async_runtime::spawn_blocking(netrepair::adapters).await.unwrap_or_default()
+}
+
+/// Release + renew one adapter's lease (index from `net_dhcp_adapters`, re-checked in the core).
+#[tauri::command]
+async fn net_renew(index: u32) -> Result<Option<std::net::Ipv4Addr>, String> {
+    tauri::async_runtime::spawn_blocking(move || netrepair::renew(index).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn net_flush_dns() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| netrepair::flush_dns().map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn net_open_reset() -> Result<(), String> {
+    netrepair::open_network_reset().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `G2 Boost.exe --gpu-helper <json>`: one ADLX request in a throwaway process (crash isolation).
@@ -2401,7 +2476,16 @@ pub fn run() {
             exposure_revert,
             exposure_reveal,
             exposure_alerts,
-            exposure_alerts_clear
+            exposure_alerts_clear,
+            volumes_list,
+            volumes_run,
+            volumes_status,
+            volumes_history,
+            boot_options_reboot,
+            net_dhcp_adapters,
+            net_renew,
+            net_flush_dns,
+            net_open_reset
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

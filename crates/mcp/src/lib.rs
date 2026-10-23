@@ -818,6 +818,25 @@ threat names). To run them, tell the user to open G2 Boost > Manutenção (admin
         blocking(|| json!({ "status": g2boost_core::repair::status(), "history": g2boost_core::repair::history() }))
             .await
     }
+
+    #[tool(description = "Drives, read-only: every fixed lettered volume (letter, file system, size, free space, \
+health, what Windows itself flagged: scan / spot_fix / full_repair, media ssd/hdd/unknown, last fragmentation and \
+last optimization date Windows recorded, and which operations G2 Boost allows: scan, spot_fix, analyze, retrim for \
+SSDs, defrag only for HDDs), the running disk job with progress, and the latest disk check / optimize results. To \
+run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")]
+    async fn get_volumes(&self) -> Result<String, String> {
+        blocking(|| {
+            json!({
+                "volumes": match g2boost_core::volumes::list() {
+                    Ok(v) => json!(v),
+                    Err(e) => json!({ "error": e.to_string() }),
+                },
+                "running": g2boost_core::volumes::status(),
+                "history": g2boost_core::volumes::history(),
+            })
+        })
+        .await
+    }
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
