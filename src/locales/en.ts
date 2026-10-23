@@ -1679,4 +1679,22 @@ export const en = {
   "settings.no": "No",
   "settings.privacy":
     "No telemetry. Nothing leaves the PC except the network tests you start and the questions you send to Luli.",
+  /* ---- round 7.1: BIOS guide, per-game tweaks, tasks and Spooler ---- */
+  "boost.tweak.winsat_task_off": "Disable Windows' automatic assessment",
+  "boost.tweak.winsat_task_off.desc":
+    "Turns off the task that runs Windows' performance tests by itself when the PC is idle, with CPU, disk and graphics spikes. The assessment from My PC still runs when you ask for it.",
+  "boost.tweak.winsat_task_off.warn":
+    "you want Windows' scores kept up to date without running the assessment by hand.",
+  "boost.tweak.feedback_tasks_off": "Disable diagnostic and feedback reports",
+  "boost.tweak.feedback_tasks_off.desc":
+    "Turns off the scheduled tasks that collect disk diagnostics, ask for your feedback and send queued error reports to Microsoft. Errors are still logged on the PC.",
+  "boost.tweak.feedback_tasks_off.warn":
+    "you are in Windows Insider or send feedback to Microsoft.",
+  "boost.tweak.svc_spooler": "Disable the Print Spooler",
+  "boost.tweak.svc_spooler.desc":
+    "Stops the printing service on PCs without a printer. Frees a little memory and closes a service that has had serious security flaws.",
+  "boost.tweak.svc_spooler.warn":
+    "you print, use a network printer or save to PDF through the virtual printer.",
+  "boost.reason.printer": "printer installed",
+  "boost.reason.unknown": "printers not checked",
 } as const satisfies Record<keyof typeof ptBR, string>;

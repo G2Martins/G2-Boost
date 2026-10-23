@@ -1,6 +1,6 @@
 # PC Boost — tweaks, efeitos visuais, serviços, RAM
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
+**Última revisão:** 2026-10-22 (tarefas WinSAT/diagnóstico/feedback, Spooler) · 2026-10-18 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
 
 > Planos de energia e Gerenciador de tarefas (abas Energia e Processos) → [power-processes.md](power-processes.md).
 
@@ -64,7 +64,7 @@ A UI calcula o preset ativo comparando o estado real (tweaks "indisponíveis" s�
 
 **Mudanças de preset pela evidência** ([../references/windows-services-research.md](../references/windows-services-research.md)): `svc_xbox` saiu do Alto desempenho (serviços já Manual/parados → ganho nulo, efeitos reais no Game Pass); `svc_sysmain` continua no Padrão por decisão do dono, mas `recommend()` o tira da lista em HD mecânico. Cada tweak tem `category` (Desempenho / Privacidade / Aparência / Rede) e, no card, o motivo de "não recomendado neste PC" ([dashboard.md](dashboard.md)).
 
-**Fora, de propósito:** `Psched\NonBestEffortLimit` (fica em `Policies` — gatilho do Kaspersky, efeito desprezível), `MSMQ\TCPNoDelay` (cargo cult, só MSMQ), Prefetch (ver `legacy-bat-scripts.md`), Windows Update/Defender/Spooler.
+**Fora, de propósito:** `Psched\NonBestEffortLimit` (fica em `Policies` — gatilho do Kaspersky, efeito desprezível), `MSMQ\TCPNoDelay` (cargo cult, só MSMQ), Prefetch (ver `legacy-bat-scripts.md`), Windows Update/Defender. Spooler entrou em 2026-10-22 só para PC sem impressora (abaixo).
 
 Serviços: `WSearch` é "automático (início atrasado)"; o revert restaura o tipo de início gravado, mas não a flag de atraso (`ChangeServiceConfig2W` fica para quando alguém sentir falta). Serviço ausente na máquina (ex.: Xbox em LTSC) é ignorado; se nenhum existir, o card mostra "Indisponível".
 
@@ -75,6 +75,18 @@ Serviços: `WSearch` é "automático (início atrasado)"; o revert restaura o ti
 | `windowed_optimizations` | Flag `SwapEffectUpgradeEnable=1` dentro de `HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings` (a opção "Otimizações para jogos em janela" de Configurações › Tela › Gráficos): DX10/11 em janela/sem borda usam flip model → menos latência, VRR/Auto HDR. Edita **só essa chave** da string (`dx_set`/`dx_get`, testados) e preserva Auto HDR/VRR; backup = string inteira. Recomendado só no Windows 11 (`windows10` como motivo no 10). | Padrão, Alto |
 
 **Avaliados e deixados de fora** (vídeos/stories de otimização): HPET/`useplatformclock` via bcdedit (shell + efeito controverso, piora em CPUs modernas), resolução de timer global (`timeBeginPeriod` afeta o sistema todo; Windows 11 já isola por processo), prioridade por IFEO para exes de jogo (é o padrão que antivírus marcam como persistência/injeção), "limpeza de RAM" contínua de working set (piora; só purge da standby sob demanda), desligar mitigações de CPU (segurança).
+
+### Adicionados em 2026-10-22 (rodada 7)
+
+| id | O que faz | Mecanismo | Admin | Preset | Categoria |
+|---|---|---|---|---|---|
+| `winsat_task_off` | avaliação do Windows em ociosidade off | tarefa `\Microsoft\Windows\Maintenance\WinSAT` (`Kind::Tasks`) | sim | Alto | Desempenho |
+| `feedback_tasks_off` | diagnóstico de disco, pedidos de feedback e envio da fila de relatórios de erro off | tarefas `\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector`, `\…\Feedback\Siuf\{DmClient, DmClientOnScenarioDownload}`, `\…\Windows Error Reporting\QueueReporting` | sim | Padrão + Alto | Privacidade |
+| `svc_spooler` | Spooler de impressão Disabled + parado | SCM (`Spooler`, padrão Automático) | sim | Personalizado | Desempenho |
+
+- Tarefas ausentes no build são ignoradas (comportamento do `tasksched`); se nenhuma existir, o card fica "Indisponível". **Nunca** `ScheduledDefrag` (TRIM de SSD), `UpdateOrchestrator` nem tarefas do Defender.
+- **WinSAT continua no Meu PC:** "Rodar avaliação" usa a API COM (`CInitiateWinSAT::InitiateFormalAssessment`, `winsat.rs`), não a tarefa agendada; desligar a tarefa só para a execução automática em ociosidade (as notas param de se atualizar sozinhas, o achado `winsat_stale` aponta quando rodar).
+- **Spooler recomendado só sem impressora real** (`recommend.rs`): `EnumPrintersW` (local + conexões, nível 4), ignorando virtuais (nome com PDF, XPS, OneNote, Fax). Impressora real → motivo `printer`; lista ilegível (Spooler já desligado, RPC) → `unknown`. Fora dos presets porque o preset não consulta a recomendação; entra no "Boost agora" do Painel só quando recomendado. Imprimir em PDF pela impressora virtual também precisa do Spooler (dito no aviso do card).
 
 ## Inicialização e processos (`startup.rs`, `procs.rs` — aba "Inicialização")
 

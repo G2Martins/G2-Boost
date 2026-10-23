@@ -178,7 +178,7 @@ const MM_PROFILE: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimed
 const MM_GAMES: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games";
 const TCP_INTERFACES: &str = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
 
-const DX_PREFS: &str = r"Software\Microsoft\DirectX\UserGpuPreferences";
+pub(crate) const DX_PREFS: &str = r"Software\Microsoft\DirectX\UserGpuPreferences";
 const DX_GLOBAL: &str = "DirectXUserGlobalSettings";
 
 /// `DirectXUserGlobalSettings` holds `Key=Value;` pairs shared with Auto HDR and VRR:
@@ -309,6 +309,16 @@ const TASKS_COMPAT_TELEMETRY: &[(&str, &str)] = &[
     (r"\Microsoft\Windows\Customer Experience Improvement Program", "Consolidator"),
     (r"\Microsoft\Windows\Customer Experience Improvement Program", "UsbCeip"),
 ];
+/// The idle-time WinSAT run (Meu PC still runs WinSAT on demand through its COM API).
+const TASKS_WINSAT: &[(&str, &str)] = &[(r"\Microsoft\Windows\Maintenance", "WinSAT")];
+/// Reports sent to Microsoft: disk diagnostics, feedback prompts (Siuf) and queued error reports.
+/// Never ScheduledDefrag (SSD TRIM), UpdateOrchestrator or Defender tasks.
+const TASKS_FEEDBACK: &[(&str, &str)] = &[
+    (r"\Microsoft\Windows\DiskDiagnostic", "Microsoft-Windows-DiskDiagnosticDataCollector"),
+    (r"\Microsoft\Windows\Feedback\Siuf", "DmClient"),
+    (r"\Microsoft\Windows\Feedback\Siuf", "DmClientOnScenarioDownload"),
+    (r"\Microsoft\Windows\Windows Error Reporting", "QueueReporting"),
+];
 const TCP_OPS: [(&str, Desired, Desired); 3] = [
     ("TcpAckFrequency", Desired::Dword(1), Desired::Absent),
     ("TCPNoDelay", Desired::Dword(1), Desired::Absent),
@@ -331,6 +341,8 @@ const SVC_XBOX: &[Svc] = &[
 ];
 const SVC_DPS: &[Svc] = &[Svc { name: "DPS", default_start: AUTO }];
 const SVC_GEOLOCATION: &[Svc] = &[Svc { name: "lfsvc", default_start: MANUAL }];
+/// Print Spooler: recommended off only on a PC without real printers (`recommend.rs`).
+const SVC_SPOOLER: &[Svc] = &[Svc { name: "Spooler", default_start: AUTO }];
 
 const fn tw(id: &'static str, admin: bool, beta: bool, category: Category, kind: Kind) -> Tweak {
     Tweak { id, admin, beta, category, kind }
@@ -367,6 +379,9 @@ pub const TWEAKS: &[Tweak] = &[
     tw("hvci_off", true, true, Performance, Kind::Registry(HVCI_OFF)),
     tw("priority_sep", true, true, Performance, Kind::Registry(PRIORITY_SEP)),
     tw("perf_counters", true, true, Performance, Kind::Registry(PERF_COUNTERS)),
+    tw("winsat_task_off", true, false, Performance, Kind::Tasks(TASKS_WINSAT)),
+    tw("feedback_tasks_off", true, false, Privacy, Kind::Tasks(TASKS_FEEDBACK)),
+    tw("svc_spooler", true, false, Performance, Kind::Services(SVC_SPOOLER)),
 ];
 
 pub fn find(id: &str) -> Result<&'static Tweak, BoostError> {
@@ -1110,7 +1125,7 @@ pub struct PurgeResult {
     pub freed_bytes: u64,
 }
 
-fn enable_privilege(name: &str) -> Result<(), BoostError> {
+pub(crate) fn enable_privilege(name: &str) -> Result<(), BoostError> {
     // SAFETY: standard token privilege dance; every handle is closed.
     unsafe {
         let mut token = HANDLE::default();

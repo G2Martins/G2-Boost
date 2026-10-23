@@ -1684,4 +1684,22 @@ export const ptBR = {
   "settings.no": "Não",
   "settings.privacy":
     "Sem telemetria. Nada sai do PC além dos testes de rede que você inicia e das perguntas que você manda para a Luli.",
+  /* ---- rodada 7.1: guia da BIOS, ajustes por jogo, tarefas e Spooler ---- */
+  "boost.tweak.winsat_task_off": "Desligar a avaliação automática do Windows",
+  "boost.tweak.winsat_task_off.desc":
+    "Desliga a tarefa que roda sozinha os testes de desempenho do Windows quando o PC fica ocioso, com picos de CPU, disco e placa de vídeo. A avaliação pelo Meu PC continua funcionando quando você pedir.",
+  "boost.tweak.winsat_task_off.warn":
+    "você quer as notas do Windows atualizadas sem rodar a avaliação à mão.",
+  "boost.tweak.feedback_tasks_off": "Desligar relatórios de diagnóstico e feedback",
+  "boost.tweak.feedback_tasks_off.desc":
+    "Desliga as tarefas agendadas que coletam diagnóstico do disco, pedem sua opinião e enviam à Microsoft os relatórios de erro guardados. Os erros continuam registrados no PC.",
+  "boost.tweak.feedback_tasks_off.warn":
+    "você participa do Windows Insider ou envia feedback à Microsoft.",
+  "boost.tweak.svc_spooler": "Desligar o Spooler de impressão",
+  "boost.tweak.svc_spooler.desc":
+    "Para o serviço de impressão em PCs sem impressora. Libera um pouco de memória e fecha um serviço que já teve falhas graves de segurança.",
+  "boost.tweak.svc_spooler.warn":
+    "você imprime, usa impressora de rede ou salva em PDF pela impressora virtual.",
+  "boost.reason.printer": "impressora instalada",
+  "boost.reason.unknown": "impressoras não verificadas",
 } as const;

@@ -65,4 +65,7 @@ features = [
   "Win32_System_Com_StructuredStorage",
   "Management_Deployment",
   "Foundation_Collections",
+  "Win32_System_WindowsProgramming",
+  "Win32_System_Shutdown",
+  "Win32_Graphics_Printing",
 ]

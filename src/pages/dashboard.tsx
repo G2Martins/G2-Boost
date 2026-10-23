@@ -451,6 +451,7 @@ function categoryOf(id: string): string {
       "compat_telemetry_off",
       "svc_telemetry",
       "svc_geolocation",
+      "feedback_tasks_off",
     ].includes(id)
   )
     return "privacy";
