@@ -1041,6 +1041,23 @@ export const backend = {
   exposureReveal: (path: string) => callOrThrow<void>("exposure_reveal", { path }),
   exposureAlerts: () => call<ExposureAlert[]>("exposure_alerts"),
   exposureAlertsClear: () => call<void>("exposure_alerts_clear"),
+  /* Updates: apps through winget (one validated upgrade per package), Windows Update via WUA. */
+  updatesApps: () => callOrThrow<AppUpdate[]>("updates_apps"),
+  updatesExclude: (id: string, exclude: boolean) =>
+    callOrThrow<string[]>("updates_exclude", { id, exclude }),
+  updatesAppsConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("updates_apps_confirm", { ids }),
+  updatesAppsRun: (token: number, ids: string[]) =>
+    callOrThrow<UpdateBatch>("updates_apps_run", { token, ids }),
+  updatesAppsCancel: () => call<void>("updates_apps_cancel"),
+  updatesWuSearch: (online: boolean) => callOrThrow<WuScan>("updates_wu_search", { online }),
+  updatesWuCancel: () => call<void>("updates_wu_cancel"),
+  updatesWuConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("updates_wu_confirm", { ids }),
+  updatesWuInstall: (token: number, ids: string[]) =>
+    callOrThrow<UpdateBatch>("updates_wu_install", { token, ids }),
+  updatesWuStatus: () => call<WuStatus>("updates_wu_status"),
+  updatesHistory: () => call<UpdateBatch[]>("updates_history"),
+  /** Restarts the PC (after the UI's confirmation); refused when no restart is pending. */
+  updatesReboot: () => callOrThrow<void>("updates_reboot"),
 };
 
 export type GpuOverview = {
@@ -1084,3 +1101,57 @@ export type AmdFeature = {
 };
 export type AmdGpu = { index: number; name: string; discrete: boolean; features: AmdFeature[] };
 export type AmdChange = { feature: AmdFeatureId; enabled?: boolean; value?: number };
+
+export type AppUpdate = {
+  id: string;
+  name: string;
+  version: string;
+  available: string;
+  /** Why "update all" leaves it out. */
+  skip: "self" | "unknown_version" | "excluded" | null;
+  /** Installed for all users: the installer will likely ask for admin. */
+  machine: boolean;
+};
+export type UpdateItem = {
+  id: string;
+  name: string;
+  status: "running" | "ok" | "failed" | "cancelled";
+  reason: string;
+  code: number;
+};
+export type UpdateBatch = {
+  at: number;
+  kind: "apps" | "windows";
+  items: UpdateItem[];
+  reboot: boolean;
+  cancelled: boolean;
+};
+export type AppUpdateProgress = UpdateItem & { index: number; total: number };
+export type WuUpdate = {
+  id: string;
+  title: string;
+  kb: string[];
+  size: number;
+  severity: string | null;
+  categories: string[];
+  driver: boolean;
+  reboot: "never" | "always" | "can";
+  downloaded: boolean;
+  mandatory: boolean;
+};
+export type WuScan = { updates: WuUpdate[]; reboot_required: boolean; online: boolean };
+export type WuHistoryEntry = {
+  title: string;
+  kb: string | null;
+  at: number;
+  operation: "install" | "uninstall";
+  result: "ok" | "partial" | "failed" | "cancelled" | "in_progress";
+  hresult: number;
+};
+export type WuStatus = { history: WuHistoryEntry[]; reboot_required: boolean };
+export type WuProgress = {
+  phase: "download" | "install";
+  percent: number;
+  current: number;
+  total: number;
+};

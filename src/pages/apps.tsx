@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { UpdatesTab } from "@/components/apps/updates-tab";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
@@ -63,11 +64,14 @@ const SWEEP_ID = "sweep:unowned";
 export function AppsPage() {
   const { t } = useI18n();
   const [autoScan, setAutoScan] = useState(() => takeOpenOrphans());
-  // Dev aid: G2BOOST_START_TAB=orphans (or `unowned`, which also starts the every-drive sweep).
+  // Dev aid: G2BOOST_START_TAB=orphans (or `unowned`, which also starts the every-drive sweep),
+  // `updates` for the Updates tab.
   const [tab, setTab] = useState(
     autoScan || boot.startTab === "orphans" || boot.startTab === "unowned"
       ? "orphans"
-      : "installed",
+      : boot.startTab === "updates"
+        ? "updates"
+        : "installed",
   );
   const [drop, setDrop] = useState<string | null>(() => takeDrop());
   useEffect(
@@ -96,6 +100,7 @@ export function AppsPage() {
           <TabsList>
             <TabsTrigger value="installed">{t("apps.tab.installed")}</TabsTrigger>
             <TabsTrigger value="orphans">{t("apps.tab.orphans")}</TabsTrigger>
+            <TabsTrigger value="updates">{t("updates.tab")}</TabsTrigger>
           </TabsList>
           <TabsContent value="installed">
             <PageBody className="px-0 pb-0">
@@ -111,6 +116,11 @@ export function AppsPage() {
           <TabsContent value="orphans">
             <PageBody className="px-0 pb-0">
               <OrphansTab autoScan={autoScan} onAutoScanned={() => setAutoScan(false)} />
+            </PageBody>
+          </TabsContent>
+          <TabsContent value="updates">
+            <PageBody className="px-0 pb-0">
+              <UpdatesTab />
             </PageBody>
           </TabsContent>
         </Tabs>
