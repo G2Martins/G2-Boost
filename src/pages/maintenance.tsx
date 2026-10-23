@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { BootOptionsCard, DriveTools } from "@/components/maintenance/drive-tools";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, EmptyState, HelpHint } from "@/components/ui/primitives";
 import {
@@ -86,6 +87,8 @@ export function MaintenancePage() {
   } | null>(null);
   const [error, setError] = useState<{ card: CardKey; text: string } | null>(null);
   const [, tick] = useState(0);
+  /** A disk check / optimize holds the same servicing slot. */
+  const [volBusy, setVolBusy] = useState(false);
 
   useEffect(() => {
     backend.appInfo().then((i) => i && setElevated(i.elevated));
@@ -171,7 +174,7 @@ export function MaintenancePage() {
     return null;
   };
 
-  const blocked = !inTauri || !elevated || run !== null;
+  const blocked = !inTauri || !elevated || run !== null || volBusy;
   const mrtMissing = status !== null && !status.mrt_present;
 
   return (
@@ -358,7 +361,15 @@ export function MaintenancePage() {
           })}
         </div>
 
-        <Card className="animate-rise" style={rise(CARDS.length + 2)}>
+        <DriveTools
+          elevated={elevated}
+          repairRunning={run !== null}
+          onRunning={setVolBusy}
+          index={CARDS.length + 2}
+        />
+        <BootOptionsCard elevated={elevated} index={CARDS.length + 4} />
+
+        <Card className="animate-rise" style={rise(CARDS.length + 5)}>
           <CardTitle>
             <History className="size-4" />
             {t("maintenance.history")}
