@@ -179,7 +179,7 @@ pub struct Adapter {
     pub if_index: u32,
 }
 
-fn sockaddr_v4(sa: &SOCKET_ADDRESS) -> Option<Ipv4Addr> {
+pub(crate) fn sockaddr_v4(sa: &SOCKET_ADDRESS) -> Option<Ipv4Addr> {
     if sa.lpSockaddr.is_null() {
         return None;
     }
@@ -193,7 +193,7 @@ fn sockaddr_v4(sa: &SOCKET_ADDRESS) -> Option<Ipv4Addr> {
     }
 }
 
-fn pwstr(p: PWSTR) -> String {
+pub(crate) fn pwstr(p: PWSTR) -> String {
     if p.is_null() {
         return String::new();
     }
@@ -268,7 +268,7 @@ pub fn provider_of(servers: &[Ipv4Addr]) -> Option<&'static str> {
 }
 
 /// Interface index of the route to the internet (what multi-NIC/VPN machines actually use).
-fn best_if_index() -> Option<u32> {
+pub(crate) fn best_if_index() -> Option<u32> {
     let mut idx = 0u32;
     // 8.8.8.8 in network byte order; only the routing table is consulted, nothing is sent.
     let dest = u32::from_ne_bytes([8, 8, 8, 8]);

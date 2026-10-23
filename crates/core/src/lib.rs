@@ -59,6 +59,8 @@ pub mod nvapi;
 pub mod adlx;
 pub mod gpu;
 pub mod exposure;
+pub mod volumes;
+pub mod netrepair;
 
 /// Crate version, surfaced in the UI "about" footer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

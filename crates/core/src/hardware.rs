@@ -847,6 +847,28 @@ fn system_disk_number() -> Option<u32> {
     (ext.NumberOfDiskExtents >= 1).then_some(ext.Extents[0].DiskNumber)
 }
 
+/// Every disk a lettered volume lives on (spanned/striped volumes have several). Empty = unknown.
+pub(crate) fn volume_disks(letter: char) -> Vec<u32> {
+    if !letter.is_ascii_alphabetic() {
+        return Vec::new();
+    }
+    let Some(dev) = open_device(&format!(r"\\.\{letter}:")) else {
+        return Vec::new();
+    };
+    let mut out = vec![0u8; 1024];
+    if ioctl(&dev, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, None, &mut out).is_none() {
+        return Vec::new();
+    }
+    // VOLUME_DISK_EXTENTS: u32 count, then 8-aligned DISK_EXTENTs of 24 bytes (DiskNumber first).
+    let n = u32::from_le_bytes([out[0], out[1], out[2], out[3]]) as usize;
+    (0..n.min((out.len() - 8) / 24))
+        .map(|i| {
+            let o = 8 + i * 24;
+            u32::from_le_bytes([out[o], out[o + 1], out[o + 2], out[o + 3]])
+        })
+        .collect()
+}
+
 pub fn disks() -> Vec<Disk> {
     let system_disk = system_disk_number();
     let mut out = Vec::new();
