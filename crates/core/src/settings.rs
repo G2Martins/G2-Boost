@@ -53,6 +53,9 @@ pub struct Settings {
     /// Background check for new exposure (public listener, inbound connection, remote-access
     /// app, router port forward) every few minutes; alerts in the app.
     pub exposure_monitor: bool,
+    /// Every normal launch asks UAC once and continues elevated (like game tools that require
+    /// administrator). Not for `--mcp` / `--tray`; declining keeps the unelevated copy.
+    pub always_admin: bool,
 }
 
 impl Default for Settings {
@@ -76,6 +79,7 @@ impl Default for Settings {
             priority_rules: Vec::new(),
             game_tweaks: BTreeMap::new(),
             exposure_monitor: true,
+            always_admin: false,
         }
     }
 }
@@ -185,6 +189,7 @@ mod tests {
                 ("bad\u{1}:x".to_string(), crate::gamemode::GameTweaks { gpu_high_perf: true, ..Default::default() }),
             ]),
             exposure_monitor: true,
+            always_admin: true,
             protected_apps: vec![" Discord ".into(), "discord".into(), "".into(), "a\u{0}".into()],
             game_exes: vec![
                 " CS2.exe ".into(),

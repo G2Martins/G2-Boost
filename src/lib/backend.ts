@@ -215,6 +215,7 @@ export type Settings = {
   /** By game id; changed only through `gameTweaksSet` (it also writes the GPU preference). */
   game_tweaks: Record<string, GameTweaks>;
   exposure_monitor: boolean;
+  always_admin: boolean;
 };
 
 export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";

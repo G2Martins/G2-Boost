@@ -2275,4 +2275,10 @@ export const en = {
     "See in Security which program received it and whether you expected it.",
   "advisor.av_off.title": "Antivirus off or out of date",
   "advisor.av_off.body": "Turn real-time protection on or update the definitions.",
+  /* ---- always open as administrator ---- */
+  "settings.always_admin": "Always open as administrator",
+  "settings.always_admin.body":
+    "When G2 Boost opens, Windows asks for administrator confirmation once and the app starts with everything unlocked. If you decline, it opens normally. Opening automatically at sign-in asks nothing.",
+  "settings.always_admin.hint":
+    "Windows only lets a program open as administrator without that confirmation by opening a security hole. That is why the prompt shows on every launch, like game apps that require administrator.",
 } as const satisfies Record<keyof typeof ptBR, string>;

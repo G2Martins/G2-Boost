@@ -197,6 +197,23 @@ export function SettingsPage() {
             </CardTitle>
             <p className="text-xs text-muted-foreground">{t("security.settings.monitor.body")}</p>
           </Card>
+          <Card className="animate-rise" style={rise(5)}>
+            <CardTitle
+              help={t("settings.always_admin.hint")}
+              right={
+                <Switch
+                  checked={!!settings?.always_admin}
+                  disabled={!settings}
+                  onCheckedChange={(v) => save({ always_admin: v })}
+                  aria-label={t("settings.always_admin")}
+                />
+              }
+            >
+              <ShieldCheck className="size-4" />
+              {t("settings.always_admin")}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">{t("settings.always_admin.body")}</p>
+          </Card>
         </div>
 
         <Card className="animate-rise" style={rise(2)}>

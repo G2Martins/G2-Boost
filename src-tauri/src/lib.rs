@@ -2195,6 +2195,16 @@ pub fn run() {
         }
         return;
     }
+    // "Sempre abrir como administrador": a normal launch asks UAC once and hands over to the
+    // elevated copy. The logon task (`--tray`) never prompts; if the user declines, this
+    // unelevated copy simply carries on (no prompt loop).
+    if !system::is_elevated() && !std::env::args().any(|a| a == "--tray") && settings::load().always_admin {
+        let route = start_route();
+        let args: Vec<&str> = route.as_deref().map(|r| vec!["--route", r]).unwrap_or_default();
+        if boost::relaunch_elevated(&args).is_ok() {
+            return;
+        }
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())

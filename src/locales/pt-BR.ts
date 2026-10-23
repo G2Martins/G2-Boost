@@ -2279,4 +2279,10 @@ export const ptBR = {
   "advisor.remote_inbound.body": "Veja em Segurança qual programa recebeu e se você esperava isso.",
   "advisor.av_off.title": "Antivírus desligado ou desatualizado",
   "advisor.av_off.body": "Ligue a proteção em tempo real ou atualize as definições.",
+  /* ---- sempre abrir como administrador ---- */
+  "settings.always_admin": "Sempre abrir como administrador",
+  "settings.always_admin.body":
+    "Ao abrir o G2 Boost, o Windows pede a confirmação de administrador uma vez e o app já abre com tudo liberado. Se você recusar, ele abre normal. A abertura automática no logon não pede nada.",
+  "settings.always_admin.hint":
+    "O Windows só deixa um programa abrir como administrador sem essa confirmação criando uma brecha de segurança. Por isso o pedido aparece a cada abertura, como nos apps de jogo que exigem administrador.",
 } as const;

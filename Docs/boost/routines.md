@@ -1,6 +1,6 @@
 # Rotinas — iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja
 
-**Última revisão:** 2026-10-15 · Código: `crates/core/src/settings.rs`, `routines.rs`, `tasksched.rs`; shell `src-tauri/src/lib.rs` (`Routines`, `spawn_routines`, bandeja) · UI: `src/pages/settings.tsx`, aba RAM em `src/pages/boost.tsx`, `src/components/game-exes.tsx`.
+**Última revisão:** 2026-10-23 (sempre abrir como administrador) · 2026-10-15 · Código: `crates/core/src/settings.rs`, `routines.rs`, `tasksched.rs`; shell `src-tauri/src/lib.rs` (`Routines`, `spawn_routines`, bandeja) · UI: `src/pages/settings.tsx`, aba RAM em `src/pages/boost.tsx`, `src/components/game-exes.tsx`.
 
 ## Configurações (`settings.json`)
 
@@ -13,6 +13,10 @@
 | `routine_categories` | `default_on` do catálogo **sem admin** | shaders e Lixeira são opt-in; categorias admin só rodam com o app elevado |
 | `game_ram_clean` | `false` | purge da standby list ao detectar jogo |
 | `game_exes` | `[]` | jogos fora da Steam |
+
+## Sempre abrir como administrador (`always_admin`)
+
+Desligado por padrão. Ligado: toda abertura normal sem elevação chama `boost::relaunch_elevated` (UAC via `ShellExecuteExW("runas")`, nunca PowerShell) passando só `--route` validado, e a cópia sem elevação encerra; se o usuário recusar o UAC, a cópia sem elevação segue normalmente (sem laço). Não vale para `--mcp` (o Claude Desktop abre o exe; um UAC quebraria o MCP), `--gpu-helper` nem `--tray` (logon; a tarefa já é `Highest` quando registrada com o app elevado). **Por que não sem UAC:** a alternativa "silenciosa" (tarefa agendada com privilégios mais altos disparada pelo próprio app) vira um desvio de UAC enquanto o exe mora numa pasta gravável pelo usuário (instalação por usuário em `%LOCALAPPDATA%\Programs`): qualquer programa do usuário trocaria o exe e ganharia admin. Mesmo comportamento do ExitLag (pedido a cada abertura).
 
 ## Iniciar com o Windows
 
