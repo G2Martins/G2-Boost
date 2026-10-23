@@ -12,6 +12,7 @@ import {
   ShieldHalf,
   Sparkles,
   SquareTerminal,
+  Wrench,
 } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import { type I18nKey, useI18n } from "@/lib/i18n";
@@ -27,12 +28,14 @@ export type Route =
   | "boost"
   | "console"
   | "ai"
-  | "settings";
+  | "settings"
+  | "maintenance";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
   { route: "disk", icon: HardDrive, label: "nav.disk" },
   { route: "cleanup", icon: Sparkles, label: "nav.cleanup" },
+  { route: "maintenance", icon: Wrench, label: "maintenance.nav" },
   { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
   { route: "games", icon: Gamepad2, label: "nav.games" },

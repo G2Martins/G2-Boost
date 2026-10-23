@@ -1684,4 +1684,122 @@ export const ptBR = {
   "settings.no": "Não",
   "settings.privacy":
     "Sem telemetria. Nada sai do PC além dos testes de rede que você inicia e das perguntas que você manda para a Luli.",
+
+  "volcache.tab": "Arquivos do sistema",
+  "volcache.help":
+    "Quem apaga é o próprio módulo de limpeza do Windows (o mesmo da Limpeza de Disco), com prévia e confirmação. Só módulos originais do Windows são aceitos.",
+  "volcache.needs_admin":
+    "O Windows só deixa medir e limpar arquivos do sistema como administrador.",
+  "volcache.measuring": "Medindo {done}/{total}…",
+  "volcache.slow": "Alguns itens levam minutos.",
+  "volcache.nothing": "Nada a limpar",
+  "volcache.error.missing": "Não existe neste Windows",
+  "volcache.error.untrusted": "Bloqueado: o módulo não é o original do Windows",
+  "volcache.error.cancelled": "Parado",
+  "volcache.error.generic": "Falhou ({code})",
+  "volcache.confirm.title": "Confirmar limpeza de arquivos do sistema",
+  "volcache.confirm.body":
+    "{count} itens, {size} estimados. O próprio Windows apaga e pode levar vários minutos.",
+  "volcache.from_disk": "Limpar com segurança",
+  "volcache.h.sys_update_cleanup": "Limpeza de atualizações do Windows",
+  "volcache.h.sys_update_cleanup.hint":
+    "Versões antigas de componentes que as atualizações já substituíram (é o que encolhe a pasta WinSxS).",
+  "volcache.h.sys_update_cleanup.warn":
+    "Depois disso não dá mais para desinstalar as atualizações já instaladas.",
+  "volcache.h.sys_previous_installations": "Instalação anterior do Windows",
+  "volcache.h.sys_previous_installations.hint":
+    "A pasta Windows.old, criada quando o Windows muda de versão.",
+  "volcache.h.sys_previous_installations.warn":
+    "Remove a opção de voltar para a versão anterior do Windows.",
+  "volcache.h.sys_driver_packages": "Pacotes de drivers antigos",
+  "volcache.h.sys_driver_packages.hint": "Versões antigas de drivers que o Windows guarda.",
+  "volcache.h.sys_driver_packages.warn":
+    "Depois disso não dá para reverter um driver para a versão anterior.",
+  "volcache.h.sys_upgrade_logs": "Registros de atualização de versão",
+  "volcache.h.sys_upgrade_logs.hint": "Logs das atualizações de versão do Windows.",
+  "volcache.h.sys_temp_setup": "Arquivos temporários de instalação",
+  "volcache.h.sys_temp_setup.hint": "Sobras dos instaladores do Windows.",
+  "volcache.h.sys_upgrade_discarded": "Arquivos descartados na atualização",
+  "volcache.h.sys_upgrade_discarded.hint":
+    "Arquivos que a última atualização de versão deixou de lado.",
+  "volcache.h.sys_reset_logs": "Registros de restauração do PC",
+  "volcache.h.sys_reset_logs.hint": "Logs de quando o Windows foi restaurado.",
+  "volcache.h.sys_setup_logs": "Registros de instalação",
+  "volcache.h.sys_setup_logs.hint": "Logs de instalação de componentes do Windows.",
+  "volcache.h.sys_chkdsk": "Fragmentos antigos da verificação de disco",
+  "volcache.h.sys_chkdsk.hint": "Pedaços de arquivo recuperados pela verificação de disco (.chk).",
+  "volcache.h.sys_defender": "Temporários da Segurança do Windows",
+  "volcache.h.sys_defender.hint":
+    "Arquivos não essenciais do antivírus do Windows. A proteção não muda.",
+  "volcache.h.sys_memory_dump": "Despejo de memória de tela azul",
+  "volcache.h.sys_memory_dump.hint":
+    "O MEMORY.DMP do último travamento. Serve para diagnosticar; apague se não vai analisar.",
+
+  "maintenance.nav": "Manutenção",
+  "maintenance.title": "Manutenção",
+  "maintenance.subtitle": "Verificar e reparar o Windows com as ferramentas do próprio sistema",
+  "maintenance.admin.title": "Rode o app como administrador",
+  "maintenance.admin.body": "Verificar e reparar o Windows só funciona com o app elevado.",
+  "maintenance.order.title": "Ordem recomendada",
+  "maintenance.order.hint":
+    "A verificação de arquivos copia as peças boas da imagem do Windows. Se a imagem estiver danificada, repare ela primeiro.",
+  "maintenance.order.1": "Verificar a imagem",
+  "maintenance.order.2": "Reparar a imagem, se precisar",
+  "maintenance.order.3": "Verificar os arquivos do sistema",
+  "maintenance.dism_scan.title": "Verificar imagem do Windows",
+  "maintenance.dism_scan.body":
+    "Confere se o repositório de componentes (a cópia de onde o Windows tira os próprios arquivos) está íntegro. Só lê, não muda nada.",
+  "maintenance.dism_scan.time": "5 a 15 min",
+  "maintenance.dism_restore.title": "Reparar imagem do Windows",
+  "maintenance.dism_restore.body":
+    "Baixa do Windows Update as peças corrompidas do repositório de componentes e troca. Precisa de internet.",
+  "maintenance.dism_restore.time": "10 a 30 min",
+  "maintenance.sfc.title": "Verificar arquivos do sistema",
+  "maintenance.sfc.body":
+    "Compara cada arquivo protegido do Windows com a imagem e substitui os que estiverem corrompidos.",
+  "maintenance.sfc.time": "10 a 20 min",
+  "maintenance.mrt.title": "Verificação de malware",
+  "maintenance.mrt.body":
+    "A ferramenta de remoção de malware que vem com o Windows procura e remove ameaças comuns conhecidas.",
+  "maintenance.mrt.not_av": "É uma verificação complementar: não substitui o antivírus.",
+  "maintenance.mrt.missing": "A ferramenta não está neste PC. Ela chega pelo Windows Update.",
+  "maintenance.mrt_quick": "Rápida",
+  "maintenance.mrt_quick.time": "3 a 10 min",
+  "maintenance.mrt_full": "Completa",
+  "maintenance.mrt_full.time": "30 min a algumas horas",
+  "maintenance.start": "Iniciar",
+  "maintenance.confirm": "Começar agora? Leva {time} e o PC pode ficar mais lento enquanto roda.",
+  "maintenance.confirm.go": "Começar",
+  "maintenance.busy": "Outra verificação ou limpeza do sistema está rodando. Espere ela terminar.",
+  "maintenance.last": "Último resultado",
+  "maintenance.never": "Ainda não rodou",
+  "maintenance.verdict.healthy": "Íntegro",
+  "maintenance.verdict.repairable": "Danificado, dá para reparar",
+  "maintenance.verdict.non_repairable": "Danificado, sem reparo",
+  "maintenance.verdict.repaired": "Reparado",
+  "maintenance.verdict.clean": "Nada encontrado",
+  "maintenance.verdict.threats": "Malware encontrado",
+  "maintenance.verdict.failed": "Falhou",
+  "maintenance.verdict.cancelled": "Parado",
+  "maintenance.verdict.unknown": "Concluído",
+  "maintenance.detail.repairable": "Próximo passo: Reparar imagem do Windows.",
+  "maintenance.detail.dism_bad":
+    "A imagem não pôde ser reparada com o Windows ligado. Reinstalar o Windows por cima (mantendo arquivos e apps) resolve.",
+  "maintenance.detail.sfc":
+    "{repaired} arquivos reparados, {unrepaired} sem reparo. Sem reparo? Rode Reparar imagem e verifique de novo.",
+  "maintenance.detail.unknown": "O registro do Windows não trouxe detalhes desta execução.",
+  "maintenance.detail.threats": "Encontrado: {names}",
+  "maintenance.code.timeout": "Passou do tempo limite e foi encerrado.",
+  "maintenance.code.source":
+    "Não deu para baixar as peças do Windows Update. Confira a internet e tente de novo.",
+  "maintenance.code.pending":
+    "Há uma atualização esperando reinício. Reinicie o PC e tente de novo.",
+  "maintenance.code.other": "O Windows devolveu o código {code}.",
+  "maintenance.history": "Histórico",
+  "maintenance.history.empty": "Nenhuma verificação ainda",
+  "maintenance.tool.dism_scan": "Verificar imagem",
+  "maintenance.tool.dism_restore": "Reparar imagem",
+  "maintenance.tool.sfc": "Arquivos do sistema",
+  "maintenance.tool.mrt_quick": "Malware, rápida",
+  "maintenance.tool.mrt_full": "Malware, completa",
 } as const;

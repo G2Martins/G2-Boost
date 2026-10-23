@@ -1,6 +1,6 @@
 # Limpeza — catálogo, prévia, execução, histórico
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/cleanup.rs`, `tasksched.rs`, `safety.rs` · UI: `src/pages/cleanup.tsx` · Origem: [legacy-bat-scripts.md](../references/legacy-bat-scripts.md).
+**Última revisão:** 2026-10-22 (aba Arquivos do sistema) · Código: `crates/core/src/cleanup.rs`, `tasksched.rs`, `safety.rs` · UI: `src/pages/cleanup.tsx` · Origem: [legacy-bat-scripts.md](../references/legacy-bat-scripts.md).
 
 ## Fluxo
 
@@ -56,6 +56,10 @@ Perfis multi-pasta (Chromium, Firefox, Opera, Epic) são resolvidos com `read_di
 **Fora, de propósito:** Riot Client (layout incerto), Zoom (sem pasta de cache clara), Teams novo (`MSTeams_8wekyb3d8bbwe`, EBWebView: layout não garantido), `prefetch` (0 MB com SysMain off; só piora; anti-forense), `spool` (`System32\spool\PRINTERS` fica atrás da barreira do `SafePath`; ganho ~0), `memory.dmp` na raiz do Windows (arquivo solto no `%SystemRoot%`, que o `SafePath` bloqueia como raiz — fica para quando houver seleção explícita no treemap).
 
 Bug de precedência dos scripts (`$L+'\x|'+$L+'\y'`) não foi portado: cada caminho é um item da lista.
+
+## Aba "Arquivos do sistema" (2026-10-22)
+
+Quarta aba da página: os handlers da Limpeza de Disco do próprio Windows (Limpeza de atualizações/WinSxS, Windows.old, pacotes de driver antigos, logs de instalação/atualização, `MEMORY.DMP`…), no mesmo fluxo prévia → token → execução → histórico, admin obrigatório. Ids `sys_*`, allowlist e defesa contra handler plantado em [system-files.md](./system-files.md). Onde um handler e o catálogo cobrem o mesmo caminho (temporários, miniaturas, shaders, Delivery Optimization, WER, minidumps, INetCache), **o catálogo vence** e o handler fica fora. Essa aba substitui, para quem quer ir além, o `dism` (que só agenda o `StartComponentCleanup`).
 
 ## Rotinas (fase seguinte)
 

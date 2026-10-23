@@ -3,6 +3,7 @@ import { expect, open, t, test } from "./fixtures";
 const ROUTES = [
   ["nav.disk", "disk.title"],
   ["nav.cleanup", "cleanup.title"],
+  ["maintenance.nav", "maintenance.title"],
   ["nav.apps", "apps.title"],
   ["nav.network", "network.title"],
   ["nav.games", "games.title"],

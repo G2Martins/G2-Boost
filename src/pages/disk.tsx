@@ -7,6 +7,7 @@ import {
   Loader2,
   Play,
   Search,
+  Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
 import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { sizeText, usePageData } from "@/lib/luli";
+import { navigate } from "@/lib/nav";
 import { cn, formatBytes } from "@/lib/utils";
 
 type Crumb = { ids: number[]; name: string };
@@ -770,6 +772,9 @@ function FilesTab({
   );
 }
 
+/** Big items Windows' own cleanup handlers shrink (cleanup page, "System files" tab). */
+const SYSTEM_FILES_FOR = ["winsxs", "windows_old"];
+
 /** Big system items with what they are and the safe way to shrink each. */
 function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number }) {
   const { t, locale } = useI18n();
@@ -807,6 +812,20 @@ function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t(`disk.ess.${e.id}.body` as I18nKey)}
                 </p>
+                {SYSTEM_FILES_FOR.includes(e.id) ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => {
+                      boot.startTab = "system";
+                      navigate("cleanup");
+                    }}
+                  >
+                    <Sparkles className="size-4" />
+                    {t("volcache.from_disk")}
+                  </Button>
+                ) : null}
               </li>
             ))}
         </ul>
