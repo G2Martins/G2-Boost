@@ -960,6 +960,12 @@ mod tests {
         for s in &v.settings {
             println!("{:16} value={:?} raw={} user_set={} good={}", s.id, s.value, s.raw, s.user_set, s.good);
         }
+        // A game's profile by exe (NVIDIA ships predefined ones); reading never creates a profile.
+        for exe in ["cs2.exe", "g2boost-no-such-game.exe"] {
+            let g = read(&Target::game(exe).unwrap()).expect("DRS read by exe");
+            let summary: Vec<_> = g.settings.iter().map(|s| format!("{}={:?}{}", s.id, s.value, if s.user_set { "*" } else { "" })).collect();
+            println!("{exe}: profile={:?} {}", g.profile, summary.join(" "));
+        }
     }
 
     /// Live WRITE, manual only (`G2BOOST_LIVE_WRITE=1` + `--ignored`): frame cap on the global
