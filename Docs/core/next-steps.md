@@ -30,6 +30,8 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 | Monitor em tempo real | cadência fixa de 1 s, disco = tempo ativo, gráfico que rola, gauge que desliza | ✅ |
 | Auditoria ponytail | 3 lotes: helpers duplicados unificados (`is_reparse`, `system_root`, FILETIME, caminho de processo, `blocking()` nos comandos), 12 chaves i18n e 2 deps JS mortas, lib só `rlib`. Rejeitados após checagem: remover `windows-core` (a macro `#[implement]` precisa), unificar FNV (mudaria chaves gravadas) | ✅ |
 
+**Verificado na máquina do dono (2026-10-23):** elevado: winget atualizou o GitHub CLI (`ok`), WUA instalou o driver AOC pendente (`ok`, sem reinício), C: verificado online (saudável, 217 s) + ReTrim (2,6 s), D: (USB, tipo desconhecido) só Analyze (5 %), o core recusou Analyze em SSD (`NotAllowed`). "Sempre abrir como administrador": abertura normal → UAC aceito → cópia elevada aberta e a sem elevação encerrada. Kaspersky acusou um binário de **teste** (`PDM:Trojan.Win32.Generic`, ver [../security/kaspersky-false-positive.md](../security/kaspersky-false-positive.md)). **Pendente:** renovar IP e reiniciar nas Opções avançadas pela UI (derrubam a conexão / reiniciam), release com Kaspersky ativo.
+
 ## Rodada 7 (2026-10-22, mapeamento do dono: prints de concorrente + ideias)
 
 Decisões: as 4 frentes abaixo entram; exceção de `sfc.exe`/`mrt.exe` aberta ([global-rules.md §1.3](./global-rules.md)). Já existiam: `svc_sysmain` e tarefas via `Kind::Tasks`. Servidor MCP do NVIDIA App (`127.0.0.1:13508`, beta 11.0.9.565): o G2 Boost não usa (lê a GPU pela NVML), não há medição de perda de FPS (em repouso fica no `HTTP.sys`, pid 4); desligar se o usuário não usa agente com ele.
