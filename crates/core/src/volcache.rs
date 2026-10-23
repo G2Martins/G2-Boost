@@ -1,4 +1,4 @@
-//! "System files": Windows' own Disk Cleanup handlers (`IEmptyVolumeCache2`, registered under
+//! "System files": Windows' own Disk Cleanup handlers (`IEmptyVolumeCache`/`IEmptyVolumeCache2`, registered under
 //! `HKLM\...\Explorer\VolumeCaches`), driven in-process without `cleanmgr.exe`. Same flow as the
 //! catalog: preview (`GetSpaceUsed`) → confirmation token → execute (`Purge`) → history.
 //!
@@ -28,7 +28,8 @@ use windows::Win32::System::LibraryLoader::{
 };
 use windows::Win32::System::Registry::{HKEY, HKEY_LOCAL_MACHINE, KEY_READ, RegCloseKey, RegOpenKeyExW};
 use windows::Win32::UI::LegacyWindowsEnvironmentFeatures::{
-    EMPTY_VOLUME_CACHE_FLAGS, IEmptyVolumeCache2, IEmptyVolumeCacheCallBack, IEmptyVolumeCacheCallBack_Impl,
+    EMPTY_VOLUME_CACHE_FLAGS, IEmptyVolumeCache, IEmptyVolumeCache2, IEmptyVolumeCacheCallBack,
+    IEmptyVolumeCacheCallBack_Impl,
 };
 use windows::core::{GUID, HRESULT, IUnknown, Interface, PCWSTR, PWSTR, implement, s};
 
@@ -189,7 +190,7 @@ fn free(p: PWSTR) {
 }
 
 /// The vetted DLL's own class factory: no registry lookup by COM.
-fn instantiate(dll: &Path, clsid: &GUID) -> Result<IEmptyVolumeCache2, String> {
+fn instantiate(dll: &Path, clsid: &GUID) -> Result<IEmptyVolumeCache, String> {
     type GetClassObject = unsafe extern "system" fn(*const GUID, *const GUID, *mut *mut c_void) -> HRESULT;
     let w = wide(&dll.to_string_lossy());
     // SAFETY: full path to a System32 DLL vetted by `trusted`; DllGetClassObject has the
@@ -202,13 +203,14 @@ fn instantiate(dll: &Path, clsid: &GUID) -> Result<IEmptyVolumeCache2, String> {
         let mut p = std::ptr::null_mut();
         f(clsid, &IClassFactory::IID, &mut p).ok().map_err(|e| format!("factory 0x{:08X}", e.code().0))?;
         let factory = IClassFactory::from_raw(p);
-        factory.CreateInstance::<_, IEmptyVolumeCache2>(None::<&IUnknown>).map_err(|e| format!("create 0x{:08X}", e.code().0))
+        let obj = factory.CreateInstance::<_, IUnknown>(None::<&IUnknown>).map_err(|e| format!("create 0x{:08X}", e.code().0))?;
+        obj.cast::<IEmptyVolumeCache>().map_err(|e| format!("iface 0x{:08X}", e.code().0))
     }
 }
 
 /// What one handler reported.
 struct Measured {
-    /// `InitializeEx` returned `S_FALSE`: nothing to clean.
+    /// `Initialize`/`InitializeEx` returned `S_FALSE`: nothing to clean.
     empty: bool,
     used: u64,
     freed: u64,
@@ -228,19 +230,34 @@ fn run_one(h: &Handler, volume: &[u16], purge: bool) -> Result<Measured, String>
     let key = Key(hk);
     let (mut disp, mut desc, mut btn) = (PWSTR::null(), PWSTR::null(), PWSTR::null());
     let mut flags = EMPTY_VOLUME_CACHE_FLAGS(0);
+    // Most built-in handlers only implement the original interface (verified elevated on 24H2:
+    // 10 of 11 refuse `IEmptyVolumeCache2`), so `InitializeEx` when offered, else `Initialize`,
+    // as Disk Cleanup itself does.
     // SAFETY: valid key handle, NUL-terminated volume/key name, out params owned here. Called
     // through the vtable to see S_FALSE ("nothing to clean"), which `.ok()` would hide.
-    let hr = unsafe {
-        (Interface::vtable(&cache).InitializeEx)(
-            Interface::as_raw(&cache),
-            key.0,
-            PCWSTR(volume.as_ptr()),
-            PCWSTR(name.as_ptr()),
-            &mut disp,
-            &mut desc,
-            &mut btn,
-            &mut flags,
-        )
+    let hr = match cache.cast::<IEmptyVolumeCache2>() {
+        Ok(v2) => unsafe {
+            (Interface::vtable(&v2).InitializeEx)(
+                Interface::as_raw(&v2),
+                key.0,
+                PCWSTR(volume.as_ptr()),
+                PCWSTR(name.as_ptr()),
+                &mut disp,
+                &mut desc,
+                &mut btn,
+                &mut flags,
+            )
+        },
+        Err(_) => unsafe {
+            (Interface::vtable(&cache).Initialize)(
+                Interface::as_raw(&cache),
+                key.0,
+                PCWSTR(volume.as_ptr()),
+                &mut disp,
+                &mut desc,
+                &mut flags,
+            )
+        },
     };
     for p in [disp, desc, btn] {
         free(p);

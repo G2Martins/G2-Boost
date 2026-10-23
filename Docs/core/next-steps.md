@@ -24,12 +24,14 @@ Decisões: as 4 frentes abaixo entram; exceção de `sfc.exe`/`mrt.exe` aberta (
 
 | Frente | Como (nativo) | Estado |
 |---|---|---|
-| Guia de BIOS + Reiniciar na BIOS | checklist dos achados de `firmware.rs` + caminho do menu por fabricante da placa (SMBIOS) + `OsIndications` (`SetFirmwareEnvironmentVariableExW`, admin) | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
-| Ajustes por jogo | liberar núcleo 0 / só físicos (sem SMT) / só núcleos de desempenho via CPU Sets no Modo Jogo (desfeito ao fechar) + GPU dedicada por exe (`UserGpuPreferences`, com backup) | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
-| Tarefas e serviços extras | WinSAT, DiskDiagnostic, Feedback\Siuf, WER QueueReporting; Spooler sem impressora. Nunca `ScheduledDefrag` (TRIM), `UpdateOrchestrator`, Defender | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
-| Limpeza de arquivos do sistema + reparo | handlers `IEmptyVolumeCache` (`VolumeCaches`) no fluxo prévia + token; DISM RestoreHealth (`DismApi`); SFC e MRT pela exceção | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
-| Auditoria de acesso remoto e exposição | RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall por perfil (`INetFwPolicy2`), portas abertas no roteador via UPnP (`NATUPnP`), apps remotos, conexões de entrada da internet, sessões (`WTS`), tarefas/serviços fora da Microsoft sem assinatura; monitor no laço de rotinas. Não é antivírus (dito na tela) | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
-| Configurações 3D do driver | NVIDIA: NVAPI DRS (global e por jogo, escrita sem admin, testada ida e volta). AMD: ADLX (sem placa AMD aqui para testar). Seção escolhida pelo vendor id do DXGI | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
+| Guia de BIOS + Reiniciar na BIOS | checklist dos achados de `firmware.rs` + caminho do menu por fabricante da placa (SMBIOS) + `OsIndications` (`SetFirmwareEnvironmentVariableExW`, admin) | ✅ 2026-10-22 |
+| Ajustes por jogo | liberar núcleo 0 / só físicos (sem SMT) / só núcleos de desempenho via CPU Sets no Modo Jogo (desfeito ao fechar) + GPU dedicada por exe (`UserGpuPreferences`, com backup) | ✅ 2026-10-22 |
+| Tarefas e serviços extras | WinSAT, DiskDiagnostic, Feedback\Siuf, WER QueueReporting; Spooler sem impressora. Nunca `ScheduledDefrag` (TRIM), `UpdateOrchestrator`, Defender | ✅ 2026-10-22 |
+| Limpeza de arquivos do sistema + reparo | handlers `IEmptyVolumeCache` (`VolumeCaches`) no fluxo prévia + token; DISM RestoreHealth (`DismApi`); SFC e MRT pela exceção | ✅ 2026-10-22 |
+| Auditoria de acesso remoto e exposição | RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall por perfil (`INetFwPolicy2`), portas abertas no roteador via UPnP (`NATUPnP`), apps remotos, conexões de entrada da internet, sessões (`WTS`), tarefas/serviços fora da Microsoft sem assinatura; monitor no laço de rotinas. Não é antivírus (dito na tela) | ✅ 2026-10-22 |
+| Configurações 3D do driver | NVIDIA: NVAPI DRS (global e por jogo, escrita sem admin, testada ida e volta). AMD: ADLX (sem placa AMD aqui para testar). Seção escolhida pelo vendor id do DXGI | ✅ 2026-10-22 |
+
+**Verificado elevado na máquina do dono (2026-10-22):** EFI aceita reiniciar na BIOS (`OsIndicationsSupported` = 0x1f; o reboot real fica para o dono); Assistência Remota desligar → desfazer ok; tarefa WinSAT ida e volta ok; Modo Jogo aplicou `power_plan, priority, affinity, ram, qos`; DISM scan = **reparável** (CBS.log: 1.495 corrupções de payload, 0 reparadas), SFC saudável, MRT limpo, sem reação do Kaspersky; Arquivos do sistema: 10 de 11 handlers só têm `IEmptyVolumeCache` v1 (bug achado e corrigido com fallback; Update Cleanup = 190 MB); Segurança elevada achou 1 tarefa sem assinatura (MATLAB Startup Accelerator). **Pendente:** reiniciar na BIOS de verdade, DISM RestoreHealth pela UI, AMD em hardware real.
 
 ## Rodada 6 (2026-10-18, pedido do dono: "siga com essas frentes")
 

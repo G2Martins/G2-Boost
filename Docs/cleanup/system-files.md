@@ -4,11 +4,11 @@
 
 ## O que é
 
-Os mesmos módulos que a Limpeza de Disco do Windows usa (`IEmptyVolumeCache2`, registrados em `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\<chave>`), chamados **dentro do processo**, sem `cleanmgr.exe` e sem shell. É o caminho que a Microsoft sanciona para limpar o repositório de componentes, o Windows.old e logs de instalação, e o que o antivírus reconhece (ver [kaspersky-false-positive.md](../security/kaspersky-false-positive.md)): quem apaga é o próprio módulo do Windows, não um `del /s` nosso.
+Os mesmos módulos que a Limpeza de Disco do Windows usa (`IEmptyVolumeCache2` quando o handler oferece, senão `IEmptyVolumeCache`: verificado elevado em 2026-10-22, 10 dos 11 só têm a v1; registrados em `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\<chave>`), chamados **dentro do processo**, sem `cleanmgr.exe` e sem shell. É o caminho que a Microsoft sanciona para limpar o repositório de componentes, o Windows.old e logs de instalação, e o que o antivírus reconhece (ver [kaspersky-false-positive.md](../security/kaspersky-false-positive.md)): quem apaga é o próprio módulo do Windows, não um `del /s` nosso.
 
 ## Fluxo (igual ao catálogo)
 
-1. **Prévia** (`volcache_preview(ids)`): para cada id, carrega o handler, `InitializeEx(chave, "C:\", nome da chave)` → `S_FALSE` = nada a limpar; senão `GetSpaceUsed` (bytes) → `Deactivate`. **Admin obrigatório**: sem elevação devolve `needs_admin` em todos os itens e não carrega nada. Evento `volcache:progress {done, total}` a cada handler (Limpeza de atualizações leva minutos).
+1. **Prévia** (`volcache_preview(ids)`): para cada id, carrega o handler, `InitializeEx(chave, "C:\", nome da chave)` (ou `Initialize` na v1) → `S_FALSE` = nada a limpar; senão `GetSpaceUsed` (bytes) → `Deactivate`. **Admin obrigatório**: sem elevação devolve `needs_admin` em todos os itens e não carrega nada. Evento `volcache:progress {done, total}` a cada handler (Limpeza de atualizações leva minutos).
 2. **Confirmação**: painel com total e, em vermelho, o que não tem volta (itens com aviso). `volcache_confirm(ids)` emite um `ConfirmToken` do **mesmo** `TokenStore` do catálogo (uso único, 2 min, amarrado aos ids). Os ids `sys_*` nunca coincidem com ids do catálogo (teste), então um token não serve para o outro fluxo.
 3. **Execução** (`volcache_execute(token, ids)`): token consumido antes de qualquer coisa; `GetSpaceUsed` + `Purge(bytes medidos)` + `Deactivate` por handler, numa thread STA própria. Bytes liberados = último `PurgeProgress` (ou o medido).
 4. **Histórico**: o mesmo `history.json` da limpeza (`cleanup::record_run`), gatilho `manual`.

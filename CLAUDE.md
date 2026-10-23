@@ -138,6 +138,7 @@ Resumo. **Detalhe + checklist em [Docs/core/global-rules.md](Docs/core/global-ru
 - **Ícone novo não aparece no exe de debug:** o `generate_context!` embute os ícones na compilação e não recompila quando eles mudam. Trocou `src-tauri/icons/*` → `cargo clean -p g2-boost` antes do build (2026-10-22, a barra de título ainda mostrava o mark antigo).
 - **Scripts elevados de teste: sem `-ExecutionPolicy Bypass`** (é padrão que o Kaspersky pontua, §6 acima); `Start-Process pwsh -Verb RunAs -ArgumentList '-NoProfile','-File',<script>` basta.
 - **NVAPI DRS grava sem admin** (pasta do banco do driver dá controle total a Todos); `SaveSettings` funcionou como usuário comum (2026-10-22).
+- **Handlers da Limpeza de Disco (`VolumeCaches`): quase todos só têm `IEmptyVolumeCache` v1.** Pedir `IEmptyVolumeCache2` direto dá `E_NOINTERFACE` (0x80004002) em 10 de 11 no 24H2; criar como `IUnknown`, tentar v2 (`InitializeEx`) e cair na v1 (`Initialize`), como o `cleanmgr` (2026-10-22).
 - **Efeitos visuais são data-driven:** `HKLM\...\Explorer\VisualEffects\<item>` traz `SPIActionGet/Set` ou `RegPath`. Tabela congelada em `visualfx.rs`; o nível Média bateu com o setup do dono na primeira detecção.
 
 ## 7. Antes de fechar qualquer fase
