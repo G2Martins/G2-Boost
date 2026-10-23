@@ -1,6 +1,6 @@
 # Analisador de disco
 
-**Última revisão:** 2026-10-18 · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
+**Última revisão:** 2026-10-22 (essenciais levam à limpeza de arquivos do sistema) · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
 
 ## Varredura
 
@@ -40,7 +40,7 @@ No shell, a árvore é retirada do estado durante a operação (os outros comand
 
 ## Essenciais grandes (`disk::essentials`)
 
-Itens conhecidos relativos à raiz varrida — `pagefile.sys`, `hiberfil.sys`, `swapfile.sys`, `Windows\WinSxS`, `Windows.old`, `$Recycle.Bin`, `System Volume Information`, `Windows\SoftwareDistribution\Download`, `Windows\Installer`, `ProgramData\Package Cache` — com tamanho (0 = sem permissão para medir) e explicação i18n do que é e do **jeito seguro** de reduzir (desligar hibernação nas Opções de energia, limpeza de componentes, Windows Update cache, desinstalar o programa dono…). Nada aqui apaga; são ponteiros.
+Itens conhecidos relativos à raiz varrida — `pagefile.sys`, `hiberfil.sys`, `swapfile.sys`, `Windows\WinSxS`, `Windows.old`, `$Recycle.Bin`, `System Volume Information`, `Windows\SoftwareDistribution\Download`, `Windows\Installer`, `ProgramData\Package Cache` — com tamanho (0 = sem permissão para medir) e explicação i18n do que é e do **jeito seguro** de reduzir (desligar hibernação nas Opções de energia, limpeza de componentes, Windows Update cache, desinstalar o programa dono…). Nada aqui apaga; são ponteiros. `WinSxS` e `Windows.old` têm o botão **Limpar com segurança**, que abre Limpeza → aba Arquivos do sistema (handlers do próprio Windows, [../cleanup/system-files.md](../cleanup/system-files.md)).
 
 ## Testes
 

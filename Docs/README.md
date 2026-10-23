@@ -1,6 +1,6 @@
 # Documentação — G2 Boost
 
-**Última revisão:** 2026-10-16
+**Última revisão:** 2026-10-22
 
 Índice da documentação viva. Porta de entrada do agente: [../CLAUDE.md](../CLAUDE.md). Cada doc
 traz `**Última revisão:**` no topo; ler **antes** de codar e atualizar no **mesmo** PR que muda o
@@ -34,6 +34,8 @@ comportamento.
 | [boost/tweaks.md](./boost/tweaks.md) | Catálogo de ajustes (registro, serviços, SPI, energia, DirectX), presets, efeitos visuais em 4 níveis, backup/revert, elevação, limpeza de RAM, **inicialização e processos**, o que foi avaliado e recusado. |
 | [boost/routines.md](./boost/routines.md) | Iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja, configurações validadas. |
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
+| [cleanup/system-files.md](./cleanup/system-files.md) | Arquivos do sistema pelos handlers da Limpeza de Disco do Windows (WinSxS, Windows.old, drivers antigos, logs), allowlist e defesa contra handler plantado. |
+| [core/maintenance.md](./core/maintenance.md) | Manutenção: DISM pela DismApi (verificar/reparar imagem), SFC e MRT pela exceção da §1.3, parsers do CBS.log/mrt.log, passos de verificação elevada. |
 | [disk/analyzer.md](./disk/analyzer.md) | Varredura, treemap, filtros (`*.mp4 >1gb >6m`), mostrar na pasta, Lixeira com guarda, essenciais grandes. |
 | [network/network.md](./network/network.md) | Monitor (gateway/DNS/jogos), speedtest + bufferbloat, ping Steam, MTR/Ping/TCPing, DNS Optimizer com aplicar/restaurar. |
 | [boost/games.md](./boost/games.md) | Jogos: biblioteca de todos os launchers, Modo Jogo (energia, prioridade, RAM, rotinas; desfaz sozinho), rota até o servidor com análise honesta e Reotimizar. |
