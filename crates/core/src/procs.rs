@@ -49,10 +49,6 @@ fn ft(f: FILETIME) -> u64 {
     (u64::from(f.dwHighDateTime) << 32) | u64::from(f.dwLowDateTime)
 }
 
-fn system_root() -> String {
-    std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_ascii_lowercase()
-}
-
 /// Image path, CPU time and creation time of an open process.
 fn query(h: HANDLE) -> (String, u64, u64) {
     let mut buf = [0u16; 1024];
@@ -71,7 +67,7 @@ fn query(h: HANDLE) -> (String, u64, u64) {
 }
 
 fn snapshot() -> HashMap<u32, Snap> {
-    let win = system_root();
+    let win = crate::system::system_root();
     let mut out = HashMap::new();
     for pid in crate::system::pids() {
         if pid == 0 {
@@ -254,7 +250,7 @@ pub fn end(pid: u32, created: u64) -> Result<(), ProcError> {
     let (h, path) = open_exact(pid, created, PROCESS_TERMINATE)?;
     let result = (|| {
         let lower = path.to_ascii_lowercase();
-        if lower.starts_with(&system_root()) || crate::startup::is_security_software(&lower) {
+        if lower.starts_with(&crate::system::system_root()) || crate::startup::is_security_software(&lower) {
             return Err(ProcError::Protected);
         }
         let mut critical = BOOL(0);

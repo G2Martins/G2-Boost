@@ -138,7 +138,7 @@ impl Monitor {
         // StartTraceW below reports the real outcome.
         control(EVENT_TRACE_CONTROL_STOP);
 
-        let name = wide(SESSION_NAME);
+        let name = crate::registry::wide(SESSION_NAME);
         let mut buf = props();
         {
             // SAFETY: `props` returns a zeroed, 8-byte aligned buffer at least as large as
@@ -224,7 +224,7 @@ impl Drop for Monitor {
 
 /// Consumer thread: open the real-time session, report the handle, pump events until closed.
 fn consume(ctx: &Counters, tx: &SyncSender<Result<u64, u32>>) {
-    let mut name = wide(SESSION_NAME);
+    let mut name = crate::registry::wide(SESSION_NAME);
     let mut log = EVENT_TRACE_LOGFILEW { LoggerName: PWSTR(name.as_mut_ptr()), ..Default::default() };
     log.Anonymous1.ProcessTraceMode = PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
     log.Anonymous2.EventRecordCallback = Some(on_event);
@@ -264,10 +264,6 @@ extern "system" fn on_event(rec: *mut EVENT_RECORD) {
     }
 }
 
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain(Some(0)).collect()
-}
-
 /// Zeroed EVENT_TRACE_PROPERTIES followed by room for the logger and log file names.
 /// `Vec<u64>` keeps the 8-byte alignment the struct needs.
 fn props() -> Vec<u64> {
@@ -287,7 +283,7 @@ fn props() -> Vec<u64> {
 /// ControlTraceW on our session by name. Returns the Win32 code (0 = ok,
 /// 4201 = ERROR_WMI_INSTANCE_NOT_FOUND when no such session).
 fn control(code: EVENT_TRACE_CONTROL) -> u32 {
-    let name = wide(SESSION_NAME);
+    let name = crate::registry::wide(SESSION_NAME);
     let mut buf = props();
     // SAFETY: `name` is NUL-terminated; `buf` is a sized EVENT_TRACE_PROPERTIES with room for
     // both names ETW writes back on stop/query.

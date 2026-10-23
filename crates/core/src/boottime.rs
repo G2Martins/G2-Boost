@@ -150,12 +150,7 @@ fn iso_to_unix(s: &str) -> Option<u64> {
     if !(1..=12).contains(&m) || !(1..=31).contains(&d) || hh > 23 || mm > 59 || ss > 60 {
         return None;
     }
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let days = era * 146_097 + doe - 719_468;
+    let days = crate::advisor::days_from_civil(y, m, d);
     u64::try_from(days * 86_400 + hh * 3600 + mm * 60 + ss).ok()
 }
 

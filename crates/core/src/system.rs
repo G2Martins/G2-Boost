@@ -68,6 +68,11 @@ pub fn running_process_paths() -> Vec<String> {
 }
 
 /// Is the current process running with an elevated (admin) token?
+/// `%SystemRoot%` in lower case (`c:\windows` when unset).
+pub(crate) fn system_root() -> String {
+    std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_ascii_lowercase()
+}
+
 pub fn is_elevated() -> bool {
     unsafe {
         let mut token = HANDLE::default();

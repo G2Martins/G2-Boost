@@ -15,7 +15,6 @@ use std::time::{Instant, UNIX_EPOCH};
 use rayon::prelude::*;
 use serde::Serialize;
 
-const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
 
 #[derive(Debug, Clone)]
 pub struct Node {
@@ -143,10 +142,7 @@ fn walk(dir: &Path, name: String, progress: &ScanProgress, cancel: &AtomicBool, 
             continue;
         };
         #[cfg(windows)]
-        let reparse = {
-            use std::os::windows::fs::MetadataExt;
-            md.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-        };
+        let reparse = crate::safety::is_reparse(&md);
         #[cfg(not(windows))]
         let reparse = md.file_type().is_symlink();
         if reparse {
@@ -503,11 +499,6 @@ pub struct RecycleOutcome {
     pub failed: u32,
 }
 
-fn is_reparse(md: &fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
-    md.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-}
-
 /// Detach the node at `ids` and subtract its size/count from every ancestor.
 fn remove(n: &mut Node, ids: &[u32]) -> Option<Node> {
     let (&first, rest) = ids.split_first()?;
@@ -544,7 +535,7 @@ pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome
         }
         let p = path_of(root, ids).ok_or(RecycleError::NotFound)?;
         let md = fs::symlink_metadata(&p).map_err(|_| RecycleError::NotFound)?;
-        if is_reparse(&md) {
+        if crate::safety::is_reparse(&md) {
             return Err(RecycleError::Protected);
         }
         // Resolve the real target (any reparse point on the path, `/` separators, trailing dots)
@@ -608,7 +599,7 @@ pub fn validate_recycle(paths: &[String]) -> Result<Vec<PathBuf>, RecycleError> 
             return Err(RecycleError::Protected);
         }
         let md = fs::symlink_metadata(&p).map_err(|_| RecycleError::NotFound)?;
-        if is_reparse(&md) {
+        if crate::safety::is_reparse(&md) {
             return Err(RecycleError::Protected);
         }
         let real = strip_verbatim(&fs::canonicalize(&p).map_err(|_| RecycleError::NotFound)?);

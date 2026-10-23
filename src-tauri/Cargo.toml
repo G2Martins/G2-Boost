@@ -11,7 +11,7 @@ publish.workspace = true
 # The `_lib` suffix keeps the lib name unique vs the bin name on Windows
 # (https://github.com/rust-lang/cargo/issues/8519).
 name = "g2_boost_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"] # desktop only: staticlib/cdylib are the mobile template defaults
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

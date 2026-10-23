@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::registry::{self, Root, Value};
-use crate::safety::{PathClass, SafePath};
+use crate::safety::{PathClass, SafePath, starts_with_dir};
 
 const UNINSTALL: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
 const UNINSTALL_WOW: &str = r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
@@ -779,10 +779,6 @@ const DENY_KEYS: &[&str] = &[
 
 fn lower(p: &Path) -> String {
     p.to_string_lossy().trim_end_matches('\\').to_ascii_lowercase()
-}
-
-fn starts_with_dir(child: &str, dir: &str) -> bool {
-    child == dir || child.starts_with(&format!("{dir}\\"))
 }
 
 fn is_reparse(p: &Path) -> bool {

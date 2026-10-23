@@ -13,6 +13,7 @@ use windows::Win32::System::Threading::{
 };
 
 use crate::procs::open_exact;
+use crate::system::system_root;
 
 const MAX_RULES: usize = 50;
 
@@ -134,10 +135,6 @@ impl Enforcer {
         }
         out
     }
-}
-
-fn system_root() -> String {
-    std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_ascii_lowercase()
 }
 
 /// Opens the exact process and sets its class; `None` if it already has it.

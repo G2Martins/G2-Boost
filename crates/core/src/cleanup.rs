@@ -22,11 +22,10 @@ use windows::Win32::UI::Shell::{
 use windows::core::PCWSTR;
 
 use crate::registry::{self, wide};
-use crate::safety::{PathClass, SafePath, SafePathError};
+use crate::safety::{PathClass, SafePath, SafePathError, is_reparse};
 use crate::system;
 use crate::tasksched;
 
-const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
 const TOKEN_TTL: Duration = Duration::from_secs(120);
 const HISTORY_MAX: usize = 100;
 
@@ -298,11 +297,6 @@ fn checked_root(p: &Path) -> Result<Option<SafePath>, SafePathError> {
         return Ok(None);
     }
     Ok(Some(safe))
-}
-
-fn is_reparse(md: &fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
-    md.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
 
 /// `thumbcache_*.db` style match: one `*` at most, case-insensitive.

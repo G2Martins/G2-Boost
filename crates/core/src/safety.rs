@@ -116,9 +116,15 @@ impl SafePath {
 }
 
 /// `child` is `dir` itself or lives below it (case-insensitive, already lowered).
-fn starts_with_dir(child: &str, dir: &str) -> bool {
+pub(crate) fn starts_with_dir(child: &str, dir: &str) -> bool {
     let dir = dir.trim_end_matches('\\');
     child == dir || child.starts_with(&format!("{dir}\\"))
+}
+
+/// Reparse point (junction, symlink, mount point): never walked into by scans or cleanup.
+pub(crate) fn is_reparse(md: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    md.file_attributes() & 0x400 != 0 // FILE_ATTRIBUTE_REPARSE_POINT
 }
 
 #[cfg(test)]
