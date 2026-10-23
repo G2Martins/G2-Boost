@@ -877,7 +877,9 @@ function StartupTab({ elevated }: { elevated: boolean }) {
             {t("boost.startup.count", { on: enabled, total: items.length })}
           </Badge>
         ) : null}
-        {!elevated && items?.some((i) => i.needs_admin) ? <ElevateButton route="boost" tab="startup" /> : null}
+        {!elevated && items?.some((i) => i.needs_admin) ? (
+          <ElevateButton route="boost" tab="startup" />
+        ) : null}
         <Button
           variant="outline"
           className="ml-auto"
