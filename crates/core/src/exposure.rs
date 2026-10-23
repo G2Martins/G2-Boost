@@ -2016,6 +2016,25 @@ mod tests {
         assert_eq!(f[1].params.get("count").map(String::as_str), Some("1"));
     }
 
+    /// Elevated round trip on Remote Assistance: fix → 0 with a backup; revert → the original value,
+    /// backup gone. `--ignored ra_fix_roundtrip_elevated` in an elevated shell with `G2BOOST_DATA_DIR` set.
+    #[test]
+    #[ignore]
+    fn ra_fix_roundtrip_elevated() {
+        if !crate::system::is_elevated() {
+            println!("skip: not elevated");
+            return;
+        }
+        let before = dw(Root::Hklm, RA, "fAllowToGetHelp");
+        apply(&Fix::RaDisable).unwrap();
+        assert_eq!(dw(Root::Hklm, RA, "fAllowToGetHelp"), Some(0));
+        assert!(reverts().contains(&Fix::RaDisable));
+        revert(&Fix::RaDisable).unwrap();
+        assert_eq!(dw(Root::Hklm, RA, "fAllowToGetHelp"), before);
+        assert!(!reverts().contains(&Fix::RaDisable));
+        println!("remote assistance round trip ok (before = {before:?})");
+    }
+
     /// Read-only, no admin: prints what this machine shows. `cargo test -p g2boost-core -- --ignored live_exposure --nocapture`
     #[test]
     #[ignore]

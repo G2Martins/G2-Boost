@@ -601,6 +601,22 @@ fn record(o: &Outcome) {
 mod tests {
     use super::*;
 
+    /// Elevated and long (DISM scan + SFC + MRT quick, ~20 to 45 min): runs each tool for real.
+    /// `--ignored live_repair_tools_elevated --nocapture` with `G2BOOST_DATA_DIR` set.
+    #[test]
+    #[ignore]
+    fn live_repair_tools_elevated() {
+        for tool in [Tool::DismScan, Tool::Sfc, Tool::MrtQuick] {
+            let t0 = std::time::Instant::now();
+            let r = run(tool, &|p| {
+                if let Some(p) = p {
+                    eprintln!("{tool:?} {p}%");
+                }
+            });
+            println!("{tool:?}: {r:?} in {} s", t0.elapsed().as_secs());
+        }
+    }
+
     #[test]
     fn cbs_counts_this_run_only_and_each_file_once() {
         let log = "\

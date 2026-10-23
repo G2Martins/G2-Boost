@@ -1196,6 +1196,28 @@ pub fn relaunch_elevated(args: &[&str]) -> Result<(), BoostError> {
 mod tests {
     use super::*;
 
+    /// Elevated: flip each round-7 task tweak and flip it back; the end state must match the start.
+    /// `--ignored round7_tasks_roundtrip_elevated` in an elevated shell with `G2BOOST_DATA_DIR` set.
+    #[test]
+    #[ignore]
+    fn round7_tasks_roundtrip_elevated() {
+        if !crate::system::is_elevated() {
+            println!("skip: not elevated");
+            return;
+        }
+        for id in ["winsat_task_off", "feedback_tasks_off"] {
+            let start = detect(TWEAKS.iter().find(|t| t.id == id).unwrap()).status;
+            if start == Status::Partial {
+                println!("{id}: partial, left alone");
+                continue;
+            }
+            let on = start == Status::On;
+            assert_eq!(apply(id, !on).unwrap().status, if on { Status::Off } else { Status::On }, "{id} flip");
+            assert_eq!(apply(id, on).unwrap().status, start, "{id} back");
+            println!("{id}: {start:?} -> flipped -> back ok");
+        }
+    }
+
     const TEST_PATH: &str = r"Software\G2 Boost\Test\boost";
     const TEST_OPS: &[RegOp] = &[
         op(HKCU, TEST_PATH, "alpha", Desired::Dword(1), Desired::Dword(0)),

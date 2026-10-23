@@ -24,12 +24,12 @@ Decisões: as 4 frentes abaixo entram; exceção de `sfc.exe`/`mrt.exe` aberta (
 
 | Frente | Como (nativo) | Estado |
 |---|---|---|
-| Guia de BIOS + Reiniciar na BIOS | checklist dos achados de `firmware.rs` + caminho do menu por fabricante da placa (SMBIOS) + `OsIndications` (`SetFirmwareEnvironmentVariableExW`, admin) | planejado |
-| Ajustes por jogo | liberar núcleo 0 / só físicos (sem SMT) / só núcleos de desempenho via CPU Sets no Modo Jogo (desfeito ao fechar) + GPU dedicada por exe (`UserGpuPreferences`, com backup) | planejado |
-| Tarefas e serviços extras | WinSAT, DiskDiagnostic, Feedback\Siuf, WER QueueReporting; Spooler sem impressora. Nunca `ScheduledDefrag` (TRIM), `UpdateOrchestrator`, Defender | planejado |
-| Limpeza de arquivos do sistema + reparo | handlers `IEmptyVolumeCache` (`VolumeCaches`) no fluxo prévia + token; DISM RestoreHealth (`DismApi`); SFC e MRT pela exceção | planejado |
-| Auditoria de acesso remoto e exposição | RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall por perfil (`INetFwPolicy2`), portas abertas no roteador via UPnP (`NATUPnP`), apps remotos, conexões de entrada da internet, sessões (`WTS`), tarefas/serviços fora da Microsoft sem assinatura; monitor no laço de rotinas. Não é antivírus (dito na tela) | planejado |
-| Configurações 3D do driver | NVIDIA: NVAPI DRS (global e por jogo). AMD: ADLX (sem placa AMD aqui para testar). Seção escolhida pelo vendor id do DXGI | planejado |
+| Guia de BIOS + Reiniciar na BIOS | checklist dos achados de `firmware.rs` + caminho do menu por fabricante da placa (SMBIOS) + `OsIndications` (`SetFirmwareEnvironmentVariableExW`, admin) | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
+| Ajustes por jogo | liberar núcleo 0 / só físicos (sem SMT) / só núcleos de desempenho via CPU Sets no Modo Jogo (desfeito ao fechar) + GPU dedicada por exe (`UserGpuPreferences`, com backup) | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
+| Tarefas e serviços extras | WinSAT, DiskDiagnostic, Feedback\Siuf, WER QueueReporting; Spooler sem impressora. Nunca `ScheduledDefrag` (TRIM), `UpdateOrchestrator`, Defender | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
+| Limpeza de arquivos do sistema + reparo | handlers `IEmptyVolumeCache` (`VolumeCaches`) no fluxo prévia + token; DISM RestoreHealth (`DismApi`); SFC e MRT pela exceção | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
+| Auditoria de acesso remoto e exposição | RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall por perfil (`INetFwPolicy2`), portas abertas no roteador via UPnP (`NATUPnP`), apps remotos, conexões de entrada da internet, sessões (`WTS`), tarefas/serviços fora da Microsoft sem assinatura; monitor no laço de rotinas. Não é antivírus (dito na tela) | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
+| Configurações 3D do driver | NVIDIA: NVAPI DRS (global e por jogo, escrita sem admin, testada ida e volta). AMD: ADLX (sem placa AMD aqui para testar). Seção escolhida pelo vendor id do DXGI | ✅ 2026-10-22 (check + e2e verdes, app real visto sem admin; verificação elevada pendente) |
 
 ## Rodada 6 (2026-10-18, pedido do dono: "siga com essas frentes")
 
