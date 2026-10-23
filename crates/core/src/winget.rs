@@ -19,7 +19,6 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use windows::Win32::Globalization::{CP_OEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const COMMON: &[&str] = &["--source", "winget", "--accept-source-agreements", "--disable-interactivity"];
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -82,7 +81,7 @@ fn exe() -> Result<PathBuf, WingetError> {
 fn run(args: &[&str], limit: Duration) -> Result<(u32, Vec<u8>), WingetError> {
     let mut child = Command::new(exe()?)
         .args(args)
-        .creation_flags(CREATE_NO_WINDOW)
+        .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

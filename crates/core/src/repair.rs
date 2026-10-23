@@ -25,7 +25,6 @@ use windows::core::{HRESULT, PCWSTR, s, w};
 use crate::registry;
 use crate::system;
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const HISTORY_MAX: usize = 50;
 const LOG_CAP: u64 = 64 << 20;
 /// `ERROR_TIMEOUT`: recorded as the code when a tool ran past its limit and was stopped.
@@ -375,7 +374,7 @@ enum Stop {
 fn spawn_wait(exe: &Path, args: &[&str], limit: Duration) -> Result<Result<u32, Stop>, RepairError> {
     let mut child = Command::new(exe)
         .args(args)
-        .creation_flags(CREATE_NO_WINDOW)
+        .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

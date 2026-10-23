@@ -26,7 +26,6 @@ use crate::registry::wide;
 
 /// The command-line flag that turns `G2 Boost.exe` into the helper.
 pub const HELPER_FLAG: &str = "--gpu-helper";
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const HELPER_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REQUEST: usize = 1024;
 const MAX_ANSWER: u64 = 64 * 1024;
@@ -226,7 +225,7 @@ pub fn call(req: &Request) -> Result<Vec<AmdGpu>, AmdError> {
     let exe = std::env::current_exe().map_err(|_| AmdError::HelperFailed)?;
     let mut child = Command::new(exe)
         .args([HELPER_FLAG, &json])
-        .creation_flags(CREATE_NO_WINDOW)
+        .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

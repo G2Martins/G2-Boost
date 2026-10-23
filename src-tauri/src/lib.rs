@@ -111,9 +111,7 @@ async fn boost_state() -> Vec<TweakState> {
 
 #[tauri::command]
 async fn boost_apply(id: String, on: bool) -> Result<TweakState, String> {
-    tauri::async_runtime::spawn_blocking(move || boost::apply(&id, on).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || boost::apply(&id, on)).await
 }
 
 #[tauri::command]
@@ -125,23 +123,17 @@ async fn boost_visual_fx(level: String) -> Result<TweakState, String> {
         "performance" => Level::Performance,
         _ => return Err("unknown_level".into()),
     };
-    tauri::async_runtime::spawn_blocking(move || boost::apply_visual_fx(level).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || boost::apply_visual_fx(level)).await
 }
 
 #[tauri::command]
 async fn boost_visual_fx_revert() -> Result<TweakState, String> {
-    tauri::async_runtime::spawn_blocking(|| boost::revert_visual_fx().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(boost::revert_visual_fx).await
 }
 
 #[tauri::command]
 async fn ram_purge() -> Result<PurgeResult, String> {
-    tauri::async_runtime::spawn_blocking(|| boost::purge_standby_list().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(boost::purge_standby_list).await
 }
 
 /// Relaunch this exe elevated (UAC) on `route`, then quit this instance.
@@ -157,6 +149,11 @@ fn relaunch_elevated(app: AppHandle, route: String, tab: Option<String>) -> Resu
     boost::relaunch_elevated(&args).map_err(|e| e.to_string())?;
     app.exit(0);
     Ok(())
+}
+
+/// Core work off the async runtime; core errors become their message (what every command returns).
+async fn blocking<T: Send + 'static, E: ToString>(f: impl FnOnce() -> Result<T, E> + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(move || f().map_err(|e| e.to_string())).await.map_err(|e| e.to_string())?
 }
 
 /* ---------------- cleanup ---------------- */
@@ -303,9 +300,7 @@ async fn restore_status() -> RestoreStatus {
 #[tauri::command]
 async fn restore_create(description: String) -> Result<CreateOutcome, String> {
     let d: String = description.chars().filter(|c| !c.is_control()).take(120).collect();
-    tauri::async_runtime::spawn_blocking(move || restore::create(&d).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || restore::create(&d)).await
 }
 
 /* ---------------- WinSAT + report ---------------- */
@@ -318,9 +313,7 @@ async fn winsat_last() -> Result<WinSat, String> {
 /// Starts Windows' own formal assessment (admin, 2–5 min, full-screen D3D tests).
 #[tauri::command]
 async fn winsat_start() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| winsat::start_formal().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(winsat::start_formal).await
 }
 
 /// Write `Documents\G2 Boost\g2boost-<stamp>.json` (+ `.txt`) with the profile, WinSAT and tweak
@@ -1396,9 +1389,7 @@ fn disk_essentials(state: State<'_, DiskState>) -> Vec<disk::Essential> {
 async fn disk_reveal(state: State<'_, DiskState>, ids: Vec<u32>) -> Result<(), String> {
     let tree = state.tree.lock().unwrap().clone().ok_or("no_scan")?;
     let p = disk::path_of(&tree, &ids).ok_or("not_found")?;
-    tauri::async_runtime::spawn_blocking(move || disk::reveal(&p).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || disk::reveal(&p)).await
 }
 
 /// Recycle Bin for items the user picked (the UI confirmed first). The tree is taken out of
@@ -1434,10 +1425,6 @@ struct PingReport {
 }
 
 /// Bounds enforced here because the caller (UI or MCP) is untrusted.
-fn clamp(v: u32, lo: u32, hi: u32) -> u32 {
-    v.clamp(lo, hi)
-}
-
 #[tauri::command]
 async fn ping_host(
     host: String,
@@ -1445,9 +1432,9 @@ async fn ping_host(
     timeout_ms: u32,
     interval_ms: u32,
 ) -> Result<PingReport, String> {
-    let count = clamp(count, 1, 100);
-    let timeout = clamp(timeout_ms, 100, 5000);
-    let interval = clamp(interval_ms, 0, 2000);
+    let count = count.clamp(1, 100);
+    let timeout = timeout_ms.clamp(100, 5000);
+    let interval = interval_ms.clamp(0, 2000);
     tauri::async_runtime::spawn_blocking(move || {
         let ip = network::resolve_v4(&host).map_err(|e| e.to_string())?;
         let mut probes = Vec::with_capacity(count as usize);
@@ -1477,9 +1464,9 @@ async fn trace_host(
     probes: u32,
     timeout_ms: u32,
 ) -> Result<Vec<Hop>, String> {
-    let max_hops = clamp(max_hops, 1, 64) as u8;
-    let probes = clamp(probes, 1, 5) as u8;
-    let timeout = clamp(timeout_ms, 100, 5000);
+    let max_hops = max_hops.clamp(1, 64) as u8;
+    let probes = probes.clamp(1, 5) as u8;
+    let timeout = timeout_ms.clamp(100, 5000);
     tauri::async_runtime::spawn_blocking(move || {
         let ip = network::resolve_v4(&host).map_err(|e| e.to_string())?;
         network::trace_route(ip, max_hops, probes, timeout).map_err(|e| e.to_string())
@@ -1494,9 +1481,9 @@ async fn tcping_host(host: String, port: u16, count: u32, timeout_ms: u32, inter
     if port == 0 {
         return Err("invalid_port".into());
     }
-    let count = clamp(count, 1, 50);
-    let timeout = clamp(timeout_ms, 100, 5000);
-    let interval = clamp(interval_ms, 0, 2000);
+    let count = count.clamp(1, 50);
+    let timeout = timeout_ms.clamp(100, 5000);
+    let interval = interval_ms.clamp(0, 2000);
     tauri::async_runtime::spawn_blocking(move || {
         let ip = network::resolve_v4(&host).map_err(|e| e.to_string())?;
         let mut probes = Vec::with_capacity(count as usize);
@@ -1551,16 +1538,12 @@ async fn dns_rank(samples: u32) -> Vec<dns::RankEntry> {
 /// Apply a catalog provider to one adapter (admin); the core validates the provider id.
 #[tauri::command]
 async fn dns_apply(guid: String, provider: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || dns::apply(&guid, &provider).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || dns::apply(&guid, &provider)).await
 }
 
 #[tauri::command]
 async fn dns_restore(guid: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || dns::restore(&guid).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || dns::restore(&guid)).await
 }
 
 /* ---------------- startup apps, processes, firmware, sensors ---------------- */
@@ -1573,9 +1556,7 @@ async fn startup_list() -> Vec<startup::StartupItem> {
 /// Toggle via `StartupApproved` (Task Manager semantics); the item must exist in the live list.
 #[tauri::command]
 async fn startup_set(location: startup::Location, name: String, enabled: bool) -> Result<startup::StartupItem, String> {
-    tauri::async_runtime::spawn_blocking(move || startup::set_enabled(location, &name, enabled).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || startup::set_enabled(location, &name, enabled)).await
 }
 
 /* ---------------- power plans ---------------- */
@@ -1587,51 +1568,37 @@ async fn power_plans() -> power::Plans {
 
 #[tauri::command]
 async fn power_activate(guid: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || power::set_active(&guid).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || power::set_active(&guid)).await
 }
 
 #[tauri::command]
 async fn power_create_max() -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(|| power::create_max_performance().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(power::create_max_performance).await
 }
 
 #[tauri::command]
 async fn power_duplicate(guid: String, name: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || power::duplicate(&guid, &name).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || power::duplicate(&guid, &name)).await
 }
 
 #[tauri::command]
 async fn power_rename(guid: String, name: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || power::rename(&guid, &name).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || power::rename(&guid, &name)).await
 }
 
 #[tauri::command]
 async fn power_delete(guid: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || power::delete(&guid).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || power::delete(&guid)).await
 }
 
 #[tauri::command]
 async fn power_settings(guid: String) -> Result<Vec<power::SettingValue>, String> {
-    tauri::async_runtime::spawn_blocking(move || power::settings(&guid).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || power::settings(&guid)).await
 }
 
 #[tauri::command]
 async fn power_write(guid: String, id: String, ac: Option<u32>, dc: Option<u32>) -> Result<power::SettingValue, String> {
-    tauri::async_runtime::spawn_blocking(move || power::write(&guid, &id, ac, dc).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || power::write(&guid, &id, ac, dc)).await
 }
 
 /* ---------------- uninstaller (apps + leftovers) ---------------- */
@@ -1770,9 +1737,7 @@ async fn apps_remove(state: State<'_, AppsState>, tokens: State<'_, TokenStore>,
 #[tauri::command]
 async fn apps_uninstall(state: State<'_, AppsState>, id: String) -> Result<(), String> {
     let app = state.apps.lock().unwrap().iter().find(|a| a.id == id).cloned().ok_or("unknown_app")?;
-    tauri::async_runtime::spawn_blocking(move || apps::uninstall(&app).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || apps::uninstall(&app)).await
 }
 
 /// Other installed apps the installer of `id` added (Parsec → its display and USB drivers).
@@ -1886,9 +1851,7 @@ fn parse_created(created: &str) -> Result<u64, String> {
 #[tauri::command]
 async fn procs_end(pid: u32, created: String) -> Result<(), String> {
     let created = parse_created(&created)?;
-    tauri::async_runtime::spawn_blocking(move || procs::end(pid, created).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || procs::end(pid, created)).await
 }
 
 /// Explorer on the process image (the path is resolved here from pid + creation time).
@@ -2006,9 +1969,7 @@ async fn bios_guide(state: State<'_, Dashboard>) -> Result<firmware::Guide, Stri
 /// admin-only (`needs_admin`), `unsupported` on legacy BIOS.
 #[tauri::command]
 async fn bios_reboot() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| firmware::reboot_to_firmware().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(firmware::reboot_to_firmware).await
 }
 
 #[derive(serde::Serialize)]
@@ -2081,9 +2042,7 @@ fn gpu_target(app: &AppHandle, game: Option<String>) -> Result<nvapi::Target, St
 
 #[tauri::command]
 async fn gpu_nv_read(app: AppHandle, game: Option<String>) -> Result<nvapi::ProfileView, String> {
-    tauri::async_runtime::spawn_blocking(move || nvapi::read(&gpu_target(&app, game)?).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || nvapi::read(&gpu_target(&app, game)?).map_err(|e| e.to_string())).await
 }
 
 #[tauri::command]
@@ -2097,9 +2056,7 @@ async fn gpu_nv_apply(app: AppHandle, game: Option<String>, id: String, value: S
 
 #[tauri::command]
 async fn gpu_nv_revert(app: AppHandle, game: Option<String>, id: String) -> Result<nvapi::ProfileView, String> {
-    tauri::async_runtime::spawn_blocking(move || nvapi::revert(&gpu_target(&app, game)?, &id).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || nvapi::revert(&gpu_target(&app, game)?, &id).map_err(|e| e.to_string())).await
 }
 
 #[tauri::command]
@@ -2114,17 +2071,13 @@ async fn gpu_nv_recommended(app: AppHandle, game: Option<String>) -> Result<nvap
 /// AMD (beta): every ADLX call runs in a `--gpu-helper` child; a crash there is an error here.
 #[tauri::command]
 async fn gpu_amd_read() -> Result<Vec<adlx::AmdGpu>, String> {
-    tauri::async_runtime::spawn_blocking(|| adlx::call(&adlx::Request::read()).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(|| adlx::call(&adlx::Request::read())).await
 }
 
 #[tauri::command]
 async fn gpu_amd_set(index: u32, changes: Vec<adlx::Change>) -> Result<Vec<adlx::AmdGpu>, String> {
     let req = adlx::Request { cmd: adlx::Cmd::Set, gpu: index, changes };
-    tauri::async_runtime::spawn_blocking(move || adlx::call(&req).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || adlx::call(&req)).await
 }
 
 /* ---------------- exposure (Segurança) ---------------- */
@@ -2290,9 +2243,7 @@ fn updates_history() -> Vec<updates::Batch> {
 /// Restart now (after the UI's confirmation), only when a restart is pending.
 #[tauri::command]
 async fn updates_reboot() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| updates::restart().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(updates::restart).await
 }
 
 /* ---------------- Manutenção+: disk check, optimize drives, boot options, connection repair ---------------- */
@@ -2342,9 +2293,7 @@ fn volumes_history() -> Vec<volumes::Outcome> {
 /// Restart into the advanced startup options (Safe Mode, Startup Repair...). UI confirms first.
 #[tauri::command]
 async fn boot_options_reboot() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| firmware::reboot_to_boot_options().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(firmware::reboot_to_boot_options).await
 }
 
 #[tauri::command]
@@ -2355,9 +2304,7 @@ async fn net_dhcp_adapters() -> Vec<netrepair::DhcpAdapter> {
 /// Release + renew one adapter's lease (index from `net_dhcp_adapters`, re-checked in the core).
 #[tauri::command]
 async fn net_renew(index: u32) -> Result<Option<std::net::Ipv4Addr>, String> {
-    tauri::async_runtime::spawn_blocking(move || netrepair::renew(index).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    blocking(move || netrepair::renew(index)).await
 }
 
 #[tauri::command]
