@@ -53,6 +53,8 @@ pub struct Settings {
     /// Background check for new exposure (public listener, inbound connection, remote-access
     /// app, router port forward) every few minutes; alerts in the app.
     pub exposure_monitor: bool,
+    /// winget ids the user left out of "update all" (validated on use by `updates::excluded_ids`).
+    pub update_excluded: Vec<String>,
 }
 
 impl Default for Settings {
@@ -76,6 +78,7 @@ impl Default for Settings {
             priority_rules: Vec::new(),
             game_tweaks: BTreeMap::new(),
             exposure_monitor: true,
+            update_excluded: Vec::new(),
         }
     }
 }
@@ -194,6 +197,7 @@ mod tests {
                 "a.exe".into(),
                 "x".repeat(70) + ".exe",
             ],
+            update_excluded: vec![],
         });
         assert_eq!(s.routine_categories, vec!["temp_user".to_string()]);
         assert_eq!(s.game_exes, vec!["cs2.exe".to_string(), "a.exe".to_string()]);
