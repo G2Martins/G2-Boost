@@ -511,6 +511,8 @@ export type RestoreStatus = {
 };
 export type CreateOutcome = "created" | "skipped";
 export type MonitorSample = {
+  /** 1, 2, 3… per monitor run: the chart scrolls one step per new value. */
+  seq: number;
   ts: number;
   cpu_pct: number;
   cpu_mhz: number;

@@ -1,15 +1,18 @@
-import { useId } from "react";
+import { type CSSProperties, useId } from "react";
 
 /**
  * Rolling line chart for live samples (last `window` points). Pure SVG, token colours,
  * no library. `max` fixes the Y range (e.g. 100 for percentages); omit it for auto-scale.
- * Entry: the lines draw in once data exists, then the area under the first series fades in.
+ * With `seq` (a counter that grows by one per sample) the data scrolls continuously: each new
+ * sample re-mounts the plot one step to the right and it slides back over the 1 s tick
+ * (`.live-scroll`, off under reduced motion). Without `seq` the lines draw in once.
  */
 export function LiveLine({
   series,
   window: win,
   max,
   format,
+  seq,
   className,
   label,
 }: {
@@ -18,6 +21,8 @@ export function LiveLine({
   max?: number;
   /** Tick label formatter (default: integer). */
   format?: (v: number) => string;
+  /** Sample counter for continuous scrolling (live monitors). */
+  seq?: number;
   className?: string;
   label: string;
 }) {
@@ -32,7 +37,8 @@ export function LiveLine({
     ...series.flatMap((s) => s.values.filter((v): v is number => v !== null)),
   );
   const yMax = max ?? niceCeil(peak * 1.15);
-  const x = (i: number) => padL + (i / Math.max(1, win - 1)) * (W - padL - 8);
+  const step = (W - padL - 8) / Math.max(1, win - 1);
+  const x = (i: number) => padL + i * step;
   const y = (v: number) => 8 + (1 - Math.min(v, yMax) / yMax) * (H - padB - 8);
   const path = (values: (number | null)[]) => {
     let d = "";
@@ -64,6 +70,7 @@ export function LiveLine({
       d += `L${x(i + offset).toFixed(1)},${y(first.values[i] ?? 0).toFixed(1)} `;
     return `${d}L${x(end + offset).toFixed(1)},${y(0).toFixed(1)} Z`;
   })();
+  const live = seq !== undefined;
   const hasData = series.some((s) => s.values.filter((v) => v !== null).length > 1);
   return (
     <svg
@@ -72,14 +79,18 @@ export function LiveLine({
       role="img"
       aria-label={label}
     >
-      {first ? (
-        <defs>
+      <defs>
+        {first ? (
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={first.color} stopOpacity={0.16} />
             <stop offset="100%" stopColor={first.color} stopOpacity={0} />
           </linearGradient>
-        </defs>
-      ) : null}
+        ) : null}
+        {/* The scrolling plot must not slide over the Y labels or past the right edge. */}
+        <clipPath id={`${gid}c`}>
+          <rect x={padL} y={0} width={W - 8 - padL} height={H} />
+        </clipPath>
+      </defs>
       {ticks.map((v) => (
         <g key={v}>
           <line
@@ -102,22 +113,32 @@ export function LiveLine({
           </text>
         </g>
       ))}
-      {area ? <path d={area} fill={`url(#${gid})`} className="fade-late" /> : null}
-      {series.map((s, idx) => (
-        <path
-          // biome-ignore lint/suspicious/noArrayIndexKey: series order is stable by construction
-          key={idx}
-          d={path(s.values)}
-          pathLength={1}
-          // Added once data exists, so the draw-in plays on real data (not on an empty path).
-          className={hasData ? "draw-line" : undefined}
-          fill="none"
-          stroke={s.color}
-          strokeWidth={1.8}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      ))}
+      <g clipPath={`url(#${gid}c)`}>
+        <g
+          key={seq ?? "static"}
+          className={live ? "live-scroll" : undefined}
+          style={{ "--step": `${step}px` } as CSSProperties}
+        >
+          {area ? (
+            <path d={area} fill={`url(#${gid})`} className={live ? undefined : "fade-late"} />
+          ) : null}
+          {series.map((s, idx) => (
+            <path
+              // biome-ignore lint/suspicious/noArrayIndexKey: series order is stable by construction
+              key={idx}
+              d={path(s.values)}
+              pathLength={1}
+              // Static charts draw in once on real data; live ones enter by scrolling.
+              className={!live && hasData ? "draw-line" : undefined}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={1.8}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ))}
+        </g>
+      </g>
     </svg>
   );
 }

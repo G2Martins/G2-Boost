@@ -121,6 +121,11 @@
     stroke-dashoffset: 1;
   }
 }
+@keyframes live-scroll {
+  from {
+    transform: translateX(var(--step));
+  }
+}
 @keyframes shimmer {
   from {
     background-position: 150% 0;
@@ -397,6 +402,18 @@
   }
   .fade-late {
     animation: fade-in var(--motion-slow) var(--ease-out-expo) 520ms backwards;
+  }
+  /* Live chart: each new sample re-mounts the data group one step to the right and it slides
+     back over the 1 s tick, so the line scrolls continuously instead of jumping. */
+  .live-scroll {
+    animation: live-scroll 1000ms linear;
+  }
+  /* Gauge: needle (rotate) and arc (dash) glide together to the new value. */
+  .gauge-anim {
+    transition:
+      transform 700ms var(--ease-out-expo),
+      stroke-dasharray 700ms var(--ease-out-expo),
+      opacity 200ms linear;
   }
   .skeleton {
     animation: shimmer 2.5s linear infinite;

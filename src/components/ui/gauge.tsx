@@ -1,11 +1,12 @@
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 
 /**
  * 270° arc gauge with a gradient stroke and a needle. `value`/`max` drive both the arc fill and
- * the needle; colors come from tokens. The arc draws itself in once (CSS `draw-line`); pass
- * `format` to tween the caption number with the value (otherwise `valueText` is shown as is).
+ * the needle; colors come from tokens. Needle (CSS rotate) and arc (dash length) glide together
+ * to each new value (`.gauge-anim`, off under reduced motion) and sweep up from zero on mount;
+ * pass `format` to tween the caption number with the value (otherwise `valueText` is shown as is).
  */
 export function Gauge({
   value,
@@ -32,7 +33,14 @@ export function Gauge({
   const cy = size / 2;
   const startAngle = 135; // degrees, clockwise from +x
   const sweep = 270;
-  const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const target = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  // First frame at zero so the arc and needle sweep up to the first value.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const ratio = ready ? target : 0;
 
   const polar = (deg: number) => {
     const rad = (deg * Math.PI) / 180;
@@ -45,7 +53,6 @@ export function Gauge({
     return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
   };
   const needleAngle = startAngle + sweep * ratio;
-  const [nx, ny] = polar(needleAngle);
   const start = `hsl(var(--gauge-${tone}-start))`;
   const end = `hsl(var(--gauge-${tone}-end))`;
 
@@ -71,27 +78,29 @@ export function Gauge({
           strokeWidth={stroke}
           strokeLinecap="round"
         />
-        {ratio > 0.005 ? (
-          <path
-            d={arc(startAngle, needleAngle)}
-            pathLength={1}
-            className="draw-line"
-            fill="none"
-            stroke={`url(#${id})`}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            style={{ transition: "d 0.4s var(--ease-out-expo)" }}
-          />
-        ) : null}
+        {/* Always mounted: the filled part is a dash of the full arc, so it can glide (a
+            changing `d` cannot) and never re-plays an entrance when the value nears zero. */}
+        <path
+          d={arc(startAngle, startAngle + sweep)}
+          pathLength={1}
+          className="gauge-anim"
+          fill="none"
+          stroke={`url(#${id})`}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          style={{ strokeDasharray: `${ratio} 1`, opacity: ratio > 0.005 ? 1 : 0 }}
+        />
+        {/* Needle drawn pointing right and rotated: `transform` animates, x2/y2 do not. */}
         <line
           x1={cx}
           y1={cy}
-          x2={cx + (nx - cx) * 0.62}
-          y2={cy + (ny - cy) * 0.62}
+          x2={cx + r * 0.62}
+          y2={cy}
+          className="gauge-anim"
           stroke="hsl(var(--foreground) / 0.85)"
           strokeWidth={4}
           strokeLinecap="round"
-          style={{ transition: "all 0.4s var(--ease-out-expo)" }}
+          style={{ transform: `rotate(${needleAngle}deg)`, transformOrigin: `${cx}px ${cy}px` }}
         />
         <circle
           cx={cx}

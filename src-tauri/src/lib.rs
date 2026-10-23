@@ -252,8 +252,16 @@ fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
     std::thread::spawn(move || {
         let st = app.state::<Dashboard>();
         if let Some(mut m) = Monitor::new() {
+            // Fixed 1 s cadence like Task Manager: sleep to the next deadline, not 1 s after a slow
+            // sample (sensors/NVML can take hundreds of ms), so ticks don't drift to 1.1–1.8 s.
+            let mut next = std::time::Instant::now();
             loop {
-                std::thread::sleep(Duration::from_secs(1));
+                next += Duration::from_secs(1);
+                let now = std::time::Instant::now();
+                match next.checked_duration_since(now) {
+                    Some(wait) => std::thread::sleep(wait),
+                    None => next = now, // fell behind (machine stalled): restart the cadence
+                }
                 if st.monitor_subs.load(Ordering::SeqCst) == 0 {
                     break;
                 }

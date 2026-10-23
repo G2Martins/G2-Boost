@@ -28,6 +28,8 @@ use crate::system;
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct Sample {
+    /// Sample number of this monitor (1, 2, 3…): lets the UI scroll its chart one step per tick.
+    pub seq: u32,
     pub ts: u64,
     pub cpu_pct: f32,
     pub cpu_mhz: u32,
@@ -112,6 +114,7 @@ pub struct Monitor {
     cpu_power: Option<Counter>,
     gpu_util: Option<Counter>,
     gpu_mem: Option<Counter>,
+    disk_idle: Option<Counter>,
     disk_time: Option<Counter>,
     disk_bytes: Option<Counter>,
     last_net: Option<(Instant, u64, u64)>,
@@ -143,6 +146,9 @@ impl Monitor {
             cpu_power: add_counter(query, r"\Energy Meter(RAPL_Package0_PKG)\Power"),
             gpu_util: add_counter(query, r"\GPU Engine(*)\Utilization Percentage"),
             gpu_mem: add_counter(query, r"\GPU Adapter Memory(*)\Dedicated Usage"),
+            // Task Manager's "Active time" = 100 − % Idle Time; % Disk Time is a queue figure that
+            // passes 100 and reads higher than Task Manager.
+            disk_idle: add_counter(query, r"\PhysicalDisk(_Total)\% Idle Time"),
             disk_time: add_counter(query, r"\PhysicalDisk(_Total)\% Disk Time"),
             disk_bytes: add_counter(query, r"\PhysicalDisk(_Total)\Disk Bytes/sec"),
             last_net: None,
@@ -233,6 +239,7 @@ impl Monitor {
         self.ext_tick = self.ext_tick.wrapping_add(1);
 
         Sample {
+            seq: self.ext_tick,
             ts: now_unix(),
             cpu_pct: value(&self.cpu).unwrap_or(0.0).clamp(0.0, 100.0) as f32,
             cpu_temp_c: self.cpu_temp,
@@ -250,7 +257,11 @@ impl Monitor {
             gpu_power_w: nv.and_then(Nvml::power_w),
             ram_used: mem.as_ref().map(|m| m.total_bytes - m.avail_bytes).unwrap_or(0),
             ram_total: mem.as_ref().map(|m| m.total_bytes).unwrap_or(0),
-            disk_pct: value(&self.disk_time).unwrap_or(0.0).clamp(0.0, 100.0) as f32,
+            disk_pct: value(&self.disk_idle)
+                .map(|idle| 100.0 - idle)
+                .or_else(|| value(&self.disk_time))
+                .unwrap_or(0.0)
+                .clamp(0.0, 100.0) as f32,
             disk_bytes_s: value(&self.disk_bytes).unwrap_or(0.0).max(0.0) as u64,
             net_rx_bytes_s: net_rx,
             net_tx_bytes_s: net_tx,

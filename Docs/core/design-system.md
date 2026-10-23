@@ -49,6 +49,7 @@ Tokens: `--motion-fast` 200 ms · `--motion-base` 350 ms · `--motion-slow` 550 
 | Gráficos | linhas com `pathLength=1` + `.draw-line` (desenha em 700 ms, +260 ms) quando há dados; área sob a 1ª série com `.fade-late` (+520 ms) |
 | Loading | `<Skeleton>` (shimmer 2,5 s; cor de repouso dentro dos stops do gradiente) e `<LoadingScope loading>` (todo `MetricRow` dentro vira skeleton) — toda rota tem skeleton |
 | Modal | `<Modal>` sobre `<dialog>` nativo (foco preso, Esc, página inerte): abre 300 ms, fecha 200 ms, fundo com blur 4 px |
+| Monitor ao vivo | `LiveLine` com `seq`: o grupo de dados remonta um passo à direita a cada amostra e volta em 1 s linear (`.live-scroll`, recorte nas bordas), então a linha rola sem pular. `Gauge`: ponteiro por `transform: rotate` e arco por `stroke-dasharray` do arco inteiro, mesma transição (`.gauge-anim`, 700 ms); `x2/y2` e `d` não animam de forma confiável. |
 
 **Segurança das animações:** o estado de repouso é sempre o visível — `opacity: 0` só dentro de `@keyframes`. Tudo que se move vive em `@media (prefers-reduced-motion: no-preference)`; em `reduce` nada desloca, desenha ou brilha (cor ainda muda no hover). O único `fill-mode` é o `backwards` do stagger (segura o 1º quadro só durante o atraso, ≤ 480 ms).
 

@@ -541,6 +541,7 @@ function MonitorCard({
           <LiveLine
             series={[{ values, color: "hsl(var(--chart-1))" }]}
             window={WINDOW}
+            seq={last?.seq}
             max={isRate ? undefined : 100}
             format={isRate ? (v) => `${v.toFixed(0)}` : undefined}
             label={t(`dash.monitor.${metric}` as const)}

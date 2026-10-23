@@ -185,6 +185,7 @@ function Hero({ gpu, driver }: { gpu: Gpu; driver: GpuOverview["nvidia"] }) {
         className="h-auto w-full"
         series={[{ values: samples.map((s) => s.gpu_pct), color: "hsl(var(--chart-1))" }]}
         window={WINDOW}
+        seq={samples.at(-1)?.seq}
         max={100}
         label={t("gpu.live.chart")}
       />
