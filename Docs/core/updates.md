@@ -36,7 +36,7 @@ Pedido do dono (2026-10-23): o equivalente a `winget upgrade --all` dentro do ap
 
 ## Testes
 
-`updates::tests`: classificação (próprio app, versão desconhecida, excluído sem diferenciar caixa, HKLM, nome cortado), lista de exclusão validada, códigos → motivos, GUID (inclusive tentativa de injetar critério), KB e data OLE, token amarrado à lista/ordem/tipo e de uso único, `needs_admin` sem elevação, histórico hostil (JSON inválido, NUL, status falso). **Ao vivo (`--ignored live_updates --nocapture`, só leitura, nunca instala):** 2026-10-23 nesta máquina: winget 9 atualizações (9 elegíveis, 7 para todos os usuários); Windows Update 1 pendente (driver de monitor) no cache e online; histórico com 10 entradas. E2E: `e2e/apps.spec.ts` abre a aba no navegador (botões desabilitados, aviso de admin).
+`updates::tests`: classificação (próprio app, versão desconhecida, excluído sem diferenciar caixa, HKLM, nome cortado), lista de exclusão validada, códigos → motivos, GUID (inclusive tentativa de injetar critério), KB e data OLE, token amarrado à lista/ordem/tipo e de uso único, `needs_admin` sem elevação, histórico hostil (JSON inválido, NUL, status falso). **Ao vivo (`--ignored live_updates --nocapture`, só leitura, nunca instala):** 2026-10-23 nesta máquina: winget 9 atualizações (9 elegíveis, 7 para todos os usuários); Windows Update 1 pendente (driver de monitor, sem KB, 24 KB) no cache e online (cache em segundos, online ~40 s); histórico com 10 entradas depois de agrupar as repetições da Store, 3 com KB (KB5127648, KB5127690, KB890830). E2E: `e2e/apps.spec.ts` abre a aba no navegador (botões desabilitados, aviso de admin).
 
 ## Pendente (passos elevados)
 
