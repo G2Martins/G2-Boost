@@ -418,6 +418,9 @@ mod tests {
         log += &format!("before={before:?} during={during:?} applied={:?} skipped={:?} ram_freed={} priority_class=0x{class:x}\n", s.applied, s.skipped, s.ram_freed);
         assert!(s.applied.contains(&"power_plan".to_string()), "{log}");
         assert!(s.applied.contains(&"priority".to_string()), "{log}");
+        if crate::cpusets::summary(&crate::cpusets::topology()).physical > 1 {
+            assert!(s.applied.contains(&"affinity".to_string()) && s.affinity.is_some(), "core 0 freed\n{log}");
+        }
         assert_eq!(class, 0x80, "HIGH_PRIORITY_CLASS\n{log}");
         assert_eq!(session().map(|x| x.game_id), Some("exe:fakegame.exe".into()));
         assert!(stop().is_some());

@@ -357,6 +357,26 @@ mod tests {
         assert_eq!(with_boot_to_fw_ui(0x1, 0x1), Some(0x1), "already set");
     }
 
+    /// Elevated, read-only (`--ignored`): the EFI variables the restart uses can be read and the
+    /// firmware offers "boot to setup". Writes nothing, never restarts.
+    #[test]
+    #[ignore]
+    fn efi_variables_readable_elevated() {
+        if !crate::system::is_elevated() || boot_mode() != Some("uefi") {
+            println!("needs an elevated run on UEFI: skipped");
+            return;
+        }
+        privilege("SeSystemEnvironmentPrivilege").unwrap();
+        let supported = efi_read("OsIndicationsSupported").unwrap();
+        let current = efi_read("OsIndications").unwrap();
+        let line = format!("OsIndicationsSupported={supported:x?} OsIndications={current:x?} would_write={:x?}\n", supported.and_then(|s| with_boot_to_fw_ui(s.0, current.map_or(0, |c| c.0))));
+        let out = std::env::temp_dir().join("g2boost-live");
+        let _ = std::fs::create_dir_all(&out);
+        let _ = std::fs::write(out.join("efi.txt"), &line);
+        println!("{line}");
+        assert!(supported.is_some_and(|s| s.0 & BOOT_TO_FW_UI != 0), "{line}");
+    }
+
     #[test]
     fn reboot_refused_without_admin() {
         // Never reaches the restart: elevated runs skip this check on purpose.
