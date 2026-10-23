@@ -76,7 +76,7 @@ fn meta(v: Value) -> rmcp::model::MetaObject {
 }
 
 /// Screens `open_in_g2boost` may open (the app's own route allowlist).
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "security"];
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
@@ -764,6 +764,11 @@ tables with column ids. Changes are not possible here; use the action tools.")]
                 .collect::<Vec<Value>>()
         })
         .await
+    }
+
+    #[tool(description = "Remote access and exposure audit (takes ~3 s): Remote Desktop and NLA, Remote Assistance, WinRM, SMBv1 server/client, Windows Firewall per profile (and a third-party firewall), ports this PC opened on the router through UPnP, remote-access apps installed or running, programs listening on the network (risky ports flagged), inbound connections from the internet right now (remote IPs left out), active Remote Desktop sessions, scheduled tasks and services outside Windows that are unsigned or run from user folders, the guest account and antivirus status. Each check: id, state (ok/exposed/unknown), severity (info/low/medium/high), items and the fix the app offers. Not an antivirus. Read-only: fixes are done by the user in G2 Boost > Segurança (admin, backup, undo).")]
+    async fn get_exposure_report(&self) -> Result<String, String> {
+        blocking(|| g2boost_core::exposure::redacted(g2boost_core::exposure::report())).await
     }
 }
 
