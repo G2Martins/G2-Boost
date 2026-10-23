@@ -5,6 +5,7 @@ import {
   HardDrive,
   LayoutDashboard,
   type LucideIcon,
+  MonitorCog,
   PackageX,
   Radar,
   Settings,
@@ -27,7 +28,8 @@ export type Route =
   | "boost"
   | "console"
   | "ai"
-  | "settings";
+  | "settings"
+  | "gpu";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
@@ -36,6 +38,7 @@ const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
   { route: "games", icon: Gamepad2, label: "nav.games" },
+  { route: "gpu", icon: MonitorCog, label: "gpu.nav" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
   { route: "console", icon: SquareTerminal, label: "nav.console" },
   { route: "ai", icon: Bot, label: "nav.ai" },

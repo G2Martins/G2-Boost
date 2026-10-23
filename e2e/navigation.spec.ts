@@ -10,6 +10,8 @@ const ROUTES = [
   ["nav.console", "console.title"],
   ["nav.ai", "ai.title"],
   ["nav.settings", "settings.title"],
+  // Before the dashboard: its monitor has a "GPU" metric button with the same name.
+  ["gpu.nav", "gpu.title"],
   ["nav.dashboard", "dash.title"],
 ] as const;
 

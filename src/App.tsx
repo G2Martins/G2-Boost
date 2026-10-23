@@ -16,6 +16,7 @@ import { ConsolePage } from "@/pages/console";
 import { DashboardPage } from "@/pages/dashboard";
 import { DiskPage } from "@/pages/disk";
 import { GamesPage } from "@/pages/games";
+import { GpuPage } from "@/pages/gpu";
 import { NetworkPage } from "@/pages/network";
 import { SettingsPage } from "@/pages/settings";
 
@@ -30,6 +31,7 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   console: ConsolePage,
   ai: AiPage,
   settings: SettingsPage,
+  gpu: GpuPage,
 };
 
 const isRoute = (r: string | null | undefined): r is Route => !!r && r in PAGES;
