@@ -613,10 +613,12 @@ mod tests {
         let vols = super::list().unwrap();
         let progress = |p: Option<u32>| eprintln!("  {p:?}%");
         for v in &vols {
-            let ops: &[super::Op] = if v.letter.eq_ignore_ascii_case("C:") {
+            let ops: &[super::Op] = if v.letter.trim_end_matches(':').eq_ignore_ascii_case("C") {
                 &[super::Op::Scan, super::Op::Retrim]
-            } else {
+            } else if v.ops.contains(&super::Op::Analyze) {
                 &[super::Op::Analyze]
+            } else {
+                &[]
             };
             for &op in ops {
                 let t0 = std::time::Instant::now();

@@ -1,6 +1,6 @@
 # Kaspersky × "Limpador Diario/Mensal Windows 2026.bat" — análise do alerta
 
-**Última revisão:** 2026-10-14 · Analisado: `Referencias/Limpador Diario Windows 2026.bat` (v2.1, 9.3 KB) e `Referencias/Limpador Mensal Windows  2026.bat` (v2.1, 20.3 KB). Kaspersky instalado na máquina: 21.26 (linha 2026).
+**Última revisão:** 2026-10-23 (alerta em binário de teste) · 2026-10-14 · Analisado: `Referencias/Limpador Diario Windows 2026.bat` (v2.1, 9.3 KB) e `Referencias/Limpador Mensal Windows  2026.bat` (v2.1, 20.3 KB). Kaspersky instalado na máquina: 21.26 (linha 2026).
 
 ## Verdict confirmado (relatório exportado do Kaspersky, 2026-10-14)
 `PDM:Trojan.Win32.Generic` · severidade Alto · tecnologia **"Análise de comportamento"** (System Watcher; PDM = Proactive Defense Module) · objeto `cmd.exe` PID 16180 iniciado por `Limpador Mensal Windows  2026.bat` em `C:\Users\Windows\Desktop` · 13/10/2026 23:45:03 detectado → processo encerrado → cópia de backup → 23:45:29 **arquivo excluído**. Segunda tentativa 23:45:42 (PID 13216): detectado e encerrado de novo, "não pode ser excluído". Ou seja: não foi assinatura de arquivo, foi a **sequência de ações em execução** (elevação → PowerShell → deleção em massa → `net stop` de serviços) que bateu no limiar comportamental. O `.bat` do Desktop foi removido pelo AV; a cópia em `Referencias/` está intacta. Recuperar: Kaspersky → Quarentena → restaurar + adicionar às exclusões, ou usar a cópia.
@@ -29,6 +29,14 @@ O **Proteção contra ameaças de arquivo** pontua o texto (1, 2, 3, 4); o **Sys
 1. Confirmar o verdict e, se for só heurístico, **adicionar à lista de confiáveis** (Kaspersky → Configurações → Exclusões e ações em objetos detectados).
 2. Reportar falso positivo em `opentip.kaspersky.com` (upload do .bat) — resposta costuma vir em dias.
 3. Reduzir os gatilhos sem perder função: tirar `-ExecutionPolicy Bypass` (inútil com `-Command`); trocar a auto-elevação por um atalho "Executar como administrador" ou tarefa agendada com privilégio máximo; mover os one-liners para um `.ps1` ao lado; **parar de limpar Prefetch** (também piora desempenho); não apagar `CBS.log`/minidumps (valor forense e de diagnóstico, ganho de espaço pequeno).
+
+## 2026-10-23: alerta no binário de teste do core
+
+Durante a rodada elevada 8 (`D:\dev\g2boost-tools\elevated-r8.ps1`), o Inspetor do Sistema mostrou **`PDM:Trojan.Win32.Generic`** em `target\debug\deps\g2boost_core-28726ea23055fbf5.exe`, com as opções "Desinfectar e reiniciar" / "sem reiniciar". Fatos: o arquivo apontado é o binário de teste gerado às 00:54 pelo `cargo test --workspace` sem admin (a suíte cria junção NTFS real, mexe em chaves de teste no HKCU, muda prioridade/CPU Sets e encerra processos filhos, registra tarefa agendada); o binário que rodou elevado (00:59, outro hash) **terminou as ações** (winget atualizou o GitHub CLI, WUA instalou o driver AOC) sem ser interrompido. Binário de teste = exe sem assinatura, em pasta de build, fazendo dezenas de coisas de sistema seguidas: perfil clássico do PDM.
+
+**Conduta no PC de desenvolvimento:** "Tentar desinfectar sem reiniciar" (apaga só o binário de teste, que o `cargo` recria; reverte o que ele fez, que são artefatos de teste) e excluir a pasta `target\` do repositório da verificação do Kaspersky (Ameaças e exclusões). Não reiniciar.
+
+**Para o produto:** o app de release faz as mesmas ações, uma por clique, mas segue sem assinatura (decisão do dono, 2026-10-18). Antes de distribuir: rodar o instalador NSIS num PC com Kaspersky e repetir atualizar apps / Windows Update / DISM / SFC / limpeza; se o PDM acusar, enviar o exe como falso positivo (Kaspersky OpenTIP / laboratório de vírus) com este relato.
 
 ## O que isso impõe ao app novo
 - **Zero spawn de `cmd`/`powershell`/`reg`/`net`.** Tudo por API Win32 (`DeleteFileW`, `IFileOperation`, `RegSetValueExW`, `ControlService`, `DnsFlushResolverCache`, `DismApi`). Um exe que chama `powershell -Command` com string montada é o mesmo padrão em roupa nova.
