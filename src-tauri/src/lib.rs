@@ -21,6 +21,7 @@ use g2boost_core::routines::{self, Clock, Game, GameWatcher, RoutineState};
 use g2boost_core::settings::{self, Schedule, Settings};
 use g2boost_core::system::{self, DriveInfo, MemoryStatus};
 use g2boost_core::tasksched;
+use g2boost_core::{adlx, nvapi};
 use g2boost_core::visualfx::Level;
 use g2boost_core::winsat::{self, WinSat};
 use tauri::menu::{Menu, MenuItem};
@@ -28,7 +29,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "gpu"];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -1885,8 +1886,83 @@ async fn firmware_info(state: State<'_, Dashboard>) -> Result<firmware::Firmware
         .map_err(|e| e.to_string())
 }
 
+/* ---------------- GPU driver settings ---------------- */
+
+#[tauri::command]
+async fn gpu_info() -> Result<g2boost_core::gpu::Overview, String> {
+    tauri::async_runtime::spawn_blocking(g2boost_core::gpu::overview).await.map_err(|e| e.to_string())
+}
+
+/// `game` = an id from `games_list` (its main exe picks the driver profile); `None` = global.
+/// Only games G2 Boost listed can get a profile, never an arbitrary name from the webview.
+fn gpu_target(app: &AppHandle, game: Option<String>) -> Result<nvapi::Target, String> {
+    let Some(id) = game else {
+        return Ok(nvapi::Target::Global);
+    };
+    let custom = app.state::<Routines>().settings.lock().unwrap().game_exes.clone();
+    let g = app.state::<GamesState>().current(&custom, false).into_iter().find(|g| g.id == id).ok_or("unknown_game")?;
+    let exe = match &g.main_exe {
+        Some(p) => std::path::Path::new(p).file_name().map(|n| n.to_string_lossy().into_owned()),
+        None => id.strip_prefix("exe:").map(str::to_string),
+    }
+    .ok_or("no_exe")?;
+    nvapi::Target::game(&exe).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn gpu_nv_read(app: AppHandle, game: Option<String>) -> Result<nvapi::ProfileView, String> {
+    tauri::async_runtime::spawn_blocking(move || nvapi::read(&gpu_target(&app, game)?).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn gpu_nv_apply(app: AppHandle, game: Option<String>, id: String, value: String) -> Result<nvapi::ProfileView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        nvapi::apply(&gpu_target(&app, game)?, &id, &value).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn gpu_nv_revert(app: AppHandle, game: Option<String>, id: String) -> Result<nvapi::ProfileView, String> {
+    tauri::async_runtime::spawn_blocking(move || nvapi::revert(&gpu_target(&app, game)?, &id).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn gpu_nv_recommended(app: AppHandle, game: Option<String>) -> Result<nvapi::ProfileView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        nvapi::apply_recommended(&gpu_target(&app, game)?).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// AMD (beta): every ADLX call runs in a `--gpu-helper` child; a crash there is an error here.
+#[tauri::command]
+async fn gpu_amd_read() -> Result<Vec<adlx::AmdGpu>, String> {
+    tauri::async_runtime::spawn_blocking(|| adlx::call(&adlx::Request::read()).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn gpu_amd_set(index: u32, changes: Vec<adlx::Change>) -> Result<Vec<adlx::AmdGpu>, String> {
+    let req = adlx::Request { cmd: adlx::Cmd::Set, gpu: index, changes };
+    tauri::async_runtime::spawn_blocking(move || adlx::call(&req).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // `G2 Boost.exe --gpu-helper <json>`: one ADLX request in a throwaway process (crash isolation).
+    if adlx::helper_if_requested() {
+        return;
+    }
     // `G2 Boost.exe --mcp`: stdio MCP server for Claude Desktop / Claude Code, no window.
     // One signed binary instead of a sidecar; the server is read-only (crates/mcp).
     if std::env::args().any(|a| a == "--mcp") {
@@ -2076,7 +2152,14 @@ pub fn run() {
             boot_report,
             dupes_start,
             dupes_cancel,
-            dupes_recycle
+            dupes_recycle,
+            gpu_info,
+            gpu_nv_read,
+            gpu_nv_apply,
+            gpu_nv_revert,
+            gpu_nv_recommended,
+            gpu_amd_read,
+            gpu_amd_set
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

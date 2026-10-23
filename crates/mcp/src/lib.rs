@@ -76,7 +76,7 @@ fn meta(v: Value) -> rmcp::model::MetaObject {
 }
 
 /// Screens `open_in_g2boost` may open (the app's own route allowlist).
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings"];
+const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "gpu"];
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
@@ -765,6 +765,41 @@ tables with column ids. Changes are not possible here; use the action tools.")]
         })
         .await
     }
+
+    #[tool(description = "GPU driver 3D settings, read-only: the GPUs (DXGI), which section applies \
+(nvidia, amd beta, intel), NVIDIA driver version/branch and the global profile (or one game's profile with \
+`exe`) with each setting's current value, recommended value and whether the user set it; AMD (beta) features \
+per GPU. To change them, tell the user to open the GPU screen in the G2 Boost app.")]
+    async fn get_gpu_settings(&self, Parameters(a): Parameters<GpuArgs>) -> Result<String, String> {
+        blocking(move || {
+            let o = g2boost_core::gpu::overview();
+            let nvidia = (o.section == Some("nvidia")).then(|| {
+                let target = match a.exe.as_deref() {
+                    None => Ok(g2boost_core::nvapi::Target::Global),
+                    Some(e) => g2boost_core::nvapi::Target::game(e),
+                };
+                match target.and_then(|t| g2boost_core::nvapi::read(&t)) {
+                    Ok(v) => json!(v),
+                    Err(e) => json!({ "error": e.to_string() }),
+                }
+            });
+            let amd = (o.section == Some("amd")).then(|| {
+                match g2boost_core::adlx::call(&g2boost_core::adlx::Request::read()) {
+                    Ok(g) => json!({ "beta": true, "gpus": g }),
+                    Err(e) => json!({ "beta": true, "error": e.to_string() }),
+                }
+            });
+            json!({ "overview": o, "nvidia_profile": nvidia, "amd": amd })
+        })
+        .await
+    }
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+struct GpuArgs {
+    /// A game's executable file name (e.g. "cs2.exe") to read its driver profile; omit for global.
+    exe: Option<String>,
 }
 
 #[tool_handler(router = self.tool_router)]
