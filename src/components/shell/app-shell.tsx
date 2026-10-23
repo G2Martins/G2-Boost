@@ -8,6 +8,7 @@ import {
   PackageX,
   Radar,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   ShieldHalf,
   Sparkles,
@@ -27,7 +28,8 @@ export type Route =
   | "boost"
   | "console"
   | "ai"
-  | "settings";
+  | "settings"
+  | "security";
 
 const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "dashboard", icon: LayoutDashboard, label: "nav.dashboard" },
@@ -35,6 +37,7 @@ const NAV: { route: Route; icon: LucideIcon; label: I18nKey }[] = [
   { route: "cleanup", icon: Sparkles, label: "nav.cleanup" },
   { route: "apps", icon: PackageX, label: "nav.apps" },
   { route: "network", icon: Radar, label: "nav.network" },
+  { route: "security", icon: ShieldAlert, label: "security.nav" },
   { route: "games", icon: Gamepad2, label: "nav.games" },
   { route: "boost", icon: Gauge, label: "nav.boost" },
   { route: "console", icon: SquareTerminal, label: "nav.console" },
@@ -46,6 +49,7 @@ export function AppShell({
   onNavigate,
   version,
   elevated,
+  badges,
   children,
 }: {
   route: Route;
@@ -53,6 +57,8 @@ export function AppShell({
   version: string;
   /** null until the app info arrives. */
   elevated: boolean | null;
+  /** Small count on a nav icon (new exposure alerts on Segurança). */
+  badges?: Partial<Record<Route, number>>;
   children: ReactNode;
 }) {
   const { t } = useI18n();
@@ -74,6 +80,7 @@ export function AppShell({
               active={route === item.route}
               icon={item.icon}
               label={t(item.label)}
+              badge={badges?.[item.route]}
               onClick={() => onNavigate(item.route)}
             />
           ))}
@@ -124,11 +131,13 @@ function NavButton({
   active,
   icon: Icon,
   label,
+  badge,
   onClick,
 }: {
   active: boolean;
   icon: LucideIcon;
   label: string;
+  badge?: number;
   onClick: () => void;
 }) {
   return (
@@ -149,6 +158,11 @@ function NavButton({
         <span className="absolute -left-2.5 h-6 w-0.5 rounded-full bg-primary" aria-hidden />
       ) : null}
       <Icon className="size-5" strokeWidth={2} />
+      {badge ? (
+        <span className="num absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-background">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      ) : null}
     </button>
   );
 }

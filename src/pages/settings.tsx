@@ -1,4 +1,4 @@
-import { CalendarClock, Gamepad2, Globe, Power, ShieldCheck } from "lucide-react";
+import { CalendarClock, Gamepad2, Globe, Power, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
@@ -179,6 +179,23 @@ export function SettingsPage() {
               {t("settings.ai_web")}
             </CardTitle>
             <p className="text-xs text-muted-foreground">{t("settings.ai_web.body")}</p>
+          </Card>
+          <Card className="animate-rise" style={rise(4)}>
+            <CardTitle
+              help={t("security.settings.monitor.hint")}
+              right={
+                <Switch
+                  checked={!!settings?.exposure_monitor}
+                  disabled={!settings}
+                  onCheckedChange={(v) => save({ exposure_monitor: v })}
+                  aria-label={t("security.settings.monitor")}
+                />
+              }
+            >
+              <ShieldAlert className="size-4" />
+              {t("security.settings.monitor")}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">{t("security.settings.monitor.body")}</p>
           </Card>
         </div>
 

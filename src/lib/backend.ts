@@ -212,6 +212,7 @@ export type Settings = {
   game_mode_games: string[];
   game_mode: GameModeOptions;
   priority_rules: PriorityRule[];
+  exposure_monitor: boolean;
 };
 
 export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";
@@ -699,6 +700,66 @@ export type LeftoverOutcome = {
 };
 export type OrphanApp = { app: AppEntry; count: number; bytes: number };
 
+/* ---- Segurança › Exposição ---- */
+export type ExposureSeverity = "info" | "low" | "medium" | "high";
+export type FwProfile = "domain" | "private" | "public";
+export type ExposureFix =
+  | { kind: "rdp_disable" }
+  | { kind: "nla_enable" }
+  | { kind: "ra_disable" }
+  | { kind: "smb1_server_disable" }
+  | { kind: "firewall_on"; profile: FwProfile }
+  | { kind: "upnp_remove"; protocol: string; external_port: number }
+  | { kind: "winrm_stop" }
+  | { kind: "task_disable"; path: string };
+export type ExposureItem = {
+  name: string;
+  path: string | null;
+  source: string | null;
+  reason: string | null;
+  port: number | null;
+  protocol: "tcp" | "udp" | null;
+  remote: string | null;
+  severity: ExposureSeverity;
+  fix: ExposureFix | null;
+};
+export type ExposureCheckId =
+  | "rdp"
+  | "nla"
+  | "remote_assistance"
+  | "winrm"
+  | "smb1_server"
+  | "smb1_client"
+  | "firewall"
+  | "upnp"
+  | "remote_apps"
+  | "listeners"
+  | "inbound"
+  | "sessions"
+  | "persistence"
+  | "guest"
+  | "antivirus";
+export type ExposureCheck = {
+  id: ExposureCheckId;
+  state: "ok" | "exposed" | "unknown";
+  severity: ExposureSeverity;
+  details: Record<string, string>;
+  items: ExposureItem[];
+  fix: ExposureFix | null;
+};
+export type ExposureReport = {
+  checks: ExposureCheck[];
+  elevated: boolean;
+  reverts: ExposureFix[];
+  took_ms: number;
+};
+export type ExposureAlert = {
+  kind: "listener" | "inbound" | "remote_app" | "upnp";
+  name: string;
+  port: number | null;
+  at: number;
+};
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!inTauri) return null;
   try {
@@ -876,4 +937,11 @@ export const backend = {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as T;
   },
+
+  exposureReport: () => call<ExposureReport>("exposure_report"),
+  exposureFix: (fix: ExposureFix) => callOrThrow<void>("exposure_fix", { fix }),
+  exposureRevert: (fix: ExposureFix) => callOrThrow<void>("exposure_revert", { fix }),
+  exposureReveal: (path: string) => callOrThrow<void>("exposure_reveal", { path }),
+  exposureAlerts: () => call<ExposureAlert[]>("exposure_alerts"),
+  exposureAlertsClear: () => call<void>("exposure_alerts_clear"),
 };
