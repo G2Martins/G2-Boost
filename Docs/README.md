@@ -1,6 +1,6 @@
 # Documentação — G2 Boost
 
-**Última revisão:** 2026-10-22
+**Última revisão:** 2026-10-23
 
 Índice da documentação viva. Porta de entrada do agente: [../CLAUDE.md](../CLAUDE.md). Cada doc
 traz `**Última revisão:**` no topo; ler **antes** de codar e atualizar no **mesmo** PR que muda o
@@ -36,6 +36,7 @@ comportamento.
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [cleanup/system-files.md](./cleanup/system-files.md) | Arquivos do sistema pelos handlers da Limpeza de Disco do Windows (WinSxS, Windows.old, drivers antigos, logs), allowlist e defesa contra handler plantado. |
 | [core/maintenance.md](./core/maintenance.md) | Manutenção: DISM pela DismApi (verificar/reparar imagem), SFC e MRT pela exceção da §1.3, parsers do CBS.log/mrt.log, passos de verificação elevada. |
+| [core/updates.md](./core/updates.md) | Atualizações: apps pelo winget (um pacote validado por vez, nunca `--all`; seleção, exclusões, token amarrado à lista, cancelar, histórico) e Windows Update pela API do Windows (procurar sem admin, instalar com admin, histórico, reiniciar só com confirmação). |
 | [disk/analyzer.md](./disk/analyzer.md) | Varredura, treemap, filtros (`*.mp4 >1gb >6m`), mostrar na pasta, Lixeira com guarda, essenciais grandes. |
 | [network/network.md](./network/network.md) | Monitor (gateway/DNS/jogos), speedtest + bufferbloat, ping Steam, MTR/Ping/TCPing, DNS Optimizer com aplicar/restaurar. |
 | [boost/games.md](./boost/games.md) | Jogos: biblioteca de todos os launchers, Modo Jogo (energia, prioridade, RAM, rotinas; desfaz sozinho), rota até o servidor com análise honesta e Reotimizar. |

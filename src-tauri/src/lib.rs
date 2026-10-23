@@ -24,6 +24,7 @@ use g2boost_core::system::{self, DriveInfo, MemoryStatus};
 use g2boost_core::exposure;
 use g2boost_core::tasksched;
 use g2boost_core::{adlx, nvapi};
+use g2boost_core::updates;
 use g2boost_core::visualfx::Level;
 use g2boost_core::winsat::{self, WinSat};
 use tauri::menu::{Menu, MenuItem};
@@ -2181,6 +2182,108 @@ fn exposure_alerts_clear(app: AppHandle, state: State<'_, ExposureState>) {
     let _ = app.emit("exposure:alerts", Vec::<exposure::Alert>::new());
 }
 
+/* ---------------- updates (winget apps + Windows Update) ---------------- */
+
+/// Apps with a newer version in winget, classified against the user's exclusions.
+#[tauri::command]
+async fn updates_apps(r: State<'_, Routines>) -> Result<Vec<updates::AppUpdate>, String> {
+    let excluded = r.settings.lock().unwrap().update_excluded.clone();
+    tauri::async_runtime::spawn_blocking(move || updates::app_updates(&excluded))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// Leave a package out of "update all" (or put it back); saved in settings.
+#[tauri::command]
+fn updates_exclude(r: State<'_, Routines>, id: String, exclude: bool) -> Result<Vec<String>, String> {
+    let mut s = r.settings.lock().unwrap().clone();
+    s.update_excluded = updates::exclude(&s.update_excluded, &id, exclude).map_err(|e| e.to_string())?;
+    let saved = settings::save(&s).map_err(|e| e.to_string())?;
+    let list = saved.update_excluded.clone();
+    *r.settings.lock().unwrap() = saved;
+    Ok(list)
+}
+
+/// Issued after the UI's confirmation: bound to the exact, ordered package list.
+#[tauri::command]
+fn updates_apps_confirm(ids: Vec<String>) -> Result<ConfirmToken, String> {
+    updates::apps_confirm(&ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn updates_apps_run(app: AppHandle, token: u64, ids: Vec<String>) -> Result<updates::Batch, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        updates::apps_run(token, &ids, |p| {
+            let _ = app.emit("updates:apps", p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
+/// Stop after the package being upgraded now.
+#[tauri::command]
+fn updates_apps_cancel() {
+    updates::apps_cancel();
+}
+
+/// Pending Windows updates; `online` asks Microsoft now, otherwise Windows' last check.
+#[tauri::command]
+async fn updates_wu_search(online: bool) -> Result<updates::WuScan, String> {
+    tauri::async_runtime::spawn_blocking(move || updates::wu_search(online))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// Cancel the Windows Update search, download or install in progress.
+#[tauri::command]
+fn updates_wu_cancel() {
+    updates::wu_cancel();
+}
+
+#[tauri::command]
+fn updates_wu_confirm(ids: Vec<String>) -> Result<ConfirmToken, String> {
+    updates::wu_confirm(&ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn updates_wu_install(app: AppHandle, token: u64, ids: Vec<String>) -> Result<updates::Batch, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        updates::wu_install(token, &ids, move |p| {
+            let _ = app.emit("updates:wu", p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
+}
+
+/// Windows' update history and whether a restart is pending.
+#[tauri::command]
+async fn updates_wu_status() -> Result<updates::WuStatus, String> {
+    tauri::async_runtime::spawn_blocking(|| updates::wu_status(30))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// G2 Boost's own runs (apps and Windows), oldest first.
+#[tauri::command]
+fn updates_history() -> Vec<updates::Batch> {
+    updates::history()
+}
+
+/// Restart now (after the UI's confirmation), only when a restart is pending.
+#[tauri::command]
+async fn updates_reboot() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| updates::restart().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // `G2 Boost.exe --gpu-helper <json>`: one ADLX request in a throwaway process (crash isolation).
@@ -2411,7 +2514,19 @@ pub fn run() {
             exposure_revert,
             exposure_reveal,
             exposure_alerts,
-            exposure_alerts_clear
+            exposure_alerts_clear,
+            updates_apps,
+            updates_exclude,
+            updates_apps_confirm,
+            updates_apps_run,
+            updates_apps_cancel,
+            updates_wu_search,
+            updates_wu_cancel,
+            updates_wu_confirm,
+            updates_wu_install,
+            updates_wu_status,
+            updates_history,
+            updates_reboot
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -818,6 +818,30 @@ threat names). To run them, tell the user to open G2 Boost > Manutenção (admin
         blocking(|| json!({ "status": g2boost_core::repair::status(), "history": g2boost_core::repair::history() }))
             .await
     }
+
+    #[tool(description = "Updates, read-only (takes up to a minute): installed apps with a newer version in \
+winget (id, installed and available version, whether \"update all\" skips it: self, unknown_version or excluded by \
+the user; machine = installed for all users, its installer may ask for admin), pending Windows updates from \
+Windows' last check (title, KB, size, MSRC severity, categories, driver, restart behavior), whether a restart is \
+pending, and the last updates Windows installed (date, KB, result). To install, tell the user to open G2 Boost > \
+Desinstalar apps > Atualizações (confirmation; Windows updates need admin).")]
+    async fn get_updates(&self) -> Result<String, String> {
+        use g2boost_core::updates;
+        blocking(|| {
+            // Windows' local cache answers in seconds; winget runs meanwhile.
+            let windows = std::thread::spawn(|| updates::wu_search(false));
+            let apps = updates::app_updates(&settings::load().update_excluded);
+            let windows = windows.join().unwrap_or(Err(updates::UpdatesError::Busy));
+            let status = updates::wu_status(10);
+            let err = |e: updates::UpdatesError| json!({ "error": e.to_string() });
+            json!({
+                "apps": apps.map_or_else(err, |a| json!(a)),
+                "windows_pending": windows.map_or_else(err, |w| json!(w)),
+                "windows_history": status.map_or_else(err, |s| json!(s)),
+            })
+        })
+        .await
+    }
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]

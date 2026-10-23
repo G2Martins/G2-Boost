@@ -56,6 +56,8 @@ pub struct Settings {
     /// Every normal launch asks UAC once and continues elevated (like game tools that require
     /// administrator). Not for `--mcp` / `--tray`; declining keeps the unelevated copy.
     pub always_admin: bool,
+    /// winget ids the user left out of "update all" (validated on use by `updates::excluded_ids`).
+    pub update_excluded: Vec<String>,
 }
 
 impl Default for Settings {
@@ -80,6 +82,7 @@ impl Default for Settings {
             game_tweaks: BTreeMap::new(),
             exposure_monitor: true,
             always_admin: false,
+            update_excluded: Vec::new(),
         }
     }
 }
@@ -199,6 +202,7 @@ mod tests {
                 "a.exe".into(),
                 "x".repeat(70) + ".exe",
             ],
+            update_excluded: vec![],
         });
         assert_eq!(s.routine_categories, vec!["temp_user".to_string()]);
         assert_eq!(s.game_exes, vec!["cs2.exe".to_string(), "a.exe".to_string()]);

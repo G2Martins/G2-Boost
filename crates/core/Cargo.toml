@@ -75,4 +75,5 @@ features = [
   "Win32_Security_WinTrust",
   "Win32_Security_Cryptography",
   "Win32_Security_Cryptography_Catalog",
+  "Win32_System_UpdateAgent",
 ]
