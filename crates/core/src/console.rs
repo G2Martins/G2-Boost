@@ -59,6 +59,8 @@ const SCREENS: &[(&[&str], &str)] = &[
     (&["luli", "ia", "ai"], "ai"),
     (&["configuracoes", "configurações", "settings"], "settings"),
     (&["gpu", "placa", "video", "vídeo"], "gpu"),
+    (&["manutencao", "manutenção", "maintenance", "reparo"], "maintenance"),
+    (&["seguranca", "segurança", "security", "exposicao", "exposição"], "security"),
 ];
 
 /// A message the UI translates (`console.<key>` with params).

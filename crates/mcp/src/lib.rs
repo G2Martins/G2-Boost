@@ -798,6 +798,26 @@ per GPU. To change them, tell the user to open the GPU screen in the G2 Boost ap
     async fn get_exposure_report(&self) -> Result<String, String> {
         blocking(|| g2boost_core::exposure::redacted(g2boost_core::exposure::report())).await
     }
+
+    #[tool(description = "BIOS guide, read-only: motherboard maker, setup keys, and only the BIOS items worth \
+changing on this PC (XMP/EXPO, Resizable BAR + Above 4G, CSM, Secure Boot, TPM, BIOS update, virtualization) with \
+the menu path for that maker (best effort, names vary by BIOS version). Restarting into the BIOS is done by the \
+user in G2 Boost > Meu PC (admin, confirmation).")]
+    async fn get_bios_guide(&self) -> Result<String, String> {
+        blocking(|| {
+            let p = hardware::profile();
+            firmware::guide(&p, &firmware::read(&p))
+        })
+        .await
+    }
+
+    #[tool(description = "Windows repair status, read-only: which tool is running (DISM scan/restore, SFC, MRT \
+quick/full) with progress, whether MRT is present, and the latest results (verdict, repaired/unrepaired counts, \
+threat names). To run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")]
+    async fn get_maintenance_status(&self) -> Result<String, String> {
+        blocking(|| json!({ "status": g2boost_core::repair::status(), "history": g2boost_core::repair::history() }))
+            .await
+    }
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
