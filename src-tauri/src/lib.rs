@@ -40,6 +40,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 // r9:hw mod
 
 // r9:install mod
+mod install_cmds;
 
 // r9:tools mod
 
@@ -2601,6 +2602,13 @@ pub fn run() {
             // r9:hw
 
             // r9:install
+            install_cmds::install_catalog,
+            install_cmds::install_essentials,
+            install_cmds::install_status,
+            install_cmds::install_confirm,
+            install_cmds::install_run,
+            install_cmds::install_cancel,
+            install_cmds::install_history,
 
             // r9:tools
 
