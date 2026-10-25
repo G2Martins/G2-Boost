@@ -11,6 +11,15 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  // Second page: the in-game overlay window (src/overlay), a small entry without the app shell.
+  build: {
+    rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        overlay: fileURLToPath(new URL("./overlay.html", import.meta.url)),
+      },
+    },
+  },
   // Tauri expects a fixed port and fails if it is not available.
   clearScreen: false,
   server: {

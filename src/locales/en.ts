@@ -2530,6 +2530,80 @@ export const en = {
   // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
 
   // ── r9:overlay · overlay de jogo (agente A7) ──
+  "overlay.subtitle":
+    "Your numbers on top of the game, in a separate window. Nothing goes into the game.",
+  "overlay.test": "Test now",
+  "overlay.hide": "Hide overlay",
+  "overlay.visible": "Overlay on screen",
+  "overlay.preview": "Preview",
+  "overlay.preview.sample": "Example values",
+  "overlay.preview.live": "Live",
+  "overlay.preview.hint":
+    "Click a corner of the preview to move it. In game, the overlay goes to the monitor the game is on.",
+  "overlay.sample.game": "Your game",
+  "overlay.corner.top_left": "Top left corner",
+  "overlay.corner.top_right": "Top right corner",
+  "overlay.corner.bottom_left": "Bottom left corner",
+  "overlay.corner.bottom_right": "Bottom right corner",
+  "overlay.setup": "Set up",
+  "overlay.enabled": "Turn the overlay on",
+  "overlay.enabled.body":
+    "Registers the hotkey and keeps the overlay ready for the game, also while G2 Boost sits in the tray.",
+  "overlay.hotkey": "Hotkey to show and hide",
+  "overlay.hotkey.key": "Hotkey key",
+  "overlay.hotkey.press": "Press {key} in game to show or hide it.",
+  "overlay.hotkey.off": "Turn the overlay on to use {key}.",
+  "overlay.hotkey.hotkey_taken": "Another program already uses this hotkey. Pick another one.",
+  "overlay.hotkey.invalid_hotkey": "This hotkey is not on the safe list. Pick another one.",
+  "overlay.hotkey.error": "Windows did not accept the hotkey ({error}).",
+  "overlay.style": "Style",
+  "overlay.style.bar": "Bar",
+  "overlay.style.list": "List",
+  "overlay.opacity": "Background",
+  "overlay.size": "Size",
+  "overlay.metrics": "What to show",
+  "overlay.metrics.help":
+    "FPS: frames in the last second. Frame time: average of the last second. 1% low: average of the slowest 1% of the frames in the last 10 s, it shows the stutters the average hides.",
+  "overlay.group.perf": "Performance",
+  "overlay.group.cpu": "Processor",
+  "overlay.group.gpu": "Graphics card",
+  "overlay.group.memory": "Memory",
+  "overlay.group.game": "Game",
+  "overlay.metric.fps": "FPS",
+  "overlay.metric.frame_time": "Frame time",
+  "overlay.metric.low1": "1% low",
+  "overlay.metric.cpu_pct": "CPU usage",
+  "overlay.metric.cpu_mhz": "CPU clock",
+  "overlay.metric.cpu_temp": "CPU temperature",
+  "overlay.metric.gpu_pct": "GPU usage",
+  "overlay.metric.gpu_temp": "GPU temperature",
+  "overlay.metric.gpu_mhz": "GPU clock",
+  "overlay.metric.ram": "RAM in use",
+  "overlay.metric.vram": "VRAM in use",
+  "overlay.metric.game": "Game name",
+  "overlay.note.cpu_temp":
+    "The CPU temperature shows up when a sensor program with shared memory is already open: Windows does not expose it without a driver.",
+  "overlay.note.gpu":
+    "GPU temperature and clock only on NVIDIA cards for now. Usage shows on any card.",
+  "overlay.how": "How it works",
+  "overlay.how.windowed":
+    "Works over windowed and borderless fullscreen games. In exclusive fullscreen the game takes the monitor for itself and the overlay does not show.",
+  "overlay.how.anticheat":
+    "Anti-cheat safe: nothing is injected into the game. The overlay is a separate window and the FPS comes from Windows' own event log.",
+  "overlay.how.focus":
+    "The overlay never takes focus or clicks: keyboard and mouse stay in the game.",
+  "overlay.how.admin":
+    "FPS needs G2 Boost opened as administrator, because Windows only hands out these events that way. Without it the overlay shows the rest.",
+  "overlay.how.admin_ok": "Opened as administrator: FPS is available.",
+  "overlay.how.vulkan":
+    "Direct3D games give the most exact count. In Vulkan and OpenGL it comes from the Windows kernel graphics events and is an estimate.",
+  "overlay.hud.fps": "FPS",
+  "overlay.hud.low1": "1% low",
+  "overlay.hud.cpu": "CPU",
+  "overlay.hud.gpu": "GPU",
+  "overlay.hud.ram": "RAM",
+  "overlay.hud.vram": "VRAM",
+  "overlay.hud.needs_admin": "FPS needs administrator",
 
   // ── r9:profiles · perfis, restauração, mouse e teclado (agente A8) ──
 

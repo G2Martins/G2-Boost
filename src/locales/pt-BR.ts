@@ -2536,6 +2536,79 @@ export const ptBR = {
   // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
 
   // ── r9:overlay · overlay de jogo (agente A7) ──
+  "overlay.subtitle": "Seus números por cima do jogo, numa janela à parte. Nada entra no jogo.",
+  "overlay.test": "Testar agora",
+  "overlay.hide": "Esconder overlay",
+  "overlay.visible": "Overlay na tela",
+  "overlay.preview": "Prévia",
+  "overlay.preview.sample": "Valores de exemplo",
+  "overlay.preview.live": "Ao vivo",
+  "overlay.preview.hint":
+    "Clique num canto da prévia para mudar a posição. No jogo, o overlay vai para o monitor onde ele está.",
+  "overlay.sample.game": "Seu jogo",
+  "overlay.corner.top_left": "Canto superior esquerdo",
+  "overlay.corner.top_right": "Canto superior direito",
+  "overlay.corner.bottom_left": "Canto inferior esquerdo",
+  "overlay.corner.bottom_right": "Canto inferior direito",
+  "overlay.setup": "Configurar",
+  "overlay.enabled": "Ligar overlay",
+  "overlay.enabled.body":
+    "Registra o atalho e deixa o overlay pronto para o jogo, inclusive com o G2 Boost na bandeja.",
+  "overlay.hotkey": "Atalho para mostrar e esconder",
+  "overlay.hotkey.key": "Tecla do atalho",
+  "overlay.hotkey.press": "Aperte {key} no jogo para mostrar ou esconder.",
+  "overlay.hotkey.off": "Ligue o overlay para usar {key}.",
+  "overlay.hotkey.hotkey_taken": "Outro programa já usa esse atalho. Escolha outro.",
+  "overlay.hotkey.invalid_hotkey": "Esse atalho não está na lista segura. Escolha outro.",
+  "overlay.hotkey.error": "O Windows não aceitou o atalho ({error}).",
+  "overlay.style": "Estilo",
+  "overlay.style.bar": "Barra",
+  "overlay.style.list": "Lista",
+  "overlay.opacity": "Fundo",
+  "overlay.size": "Tamanho",
+  "overlay.metrics": "O que mostrar",
+  "overlay.metrics.help":
+    "FPS: quadros do último segundo. Tempo de quadro: média do último segundo. 1% low: média dos 1% quadros mais lentos dos últimos 10 s, mostra as travadas que a média esconde.",
+  "overlay.group.perf": "Desempenho",
+  "overlay.group.cpu": "Processador",
+  "overlay.group.gpu": "Placa de vídeo",
+  "overlay.group.memory": "Memória",
+  "overlay.group.game": "Jogo",
+  "overlay.metric.fps": "FPS",
+  "overlay.metric.frame_time": "Tempo de quadro",
+  "overlay.metric.low1": "1% low",
+  "overlay.metric.cpu_pct": "Uso da CPU",
+  "overlay.metric.cpu_mhz": "Clock da CPU",
+  "overlay.metric.cpu_temp": "Temperatura da CPU",
+  "overlay.metric.gpu_pct": "Uso da GPU",
+  "overlay.metric.gpu_temp": "Temperatura da GPU",
+  "overlay.metric.gpu_mhz": "Clock da GPU",
+  "overlay.metric.ram": "RAM em uso",
+  "overlay.metric.vram": "VRAM em uso",
+  "overlay.metric.game": "Nome do jogo",
+  "overlay.note.cpu_temp":
+    "A temperatura da CPU aparece quando um programa de sensores com memória compartilhada já está aberto: o Windows não a mostra sem driver.",
+  "overlay.note.gpu":
+    "Temperatura e clock da GPU por enquanto só em placas NVIDIA. O uso aparece em qualquer placa.",
+  "overlay.how": "Como funciona",
+  "overlay.how.windowed":
+    "Funciona sobre jogos em janela ou em tela cheia sem bordas. Na tela cheia exclusiva o jogo toma o monitor só para ele e o overlay não aparece.",
+  "overlay.how.anticheat":
+    "Seguro com anti-cheat: nada é injetado no jogo. O overlay é uma janela separada e o FPS vem do registro de eventos do próprio Windows.",
+  "overlay.how.focus":
+    "O overlay nunca recebe foco nem cliques: teclado e mouse continuam no jogo.",
+  "overlay.how.admin":
+    "O FPS precisa do G2 Boost aberto como administrador, porque o Windows só entrega esses eventos assim. Sem isso o overlay mostra o resto.",
+  "overlay.how.admin_ok": "Aberto como administrador: o FPS está disponível.",
+  "overlay.how.vulkan":
+    "Jogos em Direct3D dão a contagem mais exata. Em Vulkan e OpenGL ela vem dos eventos gráficos do núcleo do Windows e é uma estimativa.",
+  "overlay.hud.fps": "FPS",
+  "overlay.hud.low1": "1% low",
+  "overlay.hud.cpu": "CPU",
+  "overlay.hud.gpu": "GPU",
+  "overlay.hud.ram": "RAM",
+  "overlay.hud.vram": "VRAM",
+  "overlay.hud.needs_admin": "O FPS precisa de administrador",
 
   // ── r9:profiles · perfis, restauração, mouse e teclado (agente A8) ──
 
