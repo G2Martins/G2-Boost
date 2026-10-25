@@ -1,5 +1,6 @@
 import {
   Activity,
+  BrushCleaning,
   Cpu,
   Gauge as GaugeIcon,
   HardDrive,
@@ -8,29 +9,16 @@ import {
   Network,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdvisorCard } from "@/components/advisor-card";
-import { DiskHealthCard } from "@/components/disk-health";
 import { useErrorText } from "@/components/elevate-button";
-import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { LiveLine } from "@/components/ui/live-line";
-import {
-  Badge,
-  Button,
-  Card,
-  CardTitle,
-  EmptyState,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/primitives";
+import { Badge, Button, Card, CardTitle, EmptyState } from "@/components/ui/primitives";
 import { CLEANUP_CATALOG, categoryKey, TWEAKS, tweakName } from "@/data/catalogs";
 import {
   type AppInfo,
@@ -41,11 +29,9 @@ import {
   type Recommendations,
   type RestoreStatus,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { navigate } from "@/lib/nav";
 import { cn, formatBytes } from "@/lib/utils";
-import { MyPc } from "@/pages/mypc";
 
 const WINDOW = 60;
 const DEFAULT_CLEANUP = CLEANUP_CATALOG.filter((c) => c.defaultOn).map((c) => c.id);
@@ -70,43 +56,9 @@ export function DashboardPage() {
       title={t("dash.title")}
       subtitle={name ? t("dash.subtitle", { name }) : t("dash.subtitle_anon")}
       tabs={
-        <Tabs defaultValue={boot.startTab === "mypc" ? "mypc" : "overview"}>
-          <TabsList>
-            <TabsTrigger value="overview">{t("dash.tab.overview")}</TabsTrigger>
-            <TabsTrigger value="mypc">{t("dash.tab.mypc")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview">
-            <PageBody className="px-0 pb-0">
-              <Overview elevated={info?.elevated ?? false} />
-            </PageBody>
-          </TabsContent>
-          <TabsContent value="mypc">
-            <PageBody className="px-0 pb-0">
-              <LuliCard
-                findings={[
-                  "xmp_off",
-                  "single_channel",
-                  "ram_low",
-                  "vram_low",
-                  "rebar_off",
-                  "gpu_driver_old",
-                  "bios_old",
-                  "legacy_boot",
-                  "secure_boot_off",
-                  "tpm_missing",
-                  "hdd_system",
-                ]}
-                asks={[
-                  { label: "ai.quick.upgrade" },
-                  { label: "luli.ask.mypc.bios" },
-                  { label: "ai.quick.errors" },
-                ]}
-              />
-              <MyPc elevated={info?.elevated ?? false} />
-              <DiskHealthCard elevated={info?.elevated ?? false} />
-            </PageBody>
-          </TabsContent>
-        </Tabs>
+        <PageBody className="px-0 pb-0">
+          <Overview elevated={info?.elevated ?? false} />
+        </PageBody>
       }
     />
   );
@@ -333,7 +285,7 @@ function Overview({ elevated }: { elevated: boolean }) {
           style={rise(1)}
         />
         <KpiCard
-          icon={Sparkles}
+          icon={BrushCleaning}
           label={t("dash.kpi.cleanup")}
           value="—"
           count={inTauri ? cleanupBytes : undefined}

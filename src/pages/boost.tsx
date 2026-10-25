@@ -1,4 +1,5 @@
 import {
+  AudioWaveform,
   Cpu,
   Eraser,
   Gauge as GaugeIcon,
@@ -14,7 +15,6 @@ import {
   Server,
   Shield,
   ShieldCheck,
-  Sparkles,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -83,7 +83,7 @@ const ICONS: Record<string, typeof Zap> = {
   svc_telemetry: Shield,
   power_plan: Plug,
   hags: GaugeIcon,
-  mmcss: Sparkles,
+  mmcss: AudioWaveform,
   network_latency: Network,
   svc_search: Search,
   svc_xbox: Server,

@@ -1,4 +1,4 @@
-import { Activity, Gamepad2, Loader2, Play, Power, Route, Square } from "lucide-react";
+import { Activity, Check, Gamepad2, Loader2, Play, Power, Route, Square, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuliCard } from "@/components/luli-card";
 import { DevicesTab } from "@/components/network/devices-tab";
@@ -636,9 +636,9 @@ function ActivityTable({ result }: { result: SpeedResult | null }) {
     ok === undefined ? (
       <span className="text-muted-foreground">—</span>
     ) : ok ? (
-      <span className="text-success">✓</span>
+      <Check className="size-3.5 text-success" aria-label="ok" />
     ) : (
-      <span className="text-destructive">✕</span>
+      <X className="size-3.5 text-destructive" aria-label="x" />
     );
   return (
     <table className="w-full text-xs">

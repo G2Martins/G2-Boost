@@ -1,4 +1,4 @@
-import { Eye, History, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
+import { BrushCleaning, Eye, History, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SystemFilesPanel } from "@/components/cleanup/system-files";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
@@ -207,7 +207,7 @@ export function CleanupPage() {
               disabled={busy || !previewed || selected.length === 0}
               onClick={() => setPhase("confirm")}
             >
-              <Sparkles className="size-4" />
+              <BrushCleaning className="size-4" />
               {t("cleanup.run")}
             </Button>
           </div>

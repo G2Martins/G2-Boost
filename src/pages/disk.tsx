@@ -1,4 +1,5 @@
 import {
+  BrushCleaning,
   ChevronRight,
   FileWarning,
   FolderOpen,
@@ -7,7 +8,6 @@ import {
   Loader2,
   Play,
   Search,
-  Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
@@ -822,7 +822,7 @@ function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number
                       navigate("cleanup");
                     }}
                   >
-                    <Sparkles className="size-4" />
+                    <BrushCleaning className="size-4" />
                     {t("volcache.from_disk")}
                   </Button>
                 ) : null}

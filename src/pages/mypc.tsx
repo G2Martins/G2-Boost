@@ -2,6 +2,7 @@ import {
   Cpu,
   FileDown,
   Gauge as GaugeIcon,
+  Hammer,
   HardDrive,
   MemoryStick,
   Monitor,
@@ -11,17 +12,32 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BiosGuideCard } from "@/components/bios-guide";
+import { DiskHealthCard } from "@/components/disk-health";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
-import { rise } from "@/components/shell/page-header";
+import { LuliCard } from "@/components/luli-card";
+import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
   Badge,
   Button,
   Card,
   CardTitle,
+  EmptyState,
   LoadingScope,
   MetricRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui/primitives";
-import { backend, type Firmware, inTauri, type Profile, type WinSat } from "@/lib/backend";
+import {
+  type AppInfo,
+  backend,
+  type Firmware,
+  inTauri,
+  type Profile,
+  type WinSat,
+} from "@/lib/backend";
+import { boot } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -491,5 +507,60 @@ export function MyPc({ elevated }: { elevated: boolean }) {
         <BiosGuideCard elevated={elevated} index={7} />
       </div>
     </LoadingScope>
+  );
+}
+
+/** Meu PC route: the hardware sheet (+ disk health) and the Check-up. */
+export function MyPcPage() {
+  const { t } = useI18n();
+  const [info, setInfo] = useState<AppInfo | null>(null);
+  useEffect(() => {
+    backend.appInfo().then(setInfo);
+  }, []);
+  const elevated = info?.elevated ?? false;
+  return (
+    <PageHeader
+      title={t("nav.mypc")}
+      subtitle={t("mypc.subtitle")}
+      tabs={
+        <Tabs defaultValue={boot.startTab === "checkup" ? "checkup" : "overview"}>
+          <TabsList>
+            <TabsTrigger value="overview">{t("dash.tab.overview")}</TabsTrigger>
+            <TabsTrigger value="checkup">{t("mypc.tab.checkup")}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview">
+            <PageBody className="px-0 pb-0">
+              <LuliCard
+                findings={[
+                  "xmp_off",
+                  "single_channel",
+                  "ram_low",
+                  "vram_low",
+                  "rebar_off",
+                  "gpu_driver_old",
+                  "bios_old",
+                  "legacy_boot",
+                  "secure_boot_off",
+                  "tpm_missing",
+                  "hdd_system",
+                ]}
+                asks={[
+                  { label: "ai.quick.upgrade" },
+                  { label: "luli.ask.mypc.bios" },
+                  { label: "ai.quick.errors" },
+                ]}
+              />
+              <MyPc elevated={elevated} />
+              <DiskHealthCard elevated={elevated} />
+            </PageBody>
+          </TabsContent>
+          <TabsContent value="checkup">
+            <PageBody className="px-0 pb-0">
+              <EmptyState icon={<Hammer className="size-5" />} title={t("nav.soon")} />
+            </PageBody>
+          </TabsContent>
+        </Tabs>
+      }
+    />
   );
 }

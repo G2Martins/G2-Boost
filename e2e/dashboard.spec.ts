@@ -8,7 +8,8 @@ test("dashboard renders KPIs and the live monitor", async ({ page }) => {
   await expect(page.getByText("0%")).toHaveCount(0);
 });
 
-test("dashboard My PC tab renders", async ({ page }) => {
-  await open(page, "dashboard", t["dash.title"], "mypc");
-  await expect(page.getByRole("tab", { name: t["dash.tab.mypc"] })).toHaveAttribute("data-state", "active");
+test("My PC page renders with its tabs", async ({ page }) => {
+  await open(page, "mypc", t["nav.mypc"]);
+  await expect(page.getByRole("tab", { name: t["dash.tab.overview"] })).toHaveAttribute("data-state", "active");
+  await expect(page.getByRole("tab", { name: t["mypc.tab.checkup"] })).toBeVisible();
 });

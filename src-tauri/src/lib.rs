@@ -32,7 +32,11 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
-const ROUTES: &[&str] = &["dashboard", "disk", "cleanup", "apps", "network", "games", "boost", "console", "ai", "settings", "maintenance", "gpu", "security"];
+const ROUTES: &[&str] = &[
+    "dashboard", "mypc", "hwmonitor", "maintenance", "security", "setup", "debloat", "boost", "peripherals", "profiles",
+    "gpu", "games", "apps", "cleanup", "disk", "network", "overlay", "mousetest", "monitortest", "packetloss", "console",
+    "ai", "settings",
+];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
 /// the `G2BOOST_START_ROUTE` env var (dev/screenshot aid).
@@ -2568,7 +2572,23 @@ pub fn run() {
             net_dhcp_adapters,
             net_renew,
             net_flush_dns,
-            net_open_reset
+            net_open_reset,
+            // r9:games
+
+            // r9:tweaks
+
+            // r9:maint
+
+            // r9:hw
+
+            // r9:install
+
+            // r9:tools
+
+            // r9:overlay
+
+            // r9:setup
+
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

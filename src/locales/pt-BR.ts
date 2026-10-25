@@ -7,11 +7,30 @@ export const ptBR = {
   "app.version": "v{version}",
 
   "nav.dashboard": "Painel",
+  "nav.group.main": "Principal",
+  "nav.group.optimize": "Otimizar",
+  "nav.group.tools": "Ferramentas",
+  "nav.group.system": "Sistema",
+  "nav.mypc": "Meu PC",
+  "nav.hwmonitor": "Monitor de hardware",
+  "nav.setup": "Pós-formatação",
+  "nav.debloat": "Debloat",
+  "nav.peripherals": "Mouse e teclado",
+  "nav.profiles": "Perfis e restauração",
+  "nav.overlay": "Overlay de jogo",
+  "nav.mousetest": "Teste do mouse",
+  "nav.monitortest": "Teste de monitor",
+  "nav.packetloss": "Perda de pacotes",
+  "nav.collapse": "Recolher menu",
+  "nav.expand": "Expandir menu",
+  "nav.soon": "Em construção nesta versão.",
+  "mypc.subtitle": "Tudo sobre o hardware deste PC, lido direto do Windows.",
+  "mypc.tab.checkup": "Check-up",
+  "common.close": "Fechar",
   "dash.title": "Painel",
   "dash.subtitle": "Olá, {name}! Pronto pra deixar o PC mais rápido?",
   "dash.subtitle_anon": "Pronto pra deixar o PC mais rápido?",
   "dash.tab.overview": "Visão geral",
-  "dash.tab.mypc": "Meu PC",
   "health.title": "Saúde dos discos",
   "health.help":
     "O relatório que cada disco guarda sobre si mesmo (NVMe e S.M.A.R.T.). O G2 Boost guarda uma leitura por dia e avisa quando algo piora.",
@@ -848,7 +867,7 @@ export const ptBR = {
     "Um SSD NVMe para o sistema e os jogos é o upgrade com melhor retorno aqui.",
   "nav.disk": "Analisador de disco",
   "nav.cleanup": "Limpeza",
-  "nav.apps": "Desinstalar apps",
+  "nav.apps": "Apps",
   "nav.network": "Analisador de rede",
   "nav.boost": "PC Boost",
   "nav.settings": "Configurações",
@@ -2503,4 +2522,20 @@ export const ptBR = {
     "Reinstala os adaptadores e volta a rede ao padrão de fábrica do Windows. Apaga Wi-Fi salvo e VPNs, e pede reinício. Fica na página do próprio Windows.",
   "maint2.net.reset.button": "Abrir no Windows",
   "maint2.net.reset.opened": "Página aberta. Procure Redefinição de rede.",
+
+  // ── r9:games · jogos: capas, preparar e jogar (agente A1) ──
+
+  // ── r9:tweaks · ajustes, debloat, perfis, restauração, mouse e teclado (agente A2) ──
+
+  // ── r9:maint · manutenção+, antivírus (agente A3) ──
+
+  // ── r9:hw · monitor de hardware, check-up (agente A4) ──
+
+  // ── r9:install · instalar apps (agente A5) ──
+
+  // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
+
+  // ── r9:overlay · overlay de jogo (agente A7) ──
+
+  // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
 } as const;

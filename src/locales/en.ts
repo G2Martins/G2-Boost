@@ -10,11 +10,30 @@ export const en = {
   "app.version": "v{version}",
 
   "nav.dashboard": "Dashboard",
+  "nav.group.main": "Main",
+  "nav.group.optimize": "Optimize",
+  "nav.group.tools": "Tools",
+  "nav.group.system": "System",
+  "nav.mypc": "My PC",
+  "nav.hwmonitor": "Hardware monitor",
+  "nav.setup": "Fresh install setup",
+  "nav.debloat": "Debloat",
+  "nav.peripherals": "Mouse and keyboard",
+  "nav.profiles": "Profiles and restore",
+  "nav.overlay": "Game overlay",
+  "nav.mousetest": "Mouse test",
+  "nav.monitortest": "Monitor test",
+  "nav.packetloss": "Packet loss",
+  "nav.collapse": "Collapse menu",
+  "nav.expand": "Expand menu",
+  "nav.soon": "Being built in this version.",
+  "mypc.subtitle": "Everything about this PC's hardware, read straight from Windows.",
+  "mypc.tab.checkup": "Check-up",
+  "common.close": "Close",
   "dash.title": "Dashboard",
   "dash.subtitle": "Hi, {name}! Ready to make this PC faster?",
   "dash.subtitle_anon": "Ready to make this PC faster?",
   "dash.tab.overview": "Overview",
-  "dash.tab.mypc": "My PC",
   "health.title": "Drive health",
   "health.help":
     "The report each drive keeps about itself (NVMe and S.M.A.R.T.). G2 Boost keeps one reading a day and warns when something gets worse.",
@@ -845,7 +864,7 @@ export const en = {
     "An NVMe SSD for the system and games is the best-value upgrade here.",
   "nav.disk": "Disk analyzer",
   "nav.cleanup": "Cleanup",
-  "nav.apps": "Uninstall apps",
+  "nav.apps": "Apps",
   "nav.network": "Network analyzer",
   "nav.boost": "PC Boost",
   "nav.settings": "Settings",
@@ -2498,4 +2517,19 @@ export const en = {
     "Reinstalls the adapters and puts networking back to Windows defaults. Removes saved Wi-Fi and VPNs, and asks for a restart. Lives on Windows' own page.",
   "maint2.net.reset.button": "Open in Windows",
   "maint2.net.reset.opened": "Page opened. Look for Network reset.",
+  // ── r9:games · jogos: capas, preparar e jogar (agente A1) ──
+
+  // ── r9:tweaks · ajustes, debloat, perfis, restauração, mouse e teclado (agente A2) ──
+
+  // ── r9:maint · manutenção+, antivírus (agente A3) ──
+
+  // ── r9:hw · monitor de hardware, check-up (agente A4) ──
+
+  // ── r9:install · instalar apps (agente A5) ──
+
+  // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
+
+  // ── r9:overlay · overlay de jogo (agente A7) ──
+
+  // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
 } as const satisfies Record<keyof typeof ptBR, string>;

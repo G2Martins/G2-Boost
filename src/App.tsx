@@ -1,8 +1,9 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { X } from "lucide-react";
+import { LucideProvider, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell, type Route } from "@/components/shell/app-shell";
 import { Button, TooltipProvider } from "@/components/ui/primitives";
+import { Toaster } from "@/components/ui/toast";
 import { backend, inTauri } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider, useI18n } from "@/lib/i18n";
@@ -14,13 +15,23 @@ import { BoostPage } from "@/pages/boost";
 import { CleanupPage } from "@/pages/cleanup";
 import { ConsolePage } from "@/pages/console";
 import { DashboardPage } from "@/pages/dashboard";
+import { DebloatPage } from "@/pages/debloat";
 import { DiskPage } from "@/pages/disk";
 import { GamesPage } from "@/pages/games";
 import { GpuPage } from "@/pages/gpu";
+import { HwMonitorPage } from "@/pages/hwmonitor";
 import { MaintenancePage } from "@/pages/maintenance";
+import { MonitorTestPage } from "@/pages/monitortest";
+import { MouseTestPage } from "@/pages/mousetest";
+import { MyPcPage } from "@/pages/mypc";
 import { NetworkPage } from "@/pages/network";
+import { OverlayPage } from "@/pages/overlay";
+import { PacketLossPage } from "@/pages/packetloss";
+import { PeripheralsPage } from "@/pages/peripherals";
+import { ProfilesPage } from "@/pages/profiles";
 import { SecurityPage } from "@/pages/security";
 import { SettingsPage } from "@/pages/settings";
+import { SetupPage } from "@/pages/setup";
 
 const PAGES: Record<Route, () => React.JSX.Element> = {
   dashboard: DashboardPage,
@@ -36,6 +47,16 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   maintenance: MaintenancePage,
   gpu: GpuPage,
   security: SecurityPage,
+  mypc: MyPcPage,
+  hwmonitor: HwMonitorPage,
+  setup: SetupPage,
+  debloat: DebloatPage,
+  peripherals: PeripheralsPage,
+  profiles: ProfilesPage,
+  overlay: OverlayPage,
+  mousetest: MouseTestPage,
+  monitortest: MonitorTestPage,
+  packetloss: PacketLossPage,
 };
 
 const isRoute = (r: string | null | undefined): r is Route => !!r && r in PAGES;
@@ -74,13 +95,20 @@ export default function App() {
   const [elevated, setElevated] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    // Pointer halo: one listener for the whole app; `.halo` cards only read --mx/--my.
+    // Pointer halo/glare: one listener for the whole app; `.halo` cards and `.poster` covers only
+    // read --mx/--my (posters also lean toward the pointer: --rx/--ry, used under a fine pointer).
     const move = (e: PointerEvent) => {
-      const el = (e.target as Element | null)?.closest?.<HTMLElement>(".halo");
+      const el = (e.target as Element | null)?.closest?.<HTMLElement>(".halo, .poster");
       if (!el) return;
       const r = el.getBoundingClientRect();
-      el.style.setProperty("--mx", `${e.clientX - r.left}px`);
-      el.style.setProperty("--my", `${e.clientY - r.top}px`);
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      el.style.setProperty("--mx", `${x}px`);
+      el.style.setProperty("--my", `${y}px`);
+      if (el.classList.contains("poster")) {
+        el.style.setProperty("--ry", `${((x / r.width - 0.5) * 9).toFixed(2)}deg`);
+        el.style.setProperty("--rx", `${((0.5 - y / r.height) * 9).toFixed(2)}deg`);
+      }
     };
     document.addEventListener("pointermove", move, { passive: true });
     return () => document.removeEventListener("pointermove", move);
@@ -140,33 +168,41 @@ export default function App() {
     <I18nProvider>
       <LuliProvider>
         <TooltipProvider>
-          <AppShell
-            route={route}
-            onNavigate={setRoute}
-            version={version}
-            elevated={elevated}
-            badges={{ security: exposureAlerts }}
-          >
-            {removed ? (
-              <RemovedBanner
-                name={removed}
-                onOpen={() => {
-                  setRemoved(null);
-                  openOrphans();
-                  setRoute("apps");
-                }}
-                onClose={() => setRemoved(null)}
-              />
-            ) : null}
-            {ready ? (
-              // Only the content area enters (200 ms, 4 px); the shell stays still.
-              <div key={route} className="route-enter min-h-full">
-                <Page />
-              </div>
-            ) : null}
-          </AppShell>
+          <LucideProvider strokeWidth={1.5}>
+            <AppShell
+              route={route}
+              onNavigate={setRoute}
+              version={version}
+              elevated={elevated}
+              badges={{ security: exposureAlerts }}
+            >
+              {removed ? (
+                <RemovedBanner
+                  name={removed}
+                  onOpen={() => {
+                    setRemoved(null);
+                    openOrphans();
+                    setRoute("apps");
+                  }}
+                  onClose={() => setRemoved(null)}
+                />
+              ) : null}
+              {ready ? (
+                // Only the content area enters (200 ms, 4 px); the shell stays still.
+                <div key={route} className="route-enter min-h-full">
+                  <Page />
+                </div>
+              ) : null}
+            </AppShell>
+            <ToasterI18n />
+          </LucideProvider>
         </TooltipProvider>
       </LuliProvider>
     </I18nProvider>
   );
+}
+
+function ToasterI18n() {
+  const { t } = useI18n();
+  return <Toaster closeLabel={t("common.close")} />;
 }

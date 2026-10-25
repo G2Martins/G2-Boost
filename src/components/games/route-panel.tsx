@@ -1,4 +1,13 @@
-import { Home, Loader2, Route as RouteIcon, Server, User, Wand2 } from "lucide-react";
+import {
+  Check as CheckIcon,
+  Home,
+  Loader2,
+  Route as RouteIcon,
+  Server,
+  TriangleAlert,
+  User,
+  Wand2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardTitle } from "@/components/ui/primitives";
 import { backend, type GameEntry, inTauri } from "@/lib/backend";
@@ -316,7 +325,13 @@ export function RoutePanel({ game }: { game: GameEntry }) {
               <ul className="mt-3 space-y-1.5">
                 {checks.map((c) => (
                   <li key={c.key} className="flex flex-wrap items-center gap-2 text-xs">
-                    <Badge tone={c.ok ? "success" : "warning"}>{c.ok ? "OK" : "!"}</Badge>
+                    <Badge tone={c.ok ? "success" : "warning"}>
+                      {c.ok ? (
+                        <CheckIcon className="size-3" />
+                      ) : (
+                        <TriangleAlert className="size-3" />
+                      )}
+                    </Badge>
                     <span className="min-w-0 flex-1">{t(c.key, c.vars)}</span>
                     {c.go ? (
                       <Button size="sm" variant="ghost" onClick={() => navigate(c.go ?? "network")}>

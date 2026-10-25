@@ -1,4 +1,4 @@
-import { Cpu, FlaskConical, Loader2, MonitorCog, RefreshCw, Sparkles, Undo2 } from "lucide-react";
+import { Cpu, FlaskConical, ListChecks, Loader2, MonitorCog, RefreshCw, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
@@ -360,7 +360,7 @@ function NvProfilePanel({ game }: { game: string | null }) {
               title={view && pending.length === 0 ? t("gpu.recommended.none") : undefined}
               onClick={() => setConfirm(true)}
             >
-              <Sparkles className="size-4" />
+              <ListChecks className="size-4" />
               {t("gpu.recommended.apply")}
             </Button>
           </div>
@@ -668,7 +668,7 @@ function AmdSection() {
               title={pending(g).length === 0 ? t("gpu.recommended.none") : undefined}
               onClick={() => setConfirm(g)}
             >
-              <Sparkles className="size-4" />
+              <ListChecks className="size-4" />
               {t("gpu.recommended.apply")}
             </Button>
           </header>

@@ -16,9 +16,16 @@ export function PageHeader({
   return (
     <div className="banner relative min-h-full overflow-hidden px-6 pt-7 pb-6">
       <div className="relative flex items-end justify-between gap-6">
-        <div className="animate-rise">
-          <h1 className="font-display text-[22px] font-semibold tracking-wide">{title}</h1>
-          {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
+        <div>
+          <h1 className="title-rise font-display text-[22px] font-semibold tracking-wide">
+            {title}
+          </h1>
+          {subtitle ? (
+            <p className="animate-rise mt-1 text-xs text-muted-foreground" style={rise(1)}>
+              {subtitle}
+            </p>
+          ) : null}
+          <div className="title-rule" aria-hidden />
         </div>
         {actions ? <div className="relative mb-1">{actions}</div> : null}
       </div>

@@ -41,7 +41,7 @@ export function KpiCard({
       style={style}
     >
       <header className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-        <Icon className="size-4 text-primary" strokeWidth={2} />
+        <Icon className="size-4 text-primary" />
         {label}
       </header>
       <div

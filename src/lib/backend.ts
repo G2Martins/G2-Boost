@@ -1073,6 +1073,21 @@ export const backend = {
   netRenew: (index: number) => callOrThrow<string | null>("net_renew", { index }),
   netFlushDns: () => callOrThrow<void>("net_flush_dns"),
   netOpenReset: () => callOrThrow<void>("net_open_reset"),
+  // r9:games
+
+  // r9:tweaks
+
+  // r9:maint
+
+  // r9:hw
+
+  // r9:install
+
+  // r9:tools
+
+  // r9:overlay
+
+  // r9:setup
 };
 
 export type VolumeOp = "scan" | "spot_fix" | "analyze" | "retrim" | "defrag";
@@ -1225,3 +1240,19 @@ export type WuProgress = {
   current: number;
   total: number;
 };
+
+// ── r9:games types ──
+
+// ── r9:tweaks types ──
+
+// ── r9:maint types ──
+
+// ── r9:hw types ──
+
+// ── r9:install types ──
+
+// ── r9:tools types ──
+
+// ── r9:overlay types ──
+
+// ── r9:setup types ──

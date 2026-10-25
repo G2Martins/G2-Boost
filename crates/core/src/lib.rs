@@ -62,6 +62,22 @@ pub mod exposure;
 pub mod updates;
 pub mod volumes;
 pub mod netrepair;
+// r9:games
+
+// r9:tweaks
+
+// r9:maint
+
+// r9:hw
+
+// r9:install
+
+// r9:tools
+
+// r9:overlay
+
+// r9:setup
+
 
 /// Crate version, surfaced in the UI "about" footer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

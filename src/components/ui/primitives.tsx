@@ -1,14 +1,16 @@
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { CircleHelp, X } from "lucide-react";
+import { Check, CircleHelp, TriangleAlert, X } from "lucide-react";
 import {
   type ComponentProps,
+  type CSSProperties,
   createContext,
   type ReactNode,
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
 } from "react";
 import { reducedMotion } from "@/components/ui/count-up";
@@ -19,19 +21,29 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "outline" | "danger";
 export function Button({
   variant = "secondary",
   size = "md",
+  tactile,
   className,
   ...props
-}: ComponentProps<"button"> & { variant?: ButtonVariant; size?: "sm" | "md" | "lg" }) {
+}: ComponentProps<"button"> & {
+  variant?: ButtonVariant;
+  size?: "sm" | "md" | "lg";
+  /** The page's one hero CTA (primary only): sits on a base and sinks when pressed. */
+  tactile?: boolean;
+}) {
+  const raised = tactile && variant === "primary";
   return (
     <button
       type="button"
       className={cn(
-        "press inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-[background-color,border-color,color,filter,translate] duration-200 ease-out-expo disabled:pointer-events-none disabled:opacity-40",
+        "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-[background-color,border-color,color,filter,translate] duration-200 ease-out-expo disabled:pointer-events-none disabled:opacity-40",
+        raised ? "tactile" : "press",
         size === "sm" && "h-8 px-3 text-xs",
         size === "md" && "h-10 px-4 text-[13px]",
         size === "lg" && "h-11 px-5 text-sm",
+        variant === "primary" && "bg-primary text-primary-foreground hover:brightness-110",
         variant === "primary" &&
-          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18),0_0_0_1px_hsl(var(--primary)/0.5)] hover:brightness-110",
+          !raised &&
+          "shadow-[inset_0_1px_0_hsl(0_0%_100%/0.18),0_0_0_1px_hsl(var(--primary)/0.5)]",
         variant === "secondary" && "bg-foreground/7 text-foreground hover:bg-foreground/11",
         variant === "danger" &&
           "bg-destructive text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.16)] hover:brightness-110",
@@ -87,7 +99,7 @@ export function HelpHint({ text }: { text: string }) {
           aria-label={text}
           className="inline-flex size-4 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:text-foreground"
         >
-          <CircleHelp className="size-4" strokeWidth={2} />
+          <CircleHelp className="size-4" />
         </button>
       </TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
@@ -109,12 +121,45 @@ export const TooltipProvider = TooltipPrimitive.Provider;
 export const Tabs = TabsPrimitive.Root;
 export const TabsContent = TabsPrimitive.Content;
 
-export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
+export function TabsList({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof TabsPrimitive.List>) {
+  // One ink line glides under whichever tab is active (measured; re-placed on resize/switch).
+  const listRef = useRef<HTMLDivElement>(null);
+  const inkRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const ink = inkRef.current;
+    if (!list || !ink) return;
+    const place = () => {
+      const active = list.querySelector<HTMLElement>('[role="tab"][data-state="active"]');
+      ink.style.opacity = active ? "1" : "0";
+      if (!active) return;
+      ink.style.width = `${active.offsetWidth}px`;
+      ink.style.translate = `${active.offsetLeft}px 0`;
+      if (!ink.dataset.ready) requestAnimationFrame(() => (ink.dataset.ready = "1"));
+    };
+    place();
+    const mo = new MutationObserver(place);
+    mo.observe(list, { subtree: true, attributes: true, attributeFilter: ["data-state"] });
+    const ro = new ResizeObserver(place);
+    ro.observe(list);
+    return () => {
+      mo.disconnect();
+      ro.disconnect();
+    };
+  }, []);
   return (
     <TabsPrimitive.List
-      className={cn("flex items-end gap-1 border-b border-border", className)}
+      ref={listRef}
+      className={cn("relative flex items-end gap-1 border-b border-border", className)}
       {...props}
-    />
+    >
+      {children}
+      <span ref={inkRef} aria-hidden className="tab-ink" />
+    </TabsPrimitive.List>
   );
 }
 
@@ -122,11 +167,42 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "press -mb-px rounded-t-md border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors duration-200 ease-out-expo hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-black/30 data-[state=active]:text-foreground",
+        "press -mb-px rounded-t-md px-4 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors duration-200 ease-out-expo hover:text-foreground data-[state=active]:bg-black/30 data-[state=active]:text-foreground",
         className,
       )}
       {...props}
     />
+  );
+}
+
+/* ---------- Meter (lit-tip bar; value 0..1) ---------- */
+export type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
+export function Meter({
+  value,
+  tone = "accent",
+  className,
+  label,
+}: {
+  value: number;
+  tone?: Tone;
+  className?: string;
+  /** Accessible name (e.g. "RAM 62%"). */
+  label?: string;
+}) {
+  const v = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a native <meter> cannot take the lit-tip styling; the ARIA meter role reads the same
+    <div
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(v * 100)}
+      className={cn("meter", `tone-${tone}`, className)}
+      style={{ "--v": v } as CSSProperties}
+    >
+      <span />
+    </div>
   );
 }
 
@@ -305,11 +381,15 @@ export function MetricRow({ label, value, ok }: { label: string; value: string; 
           <span
             aria-hidden
             className={cn(
-              "inline-flex size-4 items-center justify-center rounded-full text-[10px] font-bold",
+              "inline-flex size-4 items-center justify-center rounded-full",
               ok ? "bg-success text-background" : "bg-destructive text-background",
             )}
           >
-            {ok ? "✓" : "!"}
+            {ok ? (
+              <Check className="size-3" strokeWidth={3} />
+            ) : (
+              <TriangleAlert className="size-2.5" strokeWidth={3} />
+            )}
           </span>
         )}
       </span>
