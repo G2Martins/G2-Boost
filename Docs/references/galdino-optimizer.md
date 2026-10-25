@@ -1,6 +1,6 @@
-# Galdino Optimizer — o que extrair (story de 2026-10-14)
+# Galdino Optimizer / Galdino Control: o que extrair
 
-**Última revisão:** 2026-10-15 · Fonte: story do Instagram `galdino.tech` ("Só falta patentear — tudo que precisa em um único app — muita loja de informática vai usar"), foto do app rodando em Win11 IoT Enterprise LTSC 2024 (24H2, build 26100), Ryzen 7 9800X3D + RTX 5080. Parte da sidebar "Otimizar" estava tapada ("Tapei pra não copiarem"). Clean-room: aqui só a **ideia** de cada tela e a API nativa que entrega o mesmo dado; nada de assets, textos ou código dele.
+**Última revisão:** 2026-10-25 (§6: Galdino Control v2.2.1, rodada 9) · 2026-10-15 · Fonte: story do Instagram `galdino.tech` ("Só falta patentear — tudo que precisa em um único app — muita loja de informática vai usar"), foto do app rodando em Win11 IoT Enterprise LTSC 2024 (24H2, build 26100), Ryzen 7 9800X3D + RTX 5080. Parte da sidebar "Otimizar" estava tapada ("Tapei pra não copiarem"). Clean-room: aqui só a **ideia** de cada tela e a API nativa que entrega o mesmo dado; nada de assets, textos ou código dele.
 
 ## 1. O que aparece na tela
 
@@ -63,3 +63,27 @@ Fora: temperatura de CPU (driver), overlay (backlog), Policies.
 - **Galdino Optimizer** — só se houver build pública/legal; o que interessa é a lista de chaves de registro e serviços (strings), não a UI. Respeitar a licença; se proibir engenharia reversa, ficar nas strings e no comportamento observável (Process Monitor).
 - **Não precisa baixar** (código aberto, ler o fonte): Chris Titus **WinUtil** (`config/tweaks.json`), **Win11Debloat**, **Sophia Script**, **hellzerg/Optimizer** (C#, catálogo grande), **LibreHardwareMonitor** (mostra por que temperatura exige driver).
 - Fechados que só valem pela lista pública de opções: **O&O ShutUp10++** (privacidade), **Winaero Tweaker**. Sensores: **HWiNFO** (driver próprio — referência do que **não** vamos fazer).
+
+## 6. Galdino Control v2.2.1 (2026-10-25, rodada 9)
+
+Fontes: 10 prints do dono, landing `galdinocontrol.com.br` (texto, FAQ, 3 gravações WebP das telas) e release notes públicas do fornecedor (out/2026). Clean-room: só a ideia de cada tela. Binário não analisado.
+
+**Menus.** Principal: Painel, Manutenção, Desempenho, Meu PC, Hardware Monitor. Otimizar: Formatação, Debloat (54 itens), Windows (101 cartões), Mouse, Teclado, GPU, Perfis, Jogos, Instalar apps (236 via winget), Limpeza (11 categorias, inclui Prefetch), Inicialização. Ferramentas: Overlay de jogo, Teste do mouse, Teste de monitor, Teste de velocidade, Perda de pacotes, Defender e IA, Check-up, Restauração. Anuncia 170 ajustes, 60 recomendados.
+
+**Detalhes que importam.** Overlay = janela separada, FPS "lido pelo Windows" (admin), atalho F7, métricas FPS / tempo de quadro / 1% low / CPU / GPU / RAM / VRAM; CPU °C via PawnIO opcional. Perfis: "Básico", "Sem IA", "Padrão do Windows" + personalizados (aplicar, editar, exportar, excluir). Formatação: apps em 1 clique + Boost + Debloat + extras (visualizador de fotos clássico, remover OneDrive) + "contas novas". Defender e IA: liberar o próprio app no antivírus (Defender: só versão instalada; outros: copiar caminho) + "remover toda a IA do Windows" por política. Check-up: 22 medições contra limite. FAQ: cada ajuste mostra o comando, desfaz um a um ou tudo na Restauração, ponto de restauração antes de lote; sem injeção e sem driver próprio; requisitos Win10 1809+/Win11 x64. Preço: R$ 17/mês ou R$ 129,90/ano, 1 PC. Indício de PowerShell por baixo (aviso quando o PowerShell falta).
+
+**Mapeamento para o G2 Boost.**
+
+| Item dele | G2 Boost | Rodada 9 |
+|---|---|---|
+| Painel, Meu PC, Manutenção (DISM/SFC/CHKDSK), Limpeza, Inicialização, GPU, velocidade, ajustes por jogo | já existia (limpeza com 33 categorias, sem Prefetch) | painel ganha chip de pendentes, velocímetro, card pós-formatação |
+| Debloat + IA do Windows | 29 ajustes, poucos de debloat | página Debloat, ~30 ajustes novos, apps de brinde |
+| Windows (filtros, busca, salvar perfil) | cartões sem filtro | busca, filtros, "Ver o que muda", Perfis e restauração |
+| Mouse, Teclado | 2 ajustes | página Mouse e teclado |
+| Hardware Monitor, Check-up | monitor agregado no painel | árvore de sensores + check-up |
+| Instalar apps, Formatação | atualizações em lote via winget | catálogo curado + assistente pós-formatação |
+| Overlay, testes de mouse/monitor, perda de pacotes | backlog / parcial na Rede | entram |
+| Liberar no antivírus | não | detectar o antivírus; Defender automático com confirmação só com exe em pasta protegida; guia por fabricante |
+| PawnIO, Prefetch, "Windows Update só avisa", contas novas | recusados | continuam fora |
+
+**Só o G2 Boost tem:** analisador de disco, rede completa (MTR, DNS, rota até o servidor, dispositivos, uso por app, Wi-Fi), Segurança (exposição), desinstalador com sobras, atualizações winget + Windows Update, Luli + MCP, Console, rotinas, tudo nativo sem PowerShell.

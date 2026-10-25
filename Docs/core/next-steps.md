@@ -1,6 +1,6 @@
 # Roadmap — fases e backlog
 
-**Última revisão:** 2026-10-23 (rodada 8: atualizações de apps e do Windows, Manutenção+, sempre abrir como administrador, monitor, auditoria ponytail) · 2026-10-22 (rodada 7 planejada: BIOS, ajustes por jogo, limpeza do sistema + reparo, auditoria de exposição, configurações 3D do driver) · 2026-10-19 (rodada 6 fechada com testes ponta a ponta, só Wi-Fi sem hardware para testar; assinatura/SmartScreen e PawnIO/driver próprio fora do roadmap por decisão do dono)
+**Última revisão:** 2026-10-25 (rodada 9: paridade com o concorrente mapeado, capas dos jogos, overlay, debloat, instalar apps, release público) · 2026-10-23 (rodada 8: atualizações de apps e do Windows, Manutenção+, sempre abrir como administrador, monitor, auditoria ponytail) · 2026-10-22 (rodada 7 planejada: BIOS, ajustes por jogo, limpeza do sistema + reparo, auditoria de exposição, configurações 3D do driver) · 2026-10-19 (rodada 6 fechada com testes ponta a ponta, só Wi-Fi sem hardware para testar; assinatura/SmartScreen e PawnIO/driver próprio fora do roadmap por decisão do dono)
 
 **Estado:** Fases 0 ✅, 1 (núcleo) ✅, 3 (núcleo) ✅ em 2026-10-14; **Fases 4 (Boost), 2 (Limpeza), 5 (Rotinas) e 6 (Painel/Meu PC/Monitor) ✅ em 2026-10-15** (verificação com admin pendente pelo dono). **6.5 Meu PC completo ✅** (CPU-Z/Speccy user-mode + WinSAT + relatório). **9 IA + MCP ✅** (conselheiro local, assistente no app com 3 provedores, `g2boost-mcp.exe` só leitura). **2026-10-16:** disco (filtros, Lixeira, mostrar na pasta, essenciais) ✅, rede (TCPing, gateway, DNS Optimizer) ✅, BIOS/firmware + sensores externos ✅, inicialização + processos ✅, IA endurecida ✅, licença/READMEs/avisos de terceiros ✅, MCP no próprio exe (`--mcp`) ✅, instalador NSIS com licença ✅ (sem assinatura). Próximas: **rodada 6** (abaixo), MFT. Planejamento GSD em `.planning/`.
 
@@ -17,6 +17,27 @@ Ordem pensada pela dor: o C: do dono está com 40 GB livres e os scripts .bat es
 | **5 — Rotinas** ✅ 2026-10-15 | iniciar com o Windows (tarefa de logon `--tray`, Highest se elevado) · limpeza agendada (ao ligar / a cada N h / diária / semanal) com categorias · limpar RAM ao abrir jogo (Steam `RunningAppID` + exes + `steamapps\common`) · bandeja · Configurações | app vive na bandeja e limpa sozinho; tudo visível no histórico (verificar logon real + Highest pelo dono) |
 | **8 — MCP local** ✅ só leitura (13 tools, `G2 Boost.exe --mcp`); destrutivas com token = backlog | `g2boost-mcp.exe` (stdio) · tools read-only + destrutivas com token · registro no Claude Desktop/Code · doc de uso | Claude da máquina analisa o scan e propõe limpeza; humano confirma na UI |
 | **9 — Release** (NSIS ✅ 2026-10-16; **assinatura de código / "baixar sem aviso do Windows" fora do roadmap**, decisão do dono 2026-10-18; pesquisa guardada em [../release/distribution-and-trust.md](../release/distribution-and-trust.md)) | instalador NSIS · auto-update · submissão de falso positivo (Kaspersky/Microsoft) · README público | instala numa VM com Kaspersky sem bloqueio |
+
+## Rodada 9 (2026-10-25, pedido do dono: prints do Galdino Control v2.2.1, "máximo de features que fazem sentido juntas", capas dos jogos, interface com efeitos sem cara de IA, revisão ponytail e release com instalador + portátil)
+
+Decisões do dono: tudo, inclusive o overlay; antivírus = detectar qual está ativo e adaptar (Defender: exclusão automática com confirmação e desfazer, só com o exe em pasta protegida; Kaspersky, Avast, AVG, ESET, Norton, Bitdefender, McAfee, Malwarebytes, Trend Micro, Panda: passo a passo); publicar o release no GitHub. Fora de propósito: driver PawnIO (decisão anterior), limpar Prefetch, "Windows Update só avisa", aplicar ajustes a "contas novas" (perfil Default), PowerShell por baixo. Mapeamento interno em [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
+
+| Frente | Como | Estado |
+|---|---|---|
+| Navegação | barra lateral agrupada (Principal / Otimizar / Ferramentas / Sistema) com rótulos, recolhível, marcador que desliza; Meu PC vira rota; 9 rotas novas | ✅ |
+| Visual | tinta deslizante nas abas, título com máscara + fio, toasts, `Meter` com ponta acesa, `.poster` (capa 2:3 com brilho e inclinação), botão tátil, Lucide traço 1,5, sem glifos de texto e sem o ícone de "IA" | ✅ |
+| Limpeza | anel do disco do sistema + barras por categoria da última prévia | ✅ |
+| Modo portátil | `portable.txt` ao lado do exe: dados em `<pasta do exe>\data` | ✅ |
+| Jogos | capas (cache da Steam, CDN da Steam 1 vez, ícone do exe), "Preparar e jogar" sem herdar admin, seletor de exe, prioridade por jogo | em andamento |
+| Debloat + ajustes | página Debloat (Essencial/Recomendado/Avançado, IA do Windows, apps de brinde), ~30 ajustes novos, busca/filtros/"Ver o que muda" | em andamento |
+| Perfis e restauração | perfis com nome, "Sem IA", "Padrão do Windows", desfazer tudo, histórico; Mouse e teclado | em andamento |
+| Manutenção+ e antivírus | revisão semanal num clique, redefinir Windows Update, impressora, áudio; antivírus detectado + exclusão/guia | em andamento |
+| Monitor de hardware + Check-up | árvore de sensores com mín./máx. e CSV; check-up de ~20 medições | em andamento |
+| Instalar apps | catálogo curado via winget, em lote | em andamento |
+| Ferramentas | teste do mouse (polling), teste de monitor, perda de pacotes | em andamento |
+| Overlay de jogo | FPS/tempo de quadro/1% low por ETW (sem injeção), janela por cima, atalho F7 | em andamento |
+| Painel + pós-formatação | chip de pendentes, velocímetro, card e assistente pós-formatação | a fazer |
+| Release | v0.9.0: instalador NSIS (por máquina) + MSI + zip portátil + SHA256, WebView2 embutido, README com FAQ | a fazer |
 
 ## Rodada 8 (2026-10-23, pedido do dono: "winget upgrade --all", cheatsheet de comandos, ponytail, sempre admin)
 
