@@ -71,6 +71,8 @@ pub struct Settings {
     // r9:tools field
 
     // r9:overlay field
+    /// In-game overlay (hotkey, position, metrics, style). Validated by `overlay::sanitize`.
+    pub overlay: crate::overlay::OverlaySettings,
 
     // r9:profiles field
 
@@ -114,6 +116,7 @@ impl Default for Settings {
             // r9:tools default
 
             // r9:overlay default
+            overlay: crate::overlay::OverlaySettings::default(),
 
             // r9:profiles default
 
@@ -190,6 +193,7 @@ pub fn sanitize(mut s: Settings) -> Settings {
     // r9:tools sanitize
 
     // r9:overlay sanitize
+    s.overlay = crate::overlay::sanitize(std::mem::take(&mut s.overlay));
 
     // r9:profiles sanitize
 
@@ -257,6 +261,7 @@ mod tests {
                 "x".repeat(70) + ".exe",
             ],
             update_excluded: vec![],
+            ..Default::default()
         });
         assert_eq!(s.routine_categories, vec!["temp_user".to_string()]);
         assert_eq!(s.game_exes, vec!["cs2.exe".to_string(), "a.exe".to_string()]);

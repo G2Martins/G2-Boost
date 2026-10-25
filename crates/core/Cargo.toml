@@ -89,6 +89,8 @@ features = [
   # r9:tools
 
   # r9:overlay
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_HiDpi",
 
   # r9:profiles
 

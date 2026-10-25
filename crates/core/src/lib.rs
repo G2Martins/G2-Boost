@@ -75,6 +75,8 @@ pub mod netrepair;
 // r9:tools
 
 // r9:overlay
+pub mod fps;
+pub mod overlay;
 
 // r9:profiles
 
