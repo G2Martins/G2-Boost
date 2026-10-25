@@ -387,13 +387,25 @@ pub fn safe_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
-/// `%LOCALAPPDATA%\G2 Boost` (override with `G2BOOST_DATA_DIR`, used by tests).
+/// `%LOCALAPPDATA%\G2 Boost`, or `<exe folder>\data` for the portable zip (a `portable.txt`
+/// next to the exe). `G2BOOST_DATA_DIR` overrides both (tests).
 pub fn data_dir() -> PathBuf {
     if let Some(d) = std::env::var_os("G2BOOST_DATA_DIR") {
         return PathBuf::from(d);
     }
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-    base.join("G2 Boost")
+    static DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from));
+        resolve_data_dir(exe_dir.as_deref(), std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
+    })
+    .clone()
+}
+
+fn resolve_data_dir(exe_dir: Option<&std::path::Path>, local: Option<PathBuf>) -> PathBuf {
+    if let Some(dir) = exe_dir.filter(|d| d.join("portable.txt").is_file()) {
+        return dir.join("data");
+    }
+    local.unwrap_or_else(std::env::temp_dir).join("G2 Boost")
 }
 
 fn backup_file(tweak: &str) -> PathBuf {
@@ -500,6 +512,17 @@ pub(crate) mod tests {
     /// process-wide, so all tests must agree on the same value).
     pub(crate) fn test_data_dir() -> PathBuf {
         std::env::temp_dir().join("g2boost-core-tests")
+    }
+
+    #[test]
+    fn portable_marker_keeps_data_next_to_the_exe() {
+        let exe_dir = std::env::temp_dir().join(format!("g2boost-portable-{}", std::process::id()));
+        std::fs::create_dir_all(&exe_dir).unwrap();
+        let local = PathBuf::from(r"C:\Users\x\AppData\Local");
+        assert_eq!(resolve_data_dir(Some(&exe_dir), Some(local.clone())), local.join("G2 Boost"));
+        std::fs::write(exe_dir.join("portable.txt"), "x").unwrap();
+        assert_eq!(resolve_data_dir(Some(&exe_dir), Some(local)), exe_dir.join("data"));
+        std::fs::remove_dir_all(&exe_dir).unwrap();
     }
 
     #[test]

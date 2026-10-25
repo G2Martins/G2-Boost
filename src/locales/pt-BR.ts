@@ -2540,4 +2540,10 @@ export const ptBR = {
   // ── r9:profiles · perfis, restauração, mouse e teclado (agente A8) ──
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "cleanup.disk.title": "Disco do sistema",
+  "cleanup.disk.free": "livres",
+  "cleanup.disk.used": "{drive} {used} usados de {total}",
+  "cleanup.found.title": "Lixo encontrado por categoria",
+  "cleanup.found.total": "{total} no total · {selected} selecionados",
+  "cleanup.found.empty": "Meça antes de limpar: a Prévia mostra quanto cada categoria ocupa.",
 } as const;

@@ -2534,4 +2534,10 @@ export const en = {
   // ── r9:profiles · perfis, restauração, mouse e teclado (agente A8) ──
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "cleanup.disk.title": "System drive",
+  "cleanup.disk.free": "free",
+  "cleanup.disk.used": "{drive} {used} used of {total}",
+  "cleanup.found.title": "Junk found by category",
+  "cleanup.found.total": "{total} in total · {selected} selected",
+  "cleanup.found.empty": "Measure before cleaning: the Preview shows how much each category takes.",
 } as const satisfies Record<keyof typeof ptBR, string>;

@@ -6,6 +6,8 @@ node_modules/
 target/
 dist/
 out/
+# instaladores e zip portátil (bun run release)
+release/
 # saídas do Playwright
 test-results/
 playwright-report/

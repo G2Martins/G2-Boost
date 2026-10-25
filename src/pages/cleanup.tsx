@@ -11,6 +11,7 @@ import {
   CardTitle,
   EmptyState,
   HelpHint,
+  Meter,
   Switch,
   Tabs,
   TabsContent,
@@ -27,6 +28,7 @@ import {
 import {
   backend,
   type CleanupProgress,
+  type DriveInfo,
   inTauri,
   type PreviewItem,
   type RunRecord,
@@ -174,6 +176,7 @@ export function CleanupPage() {
         {group === "system" ? (
           <SystemFilesPanel elevated={elevated} onHistory={setHistory} />
         ) : null}
+        {group === "system" ? null : <DiskSummary preview={preview} selected={selected} />}
         <Card
           className={cn(
             "animate-rise flex flex-wrap items-center gap-4 py-4",
@@ -410,6 +413,115 @@ export function CleanupPage() {
         </Card>
       </PageBody>
     </>
+  );
+}
+
+/** System drive ring + what the last preview found per category (largest first). */
+function DiskSummary({
+  preview,
+  selected,
+}: {
+  preview: Record<string, PreviewItem>;
+  selected: string[];
+}) {
+  const { t, locale } = useI18n();
+  const [drive, setDrive] = useState<DriveInfo | null>(null);
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => {
+    backend.listDrives().then((d) => {
+      if (d) setDrive(d.find((x) => x.letter.toUpperCase().startsWith("C")) ?? d[0] ?? null);
+    });
+    // The ring draws from empty on the first frame (the transition lives in .gauge-anim).
+    const id = requestAnimationFrame(() => setDrawn(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const rows = Object.values(preview)
+    .filter((p) => p.measurable && !p.missing && p.bytes > 0)
+    .sort((a, b) => b.bytes - a.bytes);
+  const found = rows.reduce((s, p) => s + p.bytes, 0);
+  const picked = rows.filter((p) => selected.includes(p.id)).reduce((s, p) => s + p.bytes, 0);
+  const used = drive ? drive.total_bytes - drive.free_bytes : 0;
+  const pct = drive && drive.total_bytes > 0 ? (100 * used) / drive.total_bytes : 0;
+  return (
+    <Card className="animate-rise grid gap-6 md:grid-cols-[200px_1fr]">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <div className="relative size-32">
+          <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden>
+            <circle
+              cx="60"
+              cy="60"
+              r="50"
+              fill="none"
+              strokeWidth="9"
+              className="stroke-foreground/8"
+            />
+            <circle
+              cx="60"
+              cy="60"
+              r="50"
+              fill="none"
+              strokeWidth="9"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray={`${drawn ? pct : 0} 100`}
+              className={cn("gauge-anim", pct > 90 ? "stroke-destructive" : "stroke-primary")}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="num text-lg font-semibold">
+              {drive ? formatBytes(drive.free_bytes, locale) : "—"}
+            </span>
+            <span className="text-[11px] text-muted-foreground">{t("cleanup.disk.free")}</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {drive
+            ? t("cleanup.disk.used", {
+                drive: drive.letter,
+                used: formatBytes(used, locale),
+                total: formatBytes(drive.total_bytes, locale),
+              })
+            : t("cleanup.disk.title")}
+        </p>
+      </div>
+      <div className="min-w-0">
+        <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-display text-[15px] font-semibold tracking-wide">
+            {t("cleanup.found.title")}
+          </h3>
+          {rows.length ? (
+            <span className="num text-xs text-muted-foreground">
+              {t("cleanup.found.total", {
+                total: formatBytes(found, locale),
+                selected: formatBytes(picked, locale),
+              })}
+            </span>
+          ) : null}
+        </header>
+        {rows.length ? (
+          <ul className="grid gap-2.5">
+            {rows.slice(0, 8).map((p) => (
+              <li
+                key={p.id}
+                className="grid grid-cols-[minmax(0,13rem)_1fr_auto] items-center gap-3 text-xs"
+              >
+                <span className="truncate">{t(cleanupName(p.id))}</span>
+                <Meter
+                  value={p.bytes / (rows[0]?.bytes || 1)}
+                  tone={selected.includes(p.id) ? "accent" : "neutral"}
+                  label={t(cleanupName(p.id))}
+                />
+                <span className="num w-20 text-right text-muted-foreground">
+                  {formatBytes(p.bytes, locale)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">{t("cleanup.found.empty")}</p>
+        )}
+      </div>
+    </Card>
   );
 }
 
