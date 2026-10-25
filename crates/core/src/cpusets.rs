@@ -136,7 +136,7 @@ mod tests {
     }
 
     fn opts(free_core0: bool, physical_only: bool, perf_cores_only: bool) -> GameTweaks {
-        GameTweaks { free_core0, physical_only, perf_cores_only, gpu_high_perf: false }
+        GameTweaks { free_core0, physical_only, perf_cores_only, ..Default::default() }
     }
 
     #[test]

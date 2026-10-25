@@ -2,14 +2,29 @@
 //! registry (no network, no launcher API, nothing started): Steam manifests, Epic manifests, GOG
 //! and Ubisoft registry keys, and Uninstall entries of game publishers (EA app, Riot, Battle.net,
 //! Rockstar and others), plus executables the user added. Names are data (they reach AI prompts
-//! and the UI as text), never instructions.
+//! and the UI as text), never instructions. Also starts a game for "Preparar e jogar" (always as
+//! the signed-in user, never with G2 Boost's administrator rights) and opens the exe picker.
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::collections::{BTreeMap, HashSet};
+use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
+use windows::Win32::Foundation::{ERROR_CANCELLED, HWND};
+use windows::Win32::System::Com::{
+    CLSCTX_ALL, CLSCTX_INPROC_SERVER, CoCreateInstance, CoTaskMemFree, IDispatch, IServiceProvider,
+};
+use windows::Win32::System::Variant::VARIANT;
+use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+use windows::Win32::UI::Shell::{
+    FOS_DONTADDTORECENT, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_NOCHANGEDIR, FOS_PATHMUSTEXIST, FileOpenDialog,
+    IFileOpenDialog, IShellBrowser, IShellDispatch2, IShellFolderViewDual, IShellItem, IShellWindows,
+    SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHCreateItemFromParsingName, SHELLEXECUTEINFOW, SID_STopLevelBrowser,
+    SIGDN_FILESYSPATH, SVGIO_BACKGROUND, SWC_DESKTOP, SWFO_NEEDDISPATCH, ShellExecuteExW, ShellWindows,
+};
+use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use windows::core::{BSTR, HRESULT, Interface, PCWSTR};
 
-use crate::registry::{self, Root, Value};
+use crate::registry::{self, Root, Value, wide};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -155,6 +170,23 @@ fn steam_games() -> Vec<InstalledGame> {
         .collect()
 }
 
+/// An Epic `AppName` that is safe in an id and in the launcher URI: plain ASCII words, no `..`.
+fn epic_app_ok(a: &str) -> bool {
+    !a.is_empty()
+        && a.len() <= 128
+        && !a.starts_with('.')
+        && !a.contains("..")
+        && a.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+}
+
+/// `steam:<appid>` → the appid, only in the canonical form `games.rs` writes (digits, no sign,
+/// no leading zero, fits in u32).
+pub fn steam_appid(id: &str) -> Option<u32> {
+    let d = id.strip_prefix("steam:")?;
+    let a: u32 = d.parse().ok()?;
+    (a != 0 && a.to_string() == d).then_some(a)
+}
+
 /// One Epic manifest (`*.item`, JSON). Not a game (apps, incomplete installs) → `None`.
 pub(crate) fn parse_epic(text: &str) -> Option<InstalledGame> {
     let v: serde_json::Value = serde_json::from_str(text).ok()?;
@@ -167,7 +199,7 @@ pub(crate) fn parse_epic(text: &str) -> Option<InstalledGame> {
     {
         return None;
     }
-    let app = s("AppName").filter(|a| !a.is_empty() && a.len() <= 128 && a.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c)))?;
+    let app = s("AppName").filter(|a| epic_app_ok(a))?;
     let dir = s("InstallLocation").filter(|d| Path::new(d).is_absolute());
     let exe = match (&dir, s("LaunchExecutable")) {
         (Some(d), Some(e)) if !e.contains("..") => Some(Path::new(d).join(e).to_string_lossy().into_owned()),
@@ -301,6 +333,80 @@ pub fn installed(custom_exes: &[String]) -> Vec<InstalledGame> {
     merge(vec![steam_games(), epic_games(), gog_games(), ubisoft_games(), publisher_games(), custom_games(custom_exes)])
 }
 
+/* ---------------- executables the user picked ---------------- */
+
+/// A local exe path that is safe to keep, show and start: drive letter + `:\` (no UNC, no
+/// `\\?\`), plain components only (no `..`), no other `:` (alternate data streams), `.exe`,
+/// bounded, no control characters. Pure: nothing is read from disk.
+pub fn plain_exe(p: &str) -> bool {
+    let b = p.as_bytes();
+    b.len() > 7
+        && b.len() < 1024
+        && b[0].is_ascii_alphabetic()
+        && &b[1..3] == b":\\"
+        && !p[2..].contains(':')
+        && !p.chars().any(char::is_control)
+        && p.to_ascii_lowercase().ends_with(".exe")
+        && Path::new(p).components().all(|c| matches!(c, Component::Prefix(_) | Component::RootDir | Component::Normal(_)))
+}
+
+/// `plain_exe`, inside `inside` when given (the game's install folder), and present on disk.
+pub fn exe_ok(p: &str, inside: Option<&str>) -> Option<String> {
+    let lower = p.to_ascii_lowercase();
+    let in_dir = inside.is_none_or(|d| lower.starts_with(&format!("{}\\", d.trim_end_matches('\\').to_ascii_lowercase())));
+    (plain_exe(p) && in_dir && Path::new(p).is_file()).then(|| p.to_string())
+}
+
+/// `exe:<file name>` for a picked exe: the id a name-only entry of the same exe already has, so
+/// its Game Mode and options carry over.
+pub fn path_id(p: &str) -> Option<String> {
+    Path::new(p).file_name().map(|n| format!("exe:{}", n.to_string_lossy().to_ascii_lowercase()))
+}
+
+/// Games added by picking their exe (`settings.game_paths`). No install folder: running = that
+/// exact exe, and Game Mode uses the running exe's own folder for its checks.
+fn path_games(paths: &[String]) -> Vec<InstalledGame> {
+    paths
+        .iter()
+        .filter(|p| plain_exe(p))
+        .filter_map(|p| {
+            Some(InstalledGame {
+                id: path_id(p)?,
+                name: clean(&Path::new(p).file_stem()?.to_string_lossy()),
+                launcher: Launcher::Custom,
+                install_dir: None,
+                main_exe: Some(p.clone()),
+                size_bytes: None,
+            })
+        })
+        .collect()
+}
+
+/// The exe the user chose per game (`settings.game_exe_override`) replaces the detected one while
+/// it is still a valid exe inside the game's folder (when it has one).
+pub(crate) fn apply_overrides(list: &mut [InstalledGame], chosen: &BTreeMap<String, String>) {
+    for g in list {
+        if let Some(exe) = chosen.get(&g.id).and_then(|e| exe_ok(e, g.install_dir.as_deref())) {
+            g.main_exe = Some(exe);
+        }
+    }
+}
+
+/// The Jogos library: `installed` plus the games added by path, with the exe chosen per game.
+pub fn library(s: &crate::settings::Settings) -> Vec<InstalledGame> {
+    let mut list = merge(vec![
+        steam_games(),
+        epic_games(),
+        gog_games(),
+        ubisoft_games(),
+        publisher_games(),
+        path_games(&s.game_paths),
+        custom_games(&s.game_exes),
+    ]);
+    apply_overrides(&mut list, &s.game_exe_override);
+    list
+}
+
 /* ---------------- running ---------------- */
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -310,8 +416,8 @@ pub struct RunningGame {
     pub pid: Option<u32>,
 }
 
-/// Which of `games` are running: a process inside the game's install folder, its exe name for
-/// hand-added games, or Steam's `RunningAppID`.
+/// Which of `games` are running: a process inside the game's install folder, the exact exe (or
+/// the exe name, when only the name is known) for hand-added games, or Steam's `RunningAppID`.
 pub fn running(games: &[InstalledGame], procs: &[(u32, String)], steam_app: Option<u32>) -> Vec<RunningGame> {
     let procs: Vec<(u32, String)> = procs.iter().map(|(pid, p)| (*pid, p.to_ascii_lowercase())).collect();
     let mut out = Vec::new();
@@ -321,6 +427,11 @@ pub fn running(games: &[InstalledGame], procs: &[(u32, String)], steam_app: Opti
                 let d = format!("{}\\", lower(dir));
                 // The biggest match is usually the game; launchers live elsewhere.
                 procs.iter().find(|(_, p)| p.starts_with(&d)).map(|(pid, _)| *pid)
+            }
+            (None, Launcher::Custom) if g.main_exe.is_some() => {
+                // A picked exe has no folder of its own to match: other games may share it.
+                let exe = g.main_exe.as_deref().unwrap_or_default().to_ascii_lowercase();
+                procs.iter().find(|(_, p)| *p == exe).map(|(pid, _)| *pid)
             }
             (None, Launcher::Custom) => {
                 let exe = g.id.trim_start_matches("exe:");
@@ -348,6 +459,131 @@ pub fn steam_running_app() -> Option<u32> {
 pub fn icon(g: &InstalledGame) -> Option<String> {
     let exe = g.main_exe.as_deref()?;
     crate::icons::png_from_resource(Path::new(exe), 0).map(|png| crate::icons::data_url(&png))
+}
+
+/* ---------------- "Preparar e jogar" ---------------- */
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LaunchTarget {
+    /// A launcher URI: the launcher starts the game (DRM, updates, overlay stay in its hands).
+    Uri(String),
+    /// The game's own exe, started in its folder.
+    Exe { path: String, dir: String },
+}
+
+/// What "Preparar e jogar" starts for `g` (pure): Steam and Epic through their launcher URI, the
+/// rest through the main exe (the one the user chose, when there is one). `None` = nothing safe.
+pub fn launch_target(g: &InstalledGame) -> Option<LaunchTarget> {
+    if let Some(appid) = steam_appid(&g.id) {
+        return Some(LaunchTarget::Uri(format!("steam://rungameid/{appid}")));
+    }
+    if let Some(app) = g.id.strip_prefix("epic:") {
+        return epic_app_ok(app).then(|| LaunchTarget::Uri(format!("com.epicgames.launcher://apps/{app}?action=launch&silent=true")));
+    }
+    let exe = g.main_exe.as_deref().filter(|e| plain_exe(e))?;
+    let dir = Path::new(exe).parent()?.to_string_lossy().into_owned();
+    Some(LaunchTarget::Exe { path: exe.to_string(), dir })
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LaunchError {
+    #[error("no_exe")]
+    NoExe,
+    /// Elevated, and no desktop shell to start the game as the signed-in user.
+    #[error("shell_unavailable")]
+    Shell,
+    #[error("launch_failed")]
+    Failed,
+}
+
+/// Start `t` as the signed-in user. G2 Boost usually runs elevated and a game must not inherit
+/// that: elevated, the request goes through the desktop's own Explorer (its folder view's
+/// `IShellDispatch2::ShellExecute`), so it starts with the user's normal rights; never a fallback
+/// to an elevated start. Not elevated, a plain `ShellExecuteExW`.
+pub fn launch(t: &LaunchTarget) -> Result<(), LaunchError> {
+    let (file, dir) = match t {
+        LaunchTarget::Uri(u) => (u.as_str(), ""),
+        LaunchTarget::Exe { path, dir } => {
+            if !Path::new(path).is_file() {
+                return Err(LaunchError::NoExe);
+            }
+            (path.as_str(), dir.as_str())
+        }
+    };
+    let _com = crate::tasksched::Com::init().map_err(|_| LaunchError::Failed)?;
+    if crate::system::is_elevated() { shell_execute_as_user(file, dir) } else { shell_execute(file, dir) }
+}
+
+fn shell_execute(file: &str, dir: &str) -> Result<(), LaunchError> {
+    let (f, d, verb) = (wide(file), wide(dir), wide("open"));
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        lpVerb: PCWSTR(verb.as_ptr()),
+        lpFile: PCWSTR(f.as_ptr()),
+        lpDirectory: if dir.is_empty() { PCWSTR::null() } else { PCWSTR(d.as_ptr()) },
+        nShow: SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    // SAFETY: every string outlives the call; COM is initialised by the caller.
+    unsafe { ShellExecuteExW(&mut info) }.map_err(|_| LaunchError::Failed)
+}
+
+/// Raymond Chen's "launch unelevated from an elevated process": desktop window → its top-level
+/// browser → active view → background automation object → `Shell.Application` → ShellExecute.
+fn shell_execute_as_user(file: &str, dir: &str) -> Result<(), LaunchError> {
+    let shell = |_| LaunchError::Shell;
+    // SAFETY: COM calls on this thread (initialised by the caller); every object is released here.
+    unsafe {
+        let windows: IShellWindows = CoCreateInstance(&ShellWindows, None, CLSCTX_ALL).map_err(shell)?;
+        let (desktop, root) = (VARIANT::from(0i32), VARIANT::default()); // CSIDL_DESKTOP
+        let mut hwnd = 0i32;
+        let found = windows.FindWindowSW(&desktop, &root, SWC_DESKTOP, &mut hwnd, SWFO_NEEDDISPATCH).map_err(shell)?;
+        let browser: IShellBrowser = found.cast::<IServiceProvider>().map_err(shell)?.QueryService(&SID_STopLevelBrowser).map_err(shell)?;
+        let view = browser.QueryActiveShellView().map_err(shell)?;
+        let background: IDispatch = view.GetItemObject(SVGIO_BACKGROUND).map_err(shell)?;
+        let app = background.cast::<IShellFolderViewDual>().map_err(shell)?.Application().map_err(shell)?;
+        app.cast::<IShellDispatch2>()
+            .map_err(shell)?
+            .ShellExecute(&BSTR::from(file), &VARIANT::from(""), &VARIANT::from(dir), &VARIANT::from("open"), &VARIANT::from(SW_SHOWNORMAL.0))
+            .map_err(|_| LaunchError::Failed)
+    }
+}
+
+/// The native Open dialog for one `.exe` (owner = the app window, so it is modal to it), on its
+/// own COM STA thread; it opens in `folder` when given. `Ok(None)` = the user cancelled. The
+/// caller still validates the path (`exe_ok`): the dialog only proves the user picked it.
+pub fn pick_exe(owner: isize, folder: Option<String>) -> Result<Option<String>, String> {
+    let hr = |e: windows::core::Error| format!("{:#010x}", e.code().0 as u32);
+    std::thread::spawn(move || {
+        let _com = crate::tasksched::Com::init().map_err(|e| e.to_string())?;
+        // SAFETY: the standard IFileOpenDialog sequence on this STA thread; strings outlive the
+        // calls, the returned path is freed with CoTaskMemFree, COM objects drop here.
+        unsafe {
+            let dlg: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).map_err(hr)?;
+            let spec = wide("*.exe");
+            dlg.SetFileTypes(&[COMDLG_FILTERSPEC { pszName: PCWSTR(spec.as_ptr()), pszSpec: PCWSTR(spec.as_ptr()) }]).map_err(hr)?;
+            let opts = dlg.GetOptions().map_err(hr)?;
+            dlg.SetOptions(opts | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR | FOS_DONTADDTORECENT).map_err(hr)?;
+            if let Some(f) = folder.filter(|f| Path::new(f).is_dir()) {
+                let w = wide(&f);
+                if let Ok(item) = SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(w.as_ptr()), None) {
+                    let _ = dlg.SetFolder(&item);
+                }
+            }
+            let owner = (owner != 0).then_some(HWND(owner as *mut core::ffi::c_void));
+            match dlg.Show(owner) {
+                Err(e) if e.code() == HRESULT::from_win32(ERROR_CANCELLED.0) => return Ok(None),
+                r => r.map_err(hr)?,
+            }
+            let p = dlg.GetResult().map_err(hr)?.GetDisplayName(SIGDN_FILESYSPATH).map_err(hr)?;
+            let path = p.to_string().map_err(|e| e.to_string());
+            CoTaskMemFree(Some(p.0 as *const core::ffi::c_void));
+            path.map(Some)
+        }
+    })
+    .join()
+    .map_err(|_| "picker".to_string())?
 }
 
 #[cfg(test)]
@@ -423,6 +659,163 @@ mod tests {
             "a sibling folder with the same prefix is not the game"
         );
         assert!(running(&games, &[], None).is_empty());
+    }
+
+    fn with_exe(id: &str, launcher: Launcher, dir: Option<&str>, exe: Option<&str>) -> InstalledGame {
+        InstalledGame { main_exe: exe.map(str::to_string), ..game(id, "G", launcher, dir) }
+    }
+
+    #[test]
+    fn steam_ids_are_canonical() {
+        assert_eq!(steam_appid("steam:730"), Some(730));
+        assert_eq!(steam_appid("steam:4294967295"), Some(u32::MAX));
+        for bad in ["steam:", "steam:0", "steam:0730", "steam:+730", "steam: 730", "steam:730 ", "steam:73a", "steam:4294967296", "epic:730", "730", "steam:730/../1"] {
+            assert_eq!(steam_appid(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn plain_exe_rejects_hostile_paths() {
+        assert!(plain_exe(r"D:\Games\Hades\Hades.exe"));
+        assert!(plain_exe(r"c:\jogos\ação\Jogo.EXE"), "case and non-ASCII names are fine");
+        for bad in [
+            r"\\server\share\game.exe",
+            r"\\?\C:\Games\game.exe",
+            r"C:game.exe",
+            r"C:\Games\..\Windows\System32\cmd.exe",
+            r"C:\Games\game.exe:evil.exe",
+            r"C:\Games\game.exe\..",
+            r"C:\Games\notes.txt",
+            r"C:\Games\game.exe.lnk",
+            "C:\\Games\\ga\u{0}me.exe",
+            "C:\\Games\\game\n.exe",
+            r"Games\game.exe",
+            r"1:\game.exe",
+            "",
+        ] {
+            assert!(!plain_exe(bad), "{bad:?}");
+        }
+        assert!(!plain_exe(&format!(r"C:\{}.exe", "a".repeat(1100))), "oversize");
+    }
+
+    #[test]
+    fn exe_ok_needs_the_file_and_the_folder() {
+        let dir = std::env::temp_dir().join(format!("g2boost-exeok-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("bin")).unwrap();
+        std::fs::write(dir.join(r"bin\Game.exe"), b"MZ").unwrap();
+        let d = dir.to_string_lossy().into_owned();
+        let exe = format!(r"{d}\bin\Game.exe");
+        assert_eq!(exe_ok(&exe, Some(&d)).as_deref(), Some(exe.as_str()));
+        assert_eq!(exe_ok(&exe, Some(&format!(r"{d}\"))).as_deref(), Some(exe.as_str()), "trailing slash on the folder");
+        assert_eq!(exe_ok(&exe, None).as_deref(), Some(exe.as_str()));
+        assert_eq!(exe_ok(&exe, Some(&format!("{d}x"))), None, "a sibling folder with the same prefix");
+        assert_eq!(exe_ok(&format!(r"{d}\bin\Missing.exe"), Some(&d)), None, "must exist");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn launch_targets_per_launcher() {
+        let steam = with_exe("steam:730", Launcher::Steam, Some(r"D:\S\cs2"), Some(r"D:\S\cs2\cs2.exe"));
+        assert_eq!(launch_target(&steam), Some(LaunchTarget::Uri("steam://rungameid/730".into())));
+        let epic = with_exe("epic:Fortnite", Launcher::Epic, None, None);
+        assert_eq!(launch_target(&epic), Some(LaunchTarget::Uri("com.epicgames.launcher://apps/Fortnite?action=launch&silent=true".into())));
+        let riot = with_exe("app:m64:x", Launcher::Riot, Some(r"C:\Riot Games\League of Legends"), Some(r"C:\Riot Games\Riot Client\RiotClientServices.exe"));
+        assert_eq!(
+            launch_target(&riot),
+            Some(LaunchTarget::Exe { path: r"C:\Riot Games\Riot Client\RiotClientServices.exe".into(), dir: r"C:\Riot Games\Riot Client".into() })
+        );
+        // Hostile ids and exes never become a target.
+        for app in ["epic:", "epic:..", "epic:.hidden", "epic:a..b", "epic:a/b", "epic:a?x=1", "epic:a b", "epic:a&action=uninstall"] {
+            assert_eq!(launch_target(&with_exe(app, Launcher::Epic, None, None)), None, "{app}");
+        }
+        assert_eq!(launch_target(&with_exe("steam:0730", Launcher::Steam, None, None)), None, "not a canonical Steam id, no exe");
+        assert_eq!(launch_target(&with_exe("exe:x.exe", Launcher::Custom, None, None)), None, "name only: nothing to start");
+        assert_eq!(launch_target(&with_exe("gog:1", Launcher::Gog, None, Some(r"\\evil\share\x.exe"))), None);
+        assert_eq!(launch_target(&with_exe("gog:1", Launcher::Gog, None, Some(r"C:\G\..\x.exe"))), None);
+        assert_eq!(launch_target(&with_exe("gog:1", Launcher::Gog, None, Some(r"C:\G\setup.bat"))), None);
+    }
+
+    #[test]
+    fn picked_paths_and_chosen_exes() {
+        let paths = vec![r"D:\Games\Hades\Hades.exe".to_string(), r"\\nas\x.exe".to_string(), r"D:\Other\HADES.exe".to_string()];
+        let picked = path_games(&paths);
+        assert_eq!(picked.len(), 2, "UNC dropped");
+        assert_eq!((picked[0].id.as_str(), picked[0].name.as_str(), picked[0].install_dir.as_deref()), ("exe:hades.exe", "Hades", None));
+        // Same file name twice: the first wins (same id); a name-only entry with that name too.
+        let merged = merge(vec![picked, custom_games(&["hades.exe".into(), "other.exe".into()])]);
+        assert_eq!(merged.iter().map(|g| g.id.as_str()).collect::<Vec<_>>(), vec!["exe:hades.exe", "exe:other.exe"]);
+        assert_eq!(merged[0].main_exe.as_deref(), Some(r"D:\Games\Hades\Hades.exe"));
+        // A chosen exe only replaces the detected one when it is real and inside the game's folder.
+        let dir = std::env::temp_dir().join(format!("g2boost-override-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("Real.exe"), b"MZ").unwrap();
+        let d = dir.to_string_lossy().into_owned();
+        let mut list = vec![
+            with_exe("steam:1", Launcher::Steam, Some(&d), Some(&format!(r"{d}\Detected.exe"))),
+            with_exe("steam:2", Launcher::Steam, Some(&d), Some(&format!(r"{d}\Detected.exe"))),
+            with_exe("steam:3", Launcher::Steam, Some(r"C:\Elsewhere"), None),
+        ];
+        let chosen = BTreeMap::from([
+            ("steam:1".to_string(), format!(r"{d}\Real.exe")),
+            ("steam:2".to_string(), format!(r"{d}\Missing.exe")),
+            ("steam:3".to_string(), format!(r"{d}\Real.exe")),
+        ]);
+        apply_overrides(&mut list, &chosen);
+        assert_eq!(list[0].main_exe.as_deref(), Some(format!(r"{d}\Real.exe").as_str()));
+        assert_eq!(list[1].main_exe.as_deref(), Some(format!(r"{d}\Detected.exe").as_str()), "missing file: detected kept");
+        assert_eq!(list[2].main_exe, None, "outside the game's folder: ignored");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn settings_keep_only_plain_picked_paths() {
+        use crate::settings::{Settings, sanitize};
+        let s = sanitize(Settings {
+            game_paths: vec![
+                r"D:\Games\Hades\Hades.exe".into(),
+                r"d:\games\hades\hades.exe".into(),
+                r"\\nas\share\x.exe".into(),
+                r"C:\x\..\Windows\System32\cmd.exe".into(),
+                r"C:\x\notes.txt".into(),
+            ],
+            game_exe_override: BTreeMap::from([
+                ("steam:730".to_string(), r"D:\S\cs2\cs2.exe".to_string()),
+                ("steam:1".to_string(), r"\\nas\x.exe".to_string()),
+                ("noprefix".to_string(), r"D:\x.exe".to_string()),
+            ]),
+            ..Default::default()
+        });
+        assert_eq!(s.game_paths, vec![r"D:\Games\Hades\Hades.exe".to_string()], "deduplicated, UNC/traversal/non-exe dropped");
+        assert_eq!(s.game_exe_override.keys().collect::<Vec<_>>(), vec!["steam:730"]);
+        let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back, s, "json roundtrip");
+    }
+
+    #[test]
+    fn a_picked_exe_runs_only_as_itself() {
+        let games = vec![with_exe("exe:game.exe", Launcher::Custom, None, Some(r"D:\Games\A\game.exe"))];
+        let procs = vec![(20, r"D:\Games\B\game.exe".to_string()), (21, r"D:\Games\A\helper.exe".to_string())];
+        assert!(running(&games, &procs, None).is_empty(), "same name elsewhere, or another exe in its folder");
+        let procs = vec![(22, r"d:\games\a\GAME.exe".to_string())];
+        assert_eq!(running(&games, &procs, None), vec![RunningGame { id: "exe:game.exe".into(), pid: Some(22) }]);
+    }
+
+    /// Opens the real Open dialog (`cargo test -p g2boost-core -- pick_exe_live --ignored --nocapture`).
+    #[test]
+    #[ignore]
+    fn pick_exe_live() {
+        println!("{:?}", pick_exe(0, std::env::var("SystemRoot").ok()));
+    }
+
+    /// Starts Notepad through the launch path (elevated: through Explorer, so it must show up
+    /// unelevated in Task Manager). `cargo test -p g2boost-core -- launch_live --ignored`.
+    #[test]
+    #[ignore]
+    fn launch_live() {
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let t = LaunchTarget::Exe { path: format!(r"{win}\System32\notepad.exe"), dir: format!(r"{win}\System32") };
+        launch(&t).unwrap();
+        println!("elevated={} launched notepad", crate::system::is_elevated());
     }
 
     #[test]

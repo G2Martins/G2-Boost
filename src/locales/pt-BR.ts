@@ -2524,6 +2524,56 @@ export const ptBR = {
   "maint2.net.reset.opened": "Página aberta. Procure Redefinição de rede.",
 
   // ── r9:games · jogos: capas, preparar e jogar (agente A1) ──
+  "games.lib.title": "Biblioteca",
+  "games.lib.help":
+    "Jogos da Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG e Rockstar, lidos dos arquivos de cada launcher. Capas da Steam vêm do cache dela no PC; quando faltam, são baixadas uma vez.",
+  "games.lib.add": "Adicionar jogo (.exe)",
+  "games.lib.added": "{game} entrou na biblioteca.",
+  "games.lib.search": "Buscar jogo",
+  "games.lib.all": "Todos",
+  "games.lib.filter": "Filtrar por launcher",
+  "games.lib.empty.title": "Nenhum jogo encontrado",
+  "games.lib.empty.body":
+    "Os jogos da Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG e Rockstar aparecem sozinhos. Para outro jogo, escolha o executável dele.",
+  "games.lib.no_match": "Nenhum jogo com esse nome aqui.",
+  "games.mode.hint":
+    "Use Preparar e jogar em um jogo, ou ligue o Modo Jogo nos Ajustes dele. Quando o jogo abrir, o G2 Boost prepara o PC; quando fechar, desfaz tudo.",
+  "games.play": "Preparar e jogar",
+  "games.play.aria": "Preparar e jogar {game}",
+  "games.play.started":
+    "Abrindo {game}. O Modo Jogo entra quando o jogo abrir e desfaz tudo quando ele fechar.",
+  "games.play.error.no_exe": "Não achei o executável deste jogo. Escolha em Ajustes, Trocar .exe.",
+  "games.play.error.shell_unavailable":
+    "O G2 Boost está como administrador e não achou a área de trabalho do Windows para abrir o jogo como usuário comum. Abra pelo launcher.",
+  "games.play.error.launch_failed": "O Windows não abriu o jogo. Tente pelo launcher dele.",
+  "games.play.error.unknown_game": "Jogo não encontrado. Procure de novo e tente outra vez.",
+  "games.tweaks": "Ajustes",
+  "games.route": "Rota",
+  "gametweaks.mode": "Modo Jogo para este jogo",
+  "gametweaks.mode.desc":
+    "Quando este jogo abrir, o G2 Boost aplica o Modo Jogo e desfaz tudo quando ele fechar. Desligado, Preparar e jogar liga só para aquela partida.",
+  "gametweaks.high_priority": "Prioridade alta",
+  "gametweaks.high_priority.desc":
+    "Sobe o processo do jogo para prioridade Alta no Modo Jogo, nunca tempo real. Ganho: menos disputa com programas de fundo. Custo: o resto do PC responde um pouco mais devagar enquanto você joga.",
+  "gametweaks.high_priority.global":
+    "Já vale para todos os jogos: a opção geral do Modo Jogo está ligada.",
+  "gametweaks.mode_off.all":
+    "Com o Modo Jogo desligado para este jogo, prioridade e núcleos só valem quando você usa Preparar e jogar.",
+  "gametweaks.section.exe": "Executável",
+  "gametweaks.exe.desc":
+    "Dá o ícone e a preferência de placa de vídeo, e é o que abre os jogos que não são da Steam nem da Epic. Quando o jogo tem uma pasta, precisa estar dentro dela.",
+  "gametweaks.exe.none": "Nenhum executável encontrado.",
+  "gametweaks.exe.custom": "Escolhido por você",
+  "gametweaks.exe.change": "Trocar .exe",
+  "gametweaks.exe.reset": "Voltar ao detectado",
+  "gametweaks.exe.changed": "Executável de {game} trocado.",
+  "gametweaks.exe.restored": "{game} voltou ao executável detectado.",
+  "gametweaks.remove": "Remover da biblioteca",
+  "gametweaks.removed": "{game} saiu da biblioteca.",
+  "gametweaks.instant":
+    "Trocar o executável vale na hora. As chaves acima valem quando você clica em Salvar.",
+  "gametweaks.error.outside_folder": "Escolha um .exe dentro da pasta do jogo.",
+  "gametweaks.error.bad_exe": "Escolha um .exe de um disco deste PC, não de uma pasta de rede.",
 
   // ── r9:tweaks · ajustes, debloat, IA do Windows (agente A2) ──
 

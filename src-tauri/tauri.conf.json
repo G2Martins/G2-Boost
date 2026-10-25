@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://speed.cloudflare.com https://api.steampowered.com",
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://cover.localhost; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://speed.cloudflare.com https://api.steampowered.com",
       "devCsp": null
     }
   },

@@ -32,6 +32,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 // r9:games mod
+mod games_cmds;
 
 // r9:tweaks mod
 
@@ -864,10 +865,10 @@ struct GamesState {
 }
 
 impl GamesState {
-    fn current(&self, custom: &[String], force: bool) -> Vec<games::InstalledGame> {
+    fn current(&self, s: &Settings, force: bool) -> Vec<games::InstalledGame> {
         let stale = self.refreshed.lock().unwrap().is_none_or(|t| t.elapsed() > Duration::from_secs(300));
         if force || stale {
-            let list = games::installed(custom);
+            let list = games::library(s);
             *self.list.lock().unwrap() = list;
             *self.refreshed.lock().unwrap() = Some(std::time::Instant::now());
         }
@@ -887,7 +888,7 @@ struct GameView {
 async fn games_list(app: AppHandle, refresh: bool) -> Result<Vec<GameView>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let s = app.state::<Routines>().settings.lock().unwrap().clone();
-        let list = app.state::<GamesState>().current(&s.game_exes, refresh);
+        let list = app.state::<GamesState>().current(&s, refresh);
         let running = games::running(&list, &procs::list_paths(), games::steam_running_app());
         list.into_iter()
             .map(|g| GameView {
@@ -968,11 +969,12 @@ fn game_mode_stop(app: AppHandle) -> Option<gamemode::Session> {
 /// One Game Mode step (routine thread, every 5 s). Returns true while a session is active.
 fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
     let current = gamemode::session();
-    if s.game_mode_games.is_empty() && current.is_none() {
+    let enabled = games_cmds::mode_games(s, current.as_ref()); // + the game "Preparar e jogar" armed
+    if enabled.is_empty() && current.is_none() {
         return false;
     }
     let gs = app.state::<GamesState>();
-    let list = gs.current(&s.game_exes, false);
+    let list = gs.current(s, false);
     let mut running = games::running(&list, &procs::list_paths(), games::steam_running_app());
     {
         let mut sup = gs.suppressed.lock().unwrap();
@@ -984,11 +986,11 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
         }
     }
     // Turned off for that game while it runs → end the session too.
-    let current_id = current.as_ref().map(|c| c.game_id.clone()).filter(|id| s.game_mode_games.contains(id) || running.iter().all(|r| &r.id != id));
+    let current_id = current.as_ref().map(|c| c.game_id.clone()).filter(|id| enabled.contains(id) || running.iter().all(|r| &r.id != id));
     let decision = if current.is_some() && current_id.is_none() {
         gamemode::Decision::Stop
     } else {
-        gamemode::decide(current_id.as_deref(), &running, &s.game_mode_games)
+        gamemode::decide(current_id.as_deref(), &running, &enabled)
     };
     match decision {
         gamemode::Decision::Start(i) => {
@@ -1158,8 +1160,9 @@ fn luli_forget(id: String) -> Result<Vec<luli::MemoryItem>, String> {
 #[tauri::command]
 fn settings_set(r: State<'_, Routines>, settings: Settings) -> Result<Settings, String> {
     // Per-game options mirror the GPU preference in the registry: only `game_tweaks_set` changes
-    // them (a page holding an older copy must not undo them).
-    let settings = Settings { game_tweaks: r.settings.lock().unwrap().game_tweaks.clone(), ..settings };
+    // them (a page holding an older copy must not undo them). Picked exes: only `pick_exe` & co.
+    let live = r.settings.lock().unwrap().clone();
+    let settings = Settings { game_tweaks: live.game_tweaks, game_paths: live.game_paths, game_exe_override: live.game_exe_override, ..settings };
     let saved = settings::save(&settings).map_err(|e| e.to_string())?;
     *r.settings.lock().unwrap() = saved.clone();
     Ok(saved)
@@ -2018,8 +2021,8 @@ async fn game_tweaks_info(state: State<'_, Dashboard>) -> Result<GameTweaksInfo,
 #[tauri::command]
 async fn game_tweaks_set(app: AppHandle, id: String, tweaks: gamemode::GameTweaks) -> Result<Settings, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let exes = app.state::<Routines>().settings.lock().unwrap().game_exes.clone();
-        let game = app.state::<GamesState>().current(&exes, false).into_iter().find(|g| g.id == id).ok_or("unknown_game")?;
+        let live = app.state::<Routines>().settings.lock().unwrap().clone();
+        let game = app.state::<GamesState>().current(&live, false).into_iter().find(|g| g.id == id).ok_or("unknown_game")?;
         let r = app.state::<Routines>();
         let mut s = r.settings.lock().unwrap();
         let before = s.game_tweaks.get(&id).copied().unwrap_or_default();
@@ -2053,8 +2056,8 @@ fn gpu_target(app: &AppHandle, game: Option<String>) -> Result<nvapi::Target, St
     let Some(id) = game else {
         return Ok(nvapi::Target::Global);
     };
-    let custom = app.state::<Routines>().settings.lock().unwrap().game_exes.clone();
-    let g = app.state::<GamesState>().current(&custom, false).into_iter().find(|g| g.id == id).ok_or("unknown_game")?;
+    let live = app.state::<Routines>().settings.lock().unwrap().clone();
+    let g = app.state::<GamesState>().current(&live, false).into_iter().find(|g| g.id == id).ok_or("unknown_game")?;
     let exe = match &g.main_exe {
         Some(p) => std::path::Path::new(p).file_name().map(|n| n.to_string_lossy().into_owned()),
         None => id.strip_prefix("exe:").map(str::to_string),
@@ -2373,6 +2376,7 @@ pub fn run() {
         .manage(TokenStore::default())
         .manage(Dashboard::default())
         .manage(GamesState::default())
+        .register_asynchronous_uri_scheme_protocol("cover", games_cmds::cover_protocol) // r9:games covers
         .manage(DupState::default())
         .manage(IconCache::default())
         .manage(NetEtwState::default())
@@ -2593,6 +2597,10 @@ pub fn run() {
             net_flush_dns,
             net_open_reset,
             // r9:games
+            games_cmds::game_launch,
+            games_cmds::pick_exe,
+            games_cmds::game_exe_reset,
+            games_cmds::games_remove,
 
             // r9:tweaks
 

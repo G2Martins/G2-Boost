@@ -59,6 +59,12 @@ pub struct Settings {
     /// winget ids the user left out of "update all" (validated on use by `updates::excluded_ids`).
     pub update_excluded: Vec<String>,
     // r9:games field
+    /// Games added by picking their exe in the Open dialog (full local paths). Changed only by
+    /// the shell's `pick_exe` / `games_remove`, never by `settings_set`.
+    pub game_paths: Vec<String>,
+    /// The exe the user chose per game (id → full path, inside the game's folder when it has
+    /// one). Changed only by `pick_exe` / `game_exe_reset`.
+    pub game_exe_override: BTreeMap<String, String>,
 
     // r9:tweaks field
 
@@ -102,6 +108,8 @@ impl Default for Settings {
             always_admin: false,
             update_excluded: Vec::new(),
             // r9:games default
+            game_paths: Vec::new(),
+            game_exe_override: BTreeMap::new(),
 
             // r9:tweaks default
 
@@ -178,6 +186,15 @@ pub fn sanitize(mut s: Settings) -> Settings {
         other => other,
     };
     // r9:games sanitize
+    // Picked exes: plain local paths only (existence is checked again wherever they are used).
+    let mut seen = std::collections::HashSet::new();
+    s.game_paths.retain(|p| crate::games::plain_exe(p) && seen.insert(p.to_ascii_lowercase()));
+    s.game_paths.truncate(MAX_EXES);
+    s.game_exe_override = std::mem::take(&mut s.game_exe_override)
+        .into_iter()
+        .filter(|(id, p)| valid_game_id(id) && crate::games::plain_exe(p))
+        .take(200)
+        .collect();
 
     // r9:tweaks sanitize
 
@@ -257,6 +274,7 @@ mod tests {
                 "x".repeat(70) + ".exe",
             ],
             update_excluded: vec![],
+            ..Default::default()
         });
         assert_eq!(s.routine_categories, vec!["temp_user".to_string()]);
         assert_eq!(s.game_exes, vec!["cs2.exe".to_string(), "a.exe".to_string()]);

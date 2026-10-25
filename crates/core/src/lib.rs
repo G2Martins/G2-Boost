@@ -63,6 +63,7 @@ pub mod updates;
 pub mod volumes;
 pub mod netrepair;
 // r9:games
+pub mod covers;
 
 // r9:tweaks
 

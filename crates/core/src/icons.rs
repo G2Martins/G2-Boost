@@ -7,8 +7,9 @@ use windows::Win32::Graphics::Imaging::{
     CLSID_WICImagingFactory, GUID_ContainerFormatPng, GUID_WICPixelFormat32bppBGRA, IWICImagingFactory,
     WICBitmapEncoderNoCache,
 };
+use windows::Win32::Foundation::S_OK;
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance, STATFLAG_NONAME, STREAM_SEEK_SET};
-use windows::Win32::UI::Shell::{ExtractIconExW, SHCreateMemStream};
+use windows::Win32::UI::Shell::{ExtractIconExW, SHCreateMemStream, SHDefExtractIconW};
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, HICON};
 use windows::core::PCWSTR;
 
@@ -43,6 +44,25 @@ pub fn png_from_resource(path: &Path, index: i32) -> Option<Vec<u8>> {
     let png = encode(large);
     // SAFETY: icon returned by ExtractIconExW, destroyed once.
     let _ = unsafe { DestroyIcon(large) };
+    png
+}
+
+/// The first icon of `path` at `size` px (Windows picks the closest image in the file and
+/// scales it), as PNG bytes. For big tiles; `png_from_resource` gives the 32 px one.
+pub fn png_sized(path: &Path, size: u32) -> Option<Vec<u8>> {
+    if !path.is_file() {
+        return None;
+    }
+    let w = wide(&path.to_string_lossy());
+    let mut icon = HICON::default();
+    // SAFETY: one large icon requested into `icon`; destroyed below.
+    let hr = unsafe { SHDefExtractIconW(PCWSTR(w.as_ptr()), 0, 0, Some(&mut icon), None, size.min(256)) };
+    if hr != S_OK || icon.is_invalid() {
+        return None;
+    }
+    let png = encode(icon);
+    // SAFETY: icon returned by SHDefExtractIconW, destroyed once.
+    let _ = unsafe { DestroyIcon(icon) };
     png
 }
 
@@ -139,8 +159,11 @@ mod tests {
     #[test]
     fn extracts_a_real_icon_as_png() {
         let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-        let png = png_from_resource(&PathBuf::from(win).join("explorer.exe"), 0).expect("explorer icon");
+        let png = png_from_resource(&PathBuf::from(&win).join("explorer.exe"), 0).expect("explorer icon");
         assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
         assert!(png_from_resource(Path::new(r"C:\nope\x.exe"), 0).is_none());
+        let big = png_sized(&PathBuf::from(win).join("explorer.exe"), 256).expect("big explorer icon");
+        assert!(big.starts_with(b"\x89PNG\r\n\x1a\n") && big.len() > png.len(), "256 px is bigger than 32 px");
+        assert!(png_sized(Path::new(r"C:\nope\x.exe"), 256).is_none());
     }
 }
