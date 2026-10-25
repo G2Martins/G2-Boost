@@ -69,6 +69,9 @@ pub mod netrepair;
 // r9:maint
 
 // r9:hw
+pub mod checkup;
+pub mod hwcsv;
+pub mod hwsensors;
 
 // r9:install
 

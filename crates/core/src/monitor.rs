@@ -51,9 +51,9 @@ pub struct Sample {
     pub net_tx_bytes_s: u64,
 }
 
-struct Counter(PDH_HCOUNTER);
+pub(crate) struct Counter(PDH_HCOUNTER);
 
-fn add_counter(query: PDH_HQUERY, path: &str) -> Option<Counter> {
+pub(crate) fn add_counter(query: PDH_HQUERY, path: &str) -> Option<Counter> {
     let w = wide(path);
     let mut c = PDH_HCOUNTER::default();
     // SAFETY: valid query handle and null-terminated English counter path.
@@ -61,7 +61,7 @@ fn add_counter(query: PDH_HQUERY, path: &str) -> Option<Counter> {
     (rc == 0).then_some(Counter(c))
 }
 
-fn value(c: &Option<Counter>) -> Option<f64> {
+pub(crate) fn value(c: &Option<Counter>) -> Option<f64> {
     let c = c.as_ref()?;
     let mut v = PDH_FMT_COUNTERVALUE::default();
     // SAFETY: sized out-param; non-zero status (e.g. PDH_INVALID_DATA on the first sample) → None.
@@ -71,7 +71,7 @@ fn value(c: &Option<Counter>) -> Option<f64> {
 }
 
 /// All instances of a wildcard counter as (instance name, value).
-fn values(c: &Option<Counter>) -> Vec<(String, f64)> {
+pub(crate) fn values(c: &Option<Counter>) -> Vec<(String, f64)> {
     let Some(c) = c.as_ref() else {
         return Vec::new();
     };
