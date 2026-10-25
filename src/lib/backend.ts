@@ -1101,6 +1101,17 @@ export const backend = {
   // r9:hw
 
   // r9:install
+  /* Instalar: the curated winget catalog, what is installed, and the one-at-a-time batch installer. */
+  installCatalog: () => call<InstallEntry[]>("install_catalog"),
+  /** Ids of the "essentials" preset (also the post-format wizard's starting point). */
+  installEssentials: async () => (await call<string[]>("install_essentials")) ?? [],
+  /** `refresh` skips the core's ten-minute cache of `winget list`. */
+  installStatus: (refresh: boolean) => call<InstallStatus>("install_status", { refresh }),
+  installConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("install_confirm", { ids }),
+  installRun: (token: number, ids: string[]) =>
+    callOrThrow<InstallBatch>("install_run", { token, ids }),
+  installCancel: () => call<void>("install_cancel"),
+  installHistory: () => call<InstallBatch[]>("install_history"),
 
   // r9:tools
 
@@ -1271,6 +1282,51 @@ export type WuProgress = {
 // ── r9:hw types ──
 
 // ── r9:install types ──
+
+export type InstallCategory =
+  | "browsers"
+  | "communication"
+  | "games"
+  | "media"
+  | "creative"
+  | "dev"
+  | "utilities"
+  | "office"
+  | "security"
+  | "hardware"
+  | "network"
+  | "self_hosted";
+/** One app of the curated winget catalog (the core's allowlist). */
+export type InstallEntry = {
+  id: string;
+  name: string;
+  category: InstallCategory;
+  essential: boolean;
+};
+export type InstallState = {
+  id: string;
+  installed: boolean;
+  version: string | null;
+  /** Newer version in the winget catalog. */
+  update: string | null;
+  via: "winget" | "registry" | null;
+  /** The matching installed app's id (`AppEntry.id`): its icon and the native uninstaller. */
+  app: string | null;
+};
+export type InstallStatus = {
+  /** false: winget.exe is not installed, so nothing can be installed from the tab. */
+  winget: boolean;
+  states: InstallState[];
+};
+export type InstallBatch = {
+  at: number;
+  kind: string;
+  items: UpdateItem[];
+  reboot: boolean;
+  cancelled: boolean;
+};
+/** `install:progress` payload, same shape as the updates one. */
+export type InstallProgress = AppUpdateProgress;
 
 // ── r9:tools types ──
 
