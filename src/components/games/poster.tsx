@@ -9,6 +9,9 @@ import { cn, formatBytes } from "@/lib/utils";
 const art = (id: string, icon = false) =>
   inTauri ? `http://cover.localhost/${icon ? "icon/" : ""}${encodeURIComponent(id)}` : null;
 
+/** Short tag of the exe path: a new exe gets a new icon URL, never the old cached image. */
+const tag = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7).toString(36);
+
 /** Steam and Epic start through their launcher; the rest need an exe. */
 export const launchable = (g: GameEntry) =>
   g.launcher === "steam" || g.launcher === "epic" || g.main_exe !== null;
@@ -43,11 +46,13 @@ export function GamePoster({
 }) {
   const { t, locale } = useI18n();
   const cover = game.launcher === "steam" ? art(game.id) : null;
-  const icon = game.main_exe ? art(game.id, true) : null;
-  const [coverOk, setCoverOk] = useState(true);
-  const [iconOk, setIconOk] = useState(true);
-  const showCover = cover !== null && coverOk;
-  const showIcon = !showCover && icon !== null && iconOk;
+  const base = game.main_exe ? art(game.id, true) : null;
+  const icon = base && game.main_exe ? `${base}?v=${tag(game.main_exe)}` : null;
+  // The src that failed (not a flag): a new src gets its own try.
+  const [failed, setFailed] = useState<string[]>([]);
+  const fail = (src: string) => setFailed((f) => [...f, src]);
+  const showCover = cover !== null && !failed.includes(cover);
+  const showIcon = !showCover && icon !== null && !failed.includes(icon);
   const canPlay = launchable(game);
   return (
     <li
@@ -64,7 +69,7 @@ export function GamePoster({
           loading="lazy"
           decoding="async"
           draggable={false}
-          onError={() => setCoverOk(false)}
+          onError={() => fail(cover)}
         />
       ) : showIcon ? (
         // The tile's backdrop: the same icon, blown up and blurred into a wash of its colors.
@@ -73,7 +78,7 @@ export function GamePoster({
           alt=""
           loading="lazy"
           draggable={false}
-          onError={() => setIconOk(false)}
+          onError={() => fail(icon)}
           className="opacity-45 blur-2xl saturate-150"
           style={{ transform: "scale(1.7)" }}
         />

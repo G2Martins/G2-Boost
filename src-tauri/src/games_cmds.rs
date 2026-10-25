@@ -297,3 +297,51 @@ fn not_found() -> Response<Vec<u8>> {
     r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session(id: &str) -> gamemode::Session {
+        gamemode::Session {
+            game_id: id.into(),
+            game_name: "G".into(),
+            pid: None,
+            install_dir: None,
+            started: 0,
+            prev_plan: None,
+            applied: vec![],
+            ram_freed: 0,
+            skipped: vec![],
+            qos_policy: None,
+            affinity: None,
+        }
+    }
+
+    fn arm(id: &str, at: Instant) {
+        *ARMED.lock().unwrap() = Some(Armed { id: id.into(), at, started: false });
+    }
+
+    #[test]
+    fn armed_game_gets_one_session_then_leaves() {
+        let s = Settings { game_mode_games: vec!["steam:1".into()], ..Default::default() };
+        arm("steam:2", Instant::now());
+        assert_eq!(mode_games(&s, None), ["steam:1", "steam:2"], "waiting for the game to open");
+        assert_eq!(mode_games(&s, Some(&session("steam:2"))), ["steam:1", "steam:2"], "its session runs");
+        assert_eq!(mode_games(&s, Some(&session("steam:2"))), ["steam:1", "steam:2"]);
+        assert_eq!(mode_games(&s, None), ["steam:1"], "session over: Game Mode off again for it");
+        assert!(ARMED.lock().unwrap().is_none());
+        // A session of another game does not count as the armed one starting.
+        arm("steam:3", Instant::now());
+        assert_eq!(mode_games(&s, Some(&session("steam:1"))), ["steam:1", "steam:3"]);
+        // Already on for good: listed once.
+        arm("steam:1", Instant::now());
+        assert_eq!(mode_games(&s, None), ["steam:1"]);
+        // Never opened within the window: dropped.
+        if let Some(old) = Instant::now().checked_sub(ARM_WINDOW + Duration::from_secs(1)) {
+            arm("steam:4", old);
+            assert_eq!(mode_games(&s, None), ["steam:1"]);
+            assert!(ARMED.lock().unwrap().is_none());
+        }
+    }
+}
