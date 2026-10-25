@@ -1,10 +1,21 @@
-import { Gamepad2, Plus, RefreshCw, SlidersHorizontal, Square, Zap } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { ElevateButton } from "@/components/elevate-button";
-import { GameTweaksDialog, NO_TWEAKS } from "@/components/games/game-tweaks";
+import { Gamepad2, Plus, RefreshCw, Search, Square, Zap } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { GameTweaksDialog, optionsOf } from "@/components/games/game-tweaks";
+import { GamePoster } from "@/components/games/poster";
 import { RoutePanel } from "@/components/games/route-panel";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
-import { Badge, Button, Card, CardTitle, Skeleton, Switch } from "@/components/ui/primitives";
+import { reducedMotion } from "@/components/ui/count-up";
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  EmptyState,
+  Skeleton,
+  Switch,
+} from "@/components/ui/primitives";
+import { toast } from "@/components/ui/toast";
 import {
   backend,
   type GameEntry,
@@ -12,6 +23,7 @@ import {
   type GameModeSession,
   type GameTweaksInfo,
   inTauri,
+  type Launcher,
   type Settings,
 } from "@/lib/backend";
 import { boot } from "@/lib/boot";
@@ -26,62 +38,36 @@ const OPTIONS: (keyof GameModeOptions)[] = [
   "pause_routines",
 ];
 
-/** A game's icon (its main executable's); its initial on a tinted tile until it loads. */
-function GameIcon({ game }: { game: GameEntry }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    backend.gamesIcon(game.id).then((s) => alive && setSrc(s));
-    return () => {
-      alive = false;
-    };
-  }, [game.id]);
-  return src ? (
-    <img src={src} alt="" className="size-11 shrink-0 rounded-lg object-contain" />
-  ) : (
-    <span
-      aria-hidden
-      className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/12 font-display text-lg font-semibold text-primary"
-    >
-      {game.name.slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
+/** Browser-only dev aid (`#/games/demo`): sample games so the e2e can drive the poster grid. */
+const demo = (
+  id: string,
+  name: string,
+  launcher: Launcher,
+  enabled = false,
+  running = false,
+): GameEntry => ({
+  id,
+  name,
+  launcher,
+  install_dir: null,
+  main_exe: launcher === "custom" ? null : `C:\\Jogos\\${name}\\jogo.exe`,
+  size_bytes: launcher === "steam" ? 35e9 : null,
+  enabled,
+  running,
+});
+const DEMO = [
+  demo("steam:10", "Arena Tática", "steam", true, true),
+  demo("epic:Corrida", "Corrida Noturna", "epic"),
+  demo("app:demo", "Reino Perdido", "riot", true),
+  demo("exe:jogo.exe", "jogo", "custom"),
+];
 
-/** Opens the game's own options; tinted with a count when some are on. */
-function TweaksButton({
-  game,
-  active,
-  disabled,
-  onOpen,
-}: {
-  game: GameEntry;
-  active: number;
-  disabled: boolean;
-  onOpen: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      disabled={disabled}
-      aria-label={t("gametweaks.open.aria", { game: game.name })}
-      title={active ? t("gametweaks.active", { n: active }) : t("gametweaks.open")}
-      className={cn(
-        "press relative flex size-8 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-foreground/6 disabled:opacity-40",
-        active ? "text-primary" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      <SlidersHorizontal className="size-4" />
-      {active ? (
-        <span className="num absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-          {active}
-        </span>
-      ) : null}
-    </button>
-  );
-}
+/** Lowercase without accents, so "acao" finds "Ação". */
+const fold = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 
 function Minutes({ since }: { since: number }) {
   const { t } = useI18n();
@@ -95,19 +81,21 @@ function Minutes({ since }: { since: number }) {
 
 export function GamesPage() {
   const { t, locale } = useI18n();
+  const errorText = useErrorText();
   const [games, setGames] = useState<GameEntry[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [session, setSession] = useState<GameModeSession | null>(null);
   const [elevated, setElevated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [exe, setExe] = useState("");
-  const [exeError, setExeError] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [tweakGame, setTweakGame] = useState<GameEntry | null>(null);
+  const [tweakId, setTweakId] = useState<string | null>(null);
   const [tweakOpen, setTweakOpen] = useState(false);
   const [tweakInfo, setTweakInfo] = useState<GameTweaksInfo | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Launcher | "all">("all");
+  const [launching, setLaunching] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
   useEffect(() => {
     backend.gameTweaksInfo().then(setTweakInfo);
   }, []);
@@ -115,6 +103,16 @@ export function GamesPage() {
   useEffect(() => {
     if (boot.startTab === "route" && games?.[0] && selected === null) setSelected(games[0].id);
   }, [games, selected]);
+  // The route opens below the library: bring it into view.
+  useEffect(() => {
+    if (!selected) return;
+    const id = requestAnimationFrame(() =>
+      document
+        .getElementById("game-route")
+        ?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [selected]);
 
   const load = useCallback(async (refresh = false) => {
     setBusy(refresh);
@@ -124,7 +122,7 @@ export function GamesPage() {
       backend.gameModeStatus(),
       backend.routineStatus(),
     ]);
-    setGames(list ?? []);
+    setGames(list ?? (!inTauri && boot.startTab === "demo" ? DEMO : []));
     if (s) setSettings(s);
     setSession(sess);
     setElevated(!!rs?.elevated);
@@ -154,26 +152,45 @@ export function GamesPage() {
     }
   };
 
-  const toggleGame = (g: GameEntry, on: boolean) => {
-    if (!settings) return;
-    const ids = new Set(settings.game_mode_games);
-    if (on) ids.add(g.id);
-    else ids.delete(g.id);
-    setGames((cur) => cur?.map((x) => (x.id === g.id ? { ...x, enabled: on } : x)) ?? cur);
-    void save({ ...settings, game_mode_games: [...ids] });
+  const saved = (s: Settings) => {
+    setSettings(s);
+    void load();
   };
 
-  const addExe = async () => {
-    const v = exe.trim().toLowerCase();
-    if (!/^[^\\/:*?"<>|]{1,60}\.exe$/.test(v) || !settings) {
-      setExeError(true);
-      return;
+  const play = async (g: GameEntry) => {
+    setLaunching(g.id);
+    try {
+      await backend.gameLaunch(g.id);
+      toast(t("games.play.started", { game: g.name }), { tone: "accent" });
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      toast(
+        ["no_exe", "shell_unavailable", "launch_failed", "unknown_game"].includes(m)
+          ? t(`games.play.error.${m}` as I18nKey)
+          : m === "app-only"
+            ? t("common.app_only")
+            : errorText(e),
+        { tone: "danger", duration: 8000 },
+      );
+    } finally {
+      setLaunching(null);
     }
-    await save({ ...settings, game_exes: [...new Set([...settings.game_exes, v])] });
-    setExe("");
-    setAdding(false);
-    setExeError(false);
-    void load(true);
+  };
+
+  const add = async () => {
+    setPicking(true);
+    try {
+      const s = await backend.pickExe(null);
+      if (!s) return; // cancelled in the Windows dialog
+      const file = s.game_paths.at(-1)?.split("\\").pop() ?? "";
+      toast(t("games.lib.added", { game: file.replace(/\.exe$/i, "") }), { tone: "success" });
+      saved(s);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      toast(m === "bad_exe" ? t("gametweaks.error.bad_exe") : errorText(e), { tone: "danger" });
+    } finally {
+      setPicking(false);
+    }
   };
 
   const stop = async () => {
@@ -182,21 +199,56 @@ export function GamesPage() {
     setNote(t("games.mode.stopped"));
   };
 
+  const launchers = useMemo(() => {
+    const n = new Map<Launcher, number>();
+    for (const g of games ?? []) n.set(g.launcher, (n.get(g.launcher) ?? 0) + 1);
+    return [...n.entries()];
+  }, [games]);
+  // A filter whose launcher left the list (after a refresh) shows everything again.
+  const active = filter !== "all" && launchers.some(([l]) => l === filter) ? filter : "all";
+  const shown = useMemo(() => {
+    const q = fold(query.trim());
+    return (games ?? []).filter(
+      (g) => (active === "all" || g.launcher === active) && fold(g.name).includes(q),
+    );
+  }, [games, active, query]);
+  const tweakGame = games?.find((g) => g.id === tweakId) ?? null;
+  const selectedGame = games?.find((g) => g.id === selected);
+
+  const chip = (on: boolean) =>
+    cn(
+      "press inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors",
+      on
+        ? "bg-foreground/10 text-foreground ring-1 ring-inset ring-border-strong"
+        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+    );
+
   return (
     <>
       <PageHeader
         title={t("games.title")}
         subtitle={t("games.subtitle")}
         actions={
-          <Button
-            variant="outline"
-            size="lg"
-            disabled={busy || !inTauri}
-            onClick={() => void load(true)}
-          >
-            <RefreshCw className={cn("size-4", busy && "animate-spin")} />
-            {t("games.refresh")}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={picking || !settings || !inTauri}
+              onClick={add}
+            >
+              <Plus className="size-4" />
+              {t("games.lib.add")}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={busy || !inTauri}
+              onClick={() => void load(true)}
+            >
+              <RefreshCw className={cn("size-4", busy && "animate-spin")} />
+              {t("games.refresh")}
+            </Button>
+          </div>
         }
       />
       <PageBody>
@@ -250,7 +302,7 @@ export function GamesPage() {
                 </div>
               ) : (
                 <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                  {note ?? t("games.mode.idle")}
+                  {note ?? t("games.mode.hint")}
                 </p>
               )}
             </div>
@@ -263,131 +315,120 @@ export function GamesPage() {
           </div>
         </Card>
 
-        {/* ---------------- games grid ---------------- */}
+        {/* ---------------- library ---------------- */}
         <Card className="animate-rise" style={rise(1)}>
-          <CardTitle help={t("games.list.help")}>
+          <CardTitle help={t("games.lib.help")}>
             <Gamepad2 className="size-4" />
-            {t("games.list.title")}
+            {t("games.lib.title")}
             {games ? <Badge tone="neutral">{games.length}</Badge> : null}
           </CardTitle>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {games === null
-              ? [0, 1, 2, 3].map((k) => <Skeleton key={k} className="h-20 w-full" />)
-              : games.map((g, i) => (
-                  <div
-                    key={g.id}
-                    style={rise(Math.min(i, 8))}
-                    className={cn(
-                      "animate-rise group relative flex items-center gap-3 rounded-lg border bg-background/50 p-3 transition-colors",
-                      g.running
-                        ? "border-primary/60 bg-primary/5"
-                        : g.enabled
-                          ? "border-border-strong"
-                          : "border-border hover:border-border-strong",
-                      selected === g.id && "ring-1 ring-primary/50",
-                    )}
+          {games && games.length > 0 ? (
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <label className="relative flex min-w-56 flex-1 items-center sm:max-w-72">
+                <Search
+                  aria-hidden
+                  className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground"
+                />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  maxLength={60}
+                  placeholder={t("games.lib.search")}
+                  aria-label={t("games.lib.search")}
+                  className="h-9 w-full rounded-md border border-border bg-background pr-3 pl-8.5 text-sm outline-none focus:border-ring"
+                />
+              </label>
+              {launchers.length > 1 ? (
+                <fieldset
+                  aria-label={t("games.lib.filter")}
+                  className="flex flex-wrap items-center gap-1"
+                >
+                  <button
+                    type="button"
+                    className={chip(active === "all")}
+                    aria-pressed={active === "all"}
+                    onClick={() => setFilter("all")}
                   >
-                    <GameIcon game={g} />
+                    {t("games.lib.all")}
+                    <span className="num text-[10px] text-muted-foreground">{games.length}</span>
+                  </button>
+                  {launchers.map(([l, n]) => (
                     <button
+                      key={l}
                       type="button"
-                      onClick={() => setSelected((cur) => (cur === g.id ? null : g.id))}
-                      aria-expanded={selected === g.id}
-                      title={t("route.open")}
-                      className="min-w-0 flex-1 text-left"
+                      className={chip(active === l)}
+                      aria-pressed={active === l}
+                      onClick={() => setFilter(l)}
                     >
-                      <p className="truncate text-sm font-semibold" title={g.name}>
-                        {g.name}
-                      </p>
-                      <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-                        {t(`games.launcher.${g.launcher}` as I18nKey)}
-                        {g.running ? (
-                          <span className="flex items-center gap-1 font-semibold text-primary">
-                            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-                            {t("games.playing")}
-                          </span>
-                        ) : null}
-                      </p>
+                      {t(`games.launcher.${l}` as I18nKey)}
+                      <span className="num text-[10px] text-muted-foreground">{n}</span>
                     </button>
-                    <TweaksButton
-                      game={g}
-                      active={
-                        Object.values(settings?.game_tweaks[g.id] ?? {}).filter(Boolean).length
-                      }
-                      disabled={!settings}
-                      onOpen={() => {
-                        setTweakGame(g);
-                        setTweakOpen(true);
-                      }}
-                    />
-                    <Switch
-                      checked={g.enabled}
-                      onCheckedChange={(on) => toggleGame(g, on)}
-                      disabled={!settings}
-                      aria-label={t("games.mode.toggle", { game: g.name })}
-                    />
-                  </div>
-                ))}
-            {/* add an executable by hand */}
-            <div className="flex min-h-20 items-center rounded-lg border border-dashed border-border-strong p-3">
-              {adding ? (
-                <form
-                  className="flex w-full flex-col gap-1.5"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void addExe();
-                  }}
-                >
-                  <div className="flex gap-2">
-                    <input
-                      // biome-ignore lint/a11y/noAutofocus: opened by the user's click
-                      autoFocus
-                      value={exe}
-                      onChange={(e) => {
-                        setExe(e.target.value);
-                        setExeError(false);
-                      }}
-                      maxLength={64}
-                      placeholder={t("games.add.placeholder")}
-                      aria-label={t("games.add.title")}
-                      className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none focus:border-ring"
-                    />
-                    <Button size="sm" variant="outline" type="submit">
-                      {t("games.add.save")}
-                    </Button>
-                  </div>
-                  {exeError ? (
-                    <span className="text-[11px] text-destructive">{t("games.add.invalid")}</span>
-                  ) : null}
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setAdding(true)}
-                  disabled={!settings}
-                  className="press flex w-full items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
-                >
-                  <Plus className="size-4" />
-                  {t("games.add.title")}
-                </button>
-              )}
+                  ))}
+                </fieldset>
+              ) : null}
             </div>
-          </div>
-          {games && games.length === 0 ? (
-            <p className="mt-3 text-xs text-muted-foreground">{t("games.list.empty")}</p>
           ) : null}
+
+          {games === null ? (
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-4">
+              {[0, 1, 2, 3, 4].map((k) => (
+                <li key={k}>
+                  <Skeleton className="aspect-[2/3] h-auto rounded-[calc(var(--radius)+2px)]" />
+                </li>
+              ))}
+            </ul>
+          ) : games.length === 0 ? (
+            <EmptyState
+              icon={<Gamepad2 className="size-5" />}
+              title={t("games.lib.empty.title")}
+              body={t("games.lib.empty.body")}
+              action={
+                <Button variant="outline" disabled={picking || !settings || !inTauri} onClick={add}>
+                  <Plus className="size-4" />
+                  {t("games.lib.add")}
+                </Button>
+              }
+            />
+          ) : shown.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {t("games.lib.no_match")}
+            </p>
+          ) : (
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-4">
+              {shown.map((g, i) => (
+                <GamePoster
+                  key={g.id}
+                  game={g}
+                  style={rise(Math.min(i, 8))}
+                  options={Object.values(optionsOf(settings, g.id)).filter(Boolean).length}
+                  selected={selected === g.id}
+                  launching={launching === g.id}
+                  onPlay={() => void play(g)}
+                  onTweaks={() => {
+                    setTweakId(g.id);
+                    setTweakOpen(true);
+                  }}
+                  onRoute={() => setSelected((cur) => (cur === g.id ? null : g.id))}
+                />
+              ))}
+            </ul>
+          )}
         </Card>
 
         <GameTweaksDialog
           game={tweakGame}
           open={tweakOpen}
-          current={(tweakGame && settings?.game_tweaks[tweakGame.id]) || NO_TWEAKS}
+          settings={settings}
           info={tweakInfo}
           onClose={() => setTweakOpen(false)}
-          onSaved={setSettings}
+          onSaved={saved}
         />
 
-        {selected && games?.find((g) => g.id === selected) ? (
-          <RoutePanel game={games.find((g) => g.id === selected) as GameEntry} />
+        {selectedGame ? (
+          <div id="game-route" className="scroll-mt-4">
+            <RoutePanel game={selectedGame} />
+          </div>
         ) : null}
 
         {/* ---------------- what Game Mode does ---------------- */}

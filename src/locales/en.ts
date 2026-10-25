@@ -2518,6 +2518,57 @@ export const en = {
   "maint2.net.reset.button": "Open in Windows",
   "maint2.net.reset.opened": "Page opened. Look for Network reset.",
   // ── r9:games · jogos: capas, preparar e jogar (agente A1) ──
+  "games.lib.title": "Library",
+  "games.lib.help":
+    "Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG and Rockstar games, read from each launcher's own files. Steam covers come from its cache on this PC; missing ones are downloaded once.",
+  "games.lib.add": "Add game (.exe)",
+  "games.lib.added": "{game} joined the library.",
+  "games.lib.search": "Search games",
+  "games.lib.all": "All",
+  "games.lib.filter": "Filter by launcher",
+  "games.lib.empty.title": "No games found",
+  "games.lib.empty.body":
+    "Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG and Rockstar games show up on their own. For any other game, pick its executable.",
+  "games.lib.no_match": "No game with that name here.",
+  "games.mode.hint":
+    "Use Prepare and play on a game, or turn Game Mode on in its options. When the game opens, G2 Boost gets the PC ready; when it closes, everything is undone.",
+  "games.play": "Prepare and play",
+  "games.play.aria": "Prepare and play {game}",
+  "games.play.started":
+    "Opening {game}. Game Mode kicks in when the game opens and undoes everything when it closes.",
+  "games.play.error.no_exe":
+    "This game's executable was not found. Pick it in Options, Change .exe.",
+  "games.play.error.shell_unavailable":
+    "G2 Boost runs as administrator and could not reach the Windows desktop to open the game as a normal user. Open it from its launcher.",
+  "games.play.error.launch_failed": "Windows did not open the game. Try its launcher.",
+  "games.play.error.unknown_game": "Game not found. Search again and retry.",
+  "games.tweaks": "Options",
+  "games.route": "Route",
+  "gametweaks.mode": "Game Mode for this game",
+  "gametweaks.mode.desc":
+    "When this game opens, G2 Boost applies Game Mode and undoes everything when it closes. Off, Prepare and play turns it on for that session only.",
+  "gametweaks.high_priority": "High priority",
+  "gametweaks.high_priority.desc":
+    "Raises the game's process to High priority under Game Mode, never realtime. Gain: less competition with background programs. Cost: the rest of the PC answers a little slower while you play.",
+  "gametweaks.high_priority.global":
+    "Already on for every game: the general Game Mode option is on.",
+  "gametweaks.mode_off.all":
+    "With Game Mode off for this game, priority and cores only apply when you use Prepare and play.",
+  "gametweaks.section.exe": "Executable",
+  "gametweaks.exe.desc":
+    "Gives the icon and the graphics card preference, and it is what opens games that are not from Steam or Epic. When the game has a folder, it must be inside it.",
+  "gametweaks.exe.none": "No executable found.",
+  "gametweaks.exe.custom": "Chosen by you",
+  "gametweaks.exe.change": "Change .exe",
+  "gametweaks.exe.reset": "Back to detected",
+  "gametweaks.exe.changed": "{game} executable changed.",
+  "gametweaks.exe.restored": "{game} is back on the detected executable.",
+  "gametweaks.remove": "Remove from library",
+  "gametweaks.removed": "{game} left the library.",
+  "gametweaks.instant":
+    "Changing the executable applies right away. The switches above apply when you click Save.",
+  "gametweaks.error.outside_folder": "Pick an .exe inside the game's folder.",
+  "gametweaks.error.bad_exe": "Pick an .exe on a drive of this PC, not a network folder.",
 
   // ── r9:tweaks · ajustes, debloat, IA do Windows (agente A2) ──
 

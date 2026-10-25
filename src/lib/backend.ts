@@ -219,6 +219,10 @@ export type Settings = {
   /** winget ids left out of "update all". */
   update_excluded: string[];
   // r9:games settings
+  /** Games added by picking their exe (full paths). Changed only through `pickExe` / `gamesRemove`. */
+  game_paths: string[];
+  /** The exe chosen per game (id → path). Changed only through `pickExe` / `gameExeReset`. */
+  game_exe_override: Record<string, string>;
 
   // r9:tweaks settings
 
@@ -1093,6 +1097,12 @@ export const backend = {
   netFlushDns: () => callOrThrow<void>("net_flush_dns"),
   netOpenReset: () => callOrThrow<void>("net_open_reset"),
   // r9:games
+  /** "Preparar e jogar": Game Mode for this session if it is off, then the game starts as the user. */
+  gameLaunch: (id: string) => callOrThrow<void>("game_launch", { id }),
+  /** Windows' Open dialog for an .exe: `game` null adds a game, an id sets that game's exe. Null = cancelled. */
+  pickExe: (game: string | null) => callOrThrow<Settings | null>("pick_exe", { game }),
+  gameExeReset: (id: string) => callOrThrow<Settings>("game_exe_reset", { id }),
+  gamesRemove: (id: string) => callOrThrow<Settings>("games_remove", { id }),
 
   // r9:tweaks
 
@@ -1263,6 +1273,8 @@ export type WuProgress = {
 };
 
 // ── r9:games types ──
+/** `GameTweaks` as the core stores it now: plus high priority for this one game under Game Mode. */
+export type GameOptions = GameTweaks & { high_priority: boolean };
 
 // ── r9:tweaks types ──
 
