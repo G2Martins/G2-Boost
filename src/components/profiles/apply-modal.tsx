@@ -46,6 +46,7 @@ export function ApplyModal({
   const [offOthers, setOffOthers] = useState(
     entry.off === "always" || (entry.off === "ask" && entry.offDefault),
   );
+  const [makeRestore, setMakeRestore] = useState(restoreBefore && elevated);
   const [plan, setPlan] = useState<ProfilePlan | null>(null);
   const [planErr, setPlanErr] = useState<string | null>(null);
   const [run, setRun] = useState<{ done: number; total: number } | null>(null);
@@ -69,7 +70,7 @@ export function ApplyModal({
     const steps = plan.steps;
     setRun({ done: 0, total: steps.length });
     let restore: string | null = null;
-    if (restoreBefore && elevated) {
+    if (makeRestore && elevated) {
       try {
         const made = await backend.restoreCreate(t("dash.restore.description"));
         restore =
@@ -239,11 +240,26 @@ export function ApplyModal({
                 {t("profiles.apply.already", { count: plan.already })}
               </p>
             ) : null}
+            {plan.steps.length > 0 && elevated ? (
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-primary"
+                  checked={makeRestore}
+                  onChange={(e) => setMakeRestore(e.target.checked)}
+                />
+                <span>
+                  <span className="block text-[13px] font-semibold">
+                    {t("profiles.apply.restore_ask")}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t("profiles.apply.restore_hint")}
+                  </span>
+                </span>
+              </label>
+            ) : null}
             {plan.steps.length > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {restoreBefore && elevated ? `${t("profiles.apply.restore")} ` : ""}
-                {t("profiles.apply.safe")}
-              </p>
+              <p className="text-xs text-muted-foreground">{t("profiles.apply.safe")}</p>
             ) : null}
           </>
         )}

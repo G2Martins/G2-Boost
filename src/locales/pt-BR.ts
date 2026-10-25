@@ -2586,7 +2586,9 @@ export const ptBR = {
   "profiles.apply.unknown": "Ignorados por não existirem nesta versão: {count}.",
   "profiles.apply.unavailable": "Ignorados por não funcionarem neste PC: {count}.",
   "profiles.apply.already": "Já estão como o perfil pede: {count}.",
-  "profiles.apply.restore": "Antes de mudar, o Windows cria um ponto de restauração.",
+  "profiles.apply.restore_ask": "Criar um ponto de restauração antes de mudar",
+  "profiles.apply.restore_hint":
+    "O Windows cria no máximo um por dia: se já existe um recente, ele é mantido.",
   "profiles.apply.safe":
     "Cada ajuste guarda o valor original antes de mudar. Para voltar, use a aba Restauração.",
   "profiles.apply.nobackup": "Sem backup, voltam ao padrão do Windows: {count}.",
@@ -2622,6 +2624,7 @@ export const ptBR = {
   "profiles.export.copy_failed": "Não consegui copiar. Selecione o texto e use Ctrl+C.",
   "profiles.import.title": "Importar perfil",
   "profiles.import.files": "Arquivos na pasta Perfis",
+  "profiles.import.open_folder": "Abrir a pasta",
   "profiles.import.files.empty":
     "Nenhum arquivo ainda. Coloque arquivos .json na pasta Perfis, dentro de G2 Boost, em Documentos, ou cole o texto abaixo.",
   "profiles.import.tweaks": "Ajustes: {count}",

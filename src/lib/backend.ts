@@ -1126,6 +1126,7 @@ export const backend = {
   profilesExport: (profile: TweakProfile) =>
     callOrThrow<ProfileExport>("profiles_export", { profile }),
   profilesFiles: () => call<ProfileFile[]>("profiles_files"),
+  profilesOpenFolder: () => callOrThrow<void>("profiles_open_folder"),
   profilesImport: (source: { kind: "file"; file: string } | { kind: "text"; text: string }) =>
     callOrThrow<TweakProfile[]>("profiles_import", { source }),
   periphState: () => call<PeriphState>("periph_state"),

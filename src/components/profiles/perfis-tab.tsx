@@ -277,7 +277,7 @@ export function PerfisTab({
       </Card>
       {err ? <p className="text-xs text-destructive">{err}</p> : null}
       {!inTauri ? (
-        <p className="text-xs text-muted-foreground">{t("periph.error.app_only")}</p>
+        <p className="text-xs text-muted-foreground">{t("profiles.error.app_only")}</p>
       ) : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="profiles-builtin">

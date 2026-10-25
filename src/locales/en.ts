@@ -2580,7 +2580,9 @@ export const en = {
   "profiles.apply.unknown": "Skipped because this version does not have them: {count}.",
   "profiles.apply.unavailable": "Skipped because they do not work on this PC: {count}.",
   "profiles.apply.already": "Already as the profile asks: {count}.",
-  "profiles.apply.restore": "Windows creates a restore point before anything changes.",
+  "profiles.apply.restore_ask": "Create a restore point before changing anything",
+  "profiles.apply.restore_hint":
+    "Windows creates at most one a day: if a recent one exists, it is kept.",
   "profiles.apply.safe":
     "Every tweak saves its original value before changing. To go back, use the Restore tab.",
   "profiles.apply.nobackup": "No backup, these go to the Windows default: {count}.",
@@ -2617,6 +2619,7 @@ export const en = {
   "profiles.export.copy_failed": "Could not copy. Select the text and press Ctrl+C.",
   "profiles.import.title": "Import profile",
   "profiles.import.files": "Files in the Profiles folder",
+  "profiles.import.open_folder": "Open the folder",
   "profiles.import.files.empty":
     "No files yet. Put .json files in the Profiles folder inside G2 Boost, in Documents, or paste the text below.",
   "profiles.import.tweaks": "Tweaks: {count}",

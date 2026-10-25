@@ -1,4 +1,4 @@
-import { Copy, FileJson } from "lucide-react";
+import { Copy, FileJson, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, Modal, Skeleton } from "@/components/ui/primitives";
 import { toast } from "@/components/ui/toast";
@@ -96,6 +96,15 @@ export function ImportModal({
     };
   }, [open]);
 
+  const openFolder = async () => {
+    try {
+      await backend.profilesOpenFolder();
+    } catch (e) {
+      const key = profileErrorKey(e);
+      setError(key ? t(key) : e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const run = async (
     source: { kind: "file"; file: string } | { kind: "text"; text: string },
     label?: string,
@@ -130,9 +139,15 @@ export function ImportModal({
     >
       <div className="flex w-[min(520px,80vw)] flex-col gap-4">
         <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-semibold text-muted-foreground">
-            {t("profiles.import.files")}
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold text-muted-foreground">
+              {t("profiles.import.files")}
+            </h3>
+            <Button size="sm" variant="ghost" onClick={openFolder}>
+              <FolderOpen className="size-4" />
+              {t("profiles.import.open_folder")}
+            </Button>
+          </div>
           {files === null ? (
             <Skeleton className="h-9 w-full" />
           ) : files.length === 0 ? (
