@@ -42,6 +42,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 // r9:install mod
 
 // r9:tools mod
+mod tools_cmds;
 
 // r9:overlay mod
 
@@ -2603,6 +2604,9 @@ pub fn run() {
             // r9:install
 
             // r9:tools
+            tools_cmds::packetloss_run,
+            tools_cmds::packetloss_cancel,
+            tools_cmds::packetloss_export,
 
             // r9:overlay
 

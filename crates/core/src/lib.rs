@@ -73,6 +73,7 @@ pub mod netrepair;
 // r9:install
 
 // r9:tools
+pub mod pktloss;
 
 // r9:overlay
 
