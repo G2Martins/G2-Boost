@@ -26,7 +26,7 @@ Pedido do dono (rodada 9): instalar vários apps de uma vez, pelo winget, a part
 1. A UI manda os ids na ordem em que o usuário marcou; `install_confirm` devolve um token de uso único (2 min) **amarrado à lista exata e ordenada** (`install:<id>` por item, caixa do catálogo). Ordem diferente, lista menor, token já usado ou de outra lista: `bad_token`.
 2. `install_run` resolve os ids de novo, consome o token e toma a mesma trava do "atualizar todos" (`updates::APPS_BUSY`): o winget faz uma instalação por vez, então os dois lotes nunca rodam juntos (`busy`).
 3. Um `winget::install(id, false)` por pacote (`install --id X --exact --silent --accept-package-agreements` mais os argumentos comuns), em ordem, nunca `--all`. Evento `install:progress` (`index`, `total`, `id`, `name`, `status`, `reason`, `code`) antes e depois de cada um. **Parar** vale entre pacotes: o instalador em andamento termina e os que faltavam viram `cancelled`.
-4. Código de saída para motivo (`install::reason`): os de [updates.md](./updates.md) mais `installed` (0x8A15010D e 0x8A150061, "já estava instalado", conta como sucesso) e `no_installer` (sem instalador compatível com este PC). Reinício pendente conta como sucesso e acende o aviso no histórico.
+4. Código de saída para motivo (`install::reason`, significados lidos com `winget error <código>` no winget 1.29): os de [updates.md](./updates.md) mais `installed` (0x8A15010D, 0x8A150061 e 0x8A15002B, "já estava instalado", conta como sucesso), `not_found` (0x8A150014, o id saiu da fonte) e `no_installer` (0x8A150010, sem instalador compatível com este PC). Reinício pendente conta como sucesso e acende o aviso no histórico.
 5. Histórico em `install-history.json` (50 execuções, relido como arquivo hostil: até 2 MB, tipo `install` só, strings sem controle, status e motivo fora do formato viram `failed`), pelo mesmo código do histórico das atualizações (`updates::read_history`/`append_history`).
 6. **Instaladores que pedem administrador** abrem o UAC do Windows por app quando o G2 Boost não está elevado; o diálogo de confirmação avisa. O app não precisa estar elevado para instalar.
 
@@ -50,7 +50,7 @@ O botão de lixeira de um app instalado leva à aba **Instalados** com ele selec
 
 ## Pendente
 
-- **Instalação real** de um app pequeno por esta aba (sem e com elevação), conferindo o UAC por app, o progresso e o histórico: nada foi instalado nos testes automáticos (o instalador é injetado nos testes do laço).
+- **Instalação real** de um app pequeno por esta aba (sem e com elevação), conferindo o UAC por app, o progresso e o histórico: nada foi instalado nos testes automáticos (o instalador é injetado nos testes do laço) nem à mão. Em particular, qual dos três códigos de "já instalado" o winget 1.29 devolve para `install` num app atual: o mapeamento cobre os três, mas nenhum foi observado.
 - Nomes de app em CJK desalinham o corte por caracteres da tabela do winget (as linhas afetadas são descartadas pela validação do id; as demais seguem).
 - O Firefox e o Thunderbird do catálogo são o build em português: numa interface em inglês o app instalado abre em português (dá para trocar no próprio app).
 - O catálogo envelhece: conferir de tempos em tempos com o teste ao vivo.

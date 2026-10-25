@@ -961,6 +961,7 @@ const SHARED_REASONS = [
   "start_failed",
   "timeout",
   "winget_missing",
+  "not_found",
 ];
 
 /** winget codes are HRESULT-like (hex); installer codes are small (decimal). */

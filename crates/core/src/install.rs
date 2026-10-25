@@ -245,14 +245,17 @@ pub fn cancel() {
 }
 
 /// winget's exit code to a short reason key for the UI: the "update all" mapping, plus what only
-/// an install can say.
+/// an install can say (the codes were read with `winget error <code>` on winget 1.29).
 pub fn reason(code: u32) -> &'static str {
     match code {
-        0x8A15_010D | 0x8A15_0061 => "installed",
-        c => match updates::reason(c) {
-            "not_applicable" => "no_installer",
-            r => r,
-        },
+        // Already there: installing an installed app ends in one of these (the last one is
+        // winget's "no newer version to move to").
+        0x8A15_010D | 0x8A15_0061 | 0x8A15_002B => "installed",
+        // The id is not in the source any more.
+        0x8A15_0014 => "not_found",
+        // No installer fits this PC (architecture, locale, scope).
+        0x8A15_0010 => "no_installer",
+        c => updates::reason(c),
     }
 }
 
@@ -563,6 +566,8 @@ mod tests {
         assert_eq!(reason(0), "ok");
         assert_eq!(reason(0x8A15_010D), "installed");
         assert_eq!(reason(0x8A15_0061), "installed");
+        assert_eq!(reason(0x8A15_002B), "installed", "an install of an up-to-date app");
+        assert_eq!(reason(0x8A15_0014), "not_found");
         assert_eq!(reason(0x8A15_0010), "no_installer");
         assert_eq!(reason(0x8A15_0109), "reboot");
         assert_eq!(reason(0x8A15_0019), "admin");
