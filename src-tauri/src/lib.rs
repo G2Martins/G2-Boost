@@ -2617,6 +2617,7 @@ pub fn run() {
             profiles_cmds::profiles_history,
             profiles_cmds::profiles_export,
             profiles_cmds::profiles_files,
+            profiles_cmds::profiles_open_folder,
             profiles_cmds::profiles_import,
             profiles_cmds::periph_state,
             profiles_cmds::periph_set,

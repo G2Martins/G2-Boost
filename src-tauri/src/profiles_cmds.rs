@@ -82,6 +82,18 @@ pub async fn profiles_export(profile: Profile) -> Result<Exported, String> {
     Ok(Exported { json, path: path.map(|p| p.to_string_lossy().into_owned()) })
 }
 
+/// Show `Documents\G2 Boost\Perfis` in Explorer (created when missing).
+#[tauri::command]
+pub async fn profiles_open_folder() -> Result<(), String> {
+    let dir = blocking(|| {
+        let dir = profiles::profiles_dir().ok_or(ProfileError::NoFolder)?;
+        profiles::prepare_dir(&dir)?;
+        Ok::<_, ProfileError>(dir)
+    })
+    .await?;
+    tauri_plugin_opener::reveal_item_in_dir(dir).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn profiles_files() -> Result<Vec<FileEntry>, String> {
     blocking(|| Ok::<_, String>(profiles::profiles_dir().map(|d| profiles::list_files(&d)).unwrap_or_default())).await

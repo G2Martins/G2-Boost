@@ -202,10 +202,24 @@ pub fn profiles_dir() -> Option<PathBuf> {
     Some(docs.join("G2 Boost").join("Perfis"))
 }
 
+/// Accented Latin letters to plain ones, so "Ação" becomes "acao" and not "a-o".
+fn fold(c: char) -> char {
+    match c {
+        'á' | 'à' | 'â' | 'ã' | 'ä' | 'Á' | 'À' | 'Â' | 'Ã' | 'Ä' => 'a',
+        'é' | 'è' | 'ê' | 'ë' | 'É' | 'È' | 'Ê' | 'Ë' => 'e',
+        'í' | 'ì' | 'î' | 'ï' | 'Í' | 'Ì' | 'Î' | 'Ï' => 'i',
+        'ó' | 'ò' | 'ô' | 'õ' | 'ö' | 'Ó' | 'Ò' | 'Ô' | 'Õ' | 'Ö' => 'o',
+        'ú' | 'ù' | 'û' | 'ü' | 'Ú' | 'Ù' | 'Û' | 'Ü' => 'u',
+        'ç' | 'Ç' => 'c',
+        'ñ' | 'Ñ' => 'n',
+        other => other,
+    }
+}
+
 /// ASCII file name from a profile name. The `perfil-` prefix keeps it clear of device names (CON, NUL…).
 pub fn file_name(name: &str) -> String {
     let mut slug = String::new();
-    for c in name.chars() {
+    for c in name.chars().map(fold) {
         let c = if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' };
         if c != '-' || !slug.ends_with('-') {
             slug.push(c);
@@ -223,15 +237,20 @@ fn not_a_link(p: &Path) -> bool {
     }
 }
 
-/// Write `<dir>\perfil-<slug>.json` (same name overwrites: exporting a profile twice is one file).
-/// Nothing is written through a link: a junction planted over the folder (or a link in place of the
-/// file) would send the write elsewhere, with the app's privileges.
-pub fn export_file(dir: &Path, p: &Profile) -> Result<PathBuf, ProfileError> {
-    let p = clean_profile(p.clone()).ok_or(ProfileError::InvalidName)?;
+/// Create the profiles folder, unless it (or its parent) is a link: a junction planted over it
+/// would send what is written there somewhere else, with the app's privileges.
+pub fn prepare_dir(dir: &Path) -> Result<(), ProfileError> {
     if !not_a_link(dir) || !dir.parent().is_none_or(not_a_link) {
         return Err(ProfileError::BadFile);
     }
-    std::fs::create_dir_all(dir).map_err(|e| ProfileError::Io(e.to_string()))?;
+    std::fs::create_dir_all(dir).map_err(|e| ProfileError::Io(e.to_string()))
+}
+
+/// Write `<dir>\perfil-<slug>.json` (same name overwrites: exporting a profile twice is one file).
+/// Nothing is written through a link, the file's own name included.
+pub fn export_file(dir: &Path, p: &Profile) -> Result<PathBuf, ProfileError> {
+    let p = clean_profile(p.clone()).ok_or(ProfileError::InvalidName)?;
+    prepare_dir(dir)?;
     let path = dir.join(file_name(&p.name));
     if let Ok(m) = std::fs::symlink_metadata(&path)
         && (!m.file_type().is_file() || crate::safety::is_reparse(&m))
@@ -744,7 +763,9 @@ mod tests {
     fn file_names_are_slugs_clear_of_device_names() {
         assert_eq!(file_name("Alto desempenho"), "perfil-alto-desempenho.json");
         assert_eq!(file_name("CON"), "perfil-con.json");
-        assert_eq!(file_name("Ação (2)"), "perfil-a-o-2.json");
+        assert_eq!(file_name("Ação (2)"), "perfil-acao-2.json");
+        assert_eq!(file_name("Padrão do Windows"), "perfil-padrao-do-windows.json");
+        assert_eq!(file_name("日本語"), "perfil-sem-nome.json", "other scripts cannot be slugged");
         assert_eq!(file_name("..."), "perfil-sem-nome.json");
         assert!(valid_file(&file_name("Jogos")));
         for bad in ["", ".json", "a.txt", "..\\x.json", "a/b.json", "a\\b.json", ".hidden.json", "a..json", "a:b.json", "CON:.json", "a\u{0}.json"] {
