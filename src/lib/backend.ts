@@ -511,7 +511,14 @@ export type WinSat = {
   disk: number | null;
   taken: string | null;
 };
-export type TweakCategory = "performance" | "privacy" | "appearance" | "network";
+export type TweakCategory =
+  | "performance"
+  | "privacy"
+  | "appearance"
+  | "network"
+  | "gaming"
+  | "ai"
+  | "system";
 export type Recommendation = { id: string; recommended: boolean; reason: string | null };
 export type Facts = {
   system_ssd: boolean | null;
@@ -1095,6 +1102,12 @@ export const backend = {
   // r9:games
 
   // r9:tweaks
+  /** What turning the tweak on writes (registry values, services, tasks, power, features). */
+  tweakChanges: (id: string) => call<TweakChange[]>("tweak_changes", { id }),
+  debloatApps: () => call<PreinstalledApp[]>("debloat_apps"),
+  debloatAppsConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("debloat_apps_confirm", { ids }),
+  debloatAppsRemove: (token: number, ids: string[]) =>
+    callOrThrow<RemovedApp[]>("debloat_apps_remove", { token, ids }),
 
   // r9:maint
 
@@ -1265,6 +1278,15 @@ export type WuProgress = {
 // ── r9:games types ──
 
 // ── r9:tweaks types ──
+export type TweakChange = {
+  kind: "registry" | "service" | "task" | "power" | "plan" | "feature" | "system" | "visual_fx";
+  /** Registry path + value name (`@` = default value), service/task name, GUIDs, feature, call. */
+  target: string;
+  /** What it becomes; null = removed. */
+  value: string | null;
+};
+export type PreinstalledApp = { id: string; name: string; family: string; kind: string };
+export type RemovedApp = { id: string; name: string; ok: boolean; error: string | null };
 
 // ── r9:maint types ──
 

@@ -392,24 +392,9 @@ function Overview({ elevated }: { elevated: boolean }) {
   );
 }
 
-/** Category lives in the Rust catalog; the UI only needs it for the tag. */
+/** The catalog's category (a core test keeps it equal to the Rust one). */
 function categoryOf(id: string): string {
-  if (
-    [
-      "tips",
-      "search_highlights_off",
-      "silent_apps_off",
-      "advertising_id_off",
-      "compat_telemetry_off",
-      "svc_telemetry",
-      "svc_geolocation",
-      "feedback_tasks_off",
-    ].includes(id)
-  )
-    return "privacy";
-  if (["visual_fx", "show_extensions", "widgets_off"].includes(id)) return "appearance";
-  if (id === "network_latency") return "network";
-  return "performance";
+  return TWEAKS.find((tw) => tw.id === id)?.category ?? "performance";
 }
 
 function MonitorCard({
