@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "overlay",
+  "description": "In-game overlay window: it only listens to the overlay events (no other API)",
+  "windows": ["overlay"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}
