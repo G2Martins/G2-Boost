@@ -31,6 +31,25 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
+// r9:games mod
+
+// r9:tweaks mod
+
+// r9:maint mod
+
+// r9:hw mod
+
+// r9:install mod
+
+// r9:tools mod
+
+// r9:overlay mod
+
+// r9:profiles mod
+
+// r9:setup mod
+
+
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
 const ROUTES: &[&str] = &[
     "dashboard", "mypc", "hwmonitor", "maintenance", "security", "setup", "debloat", "boost", "peripherals", "profiles",
@@ -2586,6 +2605,9 @@ pub fn run() {
             // r9:tools
 
             // r9:overlay
+
+            // r9:profiles
+
 
             // r9:setup
 

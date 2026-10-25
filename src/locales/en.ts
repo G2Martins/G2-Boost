@@ -2519,7 +2519,7 @@ export const en = {
   "maint2.net.reset.opened": "Page opened. Look for Network reset.",
   // ── r9:games · jogos: capas, preparar e jogar (agente A1) ──
 
-  // ── r9:tweaks · ajustes, debloat, perfis, restauração, mouse e teclado (agente A2) ──
+  // ── r9:tweaks · ajustes, debloat, IA do Windows (agente A2) ──
 
   // ── r9:maint · manutenção+, antivírus (agente A3) ──
 
@@ -2530,6 +2530,8 @@ export const en = {
   // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
 
   // ── r9:overlay · overlay de jogo (agente A7) ──
+
+  // ── r9:profiles · perfis, restauração, mouse e teclado (agente A8) ──
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
 } as const satisfies Record<keyof typeof ptBR, string>;

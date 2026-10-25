@@ -1087,6 +1087,8 @@ export const backend = {
 
   // r9:overlay
 
+  // r9:profiles
+
   // r9:setup
 };
 
@@ -1254,5 +1256,7 @@ export type WuProgress = {
 // ── r9:tools types ──
 
 // ── r9:overlay types ──
+
+// ── r9:profiles types ──
 
 // ── r9:setup types ──
