@@ -268,9 +268,88 @@ pub fn summary(days: u32) -> Summary {
     Summary { days, scanned, truncated, groups }
 }
 
+/* ---------------- counts for the check-up ---------------- */
+
+/// Counting stops here; the check-up only needs "none / a few / many".
+const COUNT_CAP: u32 = 500;
+
+/// XPath for one provider + event id over the last `ms` milliseconds. The arguments are
+/// constants of ours (never user input).
+fn count_query(provider: &str, id: u32, ms: u64) -> String {
+    format!("*[System[Provider[@Name='{provider}'] and EventID={id} and TimeCreated[timediff(@SystemTime) <= {ms}]]]")
+}
+
+/// How many `provider`/`id` events `log` holds for the last `days` (1..=90), capped. `None` when
+/// the log cannot be queried. Nothing is rendered: handles are only counted and closed.
+fn count_matching(log: &str, provider: &str, id: u32, days: u32) -> Option<u32> {
+    let query = count_query(provider, id, u64::from(days.clamp(1, 90)) * 86_400_000);
+    let (wl, wq) = (wide(log), wide(&query));
+    // SAFETY: query handle closed by `Handle`.
+    let rs = Handle(unsafe { EvtQuery(None, PCWSTR(wl.as_ptr()), PCWSTR(wq.as_ptr()), EvtQueryChannelPath.0 | EvtQueryReverseDirection.0) }.ok()?);
+    let mut n = 0u32;
+    loop {
+        let mut batch = [0isize; 64];
+        let mut got = 0u32;
+        // SAFETY: up to 64 event handles written into `batch`; each is closed through `Handle`.
+        if unsafe { EvtNext(rs.0, &mut batch, 1000, 0, &mut got) }.is_err() || got == 0 {
+            return Some(n);
+        }
+        let events: Vec<Handle> = batch[..got as usize].iter().map(|&h| Handle(EVT_HANDLE(h))).collect();
+        n += events.len() as u32;
+        if n >= COUNT_CAP {
+            return Some(COUNT_CAP);
+        }
+    }
+}
+
+/// Kernel-Power 41 and EventLog 6008 both log the same unexpected shutdown (one per boot after
+/// it): the larger count is the number of shutdowns. `None` only when neither log answered.
+pub(crate) fn shutdowns_from(kernel_power: Option<u32>, event_log: Option<u32>) -> Option<u32> {
+    match (kernel_power, event_log) {
+        (None, None) => None,
+        (a, b) => Some(a.unwrap_or(0).max(b.unwrap_or(0))),
+    }
+}
+
+/// Unexpected shutdowns (power loss, freeze + reset, bug check) in the last `days`.
+pub fn unexpected_shutdowns(days: u32) -> Option<u32> {
+    shutdowns_from(
+        count_matching("System", "Microsoft-Windows-Kernel-Power", 41, days),
+        count_matching("System", "EventLog", 6008, days),
+    )
+}
+
+/// Application crashes (Application Error 1000) in the last `days`.
+pub fn app_crashes(days: u32) -> Option<u32> {
+    count_matching("Application", "Application Error", 1000, days)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn count_query_and_shutdown_rule() {
+        assert_eq!(
+            count_query("Application Error", 1000, 604_800_000),
+            "*[System[Provider[@Name='Application Error'] and EventID=1000 and TimeCreated[timediff(@SystemTime) <= 604800000]]]"
+        );
+        assert_eq!(shutdowns_from(None, None), None);
+        assert_eq!(shutdowns_from(Some(2), None), Some(2));
+        assert_eq!(shutdowns_from(None, Some(3)), Some(3));
+        assert_eq!(shutdowns_from(Some(2), Some(3)), Some(3), "the pair describes the same shutdown, not two");
+        assert_eq!(shutdowns_from(Some(0), Some(0)), Some(0));
+    }
+
+    /// Live: counts on this machine's logs (read-only, no admin).
+    #[test]
+    #[ignore = "live: reads this machine's event logs"]
+    fn live_counts_answer() {
+        let (s, c) = (unexpected_shutdowns(30), app_crashes(7));
+        println!("unexpected shutdowns (30 d): {s:?}, app crashes (7 d): {c:?}");
+        assert!(s.is_some() && c.is_some());
+        assert_eq!(count_matching("System", "No-Such-Provider", 1, 7), Some(0));
+    }
 
     #[test]
     fn hints_and_cleaning() {

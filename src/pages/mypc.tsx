@@ -2,7 +2,6 @@ import {
   Cpu,
   FileDown,
   Gauge as GaugeIcon,
-  Hammer,
   HardDrive,
   MemoryStick,
   Monitor,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BiosGuideCard } from "@/components/bios-guide";
+import { CheckupTab } from "@/components/checkup";
 import { DiskHealthCard } from "@/components/disk-health";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
@@ -21,7 +21,6 @@ import {
   Button,
   Card,
   CardTitle,
-  EmptyState,
   LoadingScope,
   MetricRow,
   Tabs,
@@ -518,12 +517,14 @@ export function MyPcPage() {
     backend.appInfo().then(setInfo);
   }, []);
   const elevated = info?.elevated ?? false;
+  // Controlled so a check-up row can send the user to the overview (BIOS guide, disk health).
+  const [tab, setTab] = useState(boot.startTab === "checkup" ? "checkup" : "overview");
   return (
     <PageHeader
       title={t("nav.mypc")}
       subtitle={t("mypc.subtitle")}
       tabs={
-        <Tabs defaultValue={boot.startTab === "checkup" ? "checkup" : "overview"}>
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="overview">{t("dash.tab.overview")}</TabsTrigger>
             <TabsTrigger value="checkup">{t("mypc.tab.checkup")}</TabsTrigger>
@@ -556,7 +557,7 @@ export function MyPcPage() {
           </TabsContent>
           <TabsContent value="checkup">
             <PageBody className="px-0 pb-0">
-              <EmptyState icon={<Hammer className="size-5" />} title={t("nav.soon")} />
+              <CheckupTab onOverview={() => setTab("overview")} />
             </PageBody>
           </TabsContent>
         </Tabs>

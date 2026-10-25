@@ -39,6 +39,7 @@ mod games_cmds;
 // r9:maint mod
 
 // r9:hw mod
+mod hw_cmds;
 
 // r9:install mod
 
@@ -2608,6 +2609,10 @@ pub fn run() {
             // r9:maint
 
             // r9:hw
+            hw_cmds::hw_start,
+            hw_cmds::hw_stop,
+            hw_cmds::hw_export_csv,
+            hw_cmds::checkup_run,
 
             // r9:install
 

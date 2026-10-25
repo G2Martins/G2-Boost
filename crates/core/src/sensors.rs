@@ -205,6 +205,70 @@ pub fn read() -> Option<External> {
     Some(External { source, cpu_temp_c, readings })
 }
 
+/* ---------------- everything the tool publishes (hardware monitor page) ---------------- */
+
+/// LibreHardwareMonitor device names by identifier (`/intelcpu/0` → `Intel Core i5-10400`).
+fn lhm_names() -> std::collections::HashMap<String, String> {
+    let rows = wmi::query_timeout(
+        r"ROOT\LibreHardwareMonitor",
+        "SELECT Name, Identifier FROM Hardware",
+        &["Name", "Identifier"],
+        std::time::Duration::from_millis(1500),
+    )
+    .unwrap_or_default();
+    rows.iter()
+        .filter_map(|r| Some((r.get("Identifier")?.as_str()?.to_string(), r.get("Name")?.as_str()?.to_string())))
+        .collect()
+}
+
+/// Like `read_lhm` but with loads and currents too, and the devices' own names.
+fn read_lhm_all() -> Option<Vec<Reading>> {
+    let rows = wmi::query_timeout(
+        r"ROOT\LibreHardwareMonitor",
+        "SELECT Name, SensorType, Value, Parent FROM Sensor",
+        &["Name", "SensorType", "Value", "Parent"],
+        std::time::Duration::from_millis(1500),
+    )
+    .ok()?;
+    if rows.is_empty() {
+        return None;
+    }
+    let names = lhm_names();
+    Some(
+        rows.iter()
+            .filter_map(|r| {
+                let (kind, unit) = match r.get("SensorType")?.as_str()? {
+                    "Temperature" => (Kind::Temperature, "°C"),
+                    "Voltage" => (Kind::Voltage, "V"),
+                    "Fan" => (Kind::Fan, "RPM"),
+                    "Power" => (Kind::Power, "W"),
+                    "Clock" => (Kind::Clock, "MHz"),
+                    "Load" | "Control" | "Level" => (Kind::Other, "%"),
+                    "Current" => (Kind::Other, "A"),
+                    _ => return None,
+                };
+                let parent = r.get("Parent").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                Some(Reading {
+                    sensor: names.get(&parent).cloned().unwrap_or(parent),
+                    label: r.get("Name")?.as_str()?.to_string(),
+                    kind,
+                    value: r.get("Value")?.as_f64()?,
+                    unit: unit.to_string(),
+                })
+            })
+            .collect(),
+    )
+}
+
+/// Every reading of whichever tool is running (HWiNFO first), unfiltered: the hardware monitor
+/// groups them by device. `None` when neither runs.
+pub fn read_all() -> Option<(Source, Vec<Reading>)> {
+    match read_hwinfo() {
+        Some(r) if !r.is_empty() => Some((Source::Hwinfo, r)),
+        _ => Some((Source::LibreHardwareMonitor, read_lhm_all()?)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

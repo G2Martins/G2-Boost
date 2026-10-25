@@ -1109,6 +1109,13 @@ export const backend = {
   // r9:maint
 
   // r9:hw
+  /* Monitor de hardware: one snapshot of the sensor tree per second on `hw:tick` while subscribed. */
+  hwStart: () => call<void>("hw_start"),
+  hwStop: () => call<void>("hw_stop"),
+  /** Writes the CSV to Documents and reveals it in Explorer; resolves with its path. */
+  hwExportCsv: (request: HwCsvRequest) => callOrThrow<string>("hw_export_csv", { request }),
+  /** Meu PC › Check-up: about twenty read-only measurements (a few seconds). */
+  checkupRun: () => call<CheckupReport>("checkup_run"),
 
   // r9:install
 
@@ -1288,6 +1295,70 @@ export type GameOptions = GameTweaks & { high_priority: boolean };
 // ── r9:maint types ──
 
 // ── r9:hw types ──
+export type HwDeviceKind = "cpu" | "gpu" | "memory" | "disk" | "network" | "external";
+export type HwSensor = {
+  /** Stable between snapshots: the page keeps min/max by it. */
+  id: string;
+  label: string;
+  /** i18n key suffix (`hw.s.<key>`) for built-in sensors; null = show `label` as is. */
+  key: string | null;
+  /** Index of numbered sensors (thread 3), the `{n}` of the translated label. */
+  n: number | null;
+  value: number;
+  /** `%`, `°C`, `MHz`, `W`, `V`, `RPM`, `B`, `B/s`, `Mb/s`, or the external tool's own. */
+  unit: string;
+};
+export type HwGroup = { id: string; label: string; key: string | null; sensors: HwSensor[] };
+export type HwDevice = {
+  id: string;
+  /** The machine's or the tool's own name; empty when `key` names a generic device. */
+  label: string;
+  key: string | null;
+  n: number | null;
+  kind: HwDeviceKind;
+  groups: HwGroup[];
+};
+export type HwSnapshot = {
+  seq: number;
+  ts: number;
+  devices: HwDevice[];
+  count: number;
+  /** The tool feeding the external devices; null = none running. */
+  external: "hwinfo" | "libre_hardware_monitor" | null;
+  /** A CPU temperature is among the readings. */
+  cpu_temp: boolean;
+};
+export type HwCsvRow = {
+  device: string;
+  group: string;
+  sensor: string;
+  value: number | null;
+  min: number | null;
+  max: number | null;
+  unit: string;
+};
+export type HwCsvRequest = { locale: string; header: string[]; rows: HwCsvRow[] };
+
+export type CheckupState = "ok" | "attention" | "unknown";
+export type CheckupReason = "unreadable" | "needs_admin" | "not_applicable" | "no_history";
+export type CheckupItem = {
+  id: string;
+  state: CheckupState;
+  reason: CheckupReason | null;
+  value: number | null;
+  limit: number | null;
+  unit: "pct" | "bytes" | "days" | "count" | "ms" | "bool";
+  /** Names ending in `_bytes` or `_days` are numbers to format; the rest is text. */
+  params: Record<string, string>;
+  /** Route of the screen that fixes it; null = the fix lives in Windows itself. */
+  fix: string | null;
+};
+export type CheckupReport = {
+  items: CheckupItem[];
+  summary: { ok: number; attention: number; unknown: number };
+  took_ms: number;
+  elevated: boolean;
+};
 
 // ── r9:install types ──
 
