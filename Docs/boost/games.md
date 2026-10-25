@@ -56,3 +56,7 @@ Por id de jogo validado (mesma regra de `game_mode_games`; entradas vazias são 
 - **Diagrama:** Você → saltos (`trace_host`, ICMP com TTL, sem admin) → destino, cada salto com zona (sua rede = privado; provedor = CGNAT e os 2 primeiros públicos, heurística sem ASN) e o ms que acrescenta.
 - **Análise honesta:** um salto só é "o pior" se os seguintes continuam altos (roteador que responde ICMP devagar não é culpado); perda só conta se chega ao destino.
 - **Reotimizar:** DNS mais rápido agora (`dns_rank`), Wi-Fi (sinal/banda), salto do roteador de casa (ms/perda), onde está o pior trecho e lembrete do teste de bufferbloat, cada um com botão para a tela que corrige.
+
+## Overlay de jogo (2026-10-25)
+
+FPS, tempo de quadro, 1% low, CPU, GPU e RAM por cima do jogo, numa janela à parte, sem injeção e sem driver (eventos do próprio Windows), com atalho global: [overlay.md](./overlay.md). O nome do jogo no overlay vem desta biblioteca (exe dentro da pasta de instalação, `games::running`).
