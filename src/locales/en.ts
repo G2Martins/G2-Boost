@@ -2528,6 +2528,246 @@ export const en = {
   // ── r9:install · instalar apps (agente A5) ──
 
   // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
+  "tools.reset": "Reset",
+
+  // Mouse test
+  "tools.mouse.subtitle":
+    "Polling rate, buttons, false double clicks and wheel, measured straight from the pointer.",
+  "tools.mouse.poll.title": "Polling rate",
+  "tools.mouse.poll.help":
+    "How many times per second the mouse reports its position to the PC. 125 Hz is the old default, 1000 Hz is common on gaming mice and some models reach 4000 and 8000 Hz. The number is what reached this window, so it cannot go past what Windows and the browser deliver.",
+  "tools.mouse.source.raw": "Raw events",
+  "tools.mouse.source.grouped": "Grouped events",
+  "tools.mouse.source.raw.help": "Each mouse report arrives on its own: the most faithful reading.",
+  "tools.mouse.source.grouped.help":
+    "This browser merges reports into the same video frame. The reading works but can come out below the real rate.",
+  "tools.mouse.pad.title": "Move the mouse in here, in fast circles",
+  "tools.mouse.pad.body":
+    "The faster and steadier the movement, the more reports the mouse sends and the closer the reading gets to the real value. Slow or stopped movement pulls the number down.",
+  "tools.mouse.pad.label": "Polling rate test area",
+  "tools.mouse.now": "Now",
+  "tools.mouse.max": "Maximum",
+  "tools.mouse.avg": "Average",
+  "tools.mouse.response": "Response",
+  "tools.mouse.response.help":
+    "Average time between two mouse reports. 1000 Hz is 1 ms; 125 Hz is 8 ms.",
+  "tools.mouse.samples": "Samples",
+  "tools.mouse.jitter": "Jitter",
+  "tools.mouse.jitter.help":
+    "How much the interval changes from one report to the next. Near zero is a steady mouse; high values mean uneven reports.",
+  "tools.mouse.chart": "Time between reports (ms)",
+  "tools.mouse.chart.label": "Chart of the time between mouse reports",
+  "tools.mouse.note":
+    "Pauses between movements and window hiccups are left out. Hiccups ignored: {stalls}.",
+  "tools.mouse.buttons.title": "Buttons and wheel",
+  "tools.mouse.buttons.pad": "Click here with every button and spin the wheel",
+  "tools.mouse.buttons.pad.body":
+    "A button lights up while it is pressed. The right click menu is turned off in this area.",
+  "tools.mouse.buttons.label": "Buttons and wheel test area",
+  "tools.mouse.btn.left": "Left",
+  "tools.mouse.btn.middle": "Middle (wheel)",
+  "tools.mouse.btn.right": "Right",
+  "tools.mouse.btn.back": "Back",
+  "tools.mouse.btn.forward": "Forward",
+  "tools.mouse.clicks": "Clicks",
+  "tools.mouse.wheel": "Wheel",
+  "tools.mouse.wheel.up": "Up",
+  "tools.mouse.wheel.down": "Down",
+  "tools.mouse.wheel.help":
+    "Each step is one scroll event. High resolution wheels send several per notch.",
+  "tools.mouse.bounce.title": "False double click detected",
+  "tools.mouse.bounce.body":
+    "{button}: two clicks less than {ms} ms apart, too fast for a person ({count}x, last gap {gap} ms). Usually a worn micro switch.",
+  "tools.mouse.bounce.ok": "No false double clicks in {count} clicks.",
+  "tools.mouse.bounce.idle": "Click each button a few times to look for false double clicks.",
+
+  // Monitor test
+  "tools.monitor.subtitle":
+    "Stuck pixels, blacks, whites, gradients, uniformity, sharpness and motion, full screen.",
+  "tools.monitor.start.title": "Run the tests full screen",
+  "tools.monitor.start.body":
+    "Opens the first pattern across the whole screen. Switch patterns with the arrow keys and leave with Esc. For blacks and backlight bleed, turn off the room light.",
+  "tools.monitor.start.button": "Start full screen",
+  "tools.monitor.key.pattern": "Switch pattern",
+  "tools.monitor.key.test": "Switch test",
+  "tools.monitor.key.exit": "Exit",
+  "tools.monitor.key.space": "Space",
+  "tools.monitor.key.esc": "Esc",
+  "tools.monitor.key.click": "A click also switches pattern.",
+  "tools.monitor.screen.title": "This screen",
+  "tools.monitor.screen.resolution": "Resolution",
+  "tools.monitor.screen.scale": "Windows scaling",
+  "tools.monitor.screen.colors": "Colors",
+  "tools.monitor.screen.colors.value": "{bits} bits",
+  "tools.monitor.screen.rate": "Refresh rate",
+  "tools.monitor.screen.rate.none": "Run the motion test",
+  "tools.monitor.screen.rate.note":
+    "Measured in the motion test: {seconds} s, {dropped} dropped frames.",
+  "tools.monitor.open": "Open full screen",
+  "tools.monitor.motion.notice":
+    "The motion test animates the screen on purpose, even with “reduce motion” on in Windows, and only runs when you start it.",
+  "tools.monitor.t.solid": "Dead and stuck pixels",
+  "tools.monitor.t.solid.desc":
+    "Five full colors, one at a time. Look for dots that never change color (stuck) or stay dark all the time.",
+  "tools.monitor.t.blacks": "Blacks",
+  "tools.monitor.t.blacks.desc":
+    "Squares from 0 to 10 on black. The 0 disappears; if 1, 2 and 3 disappear too, the blacks are crushed.",
+  "tools.monitor.t.whites": "Whites",
+  "tools.monitor.t.whites.desc":
+    "Squares from 245 to 255 on white. If several on the right vanish into the background, the whites are blown out.",
+  "tools.monitor.t.gradient": "Gradient",
+  "tools.monitor.t.gradient.desc":
+    "Gray, red, green and blue ramps. Look for wide visible bands instead of a smooth transition.",
+  "tools.monitor.t.uniformity": "Uniformity and backlight bleed",
+  "tools.monitor.t.uniformity.desc":
+    "Black, dark gray and mid gray. In a dark room, light patches at the corners and edges are backlight bleed.",
+  "tools.monitor.t.sharpness": "Sharpness and geometry",
+  "tools.monitor.t.sharpness.desc":
+    "1 pixel checkerboard and lines, small text, a circle and a frame. It should look firm with no color fringes, and the frame must show whole on all four edges.",
+  "tools.monitor.t.motion": "Motion and refresh rate",
+  "tools.monitor.t.motion.desc":
+    "Squares at four speeds, with the real refresh rate measured by the browser and the dropped frames. Trails behind a square are ghosting.",
+  "tools.monitor.c.black": "Black",
+  "tools.monitor.c.white": "White",
+  "tools.monitor.c.red": "Red",
+  "tools.monitor.c.green": "Green",
+  "tools.monitor.c.blue": "Blue",
+  "tools.monitor.u.dark": "Dark gray",
+  "tools.monitor.u.mid": "Mid gray",
+  "tools.monitor.surface": "Monitor test screen",
+  "tools.monitor.hint.step": "{name} ({n} of {total})",
+  "tools.monitor.motion.rate": "Measured rate",
+  "tools.monitor.motion.waiting": "Measuring…",
+  "tools.monitor.motion.standard": "close to {hz} Hz",
+  "tools.monitor.motion.frame": "Frame",
+  "tools.monitor.motion.dropped": "Dropped frames",
+  "tools.monitor.motion.worst": "Worst frame",
+  "tools.monitor.motion.lane": "{speed} px/s",
+  "tools.monitor.motion.ppf": "{px} px per frame",
+  "tools.monitor.motion.help":
+    "Follow the squares with your eyes. Trails or shadows behind them are ghosting; squares that move in jerks mean dropped frames.",
+
+  // Packet loss
+  "tools.loss.subtitle":
+    "Measures how many packets get lost, arrive late or arrive out of order on the way to a destination.",
+  "tools.loss.target": "Destination",
+  "tools.loss.target.gateway": "Router",
+  "tools.loss.target.gateway.none": "not found",
+  "tools.loss.target.cloudflare": "Cloudflare",
+  "tools.loss.target.google": "Google",
+  "tools.loss.target.custom": "Other",
+  "tools.loss.custom.label": "IP or address",
+  "tools.loss.custom.placeholder": "e.g. 177.10.20.30 or server.example.com",
+  "tools.loss.profile": "Duration",
+  "tools.loss.profile.quick": "Quick",
+  "tools.loss.profile.quick.hint": "100 packets in 10 s",
+  "tools.loss.profile.standard": "Standard",
+  "tools.loss.profile.standard.hint": "300 packets in 20 s",
+  "tools.loss.profile.long": "Long",
+  "tools.loss.profile.long.hint": "600 packets in 60 s",
+  "tools.loss.start": "Start test",
+  "tools.loss.stop": "Stop",
+  "tools.loss.progress": "{done} of {total} packets",
+  "tools.loss.help":
+    "Sends test packets (ICMP) at a fixed pace. A packet that does not come back within 1 second counts as lost. Late means it came back too slowly: over 150 ms, or more than double the normal time. Out of order means it arrived after a packet that was sent after it. Some servers ignore or limit this kind of packet, so compare with the router.",
+  "tools.loss.empty.title": "No test yet",
+  "tools.loss.empty.body":
+    "Pick a destination and a duration, then start. To find where the problem is, test the router first and then the internet.",
+  "tools.loss.loss": "Loss",
+  "tools.loss.lost": "Lost",
+  "tools.loss.late": "Late",
+  "tools.loss.ooo": "Out of order",
+  "tools.loss.run": "Longest lost streak",
+  "tools.loss.avg": "Average",
+  "tools.loss.min": "Minimum",
+  "tools.loss.max": "Maximum",
+  "tools.loss.p95": "P95",
+  "tools.loss.p95.help": "95% of the packets answered within this time.",
+  "tools.loss.jitter": "Jitter",
+  "tools.loss.strip": "Packet sequence",
+  "tools.loss.strip.label": "{total} packets: {ok} on time, {late} late, {lost} lost",
+  "tools.loss.legend.ok": "On time",
+  "tools.loss.legend.late": "Late",
+  "tools.loss.legend.lost": "Lost",
+  "tools.loss.legend.ooo": "Out of order",
+  "tools.loss.legend.pending": "Waiting",
+  "tools.loss.cell.ok": "#{seq}: {ms} ms",
+  "tools.loss.cell.late": "#{seq}: {ms} ms, late",
+  "tools.loss.cell.lost": "#{seq}: lost",
+  "tools.loss.cell.pending": "#{seq}: waiting",
+  "tools.loss.cell.ooo": "arrived out of order",
+  "tools.loss.chart": "Response time of each packet",
+  "tools.loss.chart.label": "Chart of the response time of each packet",
+  "tools.loss.chart.limit": "150 ms",
+  "tools.loss.csv": "Save as CSV",
+  "tools.loss.csv.saved": "Saved in Documents: {name}",
+  "tools.loss.csv.error.no_run": "Run a test before saving.",
+  "tools.loss.csv.error.no_folder": "Could not find the Documents folder.",
+  "tools.loss.csv.error.io": "Could not write the file.",
+  "tools.loss.verdict.collecting": "Measuring",
+  "tools.loss.verdict.collecting.body":
+    "The numbers below show what was measured so far. The verdict comes when the test ends.",
+  "tools.loss.verdict.short": "Too few packets",
+  "tools.loss.verdict.short.body":
+    "The test stopped at only {sent} packets, too few for a verdict. Let it finish for a reliable result.",
+  "tools.loss.verdict.noanswer": "No answer",
+  "tools.loss.verdict.noanswer.body":
+    "The destination answered no packet at all. It may block this kind of test, or the connection is down.",
+  "tools.loss.verdict.heavy": "Heavy loss",
+  "tools.loss.verdict.heavy.body":
+    "{lost} of {sent} packets were lost ({pct}%), and the worst streak lost {run} in a row. In an online game that means freezes, shots that do not register and your character snapping back in time.",
+  "tools.loss.verdict.noticeable": "Noticeable loss",
+  "tools.loss.verdict.noticeable.body":
+    "{lost} of {sent} packets were lost ({pct}%). In competitive games that already shows up as small stutters and hits that do not count.",
+  "tools.loss.verdict.minor": "Minimal loss",
+  "tools.loss.verdict.minor.body":
+    "{lost} of {sent} packets were lost ({pct}%). Barely noticeable; repeat later to see if it happens again.",
+  "tools.loss.verdict.unstable": "No loss, but unstable",
+  "tools.loss.verdict.unstable.body":
+    "No packet was lost, but {late} arrived late, {ooo} out of order and the jitter was {jitter} ms. Latency swings and the game can hiccup.",
+  "tools.loss.verdict.clean": "Clean connection",
+  "tools.loss.verdict.clean.body":
+    "No packet lost out of {sent}, and latency stayed steady (average {avg} ms).",
+  "tools.loss.advice.noanswer":
+    "Try another destination, such as the router or Cloudflare, to tell a block from an outage.",
+  "tools.loss.advice.gateway":
+    "The loss already shows between the PC and the router. Try a cable instead of Wi-Fi, get closer to the router or restart it.",
+  "tools.loss.advice.beyond":
+    "Also run it on the router: if nothing is lost there, the problem is past your home. Use Analyze route to see where.",
+  "tools.loss.advice.unstable":
+    "Spikes like this usually come from downloads or streaming in progress, crowded Wi-Fi or a router with no queue control. Pause whatever uses the network and test again.",
+  "tools.loss.route.button": "Analyze route",
+  "tools.loss.route.title": "Route to the destination",
+  "tools.loss.route.busy": "Analyzing the route… it can take up to a minute.",
+  "tools.loss.route.empty":
+    "Shows the path the packets take and tells real loss from a router that only ignores the ping test.",
+  "tools.loss.route.error": "Could not analyze the route: {error}",
+  "tools.loss.route.real": "Real loss on the way",
+  "tools.loss.route.real.body":
+    "Packets vanish from hop {ttl} ({addr}) on, {where}, and keep vanishing all the way to the destination.",
+  "tools.loss.route.unseen": "The route did not show where",
+  "tools.loss.route.unseen.body":
+    "The test lost packets, but the route analysis uses few packets per hop and did not catch the spot. Run the Long test or compare the router with another destination.",
+  "tools.loss.route.ignores": "No real loss",
+  "tools.loss.route.ignores.body":
+    "{hops} hop(s) in the middle did not answer every test, but the destination did. Those routers only ignore the ping test and keep forwarding traffic. This is not real loss.",
+  "tools.loss.route.clean": "Clean route",
+  "tools.loss.route.clean.body": "Every hop answered and none lost packets.",
+  "tools.loss.route.where.home": "inside your own network",
+  "tools.loss.route.where.isp": "at your provider",
+  "tools.loss.route.where.internet": "on the internet, past your provider",
+  "tools.loss.route.zone": "Zone",
+  "tools.loss.route.zone.home": "Your network",
+  "tools.loss.route.zone.isp": "Provider",
+  "tools.loss.route.zone.internet": "Internet",
+  "tools.loss.error.busy": "A test is already running.",
+  "tools.loss.error.empty": "Type a destination.",
+  "tools.loss.error.too_long": "The address is too long.",
+  "tools.loss.error.invalid":
+    "Invalid address. Use an IP such as 1.1.1.1 or a name such as example.com.",
+  "tools.loss.error.not_allowed": "That address cannot be tested (reserved range).",
+  "tools.loss.error.resolve": "Could not find that address. Check the name and your internet.",
+  "tools.loss.error.generic": "Test failed: {error}",
 
   // ── r9:overlay · overlay de jogo (agente A7) ──
 

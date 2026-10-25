@@ -2534,6 +2534,247 @@ export const ptBR = {
   // ── r9:install · instalar apps (agente A5) ──
 
   // ── r9:tools · teste do mouse, teste de monitor, perda de pacotes (agente A6) ──
+  "tools.reset": "Zerar",
+
+  // Teste do mouse
+  "tools.mouse.subtitle":
+    "Taxa de polling, botões, cliques duplos falsos e roda, medidos direto no ponteiro.",
+  "tools.mouse.poll.title": "Taxa de polling",
+  "tools.mouse.poll.help":
+    "Quantas vezes por segundo o mouse informa a posição ao PC. 125 Hz é o padrão antigo, 1000 Hz é comum em mouses para jogos e existem modelos de 4000 e 8000 Hz. O número é o que chegou até esta janela, então não passa do que o Windows e o navegador entregam.",
+  "tools.mouse.source.raw": "Eventos brutos",
+  "tools.mouse.source.grouped": "Eventos agrupados",
+  "tools.mouse.source.raw.help": "Cada relatório do mouse chega separado: é a leitura mais fiel.",
+  "tools.mouse.source.grouped.help":
+    "Este navegador junta relatórios no mesmo quadro de vídeo. A leitura funciona, mas pode ficar abaixo do real.",
+  "tools.mouse.pad.title": "Mova o mouse aqui dentro, em círculos rápidos",
+  "tools.mouse.pad.body":
+    "Quanto mais rápido e contínuo o movimento, mais relatórios o mouse envia e mais perto do valor real a leitura fica. Movimento lento ou parado derruba o número.",
+  "tools.mouse.pad.label": "Área de teste da taxa de polling",
+  "tools.mouse.now": "Agora",
+  "tools.mouse.max": "Máximo",
+  "tools.mouse.avg": "Média",
+  "tools.mouse.response": "Resposta",
+  "tools.mouse.response.help":
+    "Tempo médio entre dois relatórios do mouse. 1000 Hz são 1 ms; 125 Hz são 8 ms.",
+  "tools.mouse.samples": "Amostras",
+  "tools.mouse.jitter": "Jitter",
+  "tools.mouse.jitter.help":
+    "Quanto o intervalo muda de um relatório para o outro. Perto de zero é um mouse regular; valores altos indicam relatórios irregulares.",
+  "tools.mouse.chart": "Tempo entre relatórios (ms)",
+  "tools.mouse.chart.label": "Gráfico do tempo entre relatórios do mouse",
+  "tools.mouse.note":
+    "Pausas entre movimentos e travadas da janela não entram na conta. Travadas ignoradas: {stalls}.",
+  "tools.mouse.buttons.title": "Botões e roda",
+  "tools.mouse.buttons.pad": "Clique aqui com cada botão e gire a roda",
+  "tools.mouse.buttons.pad.body":
+    "O botão acende enquanto está apertado. O menu do botão direito fica desligado nesta área.",
+  "tools.mouse.buttons.label": "Área de teste dos botões e da roda",
+  "tools.mouse.btn.left": "Esquerdo",
+  "tools.mouse.btn.middle": "Meio (roda)",
+  "tools.mouse.btn.right": "Direito",
+  "tools.mouse.btn.back": "Voltar",
+  "tools.mouse.btn.forward": "Avançar",
+  "tools.mouse.clicks": "Cliques",
+  "tools.mouse.wheel": "Roda",
+  "tools.mouse.wheel.up": "Para cima",
+  "tools.mouse.wheel.down": "Para baixo",
+  "tools.mouse.wheel.help":
+    "Cada passo é um evento de rolagem. Rodas de alta resolução mandam vários por clique da roda.",
+  "tools.mouse.bounce.title": "Clique duplo falso detectado",
+  "tools.mouse.bounce.body":
+    "{button}: dois cliques a menos de {ms} ms um do outro, rápido demais para uma pessoa ({count}x, último intervalo de {gap} ms). Costuma ser o micro-switch gasto.",
+  "tools.mouse.bounce.ok": "Nenhum clique duplo falso em {count} cliques.",
+  "tools.mouse.bounce.idle":
+    "Clique várias vezes em cada botão para procurar cliques duplos falsos.",
+
+  // Teste de monitor
+  "tools.monitor.subtitle":
+    "Pixels travados, pretos, brancos, degradê, uniformidade, nitidez e movimento, em tela cheia.",
+  "tools.monitor.start.title": "Rodar os testes em tela cheia",
+  "tools.monitor.start.body":
+    "Abre o primeiro padrão ocupando a tela inteira. Troque de padrão com as setas e saia com Esc. Para pretos e vazamento de luz, apague a luz do quarto.",
+  "tools.monitor.start.button": "Iniciar em tela cheia",
+  "tools.monitor.key.pattern": "Trocar padrão",
+  "tools.monitor.key.test": "Trocar teste",
+  "tools.monitor.key.exit": "Sair",
+  "tools.monitor.key.space": "Espaço",
+  "tools.monitor.key.esc": "Esc",
+  "tools.monitor.key.click": "Um clique também troca de padrão.",
+  "tools.monitor.screen.title": "Esta tela",
+  "tools.monitor.screen.resolution": "Resolução",
+  "tools.monitor.screen.scale": "Escala do Windows",
+  "tools.monitor.screen.colors": "Cores",
+  "tools.monitor.screen.colors.value": "{bits} bits",
+  "tools.monitor.screen.rate": "Taxa de atualização",
+  "tools.monitor.screen.rate.none": "Rode o teste de movimento",
+  "tools.monitor.screen.rate.note":
+    "Medida no teste de movimento: {seconds} s, {dropped} quadros perdidos.",
+  "tools.monitor.open": "Abrir em tela cheia",
+  "tools.monitor.motion.notice":
+    "O teste de movimento anima a tela de propósito, mesmo com “reduzir movimento” ligado no Windows, e só roda quando você o inicia.",
+  "tools.monitor.t.solid": "Pixels mortos e travados",
+  "tools.monitor.t.solid.desc":
+    "Cinco cores cheias, uma por vez. Procure pontos que não mudam de cor (travados) ou que ficam sempre apagados.",
+  "tools.monitor.t.blacks": "Pretos",
+  "tools.monitor.t.blacks.desc":
+    "Quadrados de 0 a 10 sobre o preto. O 0 some; se o 1, o 2 e o 3 também somem, os pretos estão esmagados.",
+  "tools.monitor.t.whites": "Brancos",
+  "tools.monitor.t.whites.desc":
+    "Quadrados de 245 a 255 sobre o branco. Se vários da direita somem no fundo, os brancos estão estourados.",
+  "tools.monitor.t.gradient": "Degradê",
+  "tools.monitor.t.gradient.desc":
+    "Rampas de cinza, vermelho, verde e azul. Procure faixas largas e visíveis no lugar de uma transição lisa.",
+  "tools.monitor.t.uniformity": "Uniformidade e vazamento de luz",
+  "tools.monitor.t.uniformity.desc":
+    "Preto, cinza escuro e cinza médio. Com o quarto escuro, manchas claras nos cantos e nas bordas são vazamento de luz do painel.",
+  "tools.monitor.t.sharpness": "Nitidez e geometria",
+  "tools.monitor.t.sharpness.desc":
+    "Xadrez e linhas de 1 pixel, textos pequenos, círculo e moldura. Deve parecer firme, sem franjas de cor, e a moldura precisa aparecer inteira nas quatro bordas.",
+  "tools.monitor.t.motion": "Movimento e taxa de atualização",
+  "tools.monitor.t.motion.desc":
+    "Quadrados em quatro velocidades, com a taxa real medida pelo navegador e os quadros perdidos. Rastros atrás do quadrado indicam fantasmas.",
+  "tools.monitor.c.black": "Preto",
+  "tools.monitor.c.white": "Branco",
+  "tools.monitor.c.red": "Vermelho",
+  "tools.monitor.c.green": "Verde",
+  "tools.monitor.c.blue": "Azul",
+  "tools.monitor.u.dark": "Cinza escuro",
+  "tools.monitor.u.mid": "Cinza médio",
+  "tools.monitor.surface": "Tela de teste do monitor",
+  "tools.monitor.hint.step": "{name} ({n} de {total})",
+  "tools.monitor.motion.rate": "Taxa medida",
+  "tools.monitor.motion.waiting": "Medindo…",
+  "tools.monitor.motion.standard": "perto de {hz} Hz",
+  "tools.monitor.motion.frame": "Quadro",
+  "tools.monitor.motion.dropped": "Quadros perdidos",
+  "tools.monitor.motion.worst": "Pior quadro",
+  "tools.monitor.motion.lane": "{speed} px/s",
+  "tools.monitor.motion.ppf": "{px} px por quadro",
+  "tools.monitor.motion.help":
+    "Siga os quadrados com os olhos. Rastros ou sombras atrás deles são fantasmas; quadrados que andam aos soquinhos indicam quadros perdidos.",
+
+  // Perda de pacotes
+  "tools.loss.subtitle":
+    "Mede quantos pacotes se perdem, chegam atrasados ou fora de ordem no caminho até um destino.",
+  "tools.loss.target": "Destino",
+  "tools.loss.target.gateway": "Roteador",
+  "tools.loss.target.gateway.none": "não encontrado",
+  "tools.loss.target.cloudflare": "Cloudflare",
+  "tools.loss.target.google": "Google",
+  "tools.loss.target.custom": "Outro",
+  "tools.loss.custom.label": "IP ou endereço",
+  "tools.loss.custom.placeholder": "ex.: 177.10.20.30 ou servidor.exemplo.com",
+  "tools.loss.profile": "Duração",
+  "tools.loss.profile.quick": "Rápido",
+  "tools.loss.profile.quick.hint": "100 pacotes em 10 s",
+  "tools.loss.profile.standard": "Padrão",
+  "tools.loss.profile.standard.hint": "300 pacotes em 20 s",
+  "tools.loss.profile.long": "Longo",
+  "tools.loss.profile.long.hint": "600 pacotes em 60 s",
+  "tools.loss.start": "Iniciar teste",
+  "tools.loss.stop": "Parar",
+  "tools.loss.progress": "{done} de {total} pacotes",
+  "tools.loss.help":
+    "Envia pacotes de teste (ICMP) em ritmo fixo. O pacote que não volta em 1 segundo conta como perdido. Atrasado é o que volta lento demais: mais de 150 ms, ou mais que o dobro do normal. Fora de ordem é o que chega depois de um pacote enviado depois dele. Alguns servidores ignoram ou limitam esse tipo de pacote, por isso compare com o roteador.",
+  "tools.loss.empty.title": "Nenhum teste feito ainda",
+  "tools.loss.empty.body":
+    "Escolha um destino e uma duração e inicie. Para saber onde está o problema, teste primeiro o roteador e depois a internet.",
+  "tools.loss.loss": "Perda",
+  "tools.loss.lost": "Perdidos",
+  "tools.loss.late": "Atrasados",
+  "tools.loss.ooo": "Fora de ordem",
+  "tools.loss.run": "Maior sequência perdida",
+  "tools.loss.avg": "Média",
+  "tools.loss.min": "Mínima",
+  "tools.loss.max": "Máxima",
+  "tools.loss.p95": "P95",
+  "tools.loss.p95.help": "95% dos pacotes responderam em até este tempo.",
+  "tools.loss.jitter": "Jitter",
+  "tools.loss.strip": "Sequência de pacotes",
+  "tools.loss.strip.label": "{total} pacotes: {ok} no prazo, {late} atrasados, {lost} perdidos",
+  "tools.loss.legend.ok": "No prazo",
+  "tools.loss.legend.late": "Atrasado",
+  "tools.loss.legend.lost": "Perdido",
+  "tools.loss.legend.ooo": "Fora de ordem",
+  "tools.loss.legend.pending": "Aguardando",
+  "tools.loss.cell.ok": "#{seq}: {ms} ms",
+  "tools.loss.cell.late": "#{seq}: {ms} ms, atrasado",
+  "tools.loss.cell.lost": "#{seq}: perdido",
+  "tools.loss.cell.pending": "#{seq}: aguardando",
+  "tools.loss.cell.ooo": "chegou fora de ordem",
+  "tools.loss.chart": "Tempo de resposta de cada pacote",
+  "tools.loss.chart.label": "Gráfico do tempo de resposta de cada pacote",
+  "tools.loss.chart.limit": "150 ms",
+  "tools.loss.csv": "Gravar em CSV",
+  "tools.loss.csv.saved": "Salvo em Documentos: {name}",
+  "tools.loss.csv.error.no_run": "Rode um teste antes de gravar.",
+  "tools.loss.csv.error.no_folder": "Não achei a pasta Documentos.",
+  "tools.loss.csv.error.io": "Não consegui gravar o arquivo.",
+  "tools.loss.verdict.collecting": "Medindo",
+  "tools.loss.verdict.collecting.body":
+    "Os números abaixo mostram o que foi medido até agora. O veredito sai quando o teste terminar.",
+  "tools.loss.verdict.short": "Poucos pacotes",
+  "tools.loss.verdict.short.body":
+    "O teste parou com só {sent} pacotes, pouco para um veredito. Deixe ele terminar para ter um resultado confiável.",
+  "tools.loss.verdict.noanswer": "Nenhuma resposta",
+  "tools.loss.verdict.noanswer.body":
+    "O destino não respondeu a nenhum pacote. Ele pode bloquear esse tipo de teste ou a conexão está fora do ar.",
+  "tools.loss.verdict.heavy": "Perda alta",
+  "tools.loss.verdict.heavy.body":
+    "{lost} de {sent} pacotes se perderam ({pct}%), e a pior sequência perdeu {run} seguidos. Em jogo online isso vira congelamento, tiros que não registram e o personagem voltando no tempo.",
+  "tools.loss.verdict.noticeable": "Perda perceptível",
+  "tools.loss.verdict.noticeable.body":
+    "{lost} de {sent} pacotes se perderam ({pct}%). Em jogos competitivos isso já aparece como pequenos travamentos e acertos que não contam.",
+  "tools.loss.verdict.minor": "Perda mínima",
+  "tools.loss.verdict.minor.body":
+    "{lost} de {sent} pacotes se perderam ({pct}%). Quase imperceptível; repita mais tarde para ver se acontece de novo.",
+  "tools.loss.verdict.unstable": "Sem perda, mas instável",
+  "tools.loss.verdict.unstable.body":
+    "Nenhum pacote se perdeu, porém {late} chegaram atrasados, {ooo} fora de ordem e o jitter foi de {jitter} ms. A latência oscila e o jogo pode dar soluços.",
+  "tools.loss.verdict.clean": "Conexão limpa",
+  "tools.loss.verdict.clean.body":
+    "Nenhum pacote se perdeu em {sent}, e a latência ficou estável (média de {avg} ms).",
+  "tools.loss.advice.noanswer":
+    "Teste outro destino, como o roteador ou a Cloudflare, para separar um bloqueio de uma queda.",
+  "tools.loss.advice.gateway":
+    "A perda aparece já entre o PC e o roteador. Tente cabo no lugar do Wi-Fi, chegue mais perto do roteador ou reinicie-o.",
+  "tools.loss.advice.beyond":
+    "Rode também no roteador: se lá não se perde nada, o problema está depois da sua casa. Use Analisar rota para ver onde.",
+  "tools.loss.advice.unstable":
+    "Picos assim costumam vir de downloads ou streaming em andamento, Wi-Fi congestionado ou roteador sem controle de fila. Pause o que usa a rede e teste de novo.",
+  "tools.loss.route.button": "Analisar rota",
+  "tools.loss.route.title": "Rota até o destino",
+  "tools.loss.route.busy": "Analisando a rota… pode levar até um minuto.",
+  "tools.loss.route.empty":
+    "Mostra por onde os pacotes passam e separa perda real de roteador que só ignora o teste de ping.",
+  "tools.loss.route.error": "Não deu para analisar a rota: {error}",
+  "tools.loss.route.real": "Perda real no caminho",
+  "tools.loss.route.real.body":
+    "Os pacotes somem a partir do salto {ttl} ({addr}), {where}, e continuam sumindo até o destino.",
+  "tools.loss.route.unseen": "A rota não mostrou onde",
+  "tools.loss.route.unseen.body":
+    "O teste perdeu pacotes, mas a análise de rota usa poucos pacotes por salto e não flagrou o ponto. Rode o teste Longo ou compare o roteador com outro destino.",
+  "tools.loss.route.ignores": "Sem perda real",
+  "tools.loss.route.ignores.body":
+    "{hops} salto(s) do meio não responderam a todos os testes, mas o destino respondeu. Esses roteadores só ignoram o teste de ping e seguem repassando o tráfego. Isso não é perda real.",
+  "tools.loss.route.clean": "Rota limpa",
+  "tools.loss.route.clean.body": "Todos os saltos responderam e nenhum perdeu pacotes.",
+  "tools.loss.route.where.home": "dentro da sua rede",
+  "tools.loss.route.where.isp": "no seu provedor",
+  "tools.loss.route.where.internet": "na internet, depois do seu provedor",
+  "tools.loss.route.zone": "Zona",
+  "tools.loss.route.zone.home": "Sua rede",
+  "tools.loss.route.zone.isp": "Provedor",
+  "tools.loss.route.zone.internet": "Internet",
+  "tools.loss.error.busy": "Já existe um teste em andamento.",
+  "tools.loss.error.empty": "Digite um destino.",
+  "tools.loss.error.too_long": "O endereço é longo demais.",
+  "tools.loss.error.invalid":
+    "Endereço inválido. Use um IP como 1.1.1.1 ou um nome como exemplo.com.",
+  "tools.loss.error.not_allowed": "Esse endereço não pode ser testado (faixa reservada).",
+  "tools.loss.error.resolve": "Não encontrei esse endereço. Confira o nome e a internet.",
+  "tools.loss.error.generic": "Falha no teste: {error}",
 
   // ── r9:overlay · overlay de jogo (agente A7) ──
 

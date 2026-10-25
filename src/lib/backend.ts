@@ -1103,6 +1103,13 @@ export const backend = {
   // r9:install
 
   // r9:tools
+  /** One ICMP burst to the end (or until `packetlossCancel`); each probe also arrives as the
+   *  `packetloss:probe` event. The core validates `host`; `profile` is a closed word. */
+  packetlossRun: (host: string, profile: PacketLossProfile) =>
+    callOrThrow<PacketLossReport>("packetloss_run", { host, profile }),
+  packetlossCancel: () => call<void>("packetloss_cancel"),
+  /** Saves the last run as CSV in Documents and shows it in Explorer; returns the file name. */
+  packetlossExport: (locale: string) => callOrThrow<string>("packetloss_export", { locale }),
 
   // r9:overlay
 
@@ -1273,6 +1280,50 @@ export type WuProgress = {
 // ── r9:install types ──
 
 // ── r9:tools types ──
+export type PacketLossProfile = "quick" | "standard" | "long";
+export type PacketLossSummary = {
+  /** Probes with an outcome (a reply or a timeout). */
+  sent: number;
+  received: number;
+  lost: number;
+  loss_pct: number;
+  late: number;
+  out_of_order: number;
+  avg_ms: number | null;
+  min_ms: number | null;
+  max_ms: number | null;
+  median_ms: number | null;
+  p95_ms: number | null;
+  jitter_ms: number | null;
+  /** Most packets lost back to back. */
+  longest_loss_run: number;
+};
+export type PacketLossSample = {
+  seq: number;
+  /** null = no reply within a second. */
+  rtt_ms: number | null;
+  late: boolean;
+  out_of_order: boolean;
+  arrival: number;
+};
+export type PacketLossEvent = {
+  seq: number;
+  rtt_ms: number | null;
+  late: boolean;
+  out_of_order: boolean;
+  /** Totals so far. */
+  summary: PacketLossSummary;
+};
+export type PacketLossReport = {
+  host: string;
+  ip: string;
+  profile: PacketLossProfile;
+  cancelled: boolean;
+  started: string;
+  duration_ms: number;
+  samples: PacketLossSample[];
+  summary: PacketLossSummary;
+};
 
 // ── r9:overlay types ──
 
