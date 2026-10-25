@@ -15,7 +15,7 @@ Pedido do dono (2026-10-23): o equivalente a `winget upgrade --all` dentro do ap
 - **Progresso:** evento `updates:apps` (`index`, `total`, `id`, `name`, `status` = running/ok/failed/cancelled, `reason`, `code`) antes e depois de cada pacote.
 - **Cancelar:** `updates_apps_cancel` vale entre pacotes; o pacote em andamento termina (matar um instalador no meio pode deixar o app quebrado). Os que faltavam entram como `cancelled`.
 - **Código de saída → motivo** (`updates::reason`): `0x8A150109/0x8A15010B/3010/1641` reinicie para concluir (conta como ok), `0x8A15010A` reinicie antes, `0x8A150101/0103/0111` app aberto, `0x8A150102/1618` outra instalação, `0x8A15010C/1602/1223` cancelado (UAC recusado), `0x8A150019` precisa de admin, `0x8A15002B/0010/0014/010D` nada aplicável, `0x8A150008/0107` download, `0x8A150011` hash, `0x8A150105` disco cheio, `0x8A15010F/001B/001C` política, `0x8A150006` instalador não abriu; o resto é "falhou (código)".
-- Um lote por vez por processo (`busy`).
+- Um lote por vez por processo (`busy`). A trava vale também para o lote da aba **Instalar** ([install-apps.md](./install-apps.md)), que usa o mesmo padrão de token amarrado à lista ordenada; a aba Instalar mostra "há atualização" nos apps do catálogo (coluna Disponível do `winget list`) e leva para cá.
 
 ## Windows Update (API do Windows, sem `usoclient`/`wuauclt`/PowerShell)
 
