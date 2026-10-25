@@ -34,6 +34,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 // r9:games mod
 
 // r9:tweaks mod
+mod tweaks_cmds;
 
 // r9:maint mod
 
@@ -2595,6 +2596,10 @@ pub fn run() {
             // r9:games
 
             // r9:tweaks
+            tweaks_cmds::tweak_changes,
+            tweaks_cmds::debloat_apps,
+            tweaks_cmds::debloat_apps_confirm,
+            tweaks_cmds::debloat_apps_remove,
 
             // r9:maint
 

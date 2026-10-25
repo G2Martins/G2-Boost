@@ -25,6 +25,12 @@ pub struct Facts {
     /// A real printer (local or connection, not PDF/XPS/OneNote/Fax) is installed.
     /// `None` = the list could not be read (the Print Spooler is off, for one).
     pub printers: Option<bool>,
+    /// Keyboard layouts loaded at sign-in (`Keyboard Layout\Preload`): Alt+Shift only switches
+    /// something when there are two or more.
+    pub layouts: u32,
+    /// Ryzen X3D with two CCDs (7900X3D, 7950X3D, 9900X3D, 9950X3D): the chipset driver parks the
+    /// cache-less CCD in games, so core parking must stay on.
+    pub x3d_dual_ccd: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -59,13 +65,25 @@ pub fn facts_for(p: &hardware::Profile) -> Facts {
         ),
         game_pass,
         outlook,
-        windows11: matches!(
-            registry::read(Root::Hklm, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber"),
-            Ok(Value::Str(b)) if b.parse::<u32>().is_ok_and(|n| n >= 22_000)
-        ),
+        windows11: boost::windows11(),
         printers: real_printers(),
+        layouts: registry::value_names(Root::Hkcu, r"Keyboard Layout\Preload").map_or(0, |v| v.len() as u32),
+        x3d_dual_ccd: is_x3d_dual_ccd(&p.cpu, p.cores_physical),
     }
 }
+
+pub(crate) fn is_x3d_dual_ccd(cpu: &str, cores: u32) -> bool {
+    cpu.to_ascii_uppercase().contains("X3D") && cores > 8
+}
+
+/// Tweaks that change how Windows looks or behaves, with no gain to measure: offered, never
+/// counted as pending in the score.
+const PREFERENCE: &[&str] = &[
+    "mouse", "svc_dps", "svc_geolocation", "teams_chat_off", "copilot_off", "recall_off", "click_to_do_off",
+    "recall_feature_off", "paint_ai_off", "notepad_ai_off", "edge_ai_off", "delivery_p2p_off", "spotlight_off",
+    "ntfs_last_access_off", "storage_sense_off", "network_throttling_off", "transparency_off", "classic_context_menu",
+    "taskbar_left", "notifications_off", "error_reporting_off", "narrator_shortcut_off",
+];
 
 /// Printers that print to a file or app, not paper: they need the Spooler but no device.
 pub(crate) fn is_virtual_printer(name: &str) -> bool {
@@ -112,15 +130,27 @@ pub fn recommend(f: &Facts) -> Vec<Recommendation> {
                 "svc_xbox" if f.game_pass => (false, Some("game_pass")),
                 "svc_xbox" => (false, Some("preference")),
                 "svc_search" if f.outlook => (false, Some("outlook")),
-                "mouse" => (false, Some("preference")),
                 "windowed_optimizations" if !f.windows11 => (false, Some("windows10")),
                 "hvci_off" => (false, Some("security")),
-                "svc_dps" | "svc_geolocation" => (false, Some("preference")),
                 "svc_spooler" => match f.printers {
                     Some(false) => (true, None),
                     Some(true) => (false, Some("printer")),
                     None => (false, Some("unknown")),
                 },
+                // Fast Startup is a half hibernation: it saves real seconds on a hard disk, next to
+                // nothing on an SSD, and keeps stale driver state between "shutdowns".
+                "fast_startup_off" => match f.system_ssd {
+                    Some(true) => (true, None),
+                    Some(false) => (false, Some("hdd")),
+                    None => (false, Some("unknown_disk")),
+                },
+                "alt_shift_off" if f.layouts < 2 => (false, Some("single_layout")),
+                "core_parking_off" if f.laptop => (false, Some("laptop")),
+                "core_parking_off" if f.x3d_dual_ccd => (false, Some("x3d")),
+                "core_parking_off" => (false, Some("preference")),
+                "wifi_power_saving_off" if f.laptop => (false, Some("laptop")),
+                "wifi_power_saving_off" => (false, Some("preference")),
+                id if PREFERENCE.contains(&id) => (false, Some("preference")),
                 _ if t.beta => (false, Some("beta")),
                 _ => (true, None),
             };
@@ -208,6 +238,38 @@ mod tests {
         for real in ["HP LaserJet Pro M404", "EPSON L3250 Series", r"\\office\Brother HL-L2350DW"] {
             assert!(!is_virtual_printer(real), "{real}");
         }
+    }
+
+    #[test]
+    fn round9_rules_keep_the_score_meaningful() {
+        let desktop = Facts { system_ssd: Some(true), windows11: true, layouts: 2, ..Default::default() };
+        let r = recommend(&desktop);
+        for id in ["edge_background_off", "consumer_features_off", "telemetry_min", "accessibility_shortcuts_off", "fast_startup_off", "alt_shift_off"] {
+            assert!(by(&r, id).recommended, "{id}");
+        }
+        for id in ["copilot_off", "recall_feature_off", "classic_context_menu", "taskbar_left", "notifications_off", "error_reporting_off"] {
+            assert_eq!(by(&r, id).reason, Some("preference"), "{id}: a taste, not a gain");
+        }
+        // Adding the debloat catalog must not bury the score: only a handful become "pending".
+        let start = boost::TWEAKS.iter().position(|t| t.id == "edge_background_off").unwrap();
+        let new_recommended = r[start..].iter().filter(|x| x.recommended).count();
+        assert!(new_recommended <= 12, "{new_recommended} new recommendations");
+
+        let hdd = recommend(&Facts { system_ssd: Some(false), layouts: 1, ..Default::default() });
+        assert_eq!(by(&hdd, "fast_startup_off").reason, Some("hdd"));
+        assert_eq!(by(&hdd, "alt_shift_off").reason, Some("single_layout"));
+        let x3d = recommend(&Facts { x3d_dual_ccd: true, ..Default::default() });
+        assert_eq!(by(&x3d, "core_parking_off").reason, Some("x3d"));
+        let laptop = recommend(&Facts { laptop: true, ..Default::default() });
+        assert_eq!(by(&laptop, "core_parking_off").reason, Some("laptop"));
+        assert_eq!(by(&laptop, "wifi_power_saving_off").reason, Some("laptop"));
+        assert_eq!(by(&r, "core_parking_off").reason, Some("preference"));
+
+        assert!(is_x3d_dual_ccd("AMD Ryzen 9 7950X3D 16-Core Processor", 16));
+        assert!(is_x3d_dual_ccd("AMD Ryzen 9 9900X3D 12-Core Processor", 12));
+        assert!(!is_x3d_dual_ccd("AMD Ryzen 7 7800X3D 8-Core Processor", 8), "one CCD");
+        assert!(!is_x3d_dual_ccd("AMD Ryzen 9 7950X 16-Core Processor", 16));
+        assert!(!is_x3d_dual_ccd("13th Gen Intel(R) Core(TM) i9-13900K", 24));
     }
 
     #[test]
