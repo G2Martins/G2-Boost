@@ -2622,6 +2622,7 @@ export const ptBR = {
   "checkup.section.firmware": "Drivers e firmware",
   "checkup.fix": "Resolver",
   "checkup.open": "Abrir a tela",
+  "checkup.limit": "limite {limit}",
   "checkup.day": "1 dia",
   "checkup.days": "{n} dias",
   "checkup.months": "{n} meses",

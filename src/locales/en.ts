@@ -2617,6 +2617,7 @@ export const en = {
   "checkup.section.firmware": "Drivers and firmware",
   "checkup.fix": "Fix it",
   "checkup.open": "Open the screen",
+  "checkup.limit": "limit {limit}",
   "checkup.day": "1 day",
   "checkup.days": "{n} days",
   "checkup.months": "{n} months",

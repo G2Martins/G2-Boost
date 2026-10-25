@@ -28,11 +28,15 @@ export function formatDays(days: number, t: T, locale: string): string {
   return t("checkup.years", { n: years });
 }
 
-/** The measure a row shows on its right; null for yes/no rows (the state says it all). */
-export function formatMeasure(item: CheckupItem, t: T, locale: string): string | null {
-  const v = item.value;
+/** A number of a row in the unit the core measured it in; null for yes/no rows. */
+function formatUnit(
+  unit: CheckupItem["unit"],
+  v: number | null,
+  t: T,
+  locale: string,
+): string | null {
   if (v === null || !Number.isFinite(v)) return null;
-  switch (item.unit) {
+  switch (unit) {
     case "pct":
       return `${Math.round(v)}%`;
     case "bytes":
@@ -46,6 +50,17 @@ export function formatMeasure(item: CheckupItem, t: T, locale: string): string |
     default:
       return null;
   }
+}
+
+/** The measure a row shows on its right; null for yes/no rows (the state says it all). */
+export function formatMeasure(item: CheckupItem, t: T, locale: string): string | null {
+  return formatUnit(item.unit, item.value, t, locale);
+}
+
+/** The line the verdict is judged against ("limite 45 dias"); null when the rule is not a number. */
+export function formatLimit(item: CheckupItem, t: T, locale: string): string | null {
+  const v = formatUnit(item.unit, item.limit, t, locale);
+  return v === null ? null : t("checkup.limit", { limit: v });
 }
 
 /**

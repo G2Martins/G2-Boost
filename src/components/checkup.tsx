@@ -12,7 +12,7 @@ import {
   type CheckupState,
   inTauri,
 } from "@/lib/backend";
-import { formatMeasure, rowText, rowTitle, SECTIONS } from "@/lib/checkup";
+import { formatLimit, formatMeasure, rowText, rowTitle, SECTIONS } from "@/lib/checkup";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { navigate } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -175,14 +175,20 @@ function LimitBar({
   value,
   limit,
   attention,
+  title,
 }: {
   value: number;
   limit: number | null;
   attention: boolean;
+  title: string | null;
 }) {
   const pct = (n: number) => `${Math.min(100, Math.max(0, n))}%`;
   return (
-    <span aria-hidden className="relative hidden h-1.5 w-24 rounded-full bg-foreground/8 sm:block">
+    <span
+      aria-hidden
+      title={title ?? undefined}
+      className="relative hidden h-1.5 w-24 rounded-full bg-foreground/8 sm:block"
+    >
       <span
         className={cn(
           "absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-500",
@@ -212,6 +218,7 @@ function CheckRow({
   const { t, locale } = useI18n();
   const name = rowTitle(item, t, locale);
   const measure = formatMeasure(item, t, locale);
+  const limit = formatLimit(item, t, locale);
   const fix = item.fix;
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
@@ -222,10 +229,20 @@ function CheckRow({
       </div>
       <div className="flex items-center gap-3">
         {item.unit === "pct" && item.value !== null ? (
-          <LimitBar value={item.value} limit={item.limit} attention={item.state === "attention"} />
+          <LimitBar
+            value={item.value}
+            limit={item.limit}
+            attention={item.state === "attention"}
+            title={limit}
+          />
         ) : null}
         {measure !== null ? (
-          <span className="num min-w-14 text-right text-[13px] font-semibold">{measure}</span>
+          <span className="min-w-16 text-right">
+            <span className="num block text-[13px] font-semibold">{measure}</span>
+            {limit !== null ? (
+              <span className="num block text-[10px] text-muted-foreground">{limit}</span>
+            ) : null}
+          </span>
         ) : null}
         {item.state === "unknown" && item.reason === "needs_admin" && !elevated ? (
           <ElevateButton route="mypc" tab="checkup" />

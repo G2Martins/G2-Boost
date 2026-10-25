@@ -177,6 +177,48 @@ test.describe("hardware monitor", () => {
     expect(req.rows[4]).toMatchObject({ device: "ASUS PRIME B460M", sensor: "+12V", unit: "V" });
   });
 
+  test("a long list scrolls inside the frame and the column titles stay on top", async ({
+    page,
+  }) => {
+    await fakeTauri(page, { route: "hwmonitor" });
+    await open(page, "hwmonitor", t["nav.hwmonitor"]);
+    await listening(page, "hw:tick");
+    const board = snapshot(1, 10);
+    board.devices.push({
+      id: "ext/big",
+      label: "Big board",
+      key: null,
+      n: null,
+      kind: "external",
+      groups: [
+        {
+          id: "ext/big/fan",
+          label: "Fans",
+          key: "fan",
+          sensors: Array.from({ length: 150 }, (_, i) =>
+            sensor(`ext/big/fan/f${i}`, null, `Fan ${i}`, 900 + i, "RPM"),
+          ),
+        },
+      ],
+    });
+    await emit(page, "hw:tick", board);
+    const table = page.getByRole("table", { name: t["nav.hwmonitor"] });
+    await expect(table.getByRole("cell", { name: "Fan 149", exact: true })).toHaveCount(1);
+    const frame = table.locator("xpath=..");
+    expect(await frame.evaluate((el) => el.scrollHeight > el.clientHeight + 200)).toBe(true);
+    await frame.evaluate((el) => {
+      el.scrollTop = 900;
+    });
+    const title = table.getByRole("columnheader", { name: t["hw.col.sensor"] });
+    const gap = await title.evaluate(
+      (th) =>
+        th.getBoundingClientRect().top -
+        (th.closest("div") as HTMLElement).getBoundingClientRect().top,
+    );
+    expect(Math.abs(gap)).toBeLessThan(2);
+    await expect(title).toBeVisible();
+  });
+
   test("leaving the page stops the sampler", async ({ page }) => {
     await fakeTauri(page, { route: "hwmonitor" });
     await open(page, "hwmonitor", t["nav.hwmonitor"]);
@@ -338,6 +380,7 @@ test.describe("check-up", () => {
       }
       await expect(page.getByText("Só 28 GB livres de 238 GB.", { exact: false })).toBeVisible();
       await expect(page.getByText("A última atualização foi há 9 dias.")).toBeVisible();
+      await expect(page.getByText("limite 45 dias")).toBeVisible();
       await expect(
         page.getByText("Desligamentos inesperados nos últimos 30 dias: 2.", { exact: false }),
       ).toBeVisible();

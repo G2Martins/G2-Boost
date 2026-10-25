@@ -273,35 +273,39 @@ export function HwMonitorPage() {
                   </Button>
                 </div>
               </div>
-              <table
-                aria-label={t("nav.hwmonitor")}
-                aria-busy={!snap}
-                className="w-full table-fixed select-text border-separate border-spacing-0 text-[13px]"
-              >
-                <colgroup>
-                  <col />
-                  <col className="w-48" />
-                  <col className="w-28" />
-                  <col className="w-28" />
-                </colgroup>
-                <thead>
-                  <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <th className="sticky top-0 z-10 bg-surface px-4 py-2 text-left">
-                      {t("hw.col.sensor")}
-                    </th>
-                    <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">
-                      {t("hw.col.value")}
-                    </th>
-                    <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">
-                      {t("hw.col.min")}
-                    </th>
-                    <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">
-                      {t("hw.col.max")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>{snap ? rows : <SkeletonRows />}</tbody>
-              </table>
+              {/* The list scrolls inside the frame so the column titles stay put (the banner above
+                  clips overflow, which would stop a sticky header from sticking to the page). */}
+              <div className="max-h-[calc(100vh-19rem)] min-h-64 overflow-auto">
+                <table
+                  aria-label={t("nav.hwmonitor")}
+                  aria-busy={!snap}
+                  className="w-full table-fixed select-text border-separate border-spacing-0 text-[13px]"
+                >
+                  <colgroup>
+                    <col />
+                    <col className="w-48" />
+                    <col className="w-28" />
+                    <col className="w-28" />
+                  </colgroup>
+                  <thead>
+                    <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <th className="sticky top-0 z-10 bg-surface px-4 py-2 text-left">
+                        {t("hw.col.sensor")}
+                      </th>
+                      <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">
+                        {t("hw.col.value")}
+                      </th>
+                      <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">
+                        {t("hw.col.min")}
+                      </th>
+                      <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">
+                        {t("hw.col.max")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>{snap ? rows : <SkeletonRows />}</tbody>
+                </table>
+              </div>
             </Card>
           )}
         </PageBody>
