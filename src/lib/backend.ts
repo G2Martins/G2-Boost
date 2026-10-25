@@ -233,6 +233,8 @@ export type Settings = {
   // r9:overlay settings
 
   // r9:profiles settings
+  /** Named tweak profiles; changed through `profilesSave`/`profilesDelete`/`profilesImport`. */
+  profiles: TweakProfile[];
 
   // r9:setup settings
 };
@@ -1107,6 +1109,31 @@ export const backend = {
   // r9:overlay
 
   // r9:profiles
+  profilesList: () => call<TweakProfile[]>("profiles_list"),
+  profilesSave: (profile: TweakProfile, previous: string | null) =>
+    callOrThrow<TweakProfile[]>("profiles_save", { profile, previous }),
+  profilesDelete: (name: string) => callOrThrow<TweakProfile[]>("profiles_delete", { name }),
+  /** What applying these tweaks would change right now (reads only). */
+  profilesPlan: (ids: string[], fxLevel: FxLevel | null, offOthers: boolean) =>
+    callOrThrow<ProfilePlan>("profiles_plan", {
+      target: { ids, fx_level: fxLevel, off_others: offOthers },
+    }),
+  /** One step of a plan through the normal tweak flow; `source` is a profile name or `@undo`. */
+  profilesStep: (step: ProfileStep, source: string) =>
+    callOrThrow<ProfileStepResult>("profiles_step", { step, source }),
+  profilesRestoration: () => call<Restoration>("profiles_restoration"),
+  profilesHistory: () => call<HistoryEntry[]>("profiles_history"),
+  profilesExport: (profile: TweakProfile) =>
+    callOrThrow<ProfileExport>("profiles_export", { profile }),
+  profilesFiles: () => call<ProfileFile[]>("profiles_files"),
+  profilesImport: (source: { kind: "file"; file: string } | { kind: "text"; text: string }) =>
+    callOrThrow<TweakProfile[]>("profiles_import", { source }),
+  periphState: () => call<PeriphState>("periph_state"),
+  periphSet: (setting: PeriphSetting, value: number) =>
+    callOrThrow<PeriphState>("periph_set", { setting, value }),
+  /** Back to the saved original: one setting, or all (`null`). */
+  periphRevert: (setting: PeriphSetting | null) =>
+    callOrThrow<PeriphState>("periph_revert", { setting }),
 
   // r9:setup
 };
@@ -1277,5 +1304,64 @@ export type WuProgress = {
 // ── r9:overlay types ──
 
 // ── r9:profiles types ──
+/** A named set of tweak ids (settings.json). Unknown ids are kept and skipped when applied. */
+export type TweakProfile = { name: string; tweaks: string[]; fx_level: FxLevel | null };
+export type ProfileStep = { id: string; op: "on" | "off"; level: FxLevel | null };
+export type ProfilePlan = {
+  steps: ProfileStep[];
+  /** Would need administrator and the app is not elevated. */
+  blocked: ProfileStep[];
+  unknown: string[];
+  unavailable: string[];
+  already: number;
+};
+export type ProfileStepResult = {
+  id: string;
+  op: "on" | "off";
+  ok: boolean;
+  error: string | null;
+  state: TweakState | null;
+};
+export type AppliedTweak = {
+  id: string;
+  status: TweakStatus;
+  has_backup: boolean;
+  admin: boolean;
+  detail: string | null;
+};
+export type RestoreKind =
+  | "dns"
+  | "gpu_driver"
+  | "gpu_pref"
+  | "exposure"
+  | "qos"
+  | "apps_undo"
+  | "game_mode"
+  | "peripherals";
+export type RestoreOther = { kind: RestoreKind; count: number; names: string[] };
+export type Restoration = { tweaks: AppliedTweak[]; others: RestoreOther[] };
+export type HistoryEntry = {
+  at: number;
+  /** A profile name, or `@undo`, `@undo_all`, `@periph`. */
+  source: string;
+  /** A tweak id, or `periph_<setting>`. */
+  id: string;
+  on: boolean;
+  ok: boolean;
+  error: string | null;
+};
+export type ProfileFile = { file: string; name: string; tweaks: number };
+export type ProfileExport = { json: string; path: string | null };
+export type PeriphSetting = "mouse_speed" | "wheel_lines" | "double_click" | "kb_delay" | "kb_rate";
+export type PeriphState = {
+  mouse_speed: number;
+  /** 4294967295 = one screen per notch. */
+  wheel_lines: number;
+  double_click: number;
+  kb_delay: number;
+  kb_rate: number;
+  /** Saved originals that differ from what is set now. */
+  originals: { setting: PeriphSetting; value: number }[];
+};
 
 // ── r9:setup types ──
