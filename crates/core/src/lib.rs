@@ -71,6 +71,8 @@ pub mod netrepair;
 // r9:hw
 
 // r9:install
+pub mod catalog;
+pub mod install;
 
 // r9:tools
 
