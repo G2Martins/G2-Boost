@@ -782,7 +782,7 @@ function PickTile({
         htmlFor={uid}
         title={entry.name}
         className={cn(
-          "panel panel-hover group relative flex min-h-16 items-center gap-3 rounded-lg px-3 py-2.5 select-none has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
+          "panel panel-hover group relative flex min-h-16 items-center gap-3 overflow-clip rounded-lg px-3 py-2.5 select-none has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
           picked &&
             "bg-linear-to-br from-primary/12 to-transparent outline-1 -outline-offset-1 outline-primary/70",
           locked ? "cursor-default opacity-60" : "cursor-pointer",
