@@ -46,6 +46,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 // r9:overlay mod
 
 // r9:profiles mod
+mod profiles_cmds;
 
 // r9:setup mod
 
@@ -2607,6 +2608,19 @@ pub fn run() {
             // r9:overlay
 
             // r9:profiles
+            profiles_cmds::profiles_list,
+            profiles_cmds::profiles_save,
+            profiles_cmds::profiles_delete,
+            profiles_cmds::profiles_plan,
+            profiles_cmds::profiles_step,
+            profiles_cmds::profiles_restoration,
+            profiles_cmds::profiles_history,
+            profiles_cmds::profiles_export,
+            profiles_cmds::profiles_files,
+            profiles_cmds::profiles_import,
+            profiles_cmds::periph_state,
+            profiles_cmds::periph_set,
+            profiles_cmds::periph_revert,
 
 
             // r9:setup

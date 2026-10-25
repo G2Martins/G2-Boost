@@ -73,6 +73,9 @@ pub struct Settings {
     // r9:overlay field
 
     // r9:profiles field
+    /// Named tweak profiles (Profiles page). Cleaned by `profiles::sanitize_list`; changed through
+    /// the `profiles_*` commands, which also update the live copy.
+    pub profiles: Vec<crate::profiles::Profile>,
 
     // r9:setup field
 
@@ -116,6 +119,7 @@ impl Default for Settings {
             // r9:overlay default
 
             // r9:profiles default
+            profiles: Vec::new(),
 
             // r9:setup default
 
@@ -192,6 +196,7 @@ pub fn sanitize(mut s: Settings) -> Settings {
     // r9:overlay sanitize
 
     // r9:profiles sanitize
+    s.profiles = crate::profiles::sanitize_list(std::mem::take(&mut s.profiles));
 
     // r9:setup sanitize
 
@@ -257,6 +262,7 @@ mod tests {
                 "x".repeat(70) + ".exe",
             ],
             update_excluded: vec![],
+            ..Default::default()
         });
         assert_eq!(s.routine_categories, vec!["temp_user".to_string()]);
         assert_eq!(s.game_exes, vec!["cs2.exe".to_string(), "a.exe".to_string()]);

@@ -77,6 +77,8 @@ pub mod netrepair;
 // r9:overlay
 
 // r9:profiles
+pub mod peripherals;
+pub mod profiles;
 
 
 // r9:setup
