@@ -77,6 +77,8 @@ pub struct Settings {
     // r9:tools field
 
     // r9:overlay field
+    /// In-game overlay (hotkey, position, metrics, style). Validated by `overlay::sanitize`.
+    pub overlay: crate::overlay::OverlaySettings,
 
     // r9:profiles field
     /// Named tweak profiles (Profiles page). Cleaned by `profiles::sanitize_list`; changed through
@@ -125,6 +127,7 @@ impl Default for Settings {
             // r9:tools default
 
             // r9:overlay default
+            overlay: crate::overlay::OverlaySettings::default(),
 
             // r9:profiles default
             profiles: Vec::new(),
@@ -211,6 +214,7 @@ pub fn sanitize(mut s: Settings) -> Settings {
     // r9:tools sanitize
 
     // r9:overlay sanitize
+    s.overlay = crate::overlay::sanitize(std::mem::take(&mut s.overlay));
 
     // r9:profiles sanitize
     s.profiles = crate::profiles::sanitize_list(std::mem::take(&mut s.profiles));

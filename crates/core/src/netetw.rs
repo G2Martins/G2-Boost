@@ -72,7 +72,7 @@ pub enum EtwError {
     Api(u32),
 }
 
-fn api(code: u32) -> EtwError {
+pub(crate) fn api(code: u32) -> EtwError {
     if code == ERROR_ACCESS_DENIED { EtwError::NeedsAdmin } else { EtwError::Api(code) }
 }
 
@@ -265,8 +265,8 @@ extern "system" fn on_event(rec: *mut EVENT_RECORD) {
 }
 
 /// Zeroed EVENT_TRACE_PROPERTIES followed by room for the logger and log file names.
-/// `Vec<u64>` keeps the 8-byte alignment the struct needs.
-fn props() -> Vec<u64> {
+/// `Vec<u64>` keeps the 8-byte alignment the struct needs. Shared with `fps.rs`.
+pub(crate) fn props() -> Vec<u64> {
     let head = size_of::<EVENT_TRACE_PROPERTIES>();
     let mut buf = vec![0u64; (head + 2 * NAME_ROOM * 2).div_ceil(8)];
     let bytes = buf.len() * 8;
@@ -283,7 +283,12 @@ fn props() -> Vec<u64> {
 /// ControlTraceW on our session by name. Returns the Win32 code (0 = ok,
 /// 4201 = ERROR_WMI_INSTANCE_NOT_FOUND when no such session).
 fn control(code: EVENT_TRACE_CONTROL) -> u32 {
-    let name = crate::registry::wide(SESSION_NAME);
+    control_session(SESSION_NAME, code)
+}
+
+/// ControlTraceW on any session by name (`fps.rs` uses it for its own session).
+pub(crate) fn control_session(session: &str, code: EVENT_TRACE_CONTROL) -> u32 {
+    let name = crate::registry::wide(session);
     let mut buf = props();
     // SAFETY: `name` is NUL-terminated; `buf` is a sized EVENT_TRACE_PROPERTIES with room for
     // both names ETW writes back on stop/query.

@@ -235,6 +235,8 @@ export type Settings = {
   // r9:tools settings
 
   // r9:overlay settings
+  /** In-game overlay; changed through `overlaySet` (it also applies the hotkey). */
+  overlay: OverlaySettings;
 
   // r9:profiles settings
   /** Named tweak profiles; changed through `profilesSave`/`profilesDelete`/`profilesImport`. */
@@ -1131,6 +1133,11 @@ export const backend = {
   packetlossExport: (locale: string) => callOrThrow<string>("packetloss_export", { locale }),
 
   // r9:overlay
+  overlayStatus: () => call<OverlayStatus>("overlay_status"),
+  /** Saves (validated in the core) and applies: hotkey, window, position. */
+  overlaySet: (config: OverlaySettings) => callOrThrow<OverlayStatus>("overlay_set", { config }),
+  /** Shows the overlay over whatever is on screen (or hides it). */
+  overlayTest: (on: boolean) => callOrThrow<OverlayStatus>("overlay_test", { on }),
 
   // r9:profiles
   profilesList: () => call<TweakProfile[]>("profiles_list"),
@@ -1437,6 +1444,55 @@ export type PacketLossReport = {
 };
 
 // ── r9:overlay types ──
+export type OverlayMetric =
+  | "game"
+  | "fps"
+  | "frame_time"
+  | "low1"
+  | "cpu_pct"
+  | "cpu_mhz"
+  | "cpu_temp"
+  | "gpu_pct"
+  | "gpu_temp"
+  | "gpu_mhz"
+  | "ram"
+  | "vram";
+export type OverlayCorner = "top_left" | "top_right" | "bottom_left" | "bottom_right";
+export type OverlaySettings = {
+  enabled: boolean;
+  /** Canonical form from the core's safe list, e.g. `Ctrl+Shift+F8`. */
+  hotkey: string;
+  corner: OverlayCorner;
+  metrics: OverlayMetric[];
+  style: "bar" | "list";
+  /** Background plate opacity, 0–100. */
+  opacity: number;
+  /** Scale, 75–150 (%). */
+  size: number;
+};
+export type FpsStats = {
+  fps: number;
+  frame_ms: number;
+  /** Average FPS of the slowest 1 % of the frames of the last 10 s. */
+  low1_fps: number;
+  p99_ms: number;
+  frames: number;
+};
+/** Event `overlay:frame`, every 500 ms while the overlay is on screen. */
+export type OverlayFrame = {
+  config: OverlaySettings;
+  game: string | null;
+  fps: FpsStats | null;
+  fps_state: "ok" | "needs_admin" | "error";
+  sys: MonitorSample | null;
+};
+export type OverlayStatus = {
+  settings: OverlaySettings;
+  visible: boolean;
+  /** `hotkey_taken`, `invalid_hotkey` or `hotkey_error <code>`. */
+  hotkey_error: string | null;
+  elevated: boolean;
+};
 
 // ── r9:profiles types ──
 /** A named set of tweak ids (settings.json). Unknown ids are kept and skipped when applied. */

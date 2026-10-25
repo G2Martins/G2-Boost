@@ -80,6 +80,8 @@ pub mod hwsensors;
 pub mod pktloss;
 
 // r9:overlay
+pub mod fps;
+pub mod overlay;
 
 // r9:profiles
 pub mod peripherals;

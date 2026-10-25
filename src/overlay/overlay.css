@@ -1,0 +1,7 @@
+/* Overlay window: the page itself is see-through (only the HUD plate draws). Unlayered, so it
+   wins over the app's `body { bg-background }` base rule. */
+html,
+body,
+#root {
+  background: transparent;
+}

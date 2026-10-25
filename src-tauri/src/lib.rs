@@ -47,6 +47,7 @@ mod hw_cmds;
 mod tools_cmds;
 
 // r9:overlay mod
+mod overlay_cmds;
 
 // r9:profiles mod
 mod profiles_cmds;
@@ -2435,6 +2436,8 @@ pub fn run() {
                 let _ = w.hide();
             }
             spawn_routines(app.handle().clone());
+            // r9:overlay: overlay state + its global hotkey (when on); also stops an FPS session a crash left.
+            overlay_cmds::init(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -2445,6 +2448,17 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                 }
+                // r9:overlay: with the overlay on, closing hides to the tray too (its hotkey keeps working).
+                if s.close_to_tray && s.overlay.enabled && window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+            // r9:overlay: the main window is gone for good: take the overlay with it so the app exits.
+            if let WindowEvent::Destroyed = event
+                && window.label() == "main"
+            {
+                overlay_cmds::shutdown(window.app_handle());
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -2630,6 +2644,9 @@ pub fn run() {
             tools_cmds::packetloss_export,
 
             // r9:overlay
+            overlay_cmds::overlay_status,
+            overlay_cmds::overlay_set,
+            overlay_cmds::overlay_test,
 
             // r9:profiles
             profiles_cmds::profiles_list,
@@ -2657,6 +2674,8 @@ pub fn run() {
             // Quitting from the tray in the middle of a game: undo Game Mode on the way out.
             if let tauri::RunEvent::Exit = event {
                 gamemode::stop();
+                // r9:overlay: release the hotkey and close the FPS session on the way out.
+                overlay_cmds::shutdown(_app);
             }
         });
 }
