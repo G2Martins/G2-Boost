@@ -5,7 +5,7 @@
 //! changes, so a crash or a forced exit restores it on the next start. The per-game GPU
 //! preference (`set_gpu_high_perf`) is the one persistent setting, with its own backup.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -50,11 +50,13 @@ pub struct GameTweaks {
     pub perf_cores_only: bool,
     /// Windows' per-app graphics preference "High performance" for the game's main exe.
     pub gpu_high_perf: bool,
+    /// High priority for this game under Game Mode even when the global option is off.
+    pub high_priority: bool,
 }
 
 impl GameTweaks {
     pub fn any(&self) -> bool {
-        self.free_core0 || self.physical_only || self.perf_cores_only || self.gpu_high_perf
+        self.free_core0 || self.physical_only || self.perf_cores_only || self.gpu_high_perf || self.high_priority
     }
 }
 
@@ -149,7 +151,7 @@ pub fn start(game: &InstalledGame, pid: Option<u32>, opts: &Options, tweaks: &Ga
             Err(_) => s.skipped.push("plan_failed".into()),
         }
     }
-    if opts.high_priority
+    if (opts.high_priority || tweaks.high_priority)
         && let (Some(pid), Some(dir)) = (pid, game.install_dir.as_deref())
     {
         match crate::procs::raise_priority(pid, dir) {
@@ -232,19 +234,9 @@ const GPU_BACKUP: &str = "gpu_pref";
 
 /// The game's main exe, when it is safe to name in `UserGpuPreferences`: an absolute local path
 /// (drive letter, no UNC, no `..`), ending in `.exe`, inside the install folder when there is one,
-/// and present on disk. Hand-added games (name only) have none.
+/// and present on disk (`games::exe_ok`). Hand-added games known only by name have none.
 pub fn gpu_exe(game: &InstalledGame) -> Option<String> {
-    let exe = game.main_exe.as_deref()?;
-    let b = exe.as_bytes();
-    let local = b.len() > 7 && b[0].is_ascii_alphabetic() && &b[1..3] == b":\\";
-    let plain = Path::new(exe).components().all(|c| matches!(c, Component::Prefix(_) | Component::RootDir | Component::Normal(_)));
-    let lower = exe.to_ascii_lowercase();
-    let inside = game
-        .install_dir
-        .as_deref()
-        .is_none_or(|d| lower.starts_with(&format!("{}\\", d.trim_end_matches('\\').to_ascii_lowercase())));
-    let ok = local && plain && inside && lower.ends_with(".exe") && exe.len() < 1024 && !exe.chars().any(char::is_control);
-    (ok && Path::new(exe).is_file()).then(|| exe.to_string())
+    crate::games::exe_ok(game.main_exe.as_deref()?, game.install_dir.as_deref())
 }
 
 /// Set (`on`) or undo Windows' "High performance" GPU for `exe`. Only the `GpuPreference` key of

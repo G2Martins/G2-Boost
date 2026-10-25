@@ -30,7 +30,7 @@ pub(crate) fn vdf_pairs(text: &str) -> Vec<(String, String)> {
     out
 }
 
-fn steam_root() -> Option<PathBuf> {
+pub(crate) fn steam_root() -> Option<PathBuf> {
     match registry::read(Root::Hkcu, r"Software\Valve\Steam", "SteamPath") {
         Ok(Value::Str(s)) if !s.is_empty() => Some(PathBuf::from(s.replace('/', "\\"))),
         _ => None,
