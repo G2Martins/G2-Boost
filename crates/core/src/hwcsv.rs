@@ -305,7 +305,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// Live: asks the shell for this user's Documents folder (read-only).
     #[test]
+    #[ignore = "live: reads the known-folder API"]
     fn documents_folder_resolves() {
         assert!(documents_dir().is_some_and(|d| d.is_absolute()));
     }

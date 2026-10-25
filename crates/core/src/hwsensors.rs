@@ -1151,6 +1151,13 @@ mod tests {
                 }
             }
         }
+        // Units: known kinds are fixed by kind; free units keep the tool's text, minus a mangled degree sign.
+        assert_eq!(ext_unit(Kind::Fan, "garbage"), "RPM");
+        assert_eq!(ext_unit(Kind::Other, "  \u{FFFD}C "), "°C");
+        assert_eq!(ext_unit(Kind::Other, ""), "");
+        assert_eq!(ext_group(Kind::Other, " % "), "usage", "units are trimmed before classifying");
+        assert_eq!(ext_group(Kind::Other, "mA"), "current");
+        assert_eq!(ext_group(Kind::Other, "GT/s"), "other");
         assert_eq!(slug(""), "x");
         assert_eq!(slug("   "), "x");
         assert_eq!(slug("Ünï CPU Core #1 (°C)"), "n-cpu-core-1-c");

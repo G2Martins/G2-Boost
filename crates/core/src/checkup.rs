@@ -661,6 +661,15 @@ mod tests {
     }
 
     #[test]
+    fn shares_never_divide_by_zero_and_round_to_a_tenth() {
+        assert_eq!(pct(5, 0), 0.0);
+        assert_eq!(pct(0, 0), 0.0);
+        assert_eq!(pct(1, 3), 33.3);
+        assert_eq!(pct(2, 3), 66.7);
+        assert_eq!(pct(u64::MAX, u64::MAX), 100.0);
+    }
+
+    #[test]
     fn summary_counts_each_state() {
         let mut f = healthy();
         f.shutdowns = Some(2);
