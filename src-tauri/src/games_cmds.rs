@@ -344,4 +344,14 @@ mod tests {
             assert!(ARMED.lock().unwrap().is_none());
         }
     }
+
+    /// Steam's CDN for real (`cargo test -p g2-boost -- cover_download_live --ignored`): an old
+    /// app has a capsule, a new one has none at the plain URL (its cover comes from Steam's cache).
+    #[test]
+    #[ignore]
+    fn cover_download_live() {
+        let got = tauri::async_runtime::block_on(download(730));
+        assert!(matches!(&got, Fetch::Found(b) if covers::is_image(b)), "CS2 capsule");
+        assert!(matches!(tauri::async_runtime::block_on(download(4080220)), Fetch::Missing));
+    }
 }
