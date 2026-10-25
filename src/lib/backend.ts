@@ -216,6 +216,25 @@ export type Settings = {
   game_tweaks: Record<string, GameTweaks>;
   exposure_monitor: boolean;
   always_admin: boolean;
+  /** winget ids left out of "update all". */
+  update_excluded: string[];
+  // r9:games settings
+
+  // r9:tweaks settings
+
+  // r9:maint settings
+
+  // r9:hw settings
+
+  // r9:install settings
+
+  // r9:tools settings
+
+  // r9:overlay settings
+
+  // r9:profiles settings
+
+  // r9:setup settings
 };
 
 export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";

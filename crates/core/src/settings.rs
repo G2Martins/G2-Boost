@@ -58,6 +58,24 @@ pub struct Settings {
     pub always_admin: bool,
     /// winget ids the user left out of "update all" (validated on use by `updates::excluded_ids`).
     pub update_excluded: Vec<String>,
+    // r9:games field
+
+    // r9:tweaks field
+
+    // r9:maint field
+
+    // r9:hw field
+
+    // r9:install field
+
+    // r9:tools field
+
+    // r9:overlay field
+
+    // r9:profiles field
+
+    // r9:setup field
+
 }
 
 impl Default for Settings {
@@ -83,6 +101,24 @@ impl Default for Settings {
             exposure_monitor: true,
             always_admin: false,
             update_excluded: Vec::new(),
+            // r9:games default
+
+            // r9:tweaks default
+
+            // r9:maint default
+
+            // r9:hw default
+
+            // r9:install default
+
+            // r9:tools default
+
+            // r9:overlay default
+
+            // r9:profiles default
+
+            // r9:setup default
+
         }
     }
 }
@@ -141,6 +177,24 @@ pub fn sanitize(mut s: Settings) -> Settings {
         Schedule::Weekly { weekday, hour } => Schedule::Weekly { weekday: weekday.min(6), hour: hour.min(23) },
         other => other,
     };
+    // r9:games sanitize
+
+    // r9:tweaks sanitize
+
+    // r9:maint sanitize
+
+    // r9:hw sanitize
+
+    // r9:install sanitize
+
+    // r9:tools sanitize
+
+    // r9:overlay sanitize
+
+    // r9:profiles sanitize
+
+    // r9:setup sanitize
+
     s
 }
 
