@@ -1,6 +1,6 @@
 # Design system — grafite quente, um accent, motion curto
 
-**Última revisão:** 2026-10-22 (mark G²) · 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
+**Última revisão:** 2026-10-25 (rodada 9: sidebar agrupada, marcas que deslizam, Meter, toast, pôster, botão tátil, tela antes do UAC) · 2026-10-22 (mark G²) · 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
 
 Direção: app de diagnóstico, não "gaming dashboard" genérico. Neutros quentes (grafite, texto cor de papel), **um** accent ("brasa", herdado da marca), status com parcimônia. Cards são **poços** — mais escuros que a página, com um filete de luz de 1px no topo: no hover eles clareiam (vêm à tona), nunca "flutuam". Aplicar com a skill `frontend-design`.
 
@@ -52,6 +52,23 @@ Tokens: `--motion-fast` 200 ms · `--motion-base` 350 ms · `--motion-slow` 550 
 | Monitor ao vivo | `LiveLine` com `seq`: o grupo de dados remonta um passo à direita a cada amostra e volta em 1 s linear (`.live-scroll`, recorte nas bordas), então a linha rola sem pular. `Gauge`: ponteiro por `transform: rotate` e arco por `stroke-dasharray` do arco inteiro, mesma transição (`.gauge-anim`, 700 ms); `x2/y2` e `d` não animam de forma confiável. |
 
 **Segurança das animações:** o estado de repouso é sempre o visível — `opacity: 0` só dentro de `@keyframes`. Tudo que se move vive em `@media (prefers-reduced-motion: no-preference)`; em `reduce` nada desloca, desenha ou brilha (cor ainda muda no hover). O único `fill-mode` é o `backwards` do stagger (segura o 1º quadro só durante o atraso, ≤ 480 ms).
+
+### 4.1 Rodada 9 (2026-10-25)
+
+| Peça | Como |
+|---|---|
+| Sidebar | grupos Principal / Otimizar / Ferramentas / Sistema com rótulos (`NAV` em `app-shell.tsx`); recolhe para o trilho de ícones (botão no rodapé, guardado em `localStorage`, automático abaixo de 1240 px) com tooltip estilizado (`.tip`). **Uma** pílula (`.nav-pill`, filete accent à esquerda) desliza até o item ativo (medido; `translate` + `height` 320 ms, só depois do 1º posicionamento). Topbar mostra grupo › página. |
+| Abas | `TabsList` desenha uma tinta (`.tab-ink`) que desliza até a aba ativa (MutationObserver + ResizeObserver); a aba ativa só escurece o fundo. |
+| Título | `.title-rise` (máscara que sobe) + `.title-rule` (fio accent de 72 px que cresce da esquerda). |
+| `Meter` | barra com degradê profundo → claro e ponta acesa de 2 px (`.meter`, tom por `tone-*`), cresce no mount; substitui barras soltas. |
+| `toast()` / `<Toaster>` | canto inferior direito, borda de status de 3 px, ação opcional ("Desfazer"), entra deslizando 12 px, sai em 200 ms. |
+| Botão tátil | `<Button variant="primary" tactile>`: face sobre uma base, desce 1 px no hover e 3 px ao pressionar. **Um** por página (o CTA principal). |
+| `.poster` | capa 2:3 com scrim inferior, brilho que segue o ponteiro e inclinação ≤ 4,5° (`--rx/--ry` do listener global do `App.tsx`), só com ponteiro fino. |
+| `.frame-ticks` | quatro cantos de 10 px em instrumentos (velocímetro, árvore de sensores). |
+| Tela antes do UAC | `admin-gate.tsx`: marca G² num poço com anel accent que respira (`.admin-gate-mark`), três garantias com ícone, estado "aguardando" e "modo limitado". |
+| Ícones | Lucide com traço 1,5 para o app inteiro (`LucideProvider` no `App.tsx`); nada de glifo de texto (✓ ✕ !) nem o ícone de "brilho" de IA. |
+
+Tudo o que se move continua dentro de `prefers-reduced-motion: no-preference`; em `reduce`, nada desliza, cresce ou respira.
 
 ## 5. Estrutura — onde a UI vive
 - `src/components/ui/primitives.tsx` — Button, Card/CardTitle, HelpHint, Tabs, Switch, StatusPill, Badge (tons), Skeleton, LoadingScope, MetricRow, Modal, EmptyState, `selectClass`; `count-up.tsx` — `useCountUp`/`CountUp`/`reducedMotion`; `gauge.tsx`, `live-line.tsx`, `kpi-card.tsx`. Reusar antes de criar.

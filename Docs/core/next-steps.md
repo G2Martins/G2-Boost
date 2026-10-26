@@ -28,16 +28,19 @@ Decisões do dono: tudo, inclusive o overlay; antivírus = detectar qual está a
 | Visual | tinta deslizante nas abas, título com máscara + fio, toasts, `Meter` com ponta acesa, `.poster` (capa 2:3 com brilho e inclinação), botão tátil, Lucide traço 1,5, sem glifos de texto e sem o ícone de "IA" | ✅ |
 | Limpeza | anel do disco do sistema + barras por categoria da última prévia | ✅ |
 | Modo portátil | `portable.txt` ao lado do exe: dados em `<pasta do exe>\data` | ✅ |
-| Jogos | capas (cache da Steam, CDN da Steam 1 vez, ícone do exe), "Preparar e jogar" sem herdar admin, seletor de exe, prioridade por jogo | em andamento |
-| Debloat + ajustes | página Debloat (Essencial/Recomendado/Avançado, IA do Windows, apps de brinde), ~30 ajustes novos, busca/filtros/"Ver o que muda" | em andamento |
-| Perfis e restauração | perfis com nome, "Sem IA", "Padrão do Windows", desfazer tudo, histórico; Mouse e teclado | em andamento |
-| Manutenção+ e antivírus | revisão semanal num clique, redefinir Windows Update, impressora, áudio; antivírus detectado + exclusão/guia | em andamento |
-| Monitor de hardware + Check-up | árvore de sensores com mín./máx. e CSV; check-up de ~20 medições | em andamento |
-| Instalar apps | catálogo curado via winget, em lote | em andamento |
-| Ferramentas | teste do mouse (polling), teste de monitor, perda de pacotes | em andamento |
-| Overlay de jogo | FPS/tempo de quadro/1% low por ETW (sem injeção), janela por cima, atalho F7 | em andamento |
-| Painel + pós-formatação | chip de pendentes, velocímetro, card e assistente pós-formatação | a fazer |
-| Release | v0.9.0: instalador NSIS (por máquina) + MSI + zip portátil + SHA256, WebView2 embutido, README com FAQ | a fazer |
+| Jogos | capas (cache da Steam, CDN da Steam 1 vez, ícone do exe), "Preparar e jogar" sem herdar admin, seletor de exe, prioridade por jogo | ✅ |
+| Debloat + ajustes | página Debloat (Essencial/Recomendado/Avançado, IA do Windows, apps de brinde), ~30 ajustes novos, busca/filtros/"Ver o que muda" | ✅ |
+| Perfis e restauração | perfis com nome, "Sem IA", "Padrão do Windows", desfazer tudo, histórico; Mouse e teclado | ✅ |
+| Manutenção+ e antivírus | revisão semanal num clique, redefinir Windows Update, impressora, áudio; antivírus detectado + exclusão/guia | ✅ |
+| Monitor de hardware + Check-up | árvore de sensores com mín./máx. e CSV; check-up de ~20 medições | ✅ |
+| Instalar apps | catálogo curado via winget, em lote | ✅ |
+| Ferramentas | teste do mouse (polling), teste de monitor, perda de pacotes | ✅ |
+| Overlay de jogo | FPS/tempo de quadro/1% low por ETW (sem injeção), janela por cima, atalho F7 | ✅ |
+| Painel + pós-formatação | chip de pendentes, velocímetro com Boost agora (ajustes + limpeza + RAM, confirmado), card e assistente pós-formatação | ✅ |
+| Tela antes do UAC | "Sempre abrir como administrador" mostra a explicação do G2 Boost e só então pede o UAC; recusar abre em modo limitado | ✅ |
+| Release | v0.9.0: instalador NSIS (por máquina) + MSI pt-BR/en + zip portátil + SHA256, WebView2 embutido, README com FAQ | ✅ |
+
+**Pendente do dono (precisa de admin ou de hardware):** Preparar e jogar elevado, overlay com FPS real num jogo, Debloat/IA do Windows/recurso Recall e apps de brinde elevados, revisão semanal e consertos rápidos, exclusão no Defender (instalação por máquina), um `bun run release` testado com o Kaspersky ativo. Antes de o Kaspersky reagir a gravações em `Policies` ou à parada de `wuauserv`, registrar em [../security/kaspersky-false-positive.md](../security/kaspersky-false-positive.md).
 
 ## Rodada 8 (2026-10-23, pedido do dono: "winget upgrade --all", cheatsheet de comandos, ponytail, sempre admin)
 

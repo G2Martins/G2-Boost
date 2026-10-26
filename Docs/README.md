@@ -1,6 +1,6 @@
 # Documentação — G2 Boost
 
-**Última revisão:** 2026-10-23
+**Última revisão:** 2026-10-25 (rodada 9)
 
 Índice da documentação viva. Porta de entrada do agente: [../CLAUDE.md](../CLAUDE.md). Cada doc
 traz `**Última revisão:**` no topo; ler **antes** de codar e atualizar no **mesmo** PR que muda o
@@ -33,6 +33,10 @@ comportamento.
 | [boost/dashboard.md](./boost/dashboard.md) | Painel (pontuação por hardware, pontos de restauração, limpeza, RAM), monitor em tempo real, Meu PC (CPU, memória, GPU, monitores, discos, WinSAT), **BIOS/firmware** visível pelo Windows, sensores externos, recomendação por hardware. |
 | [boost/tweaks.md](./boost/tweaks.md) | Catálogo de ajustes (registro, serviços, SPI, energia, DirectX), presets, efeitos visuais em 4 níveis, backup/revert, elevação, limpeza de RAM, **inicialização e processos**, o que foi avaliado e recusado. |
 | [boost/debloat.md](./boost/debloat.md) | Página Debloat: níveis Essencial/Recomendado/Avançado, "Remover a IA do Windows" (políticas + recurso Recall pela DismApi), apps pré-instalados por allowlist com token, o que nunca é tocado. |
+| [boost/profiles.md](./boost/profiles.md) | Perfis e restauração (perfis com nome, Sem IA, Padrão do Windows, exportar/importar, desfazer tudo, histórico) e Mouse e teclado (velocidade do ponteiro, repetição do teclado, atalhos que atrapalham no jogo). |
+| [boost/hardware-monitor.md](./boost/hardware-monitor.md) | Monitor de hardware (árvore de sensores por dispositivo, mín./máx., CSV) e a aba Check-up do Meu PC. |
+| [boost/overlay.md](./boost/overlay.md) | Overlay de jogo: FPS, tempo de quadro e 1% low por ETW (sem injeção), janela por cima e clicável através, atalho global, limites. |
+| [core/tools.md](./core/tools.md) | Ferramentas: teste do mouse (polling e cliques), teste de monitor (pixels, níveis, movimento), perda de pacotes (atrasados, fora de ordem, CSV, rota). |
 | [boost/routines.md](./boost/routines.md) | Iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja, configurações validadas. |
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [cleanup/system-files.md](./cleanup/system-files.md) | Arquivos do sistema pelos handlers da Limpeza de Disco do Windows (WinSxS, Windows.old, drivers antigos, logs), allowlist e defesa contra handler plantado. |
