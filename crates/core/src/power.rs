@@ -10,6 +10,7 @@ use serde::Serialize;
 use windows::Win32::Foundation::{ERROR_ACCESS_DENIED, ERROR_SUCCESS, WIN32_ERROR};
 use windows::Win32::System::Power::{
     GetSystemPowerStatus, PowerDeleteScheme, PowerDuplicateScheme, PowerReadACValueIndex, PowerReadDCValueIndex,
+    PowerReadValueMax, PowerReadValueMin,
     PowerSetActiveScheme, PowerWriteACValueIndex, PowerWriteDCValueIndex, PowerWriteFriendlyName, SYSTEM_POWER_STATUS,
 };
 use windows::core::GUID;
@@ -230,6 +231,19 @@ fn read(g: &GUID, d: &SettingDef) -> SettingValue {
     // expose (no battery, no PCIe subgroup…) fails and is reported as None.
     let ac_ok = unsafe { PowerReadACValueIndex(None, Some(g), Some(&d.subgroup), Some(&d.setting), &mut ac) } == ERROR_SUCCESS;
     let dc_ok = unsafe { PowerReadDCValueIndex(None, Some(g), Some(&d.subgroup), Some(&d.setting), &mut dc) } == 0;
+    // A percentage whose declared range is a single value (core parking reads 0..0 on CPUs Windows
+    // manages itself) cannot be changed here: every write fails, so it is not offered.
+    let (mut min, mut max) = (0u32, 0u32);
+    // SAFETY: as above.
+    let fixed = matches!(d.kind, Kind::Percent)
+        && unsafe {
+            PowerReadValueMin(None, Some(&d.subgroup), Some(&d.setting), &mut min) == ERROR_SUCCESS
+                && PowerReadValueMax(None, Some(&d.subgroup), Some(&d.setting), &mut max) == ERROR_SUCCESS
+        }
+        && max <= min;
+    if fixed {
+        return SettingValue { id: d.id, kind: d.kind, ac: None, dc: None };
+    }
     SettingValue { id: d.id, kind: d.kind, ac: ac_ok.then_some(ac), dc: dc_ok.then_some(dc) }
 }
 
