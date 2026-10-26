@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1 (2026-10-25): correções achadas nos testes como administrador
+
+- **Ajustes protegidos pelo Windows:** quando o Windows (proteção de configurações do usuário) ou o antivírus recusa uma chave mesmo com administrador, como a política dos Widgets no Windows 11 24H2+, o app avisa "bloqueado", desfaz o que tiver gravado pela metade e não deixa nada alterado. Antes aparecia o erro cru `access_denied`.
+- **Núcleos sempre acordados e Energia:** em processadores em que o Windows gerencia o estacionamento de núcleos sozinho (a configuração aceita só um valor), o ajuste aparece como indisponível neste PC em vez de falhar ao aplicar.
+- **Testes como administrador na máquina de referência:** os 33 ajustes novos fizeram ida e volta sem deixar resto; revisão semanal completa (ponto de restauração, disco, SFC, DISM) rodou de ponta a ponta.
+- Visual: classe canônica no assistente pós-formatação.
+
 ## 0.9.0 (2026-10-25): primeira versão pública
 
 Primeira release com instalador, MSI e versão portátil. Reúne as rodadas 1 a 9 do desenvolvimento.
