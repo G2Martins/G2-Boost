@@ -23,7 +23,6 @@ export const ptBR = {
   "nav.packetloss": "Perda de pacotes",
   "nav.collapse": "Recolher menu",
   "nav.expand": "Expandir menu",
-  "nav.soon": "Em construção nesta versão.",
   "mypc.subtitle": "Tudo sobre o hardware deste PC, lido direto do Windows.",
   "mypc.tab.checkup": "Check-up",
   "common.close": "Fechar",
@@ -259,8 +258,6 @@ export const ptBR = {
   "games.subtitle":
     "Seus jogos de todos os launchers. Ligue o Modo Jogo e o G2 Boost prepara o PC quando o jogo abre",
   "games.mode.title": "Modo Jogo",
-  "games.mode.idle":
-    "Ligue o Modo Jogo nos jogos abaixo. Quando um deles abrir, o G2 Boost prepara o PC; quando fechar, desfaz tudo.",
   "games.mode.active": "Modo Jogo ativo em {game}",
   "games.mode.since": "há {min} min",
   "games.mode.stop": "Encerrar agora",
@@ -293,8 +290,6 @@ export const ptBR = {
   "games.skipped.qos_failed": "Não deu para criar a prioridade na rede",
   "games.options.notifications":
     "Para silenciar as notificações do Windows durante o jogo, ligue em Configurações › Sistema › Notificações › Ativar não perturbe automaticamente › Ao jogar um jogo.",
-  "games.list.title": "Seus jogos",
-  "route.open": "Ver rota até o servidor",
   "route.title": "Rota até o servidor: {game}",
   "route.help":
     "O caminho real dos pacotes do seu PC até o servidor, salto por salto (traceroute sem administrador). Sem servidores próprios ninguém muda esse caminho; dá para ver onde ele piora e corrigir o que é seu: rede de casa, Wi-Fi, DNS e escolha de servidor.",
@@ -338,16 +333,8 @@ export const ptBR = {
     "Teste a fila do roteador (bufferbloat) no Scanner da aba Rede: nota baixa explica picos ao baixar algo.",
   "route.go.boost": "Abrir PC Boost",
   "route.go.network": "Abrir Rede",
-  "games.list.help":
-    "Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG e Rockstar, lidos dos arquivos de cada launcher. Nada é aberto nem instalado.",
-  "games.list.empty": "Nenhum jogo encontrado. Adicione o executável de um jogo pelo botão +.",
   "games.refresh": "Procurar de novo",
   "games.playing": "Jogando",
-  "games.mode.toggle": "Modo Jogo para {game}",
-  "games.add.title": "Adicionar jogo",
-  "games.add.placeholder": "nome do executável, ex.: jogo.exe",
-  "games.add.save": "Adicionar",
-  "games.add.invalid": "Use só o nome do arquivo terminado em .exe, sem pasta.",
   "games.launcher.steam": "Steam",
   "games.launcher.epic": "Epic Games",
   "games.launcher.ea": "EA app",
@@ -1866,9 +1853,7 @@ export const ptBR = {
   "bios.reboot.unsupported":
     "Esta BIOS não aceita o pedido para abrir a configuração no próximo boot. Use a tecla ao ligar o PC.",
   "bios.reboot.started": "Reiniciando na BIOS…",
-  "gametweaks.open": "Ajustes do jogo",
   "gametweaks.open.aria": "Ajustes do jogo: {game}",
-  "gametweaks.active": "Ajustes do jogo: {n} ligados",
   "gametweaks.title": "Ajustes de {game}",
   "gametweaks.cpu": "Este processador: {physical} núcleos, {logical} threads",
   "gametweaks.cpu.hybrid": "híbrido, {perf} threads nos núcleos de desempenho",
@@ -1889,13 +1874,10 @@ export const ptBR = {
   "gametweaks.gpu_high_perf.desc":
     "Grava a preferência de gráficos do Windows (Alto desempenho) para o executável do jogo. Faz diferença em PCs com duas placas, como notebooks com vídeo integrado e dedicado. Fica gravado até você desligar, e o valor anterior volta.",
   "gametweaks.gpu.no_exe": "Executável principal do jogo não encontrado.",
-  "gametweaks.mode_off":
-    "O Modo Jogo está desligado para este jogo: os ajustes de núcleo só valem com ele ligado.",
   "gametweaks.combine":
     "As opções de núcleo se combinam: o jogo fica só nos núcleos que atendem a todas. Valem enquanto o Modo Jogo está ativo e voltam ao normal quando o jogo fecha.",
   "gametweaks.honest":
     "O ganho depende do jogo e do processador: teste com e sem. Anticheats podem bloquear a mudança; nesse caso o G2 Boost não insiste.",
-  "gametweaks.none": "Nenhum destes ajustes muda algo neste PC.",
   "gametweaks.save": "Salvar",
   "gametweaks.cancel": "Cancelar",
   "gametweaks.error.no_exe": "Não foi possível achar o executável principal deste jogo.",
@@ -2864,7 +2846,6 @@ export const ptBR = {
   "maint3.review.offer":
     "A imagem do Windows tem peças danificadas, ou há arquivos que a verificação não conseguiu reparar. O reparo completo baixa as peças boas do Windows Update e depois verifica os arquivos de novo.",
   "maint3.repair.button": "Reparo completo",
-  "maint3.repair.time": "20 a 50 min",
   "maint3.repair.confirm.title": "Fazer o reparo completo?",
   "maint3.repair.confirm.body":
     "Primeiro repara a imagem do Windows com peças do Windows Update; depois verifica os arquivos do sistema, que passam a usar a imagem consertada. Precisa de internet e leva de 20 a 50 minutos.",
@@ -2882,7 +2863,6 @@ export const ptBR = {
   "maint3.time.restore_point": "até 2 min",
   "maint3.state.pending": "Na fila",
   "maint3.state.running": "Rodando",
-  "maint3.state.skipped": "Pulado",
   "maint3.verdict.created": "Ponto criado",
   "maint3.verdict.throttled": "Já existe um de menos de 24 h",
   "maint3.verdict.protection_off": "Proteção do sistema desligada",
@@ -3400,7 +3380,6 @@ export const ptBR = {
   "tools.monitor.key.pattern": "Trocar padrão",
   "tools.monitor.key.test": "Trocar teste",
   "tools.monitor.key.exit": "Sair",
-  "tools.monitor.key.space": "Espaço",
   "tools.monitor.key.esc": "Esc",
   "tools.monitor.key.click": "Um clique também troca de padrão.",
   "tools.monitor.screen.title": "Esta tela",
@@ -3548,8 +3527,6 @@ export const ptBR = {
   "tools.loss.route.button": "Analisar rota",
   "tools.loss.route.title": "Rota até o destino",
   "tools.loss.route.busy": "Analisando a rota… pode levar até um minuto.",
-  "tools.loss.route.empty":
-    "Mostra por onde os pacotes passam e separa perda real de roteador que só ignora o teste de ping.",
   "tools.loss.route.error": "Não deu para analisar a rota: {error}",
   "tools.loss.route.real": "Perda real no caminho",
   "tools.loss.route.real.body":
@@ -3593,7 +3570,6 @@ export const ptBR = {
   "overlay.corner.top_right": "Canto superior direito",
   "overlay.corner.bottom_left": "Canto inferior esquerdo",
   "overlay.corner.bottom_right": "Canto inferior direito",
-  "overlay.setup": "Configurar",
   "overlay.enabled": "Ligar overlay",
   "overlay.enabled.body":
     "Registra o atalho e deixa o overlay pronto para o jogo, inclusive com o G2 Boost na bandeja.",

@@ -15,13 +15,13 @@ import { toast } from "@/components/ui/toast";
 import {
   backend,
   type GameEntry,
-  type GameOptions,
+  type GameTweaks,
   type GameTweaksInfo,
   type Settings,
 } from "@/lib/backend";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 
-export const NO_TWEAKS: GameOptions = {
+export const NO_TWEAKS: GameTweaks = {
   free_core0: false,
   physical_only: false,
   perf_cores_only: false,
@@ -29,11 +29,11 @@ export const NO_TWEAKS: GameOptions = {
   high_priority: false,
 };
 
-type Key = keyof GameOptions;
+type Key = keyof GameTweaks;
 type CpuKey = "perf_cores_only" | "free_core0" | "physical_only";
 
 /** The game's stored options (older files have no `high_priority`). */
-export function optionsOf(s: Settings | null, id: string): GameOptions {
+export function optionsOf(s: Settings | null, id: string): GameTweaks {
   return { ...NO_TWEAKS, ...s?.game_tweaks[id] };
 }
 
@@ -132,7 +132,7 @@ export function GameTweaksDialog({
   const errorText = useErrorText();
   const current = optionsOf(settings, game?.id ?? "");
   const modeOn = !!game && !!settings?.game_mode_games.includes(game.id);
-  const [draft, setDraft] = useState<GameOptions>(current);
+  const [draft, setDraft] = useState<GameTweaks>(current);
   const [draftMode, setDraftMode] = useState(modeOn);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);

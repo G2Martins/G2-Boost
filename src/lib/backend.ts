@@ -800,6 +800,7 @@ export type GameTweaks = {
   physical_only: boolean;
   perf_cores_only: boolean;
   gpu_high_perf: boolean;
+  high_priority: boolean;
 };
 export type CpuSummary = {
   logical: number;
@@ -1362,7 +1363,6 @@ export type WuProgress = {
 
 // ── r9:games types ──
 /** `GameTweaks` as the core stores it now: plus high priority for this one game under Game Mode. */
-export type GameOptions = GameTweaks & { high_priority: boolean };
 
 // ── r9:tweaks types ──
 export type TweakChange = {

@@ -26,7 +26,6 @@ export const en = {
   "nav.packetloss": "Packet loss",
   "nav.collapse": "Collapse menu",
   "nav.expand": "Expand menu",
-  "nav.soon": "Being built in this version.",
   "mypc.subtitle": "Everything about this PC's hardware, read straight from Windows.",
   "mypc.tab.checkup": "Check-up",
   "common.close": "Close",
@@ -261,8 +260,6 @@ export const en = {
   "games.subtitle":
     "Your games from every launcher. Turn on Game Mode and G2 Boost gets the PC ready when the game opens",
   "games.mode.title": "Game Mode",
-  "games.mode.idle":
-    "Turn Game Mode on for the games below. When one opens, G2 Boost gets the PC ready; when it closes, everything goes back.",
   "games.mode.active": "Game Mode on in {game}",
   "games.mode.since": "for {min} min",
   "games.mode.stop": "Stop now",
@@ -295,8 +292,6 @@ export const en = {
   "games.skipped.qos_failed": "Could not set network priority",
   "games.options.notifications":
     "To silence Windows notifications while playing, turn on Settings › System › Notifications › Turn on do not disturb automatically › When playing a game.",
-  "games.list.title": "Your games",
-  "route.open": "See the route to the server",
   "route.title": "Route to the server: {game}",
   "route.help":
     "The real path of packets from your PC to the server, hop by hop (traceroute without administrator). Without servers of its own nobody changes that path; you can see where it gets worse and fix what is yours: home network, Wi-Fi, DNS and server choice.",
@@ -338,16 +333,8 @@ export const en = {
     "Test the router queue (bufferbloat) in the Network Scanner: a low grade explains spikes while downloading.",
   "route.go.boost": "Open PC Boost",
   "route.go.network": "Open Network",
-  "games.list.help":
-    "Steam, Epic, EA app, Riot, Battle.net, Ubisoft Connect, GOG and Rockstar, read from each launcher's own files. Nothing is opened or installed.",
-  "games.list.empty": "No games found. Add a game's executable with the + button.",
   "games.refresh": "Search again",
   "games.playing": "Playing",
-  "games.mode.toggle": "Game Mode for {game}",
-  "games.add.title": "Add game",
-  "games.add.placeholder": "executable name, e.g. game.exe",
-  "games.add.save": "Add",
-  "games.add.invalid": "Use just the file name ending in .exe, no folder.",
   "games.launcher.steam": "Steam",
   "games.launcher.epic": "Epic Games",
   "games.launcher.ea": "EA app",
@@ -1859,9 +1846,7 @@ export const en = {
   "bios.reboot.unsupported":
     "This BIOS does not accept the request to open the setup on the next boot. Use the key while the PC starts.",
   "bios.reboot.started": "Restarting into the BIOS…",
-  "gametweaks.open": "Game options",
   "gametweaks.open.aria": "Game options: {game}",
-  "gametweaks.active": "Game options: {n} on",
   "gametweaks.title": "{game} options",
   "gametweaks.cpu": "This processor: {physical} cores, {logical} threads",
   "gametweaks.cpu.hybrid": "hybrid, {perf} threads on performance cores",
@@ -1882,12 +1867,10 @@ export const en = {
   "gametweaks.gpu_high_perf.desc":
     "Writes Windows' graphics preference (High performance) for the game's executable. It matters on PCs with two graphics adapters, such as laptops with integrated and dedicated graphics. It stays until you turn it off, and the previous value comes back.",
   "gametweaks.gpu.no_exe": "The game's main executable was not found.",
-  "gametweaks.mode_off": "Game Mode is off for this game: the core options only apply with it on.",
   "gametweaks.combine":
     "The core options combine: the game keeps only the cores that meet all of them. They apply while Game Mode is active and are undone when the game closes.",
   "gametweaks.honest":
     "The gain depends on the game and the processor: test with and without. Anti-cheats may block the change; G2 Boost then does not insist.",
-  "gametweaks.none": "None of these options changes anything on this PC.",
   "gametweaks.save": "Save",
   "gametweaks.cancel": "Cancel",
   "gametweaks.error.no_exe": "Could not find this game's main executable.",
@@ -2849,7 +2832,6 @@ export const en = {
   "maint3.review.offer":
     "The Windows image has damaged parts, or some files could not be repaired. The full repair downloads good parts from Windows Update and then checks the files again.",
   "maint3.repair.button": "Full repair",
-  "maint3.repair.time": "20 to 50 min",
   "maint3.repair.confirm.title": "Run the full repair?",
   "maint3.repair.confirm.body":
     "First it repairs the Windows image with parts from Windows Update; then it checks the system files, which use the repaired image. Needs internet and takes 20 to 50 minutes.",
@@ -2867,7 +2849,6 @@ export const en = {
   "maint3.time.restore_point": "up to 2 min",
   "maint3.state.pending": "Queued",
   "maint3.state.running": "Running",
-  "maint3.state.skipped": "Skipped",
   "maint3.verdict.created": "Point created",
   "maint3.verdict.throttled": "One from the last 24 h exists",
   "maint3.verdict.protection_off": "System protection off",
@@ -3377,7 +3358,6 @@ export const en = {
   "tools.monitor.key.pattern": "Switch pattern",
   "tools.monitor.key.test": "Switch test",
   "tools.monitor.key.exit": "Exit",
-  "tools.monitor.key.space": "Space",
   "tools.monitor.key.esc": "Esc",
   "tools.monitor.key.click": "A click also switches pattern.",
   "tools.monitor.screen.title": "This screen",
@@ -3525,8 +3505,6 @@ export const en = {
   "tools.loss.route.button": "Analyze route",
   "tools.loss.route.title": "Route to the destination",
   "tools.loss.route.busy": "Analyzing the route… it can take up to a minute.",
-  "tools.loss.route.empty":
-    "Shows the path the packets take and tells real loss from a router that only ignores the ping test.",
   "tools.loss.route.error": "Could not analyze the route: {error}",
   "tools.loss.route.real": "Real loss on the way",
   "tools.loss.route.real.body":
@@ -3571,7 +3549,6 @@ export const en = {
   "overlay.corner.top_right": "Top right corner",
   "overlay.corner.bottom_left": "Bottom left corner",
   "overlay.corner.bottom_right": "Bottom right corner",
-  "overlay.setup": "Set up",
   "overlay.enabled": "Turn the overlay on",
   "overlay.enabled.body":
     "Registers the hotkey and keeps the overlay ready for the game, also while G2 Boost sits in the tray.",
