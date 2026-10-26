@@ -12,6 +12,7 @@ import {
   Switch,
   selectClass,
 } from "@/components/ui/primitives";
+import { UpdateCard } from "@/components/update-card";
 import { CLEANUP_CATALOG, cleanupName } from "@/data/catalogs";
 import {
   type AppInfo,
@@ -101,6 +102,10 @@ export function SettingsPage() {
         {err ? <p className="text-xs text-destructive">{err}</p> : null}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+          <UpdateCard
+            auto={settings ? settings.update_auto_check : undefined}
+            onAuto={(v) => save({ update_auto_check: v })}
+          />
           <Card className="animate-rise">
             <CardTitle
               help={t("settings.autostart.hint")}

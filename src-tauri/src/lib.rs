@@ -56,6 +56,7 @@ mod overlay_cmds;
 mod profiles_cmds;
 
 // r9:setup mod
+mod update_cmds;
 
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
@@ -2684,6 +2685,8 @@ pub fn run() {
 
 
             // r9:setup
+            update_cmds::update_check,
+            update_cmds::update_install,
 
         ])
         .build(tauri::generate_context!())

@@ -86,6 +86,8 @@ pub struct Settings {
     pub profiles: Vec<crate::profiles::Profile>,
 
     // r9:setup field
+    /// Ask GitHub for a newer G2 Boost at launch (one request; the user installs with a click).
+    pub update_auto_check: bool,
 
 }
 
@@ -133,6 +135,7 @@ impl Default for Settings {
             profiles: Vec::new(),
 
             // r9:setup default
+            update_auto_check: true,
 
         }
     }

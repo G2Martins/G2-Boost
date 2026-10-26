@@ -3851,6 +3851,33 @@ export const ptBR = {
   "periph.error.app_only": "Disponível só no app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "update.title": "Atualizações do G2 Boost",
+  "update.hint":
+    "Consulta as versões publicadas no GitHub do G2 Boost. Nenhum dado seu é enviado: é uma consulta à página pública de versões.",
+  "update.auto": "Procurar atualização ao abrir",
+  "update.auto.body":
+    "Uma consulta ao GitHub quando o app abre; se houver versão nova, aparece um aviso. Instalar é sempre um clique seu.",
+  "update.current": "Versão instalada: {version}",
+  "update.available": "Nova versão {version}",
+  "update.up_to_date": "Você está na versão mais recente.",
+  "update.check": "Procurar agora",
+  "update.install": "Baixar e instalar {size}",
+  "update.installing": "Baixando e conferindo",
+  "update.install.note":
+    "O G2 Boost baixa o instalador e a lista de conferência (SHA-256) da mesma versão, só abre o instalador se baterem e fecha para ele trocar os arquivos. Seus ajustes e configurações continuam.",
+  "update.page": "Ver a versão no GitHub",
+  "update.kind.portable":
+    "Esta cópia é portátil: baixe o zip novo na página da versão e troque o G2 Boost.exe (a pasta data fica).",
+  "update.kind.dev":
+    "Esta cópia não está instalada em Arquivos de Programas: baixe o instalador na página da versão.",
+  "update.toast": "G2 Boost {version} disponível",
+  "update.toast.action": "Ver",
+  "update.error.offline": "Sem conexão com o GitHub agora. Tente de novo em instantes.",
+  "update.error.hash":
+    "O arquivo baixado não bate com a lista de conferência da versão. Nada foi instalado; tente de novo mais tarde.",
+  "update.error.not_installed":
+    "Só a versão instalada se atualiza por aqui. Use a página da versão.",
+  "update.error.generic": "Não foi possível atualizar: {error}",
   "maint3.fix.wu_backups.title": "Apagar os backups do reset do Windows Update",
   "maint3.fix.wu_backups.body":
     "Quando o reset renomeia as pastas, o Windows cria outras do zero. As antigas ficam guardadas só para desfazer; depois que o Windows Update voltou a funcionar, só ocupam espaço.",

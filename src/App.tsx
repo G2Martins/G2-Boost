@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { AdminGate } from "@/components/shell/admin-gate";
 import { AppShell, type Route } from "@/components/shell/app-shell";
 import { Button, TooltipProvider } from "@/components/ui/primitives";
-import { Toaster } from "@/components/ui/toast";
+import { Toaster, toast } from "@/components/ui/toast";
 import { backend, inTauri } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider, useI18n } from "@/lib/i18n";
 import { LuliProvider } from "@/lib/luli";
-import { emitDrop, onNavigate, openOrphans } from "@/lib/nav";
+import { emitDrop, navigate, onNavigate, openOrphans } from "@/lib/nav";
 import { AiPage } from "@/pages/ai";
 import { AppsPage } from "@/pages/apps";
 import { BoostPage } from "@/pages/boost";
@@ -209,5 +209,21 @@ export default function App() {
 
 function ToasterI18n() {
   const { t } = useI18n();
+  // One look at GitHub a few seconds after launch (when on in Settings): a toast if newer.
+  useEffect(() => {
+    if (!inTauri) return;
+    const id = window.setTimeout(async () => {
+      const s = await backend.settingsGet();
+      if (!s?.update_auto_check) return;
+      const u = await backend.updateCheck().catch(() => null);
+      if (!u?.newer) return;
+      toast(t("update.toast", { version: u.latest }), {
+        tone: "accent",
+        duration: 12000,
+        action: { label: t("update.toast.action"), run: () => navigate("settings") },
+      });
+    }, 4000);
+    return () => window.clearTimeout(id);
+  }, [t]);
   return <Toaster closeLabel={t("common.close")} />;
 }

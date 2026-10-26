@@ -96,6 +96,7 @@ pub mod profiles;
 
 
 // r9:setup
+pub mod selfupdate;
 
 
 /// Crate version, surfaced in the UI "about" footer.

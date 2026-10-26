@@ -3830,6 +3830,33 @@ export const en = {
   "periph.error.app_only": "Only available in the app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "update.title": "G2 Boost updates",
+  "update.hint":
+    "Looks at the versions published on G2 Boost's GitHub. Nothing about you is sent: it reads the public releases page.",
+  "update.auto": "Look for updates at launch",
+  "update.auto.body":
+    "One request to GitHub when the app opens; a notice shows when there is a new version. Installing is always your click.",
+  "update.current": "Installed version: {version}",
+  "update.available": "New version {version}",
+  "update.up_to_date": "You have the latest version.",
+  "update.check": "Check now",
+  "update.install": "Download and install {size}",
+  "update.installing": "Downloading and verifying",
+  "update.install.note":
+    "G2 Boost downloads the installer and the checksum list (SHA-256) of the same version, opens the installer only if they match, and closes so it can replace the files. Your tweaks and settings stay.",
+  "update.page": "See the version on GitHub",
+  "update.kind.portable":
+    "This copy is portable: download the new zip from the release page and replace G2 Boost.exe (the data folder stays).",
+  "update.kind.dev":
+    "This copy is not installed in Program Files: download the installer from the release page.",
+  "update.toast": "G2 Boost {version} is available",
+  "update.toast.action": "See",
+  "update.error.offline": "GitHub can't be reached right now. Try again in a moment.",
+  "update.error.hash":
+    "The downloaded file does not match the version's checksum list. Nothing was installed; try again later.",
+  "update.error.not_installed":
+    "Only the installed version updates from here. Use the release page.",
+  "update.error.generic": "Could not update: {error}",
   "maint3.fix.wu_backups.title": "Delete the Windows Update reset backups",
   "maint3.fix.wu_backups.body":
     "When the reset renames the folders, Windows creates fresh ones. The old ones are kept only for an undo; once Windows Update works again, they just take space.",

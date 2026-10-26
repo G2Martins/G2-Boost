@@ -245,6 +245,7 @@ export type Settings = {
   profiles: TweakProfile[];
 
   // r9:setup settings
+  update_auto_check: boolean;
 };
 
 export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";
@@ -1209,6 +1210,10 @@ export const backend = {
     callOrThrow<PeriphState>("periph_revert", { setting }),
 
   // r9:setup
+  /** Latest G2 Boost release on GitHub vs this copy. */
+  updateCheck: () => callOrThrow<UpdateInfo>("update_check"),
+  /** Installed copies: download, verify SHA-256, start the installer; the app then quits. */
+  updateInstall: () => callOrThrow<void>("update_install"),
 };
 
 export type VolumeOp = "scan" | "spot_fix" | "analyze" | "retrim" | "defrag";
@@ -1735,3 +1740,14 @@ export type PeriphState = {
 };
 
 // ── r9:setup types ──
+export type UpdateInfo = {
+  current: string;
+  latest: string;
+  newer: boolean;
+  name: string;
+  notes: string;
+  url: string;
+  published_at: string;
+  kind: "installed" | "portable" | "dev";
+  installer_size: number | null;
+};
