@@ -479,6 +479,22 @@ mod tests {
         dir
     }
 
+    /// Elevated, real: deletes the backup folders earlier resets left, gated by
+    /// `G2BOOST_LIVE_ACTIONS=1` (`--ignored live_wu_backups_elevated --nocapture`).
+    #[test]
+    #[ignore]
+    fn live_wu_backups_elevated() {
+        if std::env::var("G2BOOST_LIVE_ACTIONS").as_deref() != Ok("1") || !system::is_elevated() {
+            println!("skip: needs G2BOOST_LIVE_ACTIONS=1 and admin");
+            return;
+        }
+        println!("before: {:?}", wu_backups());
+        let out = run(Fix::WuBackups).unwrap();
+        println!("{out:#?}");
+        assert!(out.ok);
+        assert!(wu_backups().is_empty());
+    }
+
     #[test]
     fn backup_names_are_exactly_what_the_reset_writes() {
         assert!(is_backup_name("SoftwareDistribution.bak-20261025-2337", "SoftwareDistribution"));
