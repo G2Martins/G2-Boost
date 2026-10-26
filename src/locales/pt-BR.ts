@@ -2563,7 +2563,7 @@ export const ptBR = {
   "boost.tweak.diagtrack_manual.warn": "você participa do Programa Windows Insider.",
   "boost.tweak.copilot_off": "Copilot desligado",
   "boost.tweak.copilot_off.desc":
-    "Desliga o Copilot do Windows por política, para a sua conta e para o PC, e tira o botão da barra de tarefas. O app Copilot da Microsoft Store não obedece a essa política: remova-o na lista de apps pré-instalados.",
+    "Desliga o Copilot do Windows por política da sua conta e tira o botão da barra de tarefas. O app Copilot da Microsoft Store não obedece a essa política: remova-o na lista de apps pré-instalados.",
   "boost.tweak.copilot_off.warn": "você usa o Copilot do Windows.",
   "boost.tweak.recall_off": "Recall sem capturas",
   "boost.tweak.recall_off.desc":
@@ -2580,7 +2580,7 @@ export const ptBR = {
     "você pretende usar o Recall. Para religar, desfaça aqui e reinicie o PC.",
   "boost.tweak.paint_ai_off": "Paint sem IA",
   "boost.tweak.paint_ai_off.desc":
-    "Desliga por política os recursos de IA do Paint: Cocreator, criador de imagens, preenchimento e apagamento generativos e remoção de fundo. O resto do Paint continua igual. Vale ao abrir o Paint de novo.",
+    "Desliga por política os recursos de IA do Paint: Cocreator, criador de imagens e preenchimento generativo. O resto do Paint continua igual. Vale ao abrir o Paint de novo.",
   "boost.tweak.paint_ai_off.warn": "você usa os recursos de IA do Paint.",
   "boost.tweak.notepad_ai_off": "Bloco de Notas sem IA",
   "boost.tweak.notepad_ai_off.desc":
@@ -2588,7 +2588,7 @@ export const ptBR = {
   "boost.tweak.notepad_ai_off.warn": "você usa a reescrita com IA no Bloco de Notas.",
   "boost.tweak.edge_ai_off": "Edge sem IA",
   "boost.tweak.edge_ai_off.desc":
-    "Desliga por política o Copilot na barra lateral do Edge, o acesso dele ao conteúdo das páginas, a escrita assistida, a busca no histórico com IA e o download do modelo de IA local. A barra lateral inteira some junto. Vale ao reabrir o Edge.",
+    "Desliga por política o Copilot na barra lateral do Edge, o acesso dele ao conteúdo das páginas, a escrita assistida, o atalho do chat na nova guia e o download do modelo de IA local. A barra lateral inteira some junto. Vale ao reabrir o Edge.",
   "boost.tweak.edge_ai_off.warn":
     "você usa o Copilot ou outras ferramentas da barra lateral do Edge.",
   "boost.tweak.delivery_p2p_off": "Atualizações sem compartilhar com outros PCs",
@@ -2611,7 +2611,7 @@ export const ptBR = {
   "boost.tweak.spotlight_off.warn": "você gosta das fotos diárias na tela de bloqueio.",
   "boost.tweak.office_telemetry_off": "Office sem telemetria",
   "boost.tweak.office_telemetry_off.desc":
-    "Pede ao Microsoft 365 (Word, Excel, Outlook), por política, que não envie dados de diagnóstico, nem os opcionais nem os obrigatórios. Aparece só quando o Office está instalado.",
+    "Pede ao Microsoft 365 (Word, Excel, Outlook), por política, que não envie dados de diagnóstico, nem os opcionais nem os obrigatórios; só os dados de serviço indispensáveis continuam. Aparece só quando o Office está instalado.",
   "boost.tweak.office_telemetry_off.warn":
     "o PC é gerenciado por uma empresa e o suporte de TI usa esses dados.",
   "boost.tweak.nvidia_telemetry_off": "NVIDIA sem telemetria",

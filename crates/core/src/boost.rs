@@ -396,9 +396,7 @@ const EDGE_BACKGROUND_OFF: &[RegOp] = &[policy(HKLM, EDGE, "StartupBoostEnabled"
 const EDGE_AI_OFF: &[RegOp] = &[
     policy(HKLM, EDGE, "HubsSidebarEnabled", 0),
     policy(HKLM, EDGE, "CopilotPageContext", 0),
-    policy(HKLM, EDGE, "CopilotCDPPageContext", 0),
     policy(HKLM, EDGE, "ComposeInlineEnabled", 0),
-    policy(HKLM, EDGE, "EdgeHistoryAISearchEnabled", 0),
     policy(HKLM, EDGE, "NewTabPageBingChatEnabled", 0),
     // 1 = do not download the on-device AI model.
     policy(HKLM, EDGE, "GenAILocalFoundationalModelSettings", 1),
@@ -419,9 +417,9 @@ const CONSUMER_FEATURES_OFF: &[RegOp] = &[
 ];
 /// 0 = the lowest level the edition accepts (Security on Enterprise/Education, Required on Home/Pro).
 const TELEMETRY_MIN: &[RegOp] = &[policy(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 0)];
+/// The policy is per user only (Policy CSP: no device scope); the Store Copilot app ignores it.
 const COPILOT_OFF: &[RegOp] = &[
     policy(HKCU, r"Software\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1),
-    policy(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1),
     policy(HKCU, EXPLORER_ADV, "ShowCopilotButton", 0),
 ];
 const WINDOWS_AI: &str = r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI";
@@ -433,8 +431,6 @@ const PAINT_AI_OFF: &[RegOp] = &[
     policy(HKLM, PAINT, "DisableCocreator", 1),
     policy(HKLM, PAINT, "DisableGenerativeFill", 1),
     policy(HKLM, PAINT, "DisableImageCreator", 1),
-    policy(HKLM, PAINT, "DisableGenerativeErase", 1),
-    policy(HKLM, PAINT, "DisableRemoveBackground", 1),
 ];
 const NOTEPAD_AI_OFF: &[RegOp] = &[policy(HKLM, r"SOFTWARE\Policies\WindowsNotepad", "DisableAIFeatures", 1)];
 /// 0 = HTTP only: updates still download from Microsoft, nothing is shared with other PCs.
@@ -458,11 +454,9 @@ const SPOTLIGHT_OFF: &[RegOp] = &[
     policy(HKCU, CLOUD_CONTENT_USER, "DisableWindowsSpotlightFeatures", 1),
     policy(HKCU, CLOUD_CONTENT_USER, "DisableSpotlightCollectionOnDesktop", 1),
 ];
-/// Microsoft 365 Apps: 3 = send no optional or required diagnostic data; the old agent off.
-const OFFICE_TELEMETRY_OFF: &[RegOp] = &[
-    policy(HKCU, r"Software\Policies\Microsoft\Office\Common\ClientTelemetry", "SendTelemetry", 3),
-    policy(HKCU, r"Software\Policies\Microsoft\Office\16.0\Common\ClientTelemetry", "DisableTelemetry", 1),
-];
+/// Microsoft 365 Apps diagnostic data level: 3 = Neither (required service data still flows).
+const OFFICE_TELEMETRY_OFF: &[RegOp] =
+    &[policy(HKCU, r"Software\Policies\Microsoft\Office\Common\ClientTelemetry", "SendTelemetry", 3)];
 /// NVIDIA's telemetry reporters, in the root task folder (older drivers; recent ones no longer
 /// install them, then the tweak shows as unavailable).
 const TASKS_NVIDIA_TELEMETRY: &[(&str, &str)] = &[
@@ -2032,7 +2026,7 @@ mod tests {
         let copilot = changes("copilot_off").unwrap();
         assert!(copilot.contains(&Change {
             kind: "registry",
-            target: r"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot\TurnOffWindowsCopilot".into(),
+            target: r"HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot\TurnOffWindowsCopilot".into(),
             value: Some("1".into()),
         }));
         assert_eq!(changes("diagtrack_manual").unwrap()[0].value.as_deref(), Some("manual"));

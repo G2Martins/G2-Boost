@@ -2556,7 +2556,7 @@ export const en = {
   "boost.tweak.diagtrack_manual.warn": "you are in the Windows Insider Program.",
   "boost.tweak.copilot_off": "Copilot off",
   "boost.tweak.copilot_off.desc":
-    "Turns Windows Copilot off by policy, for your account and for the PC, and removes its taskbar button. The Copilot app from the Microsoft Store ignores this policy: remove it in the preinstalled apps list.",
+    "Turns Windows Copilot off by policy for your account and removes its taskbar button. The Copilot app from the Microsoft Store ignores this policy: remove it in the preinstalled apps list.",
   "boost.tweak.copilot_off.warn": "you use Windows Copilot.",
   "boost.tweak.recall_off": "Recall without snapshots",
   "boost.tweak.recall_off.desc":
@@ -2573,7 +2573,7 @@ export const en = {
     "you plan to use Recall. To turn it back on, undo here and restart the PC.",
   "boost.tweak.paint_ai_off": "Paint without AI",
   "boost.tweak.paint_ai_off.desc":
-    "Turns Paint's AI features off by policy: Cocreator, Image Creator, generative fill and erase, and background removal. The rest of Paint stays the same. Takes effect when Paint opens again.",
+    "Turns Paint's AI features off by policy: Cocreator, Image Creator and generative fill. The rest of Paint stays the same. Takes effect when Paint opens again.",
   "boost.tweak.paint_ai_off.warn": "you use Paint's AI features.",
   "boost.tweak.notepad_ai_off": "Notepad without AI",
   "boost.tweak.notepad_ai_off.desc":
@@ -2581,7 +2581,7 @@ export const en = {
   "boost.tweak.notepad_ai_off.warn": "you use AI rewriting in Notepad.",
   "boost.tweak.edge_ai_off": "Edge without AI",
   "boost.tweak.edge_ai_off.desc":
-    "Turns off by policy Copilot in the Edge sidebar, its access to page content, assisted writing, AI history search and the download of the local AI model. The whole sidebar goes away with it. Takes effect when Edge reopens.",
+    "Turns off by policy Copilot in the Edge sidebar, its access to page content, assisted writing, the chat shortcut on the new tab page and the download of the local AI model. The whole sidebar goes away with it. Takes effect when Edge reopens.",
   "boost.tweak.edge_ai_off.warn": "you use Copilot or other Edge sidebar tools.",
   "boost.tweak.delivery_p2p_off": "Updates without sharing with other PCs",
   "boost.tweak.delivery_p2p_off.desc":
@@ -2602,7 +2602,7 @@ export const en = {
   "boost.tweak.spotlight_off.warn": "you enjoy the daily lock screen photos.",
   "boost.tweak.office_telemetry_off": "Office without telemetry",
   "boost.tweak.office_telemetry_off.desc":
-    "Asks Microsoft 365 (Word, Excel, Outlook), by policy, not to send diagnostic data, neither optional nor required. Shows up only when Office is installed.",
+    "Asks Microsoft 365 (Word, Excel, Outlook), by policy, not to send diagnostic data, neither optional nor required; only essential service data keeps flowing. Shows up only when Office is installed.",
   "boost.tweak.office_telemetry_off.warn":
     "the PC is managed by a company and IT support uses that data.",
   "boost.tweak.nvidia_telemetry_off": "NVIDIA without telemetry",
