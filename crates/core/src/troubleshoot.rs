@@ -144,6 +144,8 @@ pub fn run(fix: Fix) -> Result<Outcome, FixError> {
     match fix {
         Fix::WuReset => {
             let _slot = repair::exclusive().ok_or(FixError::Busy)?;
+            // Not while Atualizações searches/installs through Windows Update (and none starts mid-reset).
+            let _wu = crate::updates::Busy::take(&crate::updates::WU_BUSY).map_err(|_| FixError::Busy)?;
             wu_reset(&mut steps);
         }
         Fix::PrintQueue => print_queue(&mut steps)?,

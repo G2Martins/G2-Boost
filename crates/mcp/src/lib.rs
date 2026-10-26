@@ -451,7 +451,7 @@ Rockstar, added by hand), which are running now, which have Game Mode on, and th
     async fn get_games(&self) -> Result<String, String> {
         blocking(|| {
             let s = g2boost_core::settings::load();
-            let games = g2boost_core::games::installed(&s.game_exes);
+            let games = g2boost_core::games::library(&s);
             let running = g2boost_core::games::running(&games, &g2boost_core::procs::list_paths(), g2boost_core::games::steam_running_app());
             json!({
                 "games": games.iter().map(|g| json!({

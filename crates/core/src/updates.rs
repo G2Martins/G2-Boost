@@ -368,7 +368,7 @@ pub struct WuProgress {
 }
 
 static WU_LAST: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
-static WU_BUSY: AtomicBool = AtomicBool::new(false);
+pub(crate) static WU_BUSY: AtomicBool = AtomicBool::new(false);
 static WU_CANCEL: AtomicBool = AtomicBool::new(false);
 /// Set when an install here reported that a restart is needed.
 static WU_REBOOT: AtomicBool = AtomicBool::new(false);
