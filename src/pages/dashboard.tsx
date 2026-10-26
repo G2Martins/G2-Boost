@@ -290,11 +290,13 @@ function Overview({ elevated }: { elevated: boolean }) {
               <Zap className="size-4" />
               {boosting
                 ? t("dash.applying", { done: boosting.done, total: boosting.total })
-                : pending.length > 0
-                  ? t("dash.kpi.score.action", { count: pending.length })
-                  : cleanupBytes
-                    ? t("dash.boost.label")
-                    : t("dash.kpi.score.done")}
+                : !score
+                  ? t("dash.boost.label")
+                  : pending.length > 0
+                    ? t("dash.kpi.score.action", { count: pending.length })
+                    : cleanupBytes
+                      ? t("dash.boost.label")
+                      : t("dash.kpi.score.done")}
             </Button>
             {skipped > 0 && !boosting ? (
               <p className="text-[11px] text-warning">
