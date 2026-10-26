@@ -16,6 +16,9 @@ type FnHandle = unsafe extern "C" fn(u32, *mut *mut c_void) -> i32;
 type FnDevSelU32 = unsafe extern "C" fn(*mut c_void, u32, *mut u32) -> i32;
 type FnDevU32 = unsafe extern "C" fn(*mut c_void, *mut u32) -> i32;
 type FnStr = unsafe extern "C" fn(*mut u8, u32) -> i32;
+type FnUtil = unsafe extern "C" fn(*mut c_void, *mut Utilization) -> i32;
+type FnMem = unsafe extern "C" fn(*mut c_void, *mut Memory) -> i32;
+type FnName = unsafe extern "C" fn(*mut c_void, *mut u8, u32) -> i32;
 
 pub struct Nvml {
     device: *mut c_void,
@@ -26,18 +29,29 @@ pub struct Nvml {
     pcie_gen: Option<FnDevU32>,
     pcie_width: Option<FnDevU32>,
     driver: Option<FnStr>,
-    bar1: Option<FnBar1>,
+    bar1: Option<FnMem>,
+    utilization: Option<FnUtil>,
+    memory: Option<FnMem>,
+    fan: Option<FnDevU32>,
+    name: Option<FnName>,
 }
 
-/// `nvmlBAR1Memory_t`: total / free / used bytes of the BAR1 aperture.
+/// `nvmlMemory_t` / `nvmlBAR1Memory_t` (same layout): total / free / used bytes.
 #[repr(C)]
 #[derive(Default)]
-struct Bar1Memory {
+struct Memory {
     total: u64,
     free: u64,
     used: u64,
 }
-type FnBar1 = unsafe extern "C" fn(*mut c_void, *mut Bar1Memory) -> i32;
+
+/// `nvmlUtilization_t`.
+#[repr(C)]
+#[derive(Default)]
+struct Utilization {
+    gpu: u32,
+    memory: u32,
+}
 
 // SAFETY: NVML is documented thread-safe; the device handle is an opaque, process-wide token.
 unsafe impl Send for Nvml {}
@@ -83,7 +97,11 @@ impl Nvml {
                 pcie_gen: sym!(h, "nvmlDeviceGetCurrPcieLinkGeneration", FnDevU32),
                 pcie_width: sym!(h, "nvmlDeviceGetCurrPcieLinkWidth", FnDevU32),
                 driver: sym!(h, "nvmlSystemGetDriverVersion", FnStr),
-                bar1: sym!(h, "nvmlDeviceGetBAR1MemoryInfo", FnBar1),
+                bar1: sym!(h, "nvmlDeviceGetBAR1MemoryInfo", FnMem),
+                utilization: sym!(h, "nvmlDeviceGetUtilizationRates", FnUtil),
+                memory: sym!(h, "nvmlDeviceGetMemoryInfo", FnMem),
+                fan: sym!(h, "nvmlDeviceGetFanSpeed", FnDevU32),
+                name: sym!(h, "nvmlDeviceGetName", FnName),
             })
         }
     }
@@ -125,9 +143,40 @@ impl Nvml {
     /// BAR1 aperture size. 256 MiB = classic BAR; ≈ VRAM size = Resizable BAR on.
     pub fn bar1_total_bytes(&self) -> Option<u64> {
         let f = self.bar1?;
-        let mut m = Bar1Memory::default();
+        let mut m = Memory::default();
         // SAFETY: valid device handle; struct matches nvmlBAR1Memory_t.
         (unsafe { f(self.device, &mut m) } == 0).then_some(m.total)
+    }
+
+    /// (GPU %, memory controller %).
+    pub fn utilization(&self) -> Option<(f64, f64)> {
+        let f = self.utilization?;
+        let mut u = Utilization::default();
+        // SAFETY: valid device handle; struct matches nvmlUtilization_t.
+        (unsafe { f(self.device, &mut u) } == 0).then_some((f64::from(u.gpu), f64::from(u.memory)))
+    }
+
+    /// (used, total) bytes of video memory.
+    pub fn memory(&self) -> Option<(u64, u64)> {
+        let f = self.memory?;
+        let mut m = Memory::default();
+        // SAFETY: valid device handle; struct matches nvmlMemory_t.
+        (unsafe { f(self.device, &mut m) } == 0).then_some((m.used, m.total))
+    }
+
+    pub fn fan_percent(&self) -> Option<f64> {
+        self.dev_u32(self.fan).map(f64::from)
+    }
+
+    pub fn name(&self) -> Option<String> {
+        let f = self.name?;
+        let mut buf = [0u8; 96];
+        // SAFETY: buffer of 96 bytes (NVML_DEVICE_NAME_V2_BUFFER_SIZE).
+        if unsafe { f(self.device, buf.as_mut_ptr(), buf.len() as u32) } != 0 {
+            return None;
+        }
+        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+        Some(String::from_utf8_lossy(&buf[..end]).trim().to_string()).filter(|s| !s.is_empty())
     }
 
     pub fn driver_version(&self) -> Option<String> {

@@ -188,18 +188,7 @@ pub fn parse_import(text: &str) -> Result<Profile, ProfileError> {
 
 /// `Documents\G2 Boost\Perfis` (Documents may live in OneDrive).
 pub fn profiles_dir() -> Option<PathBuf> {
-    use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::UI::Shell::{FOLDERID_Documents, KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
-    // SAFETY: the API allocates the string; it is copied then freed with CoTaskMemFree.
-    let known = unsafe {
-        SHGetKnownFolderPath(&FOLDERID_Documents, KNOWN_FOLDER_FLAG(0), None).ok().and_then(|p| {
-            let s = p.to_string().ok();
-            CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
-            s.map(PathBuf::from)
-        })
-    };
-    let docs = known.or_else(|| std::env::var_os("USERPROFILE").map(|p| PathBuf::from(p).join("Documents")))?;
-    Some(docs.join("G2 Boost").join("Perfis"))
+    Some(crate::registry::documents_dir()?.join("G2 Boost").join("Perfis"))
 }
 
 /// Accented Latin letters to plain ones, so "Ação" becomes "acao" and not "a-o".

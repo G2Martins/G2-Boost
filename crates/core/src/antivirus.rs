@@ -36,7 +36,7 @@ use windows::Win32::System::Wmi::{
 use windows::core::{BSTR, PCWSTR, PWSTR, w};
 
 use crate::exposure::{clean, product_state};
-use crate::registry::{self, wide};
+use crate::registry::{self, known_folder, wide};
 use crate::tasksched::Com;
 use crate::{system, volumes, wmi};
 
@@ -277,18 +277,6 @@ fn read_acl(p: &Path) -> Option<(String, Option<Vec<Ace>>)> {
 /// Unreadable permissions count as writable: refusing is the safe answer.
 fn writable(p: &Path) -> bool {
     read_acl(p).is_none_or(|(owner, aces)| writable_by_others(&owner, aces.as_deref()))
-}
-
-fn known_folder(id: &windows::core::GUID) -> Option<PathBuf> {
-    use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::UI::Shell::{KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
-    // SAFETY: the API allocates the string; freed with CoTaskMemFree. (Same as `apps.rs`.)
-    unsafe {
-        let p = SHGetKnownFolderPath(id, KNOWN_FOLDER_FLAG(0), None).ok()?;
-        let s = p.to_string().ok();
-        CoTaskMemFree(Some(p.0 as *const c_void));
-        s.map(PathBuf::from)
-    }
 }
 
 /// Program Files and Program Files (x86), from the shell (not from environment variables).

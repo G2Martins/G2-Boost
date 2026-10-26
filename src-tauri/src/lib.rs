@@ -359,12 +359,7 @@ async fn report_save() -> Result<String, String> {
         let profile = hardware::profile();
         let sat = winsat::last().unwrap_or_default();
         let tweaks = boost::detect_all();
-        let dir = std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .ok_or("no profile dir")?
-            .join("Documents")
-            .join("G2 Boost");
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let dir = g2boost_core::registry::documents_g2().map_err(|e| e.to_string())?;
         let stamp = {
             let clock = Clock::now();
             format!("{}-{:02}{:02}{:02}", clock.unix, clock.hour, clock.minute, clock.second)

@@ -11,9 +11,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::SystemInformation::GetLocalTime;
-use windows::Win32::UI::Shell::{FOLDERID_Documents, KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
 
 pub const MAX_ROWS: usize = 5000;
 const MAX_CELL: usize = 200;
@@ -58,13 +56,13 @@ pub fn format_for(locale: &str) -> (char, char) {
 }
 
 /// One text cell: no control characters, at most 200 characters, a leading apostrophe when a
-/// spreadsheet would read it as a formula, quoted when it holds the separator or a quote.
+/// spreadsheet would read it as a formula, quoted when it holds the separator, a quote or leading/trailing blanks.
 pub fn escape(cell: &str, sep: char) -> String {
     let mut s: String = cell.chars().filter(|c| !c.is_control()).take(MAX_CELL).collect();
     if s.starts_with(['=', '+', '-', '@']) {
         s.insert(0, '\'');
     }
-    if s.contains(sep) || s.contains('"') {
+    if s.contains(sep) || s.contains('"') || s != s.trim() {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
         s
@@ -147,23 +145,10 @@ pub fn save_in(dir: &Path, name: &str, text: &str) -> std::io::Result<PathBuf> {
     Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "too many files with this name"))
 }
 
-/// The user's Documents folder (OneDrive-redirected or not), else `%USERPROFILE%\Documents`.
-fn documents_dir() -> Option<PathBuf> {
-    // SAFETY: the API allocates the string; it is copied, then freed with CoTaskMemFree.
-    let known = unsafe {
-        SHGetKnownFolderPath(&FOLDERID_Documents, KNOWN_FOLDER_FLAG(0), None).ok().and_then(|p| {
-            let s = p.to_string().ok();
-            CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
-            s
-        })
-    };
-    known.map(PathBuf::from).or_else(|| std::env::var_os("USERPROFILE").map(|p| PathBuf::from(p).join("Documents")))
-}
-
 /// Write the file and return its path (the caller reveals it in Explorer).
 pub fn save(req: &Request) -> Result<PathBuf, CsvError> {
     let text = build_text(req)?;
-    let dir = documents_dir().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no Documents folder"))?;
+    let dir = crate::registry::documents_g2()?;
     // SAFETY: plain call, returns the struct by value.
     let t = unsafe { GetLocalTime() };
     Ok(save_in(&dir, &file_name(t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond), &text)?)
@@ -309,7 +294,7 @@ mod tests {
     #[test]
     #[ignore = "live: reads the known-folder API"]
     fn documents_folder_resolves() {
-        assert!(documents_dir().is_some_and(|d| d.is_absolute()));
+        assert!(crate::registry::documents_dir().is_some_and(|d| d.is_absolute()));
     }
 
     /// Live: writes a real file in this user's Documents folder, reads it back and deletes it.

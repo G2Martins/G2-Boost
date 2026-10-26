@@ -387,6 +387,34 @@ pub fn safe_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
+/// A shell known folder (Desktop/Documents may be redirected to OneDrive).
+pub(crate) fn known_folder(id: &windows::core::GUID) -> Option<PathBuf> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
+    // SAFETY: the API allocates the string; it is copied, then freed with CoTaskMemFree.
+    unsafe {
+        let p = SHGetKnownFolderPath(id, KNOWN_FOLDER_FLAG(0), None).ok()?;
+        let s = p.to_string().ok();
+        CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
+        s.map(PathBuf::from)
+    }
+}
+
+/// The user's Documents folder (OneDrive-redirected or not), else `%USERPROFILE%\Documents`.
+pub(crate) fn documents_dir() -> Option<PathBuf> {
+    known_folder(&windows::Win32::UI::Shell::FOLDERID_Documents)
+        .or_else(|| std::env::var_os("USERPROFILE").map(|p| PathBuf::from(p).join("Documents")))
+}
+
+/// `Documents\G2 Boost`, created when missing: where every user-visible export goes.
+pub fn documents_g2() -> std::io::Result<PathBuf> {
+    let dir = documents_dir()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no Documents folder"))?
+        .join("G2 Boost");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
 /// `%LOCALAPPDATA%\G2 Boost`, or `<exe folder>\data` for the portable zip (a `portable.txt`
 /// next to the exe). `G2BOOST_DATA_DIR` overrides both (tests).
 pub fn data_dir() -> PathBuf {

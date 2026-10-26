@@ -16,17 +16,16 @@ use std::ffi::c_void;
 use std::mem::size_of;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, IF_TYPE_SOFTWARE_LOOPBACK, MIB_IF_TABLE2};
 use windows::Win32::NetworkManagement::Ndis::{IfOperStatusUp, MediaConnectStateConnected};
-use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows::Win32::System::Performance::{PDH_HQUERY, PdhCloseQuery, PdhCollectQueryData, PdhOpenQueryW};
 use windows::Win32::System::ProcessStatus::{GetPerformanceInfo, PERFORMANCE_INFORMATION};
-use windows::core::{PCWSTR, w};
+use windows::core::PCWSTR;
 
 use crate::hardware;
 use crate::monitor::{Counter, add_counter, values};
@@ -555,110 +554,6 @@ pub(crate) fn drive_temp(d: &DriveHealth) -> Option<f64> {
     (1.0..=120.0).contains(&t).then_some(t)
 }
 
-/* ---------------- NVML extras (own loader: nvml.rs stays untouched while round 9 merges) ---------------- */
-
-#[repr(C)]
-#[derive(Default)]
-struct NvUtilization {
-    gpu: u32,
-    memory: u32,
-}
-
-#[repr(C)]
-#[derive(Default)]
-struct NvMemory {
-    total: u64,
-    free: u64,
-    used: u64,
-}
-
-type FnHandle = unsafe extern "C" fn(u32, *mut *mut c_void) -> i32;
-type FnUtil = unsafe extern "C" fn(*mut c_void, *mut NvUtilization) -> i32;
-type FnMem = unsafe extern "C" fn(*mut c_void, *mut NvMemory) -> i32;
-type FnU32 = unsafe extern "C" fn(*mut c_void, *mut u32) -> i32;
-type FnName = unsafe extern "C" fn(*mut c_void, *mut u8, u32) -> i32;
-
-// ponytail: a second small NVML loader instead of new fields on `nvml::Nvml`; fold into nvml.rs after round 9.
-struct NvExtra {
-    device: *mut c_void,
-    util: Option<FnUtil>,
-    mem: Option<FnMem>,
-    fan: Option<FnU32>,
-    name: Option<FnName>,
-}
-
-// SAFETY: NVML is documented thread-safe; the device handle is an opaque, process-wide token.
-unsafe impl Send for NvExtra {}
-unsafe impl Sync for NvExtra {}
-
-macro_rules! sym {
-    ($h:expr, $name:literal, $ty:ty) => {
-        // SAFETY: the symbol has the documented NVML C signature.
-        GetProcAddress($h, windows::core::s!($name)).map(|f| std::mem::transmute::<_, $ty>(f))
-    };
-}
-
-impl NvExtra {
-    fn load() -> Option<Self> {
-        nvml::get()?; // loads and initialises nvml.dll once
-        // SAFETY: the module is already loaded by `nvml::get`; symbols resolved by name with the C ABI.
-        unsafe {
-            let h = GetModuleHandleW(w!("nvml.dll")).ok()?;
-            let by_index: FnHandle = sym!(h, "nvmlDeviceGetHandleByIndex_v2", FnHandle)?;
-            let mut device = null_mut();
-            if by_index(0, &mut device) != 0 {
-                return None;
-            }
-            Some(Self {
-                device,
-                util: sym!(h, "nvmlDeviceGetUtilizationRates", FnUtil),
-                mem: sym!(h, "nvmlDeviceGetMemoryInfo", FnMem),
-                fan: sym!(h, "nvmlDeviceGetFanSpeed", FnU32),
-                name: sym!(h, "nvmlDeviceGetName", FnName),
-            })
-        }
-    }
-
-    /// (GPU %, memory controller %).
-    fn utilization(&self) -> Option<(f64, f64)> {
-        let f = self.util?;
-        let mut u = NvUtilization::default();
-        // SAFETY: valid device handle; struct matches nvmlUtilization_t.
-        (unsafe { f(self.device, &mut u) } == 0).then_some((f64::from(u.gpu), f64::from(u.memory)))
-    }
-
-    /// (used, total) bytes of video memory.
-    fn memory(&self) -> Option<(u64, u64)> {
-        let f = self.mem?;
-        let mut m = NvMemory::default();
-        // SAFETY: valid device handle; struct matches nvmlMemory_t.
-        (unsafe { f(self.device, &mut m) } == 0).then_some((m.used, m.total))
-    }
-
-    fn fan_percent(&self) -> Option<f64> {
-        let f = self.fan?;
-        let mut v = 0u32;
-        // SAFETY: valid device handle; out-param.
-        (unsafe { f(self.device, &mut v) } == 0).then_some(f64::from(v))
-    }
-
-    fn name(&self) -> Option<String> {
-        let f = self.name?;
-        let mut buf = [0u8; 96];
-        // SAFETY: buffer of 96 bytes (NVML_DEVICE_NAME_V2_BUFFER_SIZE).
-        if unsafe { f(self.device, buf.as_mut_ptr(), buf.len() as u32) } != 0 {
-            return None;
-        }
-        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-        Some(String::from_utf8_lossy(&buf[..end]).trim().to_string()).filter(|s| !s.is_empty())
-    }
-}
-
-fn nv_extra() -> Option<&'static NvExtra> {
-    static X: OnceLock<Option<NvExtra>> = OnceLock::new();
-    X.get_or_init(NvExtra::load).as_ref()
-}
-
 /* ---------------- gathering ---------------- */
 
 /// Disk temperatures change slowly, a SMART read can wake a sleeping drive and opens the raw
@@ -793,11 +688,10 @@ impl Sampler {
 
     fn gpu_raw(&self) -> Option<GpuRaw> {
         if let Some(n) = nvml::get() {
-            let x = nv_extra();
-            let util = x.and_then(NvExtra::utilization);
-            let mem = x.and_then(NvExtra::memory);
+            let util = n.utilization();
+            let mem = n.memory();
             return Some(GpuRaw {
-                name: x.and_then(NvExtra::name).unwrap_or_default(),
+                name: n.name().unwrap_or_default(),
                 temp_c: n.temperature_c().map(f64::from),
                 core_mhz: n.clock_mhz(0).map(f64::from),
                 mem_mhz: n.clock_mhz(2).map(f64::from),
@@ -808,7 +702,7 @@ impl Sampler {
                 mem_ctrl: util.map(|u| u.1),
                 vram_used: mem.map(|m| m.0 as f64),
                 vram_total: mem.map(|m| m.1 as f64),
-                fan_pct: x.and_then(NvExtra::fan_percent),
+                fan_pct: n.fan_percent(),
             });
         }
         let g = self.gpu_fallback.as_ref()?;

@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::registry::{self, Root, Value};
+use crate::registry::{self, Root, Value, known_folder};
 use crate::safety::{PathClass, SafePath, starts_with_dir};
 
 const UNINSTALL: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
@@ -702,19 +702,6 @@ pub(crate) struct Ctx {
     program_files: Vec<PathBuf>,
     /// Install folders (lowercase) of the desktop apps still installed: never a companion leftover.
     installed_dirs: Vec<String>,
-}
-
-/// A shell known folder (Desktop/Documents may be redirected to OneDrive).
-fn known_folder(id: &windows::core::GUID) -> Option<PathBuf> {
-    use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::UI::Shell::{KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
-    // SAFETY: the API allocates the string; freed with CoTaskMemFree.
-    unsafe {
-        let p = SHGetKnownFolderPath(id, KNOWN_FOLDER_FLAG(0), None).ok()?;
-        let s = p.to_string().ok();
-        CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
-        s.map(PathBuf::from)
-    }
 }
 
 impl Ctx {

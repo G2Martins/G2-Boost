@@ -9,8 +9,6 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
-use windows::Win32::System::Com::CoTaskMemFree;
-use windows::Win32::UI::Shell::{KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
 use windows::core::GUID;
 
 use crate::registry::{Root, Value, read, value_names};
@@ -74,14 +72,7 @@ fn folder_guid(g: &str) -> Option<GUID> {
 }
 
 fn known_folder(g: &str) -> Option<String> {
-    let id = folder_guid(g)?;
-    // SAFETY: the API allocates the string; it is copied then freed with CoTaskMemFree.
-    unsafe {
-        let p = SHGetKnownFolderPath(&id, KNOWN_FOLDER_FLAG(0), None).ok()?;
-        let s = p.to_string().ok();
-        CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
-        s
-    }
+    crate::registry::known_folder(&folder_guid(g)?).map(|p| p.to_string_lossy().into_owned())
 }
 
 fn clean(s: &str) -> String {

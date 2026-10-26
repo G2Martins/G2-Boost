@@ -465,18 +465,6 @@ impl CsvFormat {
     }
 }
 
-/// A text cell: control characters dropped, a leading `= + - @` defused (spreadsheets run those
-/// as formulas), quoted when it holds the separator or a quote.
-fn text_cell(s: &str, sep: char) -> String {
-    let clean: String = s.chars().filter(|c| !c.is_control()).collect();
-    let clean = if clean.starts_with(['=', '+', '-', '@']) { format!("'{clean}") } else { clean };
-    if clean.contains([sep, '"']) || clean != clean.trim() {
-        format!("\"{}\"", clean.replace('"', "\"\""))
-    } else {
-        clean
-    }
-}
-
 fn number(v: Option<f64>, f: CsvFormat) -> String {
     v.map(|v| format!("{v:.1}").replace('.', &f.decimal.to_string())).unwrap_or_default()
 }
@@ -513,10 +501,10 @@ pub fn csv(r: &Report, f: CsvFormat) -> String {
         Profile::Long => "long",
     };
     let pairs: [(&str, String); 17] = [
-        ("target", text_cell(&r.host, f.sep)),
+        ("target", crate::hwcsv::escape(&r.host, f.sep)),
         ("address", r.ip.to_string()),
         ("profile", profile.into()),
-        ("started", text_cell(&r.started, f.sep)),
+        ("started", crate::hwcsv::escape(&r.started, f.sep)),
         ("duration_s", number(Some(r.duration_ms as f64 / 1000.0), f)),
         ("cancelled", u8::from(r.cancelled).to_string()),
         ("sent", m.sent.to_string()),
@@ -562,43 +550,14 @@ fn file_name(r: &Report) -> String {
 
 /// Write the CSV into `dir` without overwriting anything. Returns the path.
 fn write_report(dir: &Path, r: &Report, f: CsvFormat) -> Result<PathBuf, ExportError> {
-    use std::io::Write;
-    let name = file_name(r);
-    let stem = name.strip_suffix(".csv").unwrap_or(&name);
-    let text = csv(r, f);
-    for n in 0..10 {
-        let candidate = if n == 0 { name.clone() } else { format!("{stem}-{n}.csv") };
-        let path = dir.join(candidate);
-        match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
-            Ok(mut file) => {
-                file.write_all(text.as_bytes()).map_err(|_| ExportError::Io)?;
-                return Ok(path);
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(_) => return Err(ExportError::Io),
-        }
-    }
-    Err(ExportError::Io)
-}
-
-/// The Documents folder (it may live in OneDrive).
-fn documents_dir() -> Option<PathBuf> {
-    use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::UI::Shell::{FOLDERID_Documents, KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
-    // SAFETY: the API allocates the string; freed with CoTaskMemFree.
-    unsafe {
-        let p = SHGetKnownFolderPath(&FOLDERID_Documents, KNOWN_FOLDER_FLAG(0), None).ok()?;
-        let s = p.to_string().ok();
-        CoTaskMemFree(Some(p.0 as *const std::ffi::c_void));
-        s.map(PathBuf::from)
-    }
+    crate::hwcsv::save_in(dir, &file_name(r), &csv(r, f)).map_err(|_| ExportError::Io)
 }
 
 /// Save the last run as CSV in Documents and show it in Explorer. The content is what this
 /// module measured, never what the caller sends. Returns the file name.
 pub fn export_csv(locale: &str) -> Result<String, ExportError> {
     let report = last().filter(|r| !r.samples.is_empty()).ok_or(ExportError::NoRun)?;
-    let dir = documents_dir().ok_or(ExportError::NoFolder)?;
+    let dir = crate::registry::documents_g2().map_err(|_| ExportError::NoFolder)?;
     let path = write_report(&dir, &report, CsvFormat::for_locale(locale))?;
     let _ = crate::disk::reveal(&path); // the file is saved either way
     Ok(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default())
@@ -910,16 +869,16 @@ mod tests {
 
     #[test]
     fn csv_cells_defuse_formulas_and_quoting() {
-        assert_eq!(text_cell("=cmd|' /C calc'!A0", ';'), "'=cmd|' /C calc'!A0");
-        assert_eq!(text_cell("+1+1", ','), "'+1+1");
-        assert_eq!(text_cell("-2+3", ','), "'-2+3");
-        assert_eq!(text_cell("@SUM(A1)", ','), "'@SUM(A1)");
-        assert_eq!(text_cell("a,b", ','), "\"a,b\"");
-        assert_eq!(text_cell("a;b", ','), "a;b", "only the active separator forces quotes");
-        assert_eq!(text_cell("say \"hi\"", ','), "\"say \"\"hi\"\"\"");
-        assert_eq!(text_cell("two\r\nlines\0", ','), "twolines", "control characters never reach the file");
-        assert_eq!(text_cell(" x", ','), "\" x\"");
-        assert_eq!(text_cell("plain.host-1", ','), "plain.host-1");
+        assert_eq!(crate::hwcsv::escape("=cmd|' /C calc'!A0", ';'), "'=cmd|' /C calc'!A0");
+        assert_eq!(crate::hwcsv::escape("+1+1", ','), "'+1+1");
+        assert_eq!(crate::hwcsv::escape("-2+3", ','), "'-2+3");
+        assert_eq!(crate::hwcsv::escape("@SUM(A1)", ','), "'@SUM(A1)");
+        assert_eq!(crate::hwcsv::escape("a,b", ','), "\"a,b\"");
+        assert_eq!(crate::hwcsv::escape("a;b", ','), "a;b", "only the active separator forces quotes");
+        assert_eq!(crate::hwcsv::escape("say \"hi\"", ','), "\"say \"\"hi\"\"\"");
+        assert_eq!(crate::hwcsv::escape("two\r\nlines\0", ','), "twolines", "control characters never reach the file");
+        assert_eq!(crate::hwcsv::escape(" x", ','), "\" x\"");
+        assert_eq!(crate::hwcsv::escape("plain.host-1", ','), "plain.host-1");
     }
 
     #[test]
@@ -944,7 +903,7 @@ mod tests {
         let a = write_report(&dir, &r, f).unwrap();
         let b = write_report(&dir, &r, f).unwrap();
         assert_ne!(a, b);
-        assert!(b.file_name().unwrap().to_string_lossy().ends_with("-1.csv"));
+        assert!(b.file_name().unwrap().to_string_lossy().ends_with(" (2).csv"));
         assert_eq!(std::fs::read_to_string(&a).unwrap(), csv(&r, f));
         assert!(write_report(&dir.join("missing").join("deeper"), &r, f).is_err());
         let _ = std::fs::remove_dir_all(&dir);
@@ -952,7 +911,7 @@ mod tests {
 
     #[test]
     fn documents_folder_exists() {
-        let dir = documents_dir().expect("a Documents folder");
+        let dir = crate::registry::documents_dir().expect("a Documents folder");
         assert!(dir.is_dir(), "{dir:?}");
     }
 
