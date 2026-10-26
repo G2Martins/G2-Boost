@@ -11,8 +11,10 @@ import {
 import { useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { BootOptionsCard, DriveTools } from "@/components/maintenance/drive-tools";
+import { Inside, QuickFixes, SectionRule } from "@/components/maintenance/quick-fixes";
+import { codeKey, elapsed, hex, WeeklyReview } from "@/components/maintenance/weekly-review";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
-import { Badge, Button, Card, CardTitle, EmptyState, HelpHint } from "@/components/ui/primitives";
+import { Badge, Button, Card, CardTitle, EmptyState } from "@/components/ui/primitives";
 import {
   backend,
   inTauri,
@@ -55,22 +57,6 @@ const TONE: Record<RepairVerdict, "success" | "warning" | "danger" | "neutral"> 
   unknown: "neutral",
 };
 
-/** Codes worth a sentence of their own; anything else shows the raw code. */
-function codeKey(code: number): I18nKey | null {
-  if (code === 1460) return "maintenance.code.timeout";
-  if ([0x800f081f, 0x800f0906, 0x800f0907, 0x800f0950].includes(code))
-    return "maintenance.code.source";
-  if (code === 0x800f082f) return "maintenance.code.pending";
-  return null;
-}
-
-const hex = (code: number) => `0x${code.toString(16).toUpperCase().padStart(8, "0")}`;
-
-function elapsed(ms: number) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
 export function MaintenancePage() {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
@@ -89,15 +75,21 @@ export function MaintenancePage() {
   const [, tick] = useState(0);
   /** A disk check / optimize holds the same servicing slot. */
   const [volBusy, setVolBusy] = useState(false);
+  /** So does the weekly review / full repair (its steps show in its own card). */
+  const [planBusy, setPlanBusy] = useState(false);
+  const reloadHistory = () => {
+    backend.repairHistory().then((h) => h && setHistory(h));
+  };
 
   useEffect(() => {
     backend.appInfo().then((i) => i && setElevated(i.elevated));
     backend.repairHistory().then((h) => h && setHistory(h));
-    backend.repairStatus().then((s) => {
+    Promise.all([backend.repairStatus(), backend.maintPlanStatus()]).then(([s, plan]) => {
       if (!s) return;
       setStatus(s);
-      // Came back to the page mid-run: keep showing it (start time unknown → from now).
-      if (s.running)
+      // Came back to the page mid-run: keep showing it (start time unknown → from now). A step
+      // of the weekly review is shown by its own card, not here.
+      if (s.running && !plan)
         setRun({ tool: s.running, percent: s.percent, since: Date.now(), adopted: true });
     });
     let off: (() => void) | null = null;
@@ -174,7 +166,7 @@ export function MaintenancePage() {
     return null;
   };
 
-  const blocked = !inTauri || !elevated || run !== null || volBusy;
+  const blocked = !inTauri || !elevated || run !== null || volBusy || planBusy;
   const mrtMissing = status !== null && !status.mrt_present;
 
   return (

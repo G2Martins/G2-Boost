@@ -67,6 +67,9 @@ pub mod netrepair;
 // r9:tweaks
 
 // r9:maint
+pub mod antivirus;
+pub mod svc;
+pub mod troubleshoot;
 
 // r9:hw
 

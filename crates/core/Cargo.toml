@@ -81,6 +81,7 @@ features = [
   # r9:tweaks
 
   # r9:maint
+  "Win32_Security_Authorization",
 
   # r9:hw
 

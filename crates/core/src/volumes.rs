@@ -346,7 +346,7 @@ struct Shared {
     prompted: AtomicBool,
 }
 
-fn get_u32(o: &IWbemClassObject, name: &str) -> Option<u32> {
+pub(crate) fn get_u32(o: &IWbemClassObject, name: &str) -> Option<u32> {
     let n = wide(name);
     let mut v = VARIANT::default();
     // SAFETY: NUL-terminated name; WMI fills a VARIANT that drops (VariantClear) itself.
@@ -529,11 +529,29 @@ pub fn run(op: Op, volume: &str, on_progress: &(dyn Fn(Option<u32>) + Sync)) -> 
     if !system::is_elevated() {
         return Err(VolError::NeedsAdmin);
     }
+    let v = live(op, volume)?;
+    let _slot = repair::exclusive().ok_or(VolError::Busy)?;
+    run_on(&v, op, on_progress)
+}
+
+/// [`run`] for a caller that already holds the servicing slot (the weekly review).
+pub(crate) fn run_held(op: Op, volume: &str, on_progress: &(dyn Fn(Option<u32>) + Sync)) -> Result<Outcome, VolError> {
+    if !system::is_elevated() {
+        return Err(VolError::NeedsAdmin);
+    }
+    run_on(&live(op, volume)?, op, on_progress)
+}
+
+/// The live volume `volume` names, if it allows `op`.
+fn live(op: Op, volume: &str) -> Result<Volume, VolError> {
     let v = list()?.into_iter().find(|v| v.id == volume).ok_or(VolError::UnknownVolume)?;
     if !v.ops.contains(&op) {
         return Err(VolError::NotAllowed);
     }
-    let _slot = repair::exclusive().ok_or(VolError::Busy)?;
+    Ok(v)
+}
+
+fn run_on(v: &Volume, op: Op, on_progress: &(dyn Fn(Option<u32>) + Sync)) -> Result<Outcome, VolError> {
     let running = |percent| Running { op, volume: v.id.clone(), letter: v.letter.clone(), percent };
     set_running(Some(running(None)));
     let progress = |p: Option<u32>| {

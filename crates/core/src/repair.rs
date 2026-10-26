@@ -6,6 +6,7 @@
 //!
 //! One servicing job at a time for the whole app: [`exclusive`] is shared with the Disk Cleanup
 //! handlers (`volcache`), which touch the same component store. [`cancel`] stops whatever runs.
+//! The weekly review and the full repair ([`run_plan`]) chain several tools inside one slot.
 
 use std::ffi::c_void;
 use std::os::windows::process::CommandExt;
@@ -22,8 +23,7 @@ use windows::Win32::System::SystemInformation::{GetLocalTime, GetSystemDirectory
 use windows::Win32::System::Threading::{CreateEventW, ResetEvent, SetEvent};
 use windows::core::{HRESULT, PCWSTR, s, w};
 
-use crate::registry;
-use crate::system;
+use crate::{registry, restore, system, volumes};
 
 const HISTORY_MAX: usize = 50;
 const LOG_CAP: u64 = 64 << 20;
@@ -183,6 +183,11 @@ pub fn run(tool: Tool, on_progress: &(dyn Fn(Option<u32>) + Sync)) -> Result<Out
         return Err(RepairError::MrtMissing);
     }
     let _slot = exclusive().ok_or(RepairError::Busy)?;
+    run_in_slot(tool, on_progress)
+}
+
+/// [`run`] for a caller that already holds the servicing slot (a chained plan).
+fn run_in_slot(tool: Tool, on_progress: &(dyn Fn(Option<u32>) + Sync)) -> Result<Outcome, RepairError> {
     set_running(Some((tool, None)));
     let progress = |p: Option<u32>| {
         set_running(Some((tool, p)));
@@ -218,6 +223,224 @@ pub fn run(tool: Tool, on_progress: &(dyn Fn(Option<u32>) + Sync)) -> Result<Out
 
 fn set_running(v: Option<(Tool, Option<u32>)>) {
     *RUNNING.lock().unwrap_or_else(|p| p.into_inner()) = v;
+}
+
+/* ---------------- chained plans: weekly review, full repair ---------------- */
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Plan {
+    /// Restore point, online scan of the system drive, SFC, DISM scan. Diagnostic: the only
+    /// repairs are the ones SFC makes on its own; a repairable image is offered, never started.
+    Weekly,
+    /// DISM RestoreHealth, then SFC (which copies from the image just repaired).
+    FullRepair,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Step {
+    RestorePoint,
+    DriveScan,
+    Sfc,
+    DismScan,
+    DismRestore,
+}
+
+/// The order each plan runs in (fixed: nothing but the plan comes from the caller).
+pub(crate) fn plan_steps(plan: Plan) -> &'static [Step] {
+    match plan {
+        Plan::Weekly => &[Step::RestorePoint, Step::DriveScan, Step::Sfc, Step::DismScan],
+        Plan::FullRepair => &[Step::DismRestore, Step::Sfc],
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StepState {
+    Ok,
+    /// Finished with something to look at: repairable image, files SFC could not fix, disk
+    /// errors, System Protection off.
+    Attention,
+    Failed,
+    /// Not needed or not possible: a restore point within Windows' limit (one per 24 h by
+    /// default), a system drive that cannot be scanned online.
+    Skipped,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepOutcome {
+    pub step: Step,
+    pub state: StepState,
+    /// The step's own verdict, snake_case: a [`Verdict`], a `volumes::Verdict`, or for the restore
+    /// point `created` / `throttled` / `protection_off` / `failed`; `unsupported` = no online scan.
+    pub verdict: String,
+    pub code: u32,
+    pub duration_ms: u64,
+    #[serde(default)]
+    pub repaired: u32,
+    #[serde(default)]
+    pub unrepaired: u32,
+}
+
+impl StepOutcome {
+    fn new(step: Step, state: StepState, verdict: impl Serialize) -> Self {
+        let verdict = serde_json::to_value(verdict).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default();
+        StepOutcome { step, state, verdict, code: 0, duration_ms: 0, repaired: 0, unrepaired: 0 }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanOutcome {
+    pub plan: Plan,
+    pub at: u64,
+    pub duration_ms: u64,
+    pub steps: Vec<StepOutcome>,
+    /// Weekly review: the image is repairable or SFC left files unrepaired, so the UI offers the
+    /// full repair. Never started on its own (downloads from Windows Update, up to half an hour).
+    pub offer_repair: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanRunning {
+    pub plan: Plan,
+    pub step: Step,
+    pub index: usize,
+    pub total: usize,
+    pub percent: Option<u32>,
+    /// The steps already finished in this run (the UI shows their verdicts as they land).
+    pub done: Vec<StepOutcome>,
+}
+
+static PLAN: Mutex<Option<PlanRunning>> = Mutex::new(None);
+
+pub fn plan_status() -> Option<PlanRunning> {
+    PLAN.lock().unwrap_or_else(|p| p.into_inner()).clone()
+}
+
+fn set_plan(v: Option<PlanRunning>) {
+    *PLAN.lock().unwrap_or_else(|p| p.into_inner()) = v;
+}
+
+pub(crate) fn tool_state(v: Verdict) -> StepState {
+    match v {
+        Verdict::Healthy | Verdict::Repaired | Verdict::Clean | Verdict::Unknown => StepState::Ok,
+        Verdict::Repairable | Verdict::NonRepairable | Verdict::Threats => StepState::Attention,
+        Verdict::Failed => StepState::Failed,
+        Verdict::Cancelled => StepState::Cancelled,
+    }
+}
+
+pub(crate) fn drive_state(v: volumes::Verdict) -> StepState {
+    use volumes::Verdict as V;
+    match v {
+        V::Healthy | V::Fixed | V::Optimized => StepState::Ok,
+        V::NeedsSpotFix | V::NeedsOffline | V::Retry => StepState::Attention,
+        V::Failed => StepState::Failed,
+        V::Cancelled => StepState::Cancelled,
+    }
+}
+
+/// A repairable image, or files SFC could not repair: the next step is the full repair.
+pub(crate) fn offer_repair(steps: &[StepOutcome]) -> bool {
+    steps.iter().any(|s| (s.step == Step::DismScan && s.verdict == "repairable") || (s.step == Step::Sfc && s.verdict == "non_repairable"))
+}
+
+fn tool_step(step: Step, tool: Tool, progress: &(dyn Fn(Option<u32>) + Sync)) -> StepOutcome {
+    match run_in_slot(tool, progress) {
+        Ok(o) => StepOutcome { code: o.code, repaired: o.repaired, unrepaired: o.unrepaired, ..StepOutcome::new(step, tool_state(o.verdict), o.verdict) },
+        Err(_) => StepOutcome::new(step, StepState::Failed, Verdict::Failed),
+    }
+}
+
+fn restore_step(label: &str) -> StepOutcome {
+    let step = Step::RestorePoint;
+    match restore::create(label) {
+        Ok(restore::CreateOutcome::Created) => StepOutcome::new(step, StepState::Ok, "created"),
+        Ok(restore::CreateOutcome::Skipped) => StepOutcome::new(step, StepState::Skipped, "throttled"),
+        Err(restore::RestoreError::ProtectionOff) => StepOutcome::new(step, StepState::Attention, "protection_off"),
+        Err(restore::RestoreError::Win32(code)) => StepOutcome { code, ..StepOutcome::new(step, StepState::Failed, "failed") },
+        Err(_) => StepOutcome::new(step, StepState::Failed, "failed"),
+    }
+}
+
+/// Online scan of the system drive (the same `volumes` call as the Verificar disco card).
+fn drive_step(progress: &(dyn Fn(Option<u32>) + Sync)) -> StepOutcome {
+    let step = Step::DriveScan;
+    let sys = volumes::list().ok().and_then(|v| v.into_iter().find(|v| v.system && v.ops.contains(&volumes::Op::Scan)));
+    let Some(v) = sys else {
+        return StepOutcome::new(step, StepState::Skipped, "unsupported");
+    };
+    match volumes::run_held(volumes::Op::Scan, &v.id, progress) {
+        Ok(o) => StepOutcome { code: o.code, ..StepOutcome::new(step, drive_state(o.verdict), o.verdict) },
+        Err(_) => StepOutcome::new(step, StepState::Failed, "failed"),
+    }
+}
+
+/// Run a plan to the end inside one servicing slot (nothing else starts in between; each tool
+/// still lands in its own history). `restore_label` names the restore point in Windows' list.
+/// Stop = [`cancel`]: the running step stops and the rest are marked cancelled.
+pub fn run_plan(plan: Plan, restore_label: &str, on_progress: &(dyn Fn(&PlanRunning) + Sync)) -> Result<PlanOutcome, RepairError> {
+    if !system::is_elevated() {
+        return Err(RepairError::NeedsAdmin);
+    }
+    let _slot = exclusive().ok_or(RepairError::Busy)?;
+    let t0 = Instant::now();
+    let steps = plan_steps(plan);
+    let mut done = Vec::with_capacity(steps.len());
+    for (index, &step) in steps.iter().enumerate() {
+        if cancelled() {
+            done.push(StepOutcome::new(step, StepState::Cancelled, Verdict::Cancelled));
+            continue;
+        }
+        let report = |percent: Option<u32>| {
+            let r = PlanRunning { plan, step, index, total: steps.len(), percent, done: done.clone() };
+            set_plan(Some(r.clone()));
+            on_progress(&r);
+        };
+        report(None);
+        let s0 = Instant::now();
+        let mut o = match step {
+            Step::RestorePoint => restore_step(restore_label),
+            Step::DriveScan => drive_step(&report),
+            Step::Sfc => tool_step(step, Tool::Sfc, &report),
+            Step::DismScan => tool_step(step, Tool::DismScan, &report),
+            Step::DismRestore => tool_step(step, Tool::DismRestore, &report),
+        };
+        o.duration_ms = s0.elapsed().as_millis() as u64;
+        done.push(o);
+    }
+    set_plan(None);
+    let out = PlanOutcome {
+        plan,
+        at: registry::now_unix(),
+        duration_ms: t0.elapsed().as_millis() as u64,
+        offer_repair: plan == Plan::Weekly && offer_repair(&done),
+        steps: done,
+    };
+    record_plan(&out);
+    Ok(out)
+}
+
+fn plan_history_file() -> PathBuf {
+    registry::data_dir().join("review-history.json")
+}
+
+pub fn plan_history() -> Vec<PlanOutcome> {
+    std::fs::read_to_string(plan_history_file()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+fn record_plan(o: &PlanOutcome) {
+    let mut all = plan_history();
+    all.push(o.clone());
+    let skip = all.len().saturating_sub(20);
+    all.drain(..skip);
+    let f = plan_history_file();
+    if let Some(dir) = f.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(f, serde_json::to_string_pretty(&all).unwrap_or_default());
 }
 
 /* ---------------- DISM (DismApi.dll) ---------------- */
@@ -712,6 +935,65 @@ Return code: 13 (0xd)
         assert!(exclusive().is_none(), "second job refused");
         drop(held);
         assert!(exclusive().is_some());
+    }
+
+    #[test]
+    fn plans_run_in_a_fixed_order_and_never_start_a_long_repair_alone() {
+        assert_eq!(plan_steps(Plan::Weekly), [Step::RestorePoint, Step::DriveScan, Step::Sfc, Step::DismScan]);
+        assert!(!plan_steps(Plan::Weekly).contains(&Step::DismRestore), "the weekly review only offers RestoreHealth");
+        assert_eq!(plan_steps(Plan::FullRepair), [Step::DismRestore, Step::Sfc], "image first: SFC copies from it");
+        assert_eq!(serde_json::from_str::<Plan>("\"full_repair\"").unwrap(), Plan::FullRepair);
+        assert!(serde_json::from_str::<Plan>("\"reset_base\"").is_err());
+        assert!(serde_json::from_str::<Plan>("\"weekly; sfc\"").is_err());
+    }
+
+    #[test]
+    fn step_states_and_the_repair_offer() {
+        assert_eq!(tool_state(Verdict::Healthy), StepState::Ok);
+        assert_eq!(tool_state(Verdict::Repaired), StepState::Ok);
+        assert_eq!(tool_state(Verdict::Repairable), StepState::Attention);
+        assert_eq!(tool_state(Verdict::NonRepairable), StepState::Attention);
+        assert_eq!(tool_state(Verdict::Failed), StepState::Failed);
+        assert_eq!(tool_state(Verdict::Cancelled), StepState::Cancelled);
+        assert_eq!(drive_state(volumes::Verdict::Healthy), StepState::Ok);
+        assert_eq!(drive_state(volumes::Verdict::NeedsSpotFix), StepState::Attention);
+        assert_eq!(drive_state(volumes::Verdict::Failed), StepState::Failed);
+
+        let s = |step, verdict: Verdict| StepOutcome::new(step, tool_state(verdict), verdict);
+        assert_eq!(s(Step::Sfc, Verdict::NonRepairable).verdict, "non_repairable");
+        assert_eq!(StepOutcome::new(Step::DriveScan, StepState::Attention, volumes::Verdict::NeedsSpotFix).verdict, "needs_spot_fix");
+        assert_eq!(StepOutcome::new(Step::RestorePoint, StepState::Skipped, "throttled").verdict, "throttled");
+        let healthy = [s(Step::Sfc, Verdict::Healthy), s(Step::DismScan, Verdict::Healthy)];
+        assert!(!offer_repair(&healthy));
+        assert!(offer_repair(&[s(Step::Sfc, Verdict::Healthy), s(Step::DismScan, Verdict::Repairable)]));
+        assert!(offer_repair(&[s(Step::Sfc, Verdict::NonRepairable), s(Step::DismScan, Verdict::Healthy)]));
+        assert!(!offer_repair(&[s(Step::DismScan, Verdict::NonRepairable)]), "beyond an online repair: nothing to offer");
+        // Old history lines without the SFC counts still load.
+        let old = r#"{"step":"sfc","state":"ok","verdict":"healthy","code":0,"duration_ms":5}"#;
+        assert_eq!(serde_json::from_str::<StepOutcome>(old).unwrap().repaired, 0);
+    }
+
+    #[test]
+    fn plans_refuse_without_elevation() {
+        if !system::is_elevated() {
+            assert!(matches!(run_plan(Plan::Weekly, "x", &|_| {}), Err(RepairError::NeedsAdmin)));
+            assert!(matches!(run_plan(Plan::FullRepair, "x", &|_| {}), Err(RepairError::NeedsAdmin)));
+        }
+        assert!(plan_status().is_none());
+    }
+
+    /// Elevated and long (restore point + scan of C: + SFC + DISM scan, ~20 to 45 min), changes
+    /// nothing but a restore point: `--ignored live_weekly_review_elevated --nocapture` with
+    /// `G2BOOST_DATA_DIR` set and `G2BOOST_LIVE_ACTIONS=1`.
+    #[test]
+    #[ignore]
+    fn live_weekly_review_elevated() {
+        if std::env::var("G2BOOST_LIVE_ACTIONS").as_deref() != Ok("1") || !system::is_elevated() {
+            println!("skip: needs G2BOOST_LIVE_ACTIONS=1 and admin");
+            return;
+        }
+        let r = run_plan(Plan::Weekly, "G2 Boost test", &|p| eprintln!("{:?} {}/{} {:?}", p.step, p.index + 1, p.total, p.percent));
+        println!("{r:#?}");
     }
 
     /// Elevated, read-only: DISM CheckHealth flag via the scan entry point would take minutes, so

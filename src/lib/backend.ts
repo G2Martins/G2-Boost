@@ -1097,6 +1097,19 @@ export const backend = {
   // r9:tweaks
 
   // r9:maint
+  /** Weekly review / full repair (Stop = repairCancel). Progress: `maintenance:plan-progress`. */
+  maintPlanRun: (plan: MaintPlan, label: string) =>
+    callOrThrow<MaintPlanOutcome>("maint_plan_run", { plan, label }),
+  maintPlanStatus: () => call<MaintPlanRunning | null>("maint_plan_status"),
+  maintPlanHistory: () => call<MaintPlanOutcome[]>("maint_plan_history"),
+  maintPrintStatus: () => call<PrintStatus>("maint_print_status"),
+  maintFixRun: (fix: MaintFix) => callOrThrow<MaintFixOutcome>("maint_fix_run", { fix }),
+  maintFixHistory: () => call<MaintFixOutcome[]>("maint_fix_history"),
+  avStatus: () => call<AvStatus>("av_status"),
+  /** Adds this exe to Defender's exclusions; the core re-checks the rule (admin). */
+  avExclude: () => callOrThrow<AvStatus>("av_exclude"),
+  avUnexclude: () => callOrThrow<AvStatus>("av_unexclude"),
+  avRevealExe: () => callOrThrow<void>("av_reveal_exe"),
 
   // r9:hw
 
@@ -1267,6 +1280,85 @@ export type WuProgress = {
 // ── r9:tweaks types ──
 
 // ── r9:maint types ──
+export type MaintPlan = "weekly" | "full_repair";
+export type MaintStep = "restore_point" | "drive_scan" | "sfc" | "dism_scan" | "dism_restore";
+export type MaintStepState = "ok" | "attention" | "failed" | "skipped" | "cancelled";
+/** `verdict`: a RepairVerdict, a VolumeVerdict, or created / throttled / protection_off / unsupported. */
+export type MaintStepOutcome = {
+  step: MaintStep;
+  state: MaintStepState;
+  verdict: string;
+  code: number;
+  duration_ms: number;
+  repaired: number;
+  unrepaired: number;
+};
+export type MaintPlanOutcome = {
+  plan: MaintPlan;
+  at: number;
+  duration_ms: number;
+  steps: MaintStepOutcome[];
+  /** The image is repairable: offer the full repair (never started on its own). */
+  offer_repair: boolean;
+};
+export type MaintPlanRunning = {
+  plan: MaintPlan;
+  step: MaintStep;
+  index: number;
+  total: number;
+  percent: number | null;
+  /** Steps already finished in this run. */
+  done: MaintStepOutcome[];
+};
+export type MaintFix = "wu_reset" | "print_queue" | "audio";
+export type MaintFixStep = {
+  action: "stop" | "start" | "rename" | "purge" | "check";
+  target: string;
+  ok: boolean;
+  code: number;
+  note: string | null;
+  jobs: number | null;
+};
+export type MaintFixOutcome = {
+  fix: MaintFix;
+  at: number;
+  duration_ms: number;
+  ok: boolean;
+  steps: MaintFixStep[];
+};
+export type PrintStatus = {
+  spooler: "running" | "stopped" | "disabled" | "missing" | "unknown";
+  printers: { name: string; jobs: number }[] | null;
+};
+export type AvVendor =
+  | "kaspersky"
+  | "avast"
+  | "avg"
+  | "eset"
+  | "norton"
+  | "bitdefender"
+  | "mcafee"
+  | "malwarebytes"
+  | "trend"
+  | "panda";
+export type AvProduct = {
+  name: string;
+  scanner: "on" | "off" | "snoozed" | "expired";
+  up_to_date: boolean;
+  defender: boolean;
+  vendor: AvVendor | null;
+};
+export type AvBlock = "defender_inactive" | "unknown_exe" | "not_protected_folder" | "user_writable";
+export type AvStatus = {
+  products: AvProduct[];
+  defender_active: boolean;
+  exe: string;
+  /** Why the Defender exclusion is not offered (null = offered). */
+  blocked: AvBlock | null;
+  /** Read back elevated; null = cannot tell. */
+  excluded: boolean | null;
+  elevated: boolean;
+};
 
 // ── r9:hw types ──
 
