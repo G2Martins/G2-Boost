@@ -5,6 +5,7 @@
 - **Overlay de jogo: o FPS agora aparece.** Nas versões 0.9.0 e 0.9.1 o contador nunca mostrava quadros: os horários dos eventos do Windows chegavam num relógio diferente do usado na conta. Conferido como administrador: uma animação no Edge marcou 120 FPS num monitor de 120 Hz, com 1% low de 117.
 - **O exe instalado se chama "G2 Boost.exe"** (antes `g2-boost.exe`). É o nome que a janela de permissão do Windows mostra para apps sem assinatura.
 - **Manutenção:** novo card para apagar os backups que o "Redefinir o Windows Update" deixa (pastas `.bak`), com tamanho e confirmação; aparece só quando há backups.
+- **Atualizações pelo próprio app:** Configurações › Atualizações do G2 Boost consulta o GitHub, mostra o que mudou e, na versão instalada, baixa o instalador, confere o SHA-256 publicado e o abre com um clique. Opcional: aviso ao abrir quando há versão nova.
 - **Claude / MCP:** três ferramentas novas de leitura: check-up, sensores de hardware e antivírus (60 no total).
 - **Testado de verdade, como administrador:** instalador e MSI (instalar, abrir, desinstalar sem sobras), "Preparar e jogar" abrindo o programa sem administrador, reiniciar o áudio, esvaziar a fila de impressão, redefinir o Windows Update e apagar os backups, tela de permissão antes do UAC.
 - Atualizando de 0.9.0 ou 0.9.1 com "Iniciar com o Windows" ligado: desligue e ligue de novo em Configurações (o nome do exe mudou).

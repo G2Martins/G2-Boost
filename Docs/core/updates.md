@@ -1,6 +1,6 @@
 # Atualizações (apps pelo winget, Windows Update pela WUA)
 
-**Última revisão:** 2026-10-23 · Código: `crates/core/src/updates.rs` (sobre `winget.rs`), shell `src-tauri/src/lib.rs` (`updates_*`), UI `src/components/apps/updates-tab.tsx` (aba **Atualizações** em **Desinstalar apps**, `src/pages/apps.tsx`), MCP `get_updates` (`crates/mcp/src/lib.rs`), configuração `settings.json → update_excluded`.
+**Última revisão:** 2026-10-26 (atualizações do próprio G2 Boost pelo GitHub) · 2026-10-23 · Código: `crates/core/src/updates.rs` (sobre `winget.rs`), shell `src-tauri/src/lib.rs` (`updates_*`), UI `src/components/apps/updates-tab.tsx` (aba **Atualizações** em **Desinstalar apps**, `src/pages/apps.tsx`), MCP `get_updates` (`crates/mcp/src/lib.rs`), configuração `settings.json → update_excluded`.
 
 Pedido do dono (2026-10-23): o equivalente a `winget upgrade --all` dentro do app, mais o Windows Update, sem shell.
 
@@ -25,6 +25,10 @@ Pedido do dono (2026-10-23): o equivalente a `winget upgrade --all` dentro do ap
 - **Instalar (admin, `needs_admin` sem):** `updates_wu_confirm(ids)` exige o app elevado e ids GUID da última busca (até 100); token `updates:wu:<id>`. A instalação busca de novo só esses ids (`UpdateID='…' or …`, seguro porque o GUID é validado: só hex e hífens nas posições certas), primeiro no cache e, se faltar algum, online; aceita a licença das atualizações escolhidas (o usuário confirmou, como em Configurações), baixa (`BeginDownload`) e instala só o que baixou (`BeginInstall`). Evento `updates:wu` (`phase` download/install, `percent`, `current`, `total`). Resultado por atualização (`ResultCode`, `HResult`, `RebootRequired`).
 - **Nunca reinicia sozinho.** Com reinício pendente (`ISystemInformation.RebootRequired` ou o resultado da instalação), a UI mostra **Reiniciar agora** com modal; `updates_reboot` recusa (`no_reboot_needed`) se nada estiver pendente e usa `InitiateShutdownW(SHUTDOWN_RESTART)` sem forçar apps (eles podem pedir para salvar).
 - **Histórico do Windows** ("Get-HotFix"): `QueryHistory` (mais recentes primeiro), título, KB extraído do título, data (OLE → Unix), instalação/remoção, resultado, HRESULT. Pacotes da Store gravam uma entrada por arquitetura: entradas iguais seguidas são agrupadas; a UI filtra "Só com KB" por padrão.
+
+## O próprio G2 Boost (GitHub Releases)
+
+Configurações › **Atualizações do G2 Boost** (`src/components/update-card.tsx`): versão instalada, "Procurar agora", notas da versão nova (texto puro, nunca HTML) e, na cópia instalada em Arquivos de Programas, **Baixar e instalar**: o shell (`src-tauri/src/update_cmds.rs`) busca de novo o release mais recente (nada vem da UI), baixa o instalador e o `SHA256SUMS.txt` da mesma versão, recusa se o hash não bater (`hash_mismatch`), grava em `<dados>\updates` e abre o instalador (exceção da [global-rules §1.3](./global-rules.md)); o app fecha. Portátil e cópias de desenvolvimento só abrem a página da versão. `update_auto_check` (padrão ligado): uma consulta 4 s depois de abrir e um aviso com "Ver" quando há versão nova. Decisões em `selfupdate.rs` (testadas: versão numérica, JSON hostil com links de fora descartados, nomes de arquivo, lista de hashes); teste ao vivo `update_download_live` (2026-10-26: 0.9.1 baixado pelos redirecionamentos do GitHub, SHA-256 confere, host de fora recusado).
 
 ## Histórico do G2 Boost
 

@@ -1,6 +1,6 @@
 # Regras globais de engenharia — G2 Boost
 
-**Última revisão:** 2026-10-22 (exceção `sfc.exe`/`mrt.exe`) · 2026-10-18
+**Última revisão:** 2026-10-26 (exceção: instalador do próprio G2 Boost) · 2026-10-22 (exceção `sfc.exe`/`mrt.exe`) · 2026-10-18
 
 Fonte única. Resumo em [../../CLAUDE.md §4](../../CLAUDE.md). Herda o espírito do Valerium Portal (cliente hostil, defesa em profundidade, TDD, docs vivas, GSD) adaptado a um app desktop que **apaga arquivos e mexe em registro com privilégio de administrador** — o dano possível é no PC do usuário, não num banco multi-tenant.
 
@@ -24,6 +24,8 @@ Proibido `Command::new("cmd"|"powershell"|"reg"|"net"|"sc"|"wevtutil"|"ipconfig"
 **Exceção registrada (2026-10-18): `winget.exe`** do App Installer, chamado direto (sem shell) só com verbos fixos (`search`, `list` só leitura, `upgrade`, `install`), id/termo validados antes de virar argumento (nunca começa com `-`), `CREATE_NO_WINDOW`, prazo e kill, instalar/atualizar só depois de confirmação humana, com log em `winget-log.json`. Na aba Instalar o id ainda precisa estar no catálogo curado (`catalog.rs`), a allowlist ([install-apps.md](./install-apps.md)). Motivo: a API COM do winget não funciona em exe sem identidade de pacote (testado, ver [console.md](./console.md)).
 
 **Exceção registrada (2026-10-22, decisão do dono): `sfc.exe` e `mrt.exe`** de `%windir%\System32` (caminho absoluto montado pelo app, nunca do PATH), chamados direto (sem shell) só com argumentos fixos (`sfc /scannow`; `mrt /Q` com `/F` opcional), só por clique do usuário com o app elevado, `CREATE_NO_WINDOW`, um de cada vez, resultado lido do próprio log do Windows (`CBS.log` / `%windir%\debug\mrt.log`). Motivo: nenhum dos dois tem API pública. DISM continua pela `DismApi`.
+
+**Exceção registrada (2026-10-26, pedido do dono): o instalador do próprio G2 Boost.** Configurações › Atualizações baixa do release mais recente do GitHub (`api.github.com` → `github.com/G2Martins/G2-Boost/releases/download/...`, redirecionamentos só para os hosts do GitHub, tamanho limitado) o `G2-Boost_<versão>_x64-setup.exe` **e** o `SHA256SUMS.txt` da mesma versão; só abre o instalador (`ShellExecuteExW` "open", ele pede o UAC) se o SHA-256 bater, com o arquivo aberto só para leitura dos outros até o processo existir, e só depois do clique do usuário; o app fecha em seguida. Só na cópia instalada em Arquivos de Programas (a portátil abre a página da versão). Código: `selfupdate.rs`, `src-tauri/src/update_cmds.rs`. Limite conhecido: sem assinatura de código, quem controlar a conta do GitHub controla as duas pontas (o mesmo vale para o download manual).
 
 ### 1.4 Privilégio
 Scan, treemap, rede e speedtest rodam **sem** admin. Limpeza de pastas do sistema, tweaks `HKLM`, DNS e purge de memória pedem elevação por manifesto/UAC (helper elevado ou app elevado — decidir em [architecture.md](./architecture.md)). Nunca auto-relançar via PowerShell `-Verb RunAs`.
