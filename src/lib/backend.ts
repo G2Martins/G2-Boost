@@ -84,6 +84,8 @@ export type AppInfo = {
   autorun: boolean;
   scan_path: string | null;
   exe: string;
+  /** Always-admin is on and this copy is not elevated: show the admin gate, then ask UAC. */
+  ask_admin: boolean;
 };
 
 export type DriveInfo = {

@@ -585,6 +585,13 @@
     --tone: var(--destructive);
   }
 
+  /* Admin gate: the mark sits in a well with an ember glow. */
+  .admin-gate-mark {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.25),
+      0 0 36px -6px hsl(var(--primary) / 0.55);
+  }
+
   /* Page title hairline under the header text (wipes in from the left). */
   .title-rule {
     height: 1px;
@@ -702,6 +709,16 @@
   .toast[data-state="out"] {
     animation: fade-out-down var(--motion-fast) ease-in forwards;
   }
+  /* Admin gate: a ring breathes out of the mark while Windows asks. */
+  .admin-gate-mark::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 1.25rem;
+    border: 1px solid hsl(var(--primary) / 0.5);
+    animation: gate-ring 2.2s var(--ease-out-expo) infinite;
+    pointer-events: none;
+  }
   /* Poster: the cover breathes a little and the card leans toward the pointer. */
   .poster:hover > img {
     scale: 1.05;
@@ -711,6 +728,16 @@
       transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
         translateY(-2px);
     }
+  }
+}
+@keyframes gate-ring {
+  from {
+    opacity: 0.8;
+    scale: 0.92;
+  }
+  to {
+    opacity: 0;
+    scale: 1.25;
   }
 }
 @keyframes grow-x {

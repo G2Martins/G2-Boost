@@ -103,6 +103,9 @@ struct AppInfo {
     scan_path: Option<String>,
     /// This executable (shown in the MCP registration hint).
     exe: String,
+    /// "Sempre abrir como administrador" on and this copy is not elevated: the UI shows its own
+    /// explanation first, then asks UAC (the Windows prompt dims over that screen, not a blank desktop).
+    ask_admin: bool,
 }
 
 #[tauri::command]
@@ -118,6 +121,7 @@ fn app_info() -> AppInfo {
         autorun: std::env::var("G2BOOST_AUTORUN").is_ok_and(|v| v == "1"),
         scan_path: std::env::var("G2BOOST_SCAN_PATH").ok(),
         exe: std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
+        ask_admin: !system::is_elevated() && !std::env::args().any(|a| a == "--tray") && settings::load().always_admin,
     }
 }
 
@@ -2370,16 +2374,9 @@ pub fn run() {
         }
         return;
     }
-    // "Sempre abrir como administrador": a normal launch asks UAC once and hands over to the
-    // elevated copy. The logon task (`--tray`) never prompts; if the user declines, this
-    // unelevated copy simply carries on (no prompt loop).
-    if !system::is_elevated() && !std::env::args().any(|a| a == "--tray") && settings::load().always_admin {
-        let route = start_route();
-        let args: Vec<&str> = route.as_deref().map(|r| vec!["--route", r]).unwrap_or_default();
-        if boost::relaunch_elevated(&args).is_ok() {
-            return;
-        }
-    }
+    // "Sempre abrir como administrador": the UI asks (AppInfo.ask_admin → admin gate screen, then
+    // `relaunch_elevated`), so the UAC prompt dims over G2 Boost's own explanation. The logon task
+    // (`--tray`) never prompts; declining keeps this unelevated copy (no prompt loop).
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())

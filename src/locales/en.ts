@@ -3363,6 +3363,20 @@ export const en = {
   "periph.error.app_only": "Only available in the app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "admin.gate.title": "Administrator permission",
+  "admin.gate.body":
+    "G2 Boost applies tweaks, cleanups and repairs in protected areas of Windows. In the Windows prompt that opens next, click Yes.",
+  "admin.gate.declined":
+    "No problem. The app opens in limited mode: whatever needs permission shows the Elevate button when you get there.",
+  "admin.gate.point.confirm": "Nothing changes on your PC until you confirm it inside the app.",
+  "admin.gate.point.undo": "Every tweak keeps the original value and can be undone.",
+  "admin.gate.point.publisher":
+    "Windows shows Unknown publisher because G2 Boost has no paid digital signature yet. It is the same app you just opened.",
+  "admin.gate.waiting": "Waiting for your answer in the Windows prompt",
+  "admin.gate.skip": "Continue without administrator",
+  "admin.gate.retry": "Ask again",
+  "admin.gate.settings":
+    "Don't want this prompt at launch? Turn off Always open as administrator in Settings.",
   "cleanup.disk.title": "System drive",
   "cleanup.disk.free": "free",
   "cleanup.disk.used": "{drive} {used} used of {total}",

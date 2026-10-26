@@ -1,6 +1,7 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { LucideProvider, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AdminGate } from "@/components/shell/admin-gate";
 import { AppShell, type Route } from "@/components/shell/app-shell";
 import { Button, TooltipProvider } from "@/components/ui/primitives";
 import { Toaster } from "@/components/ui/toast";
@@ -94,6 +95,8 @@ export default function App() {
   const [version, setVersion] = useState("0.1.0");
   const [elevated, setElevated] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
+  // "Sempre abrir como administrador" from an unelevated launch: explain, then ask UAC.
+  const [askAdmin, setAskAdmin] = useState(false);
   useEffect(() => {
     // Pointer halo/glare: one listener for the whole app; `.halo` cards and `.poster` covers only
     // read --mx/--my (posters also lean toward the pointer: --rx/--ry, used under a fine pointer).
@@ -122,6 +125,7 @@ export default function App() {
         boot.autorun = i.autorun;
         if (i.scan_path) boot.scanPath = i.scan_path;
         if (isRoute(i.start_route)) setRoute(i.start_route);
+        setAskAdmin(i.ask_admin);
       } else {
         // Browser (`bun run dev`, e2e tests): `#/route/tab` picks the page — dev aid only.
         const [r, tab] = window.location.hash.replace(/^#\/?/, "").split("/");
@@ -194,6 +198,7 @@ export default function App() {
                 </div>
               ) : null}
             </AppShell>
+            {askAdmin ? <AdminGate route={route} onSkip={() => setAskAdmin(false)} /> : null}
             <ToasterI18n />
           </LucideProvider>
         </TooltipProvider>

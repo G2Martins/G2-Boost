@@ -3368,6 +3368,20 @@ export const ptBR = {
   "periph.error.app_only": "Disponível só no app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "admin.gate.title": "Permissão de administrador",
+  "admin.gate.body":
+    "O G2 Boost aplica ajustes, limpezas e reparos em áreas protegidas do Windows. Na janela do Windows que vai abrir, clique em Sim.",
+  "admin.gate.declined":
+    "Tudo bem. O app abre em modo limitado: o que precisar de permissão mostra o botão Elevar na hora.",
+  "admin.gate.point.confirm": "Nada muda no seu PC sem você confirmar dentro do app.",
+  "admin.gate.point.undo": "Cada ajuste guarda o valor original e pode ser desfeito.",
+  "admin.gate.point.publisher":
+    "O Windows mostra Fornecedor desconhecido porque o G2 Boost ainda não tem assinatura digital paga. É o mesmo app que você abriu.",
+  "admin.gate.waiting": "Aguardando a sua resposta na janela do Windows",
+  "admin.gate.skip": "Continuar sem administrador",
+  "admin.gate.retry": "Pedir de novo",
+  "admin.gate.settings":
+    "Não quer este pedido ao abrir? Desligue Sempre abrir como administrador em Configurações.",
   "cleanup.disk.title": "Disco do sistema",
   "cleanup.disk.free": "livres",
   "cleanup.disk.used": "{drive} {used} usados de {total}",
