@@ -1,6 +1,6 @@
 # Segurança › Exposição (auditoria de acesso remoto)
 
-**Última revisão:** 2026-10-22 · Rodada 7, frente "Auditoria de acesso remoto e exposição" ([../core/next-steps.md](../core/next-steps.md)) · Código: `crates/core/src/exposure.rs`; shell `src-tauri/src/lib.rs` (`exposure_*`, monitor no laço de rotinas); UI `src/pages/security.tsx` (rota `security`); MCP `get_exposure_report`.
+**Última revisão:** 2026-10-25 (a página ganhou abas: esta auditoria é a aba **Exposição**; a aba **Antivírus** está em [antivirus.md](./antivirus.md)) · 2026-10-22 · Rodada 7, frente "Auditoria de acesso remoto e exposição" ([../core/next-steps.md](../core/next-steps.md)) · Código: `crates/core/src/exposure.rs`; shell `src-tauri/src/lib.rs` (`exposure_*`, monitor no laço de rotinas); UI `src/pages/security.tsx` (rota `security`); MCP `get_exposure_report`.
 
 **O que é:** uma auditoria de **por onde alguém de fora chega neste PC** e como fechar cada porta. **Não é antivírus** (a tela diz isso): não procura vírus, não mata processo, não apaga nada.
 
