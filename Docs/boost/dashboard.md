@@ -1,6 +1,6 @@
 # Painel, Meu PC e Monitor
 
-**Última revisão:** 2026-10-25 (Meu PC ganhou a aba Check-up e há uma página Monitor de hardware: [hardware-monitor.md](./hardware-monitor.md)) · 2026-10-23 (monitor: cadência fixa de 1 s, disco = tempo ativo, gráfico que rola e gauge que desliza) · 2026-10-22 (guia da BIOS + Reiniciar na BIOS; Spooler na recomendação) · 2026-10-16 · Código: `crates/core/src/hardware.rs`, `monitor.rs`, `firmware.rs`, `sensors.rs`, `restore.rs`, `recommend.rs`; shell `src-tauri/src/lib.rs` (`Dashboard`); UI `src/pages/dashboard.tsx`, `src/components/ui/kpi-card.tsx`, `live-line.tsx` · Origem da ideia: [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
+**Última revisão:** 2026-10-25 (Meu PC ganhou a aba Check-up e há uma página Monitor de hardware: [hardware-monitor.md](./hardware-monitor.md); regras de recomendação da rodada 9: debloat e ajustes do Windows; categoria do card de ações lida do catálogo) · 2026-10-23 (monitor: cadência fixa de 1 s, disco = tempo ativo, gráfico que rola e gauge que desliza) · 2026-10-22 (guia da BIOS + Reiniciar na BIOS; Spooler na recomendação) · 2026-10-16 · Código: `crates/core/src/hardware.rs`, `monitor.rs`, `firmware.rs`, `sensors.rs`, `restore.rs`, `recommend.rs`; shell `src-tauri/src/lib.rs` (`Dashboard`); UI `src/pages/dashboard.tsx`, `src/components/ui/kpi-card.tsx`, `live-line.tsx` · Origem da ideia: [../references/galdino-optimizer.md](../references/galdino-optimizer.md).
 
 ## Painel (rota inicial)
 
@@ -15,7 +15,7 @@
 
 ## Recomendação por hardware (`recommend.rs`)
 
-`Facts` = impressoras reais (`EnumPrintersW` local + conexões, sem PDF/XPS/OneNote/Fax), SSD do sistema (seek penalty), notebook (chassi SMBIOS ou bateria), vendor da GPU, `HwSchMode` presente, Game Pass/Xbox app (pacotes em `%LOCALAPPDATA%\Packages`), Outlook (registro). Regras:
+`Facts` = impressoras reais (`EnumPrintersW` local + conexões, sem PDF/XPS/OneNote/Fax), SSD do sistema (seek penalty), notebook (chassi SMBIOS ou bateria), vendor da GPU, `HwSchMode` presente, Game Pass/Xbox app (pacotes em `%LOCALAPPDATA%\Packages`), Outlook (registro), **layouts de teclado** carregados (`HKCU\Keyboard Layout\Preload`) e **Ryzen X3D de dois CCDs** (nome do CPU com "X3D" e mais de 8 núcleos físicos) (2026-10-25). Regras:
 
 | Tweak | Não recomendado quando | Motivo (i18n `boost.reason.*`) |
 |---|---|---|
@@ -24,10 +24,16 @@
 | `hags` | driver sem `HwSchMode` | `hags_unsupported` |
 | `svc_xbox` | sempre (já Manual; Game Pass) | `game_pass` / `preference` |
 | `svc_search` | Outlook instalado | `outlook` |
-| `mouse`, `svc_dps`, `svc_geolocation` | sempre (preferência) | `preference` |
 | `svc_spooler` | impressora real instalada / lista ilegível (Spooler já parado) | `printer` / `unknown` |
+| `fast_startup_off` | HD mecânico / tipo desconhecido (no HD a inicialização rápida ganha segundos de verdade) | `hdd` / `unknown_disk` |
+| `alt_shift_off` | um só layout de teclado (o atalho não troca nada) | `single_layout` |
+| `core_parking_off` | notebook / Ryzen X3D de dois CCDs (o estacionamento manda o jogo para o CCD com cache) / demais | `laptop` / `x3d` / `preference` |
+| `wifi_power_saving_off` | notebook / demais | `laptop` / `preference` |
+| `mouse`, `svc_dps`, `svc_geolocation` e, da rodada 9: toda a IA (`copilot_off`, `recall_off`, `click_to_do_off`, `recall_feature_off`, `paint_ai_off`, `notepad_ai_off`, `edge_ai_off`), `teams_chat_off`, `delivery_p2p_off`, `spotlight_off`, `ntfs_last_access_off`, `storage_sense_off`, `network_throttling_off`, `transparency_off`, `classic_context_menu`, `taskbar_left`, `notifications_off`, `error_reporting_off`, `narrator_shortcut_off` | sempre (gosto, não ganho) | `preference` |
 | `hvci_off` | sempre (segurança) | `security` |
 | betas | sempre | `beta` |
+
+Da rodada 9 entram na pontuação só os que têm ganho real e quase nenhum custo: `edge_background_off`, `widgets_policy_off`, `consumer_features_off`, `telemetry_min`, `diagtrack_manual` (fica ativo junto com `svc_telemetry`: Desativado conta como manual), `start_web_search_off`, `account_notifications_off`, `office_telemetry_off` e `nvidia_telemetry_off` (só onde existem; senão ficam indisponíveis e não contam), `accessibility_shortcuts_off`, `alt_shift_off` e `fast_startup_off` (pelas regras acima). Um teste (`round9_rules_keep_the_score_meaningful`) segura no máximo 12 recomendações novas, para a pontuação de quem já estava otimizado não despencar.
 
 O motivo aparece como badge no card do Boost. Evidência: [../references/windows-services-research.md](../references/windows-services-research.md).
 

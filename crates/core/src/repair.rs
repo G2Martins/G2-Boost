@@ -272,6 +272,11 @@ fn dism_api() -> Result<Dism, u32> {
     }
 }
 
+/// `DismInitialize` for the whole process (also used by `winfeature`); `Err` = HRESULT.
+pub(crate) fn dism_ready() -> Result<(), u32> {
+    dism_api().map(|_| ())
+}
+
 fn dism_event() -> Option<HANDLE> {
     let mut ev = DISM_EVENT.load(Ordering::SeqCst);
     if ev == 0 {

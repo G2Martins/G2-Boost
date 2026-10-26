@@ -66,6 +66,8 @@ pub mod netrepair;
 pub mod covers;
 
 // r9:tweaks
+pub mod debloat;
+pub mod winfeature;
 
 // r9:maint
 

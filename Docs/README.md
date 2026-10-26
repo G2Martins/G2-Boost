@@ -32,6 +32,7 @@ comportamento.
 | --- | --- |
 | [boost/dashboard.md](./boost/dashboard.md) | Painel (pontuação por hardware, pontos de restauração, limpeza, RAM), monitor em tempo real, Meu PC (CPU, memória, GPU, monitores, discos, WinSAT), **BIOS/firmware** visível pelo Windows, sensores externos, recomendação por hardware. |
 | [boost/tweaks.md](./boost/tweaks.md) | Catálogo de ajustes (registro, serviços, SPI, energia, DirectX), presets, efeitos visuais em 4 níveis, backup/revert, elevação, limpeza de RAM, **inicialização e processos**, o que foi avaliado e recusado. |
+| [boost/debloat.md](./boost/debloat.md) | Página Debloat: níveis Essencial/Recomendado/Avançado, "Remover a IA do Windows" (políticas + recurso Recall pela DismApi), apps pré-instalados por allowlist com token, o que nunca é tocado. |
 | [boost/routines.md](./boost/routines.md) | Iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja, configurações validadas. |
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [cleanup/system-files.md](./cleanup/system-files.md) | Arquivos do sistema pelos handlers da Limpeza de Disco do Windows (WinSxS, Windows.old, drivers antigos, logs), allowlist e defesa contra handler plantado. |
@@ -59,6 +60,7 @@ comportamento.
 | Documento | Descrição |
 | --- | --- |
 | [windows-services-research.md](./references/windows-services-research.md) | Serviços do Windows com fontes: o que fazem, padrão do Windows 11, efeitos colaterais, ganho real em jogos, mitos (Prefetch, Nagle, "limpadores de RAM", VBS/HVCI). Base dos presets. |
+| [debloat-sources.md](./references/debloat-sources.md) | Fonte de cada chave do debloat e dos ajustes da rodada 9 (doc oficial ou o que Configurações grava), o que ficou de fora e por quê. |
 | [legacy-bat-scripts.md](./references/legacy-bat-scripts.md) | Inventário dos scripts `.bat` antigos que viraram o catálogo de limpeza, com lições e bugs. |
 
 Demais notas de pesquisa ficam em `references/` para uso interno da equipe e não acompanham o produto.

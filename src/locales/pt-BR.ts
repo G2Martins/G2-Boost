@@ -2576,6 +2576,265 @@ export const ptBR = {
   "gametweaks.error.bad_exe": "Escolha um .exe de um disco deste PC, não de uma pasta de rede.",
 
   // ── r9:tweaks · ajustes, debloat, IA do Windows (agente A2) ──
+  "boost.category.gaming": "Jogos",
+  "boost.category.ai": "IA",
+  "boost.category.system": "Sistema",
+  "boost.reason.single_layout": "um só layout de teclado",
+  "boost.reason.x3d": "Ryzen X3D de dois chiplets",
+  "boost.state.signout": "Vale após sair e entrar",
+  "boost.state.explorer": "Reinicie o Explorer",
+  "boost.state.unknown_admin": "Desconhecido (precisa de admin)",
+  "boost.tweak.edge_background_off": "Edge sem rodar em segundo plano",
+  "boost.tweak.edge_background_off.desc":
+    "Impede o Edge de abrir escondido quando o Windows liga e de continuar rodando depois que você fecha a janela. Libera memória e processador; em troca, o Edge abre um pouco mais devagar na primeira vez.",
+  "boost.tweak.edge_background_off.warn":
+    "você usa notificações ou extensões do Edge que precisam dele aberto o tempo todo.",
+  "boost.tweak.widgets_policy_off": "Widgets desligados de vez",
+  "boost.tweak.widgets_policy_off.desc":
+    "Desliga o painel de Widgets (no Windows 10, Notícias e interesses) por política do sistema, junto com o processo que baixa notícias em segundo plano. Vai além de esconder o botão.",
+  "boost.tweak.widgets_policy_off.warn":
+    "você usa o painel de Widgets para clima, notícias ou bolsa.",
+  "boost.tweak.teams_chat_off": "Sem botão Chat do Teams",
+  "boost.tweak.teams_chat_off.desc":
+    "Tira da barra de tarefas o botão Chat, que abre o Teams pessoal. Só as primeiras versões do Windows 11 têm esse botão.",
+  "boost.tweak.teams_chat_off.warn": "você conversa pelo Chat da barra de tarefas.",
+  "boost.tweak.consumer_features_off": "Sem apps patrocinados por política",
+  "boost.tweak.consumer_features_off.desc":
+    "Pede ao Windows, por política, que não instale apps e jogos sugeridos nem mostre conteúdo promocional da conta. Home e Pro respeitam só parte dessa política, por isso o ajuste Sem apps instalados sozinhos, da sua conta, continua valendo junto.",
+  "boost.tweak.consumer_features_off.warn": "você quer receber os apps sugeridos pela Microsoft.",
+  "boost.tweak.telemetry_min": "Telemetria no mínimo",
+  "boost.tweak.telemetry_min.desc":
+    "Fixa por política o menor nível de dados de diagnóstico que a sua edição aceita. No Home e no Pro esse mínimo é o nível Obrigatório; no Enterprise e no Education, nenhum dado de uso.",
+  "boost.tweak.telemetry_min.warn":
+    "você participa do Programa Windows Insider, que exige os dados opcionais.",
+  "boost.tweak.diagtrack_manual": "Telemetria só quando pedida",
+  "boost.tweak.diagtrack_manual.desc":
+    "Passa o serviço de telemetria para manual: ele para de iniciar com o Windows, mas o que precisar dele ainda consegue ligá-lo. Mais suave que desligar o serviço de vez.",
+  "boost.tweak.diagtrack_manual.warn": "você participa do Programa Windows Insider.",
+  "boost.tweak.copilot_off": "Copilot desligado",
+  "boost.tweak.copilot_off.desc":
+    "Desliga o Copilot do Windows por política da sua conta e tira o botão da barra de tarefas. O app Copilot da Microsoft Store não obedece a essa política: remova-o na lista de apps pré-instalados.",
+  "boost.tweak.copilot_off.warn": "você usa o Copilot do Windows.",
+  "boost.tweak.recall_off": "Recall sem capturas",
+  "boost.tweak.recall_off.desc":
+    "Impede o Recall de salvar capturas da sua tela para busca posterior. O Recall só existe nos PCs Copilot+; nos outros a política fica guardada e não muda nada.",
+  "boost.tweak.recall_off.warn": "você usa o Recall para achar coisas que viu na tela.",
+  "boost.tweak.click_to_do_off": "Click to Do desligado",
+  "boost.tweak.click_to_do_off.desc":
+    "Desliga o Click to Do, que analisa o que está na tela para sugerir ações como copiar texto de uma imagem ou resumir. Só existe nos PCs Copilot+.",
+  "boost.tweak.click_to_do_off.warn": "você usa as ações sugeridas sobre o que está na tela.",
+  "boost.tweak.recall_feature_off": "Remover o componente Recall",
+  "boost.tweak.recall_feature_off.desc":
+    "Desativa o recurso opcional Recall pela manutenção do próprio Windows: o componente sai do sistema em uso, e os arquivos ficam guardados para voltar sem internet. Leva alguns minutos.",
+  "boost.tweak.recall_feature_off.warn":
+    "você pretende usar o Recall. Para religar, desfaça aqui e reinicie o PC.",
+  "boost.tweak.paint_ai_off": "Paint sem IA",
+  "boost.tweak.paint_ai_off.desc":
+    "Desliga por política os recursos de IA do Paint: Cocreator, criador de imagens e preenchimento generativo. O resto do Paint continua igual. Vale ao abrir o Paint de novo.",
+  "boost.tweak.paint_ai_off.warn": "você usa os recursos de IA do Paint.",
+  "boost.tweak.notepad_ai_off": "Bloco de Notas sem IA",
+  "boost.tweak.notepad_ai_off.desc":
+    "Desliga por política os recursos de IA do Bloco de Notas, como reescrever e resumir. Vale ao abrir o Bloco de Notas de novo.",
+  "boost.tweak.notepad_ai_off.warn": "você usa a reescrita com IA no Bloco de Notas.",
+  "boost.tweak.edge_ai_off": "Edge sem IA",
+  "boost.tweak.edge_ai_off.desc":
+    "Desliga por política o Copilot na barra lateral do Edge, o acesso dele ao conteúdo das páginas, a escrita assistida, o atalho do chat na nova guia e o download do modelo de IA local. A barra lateral inteira some junto. Vale ao reabrir o Edge.",
+  "boost.tweak.edge_ai_off.warn":
+    "você usa o Copilot ou outras ferramentas da barra lateral do Edge.",
+  "boost.tweak.delivery_p2p_off": "Atualizações sem compartilhar com outros PCs",
+  "boost.tweak.delivery_p2p_off.desc":
+    "O Windows Update passa a baixar só dos servidores da Microsoft, sem enviar pedaços de atualizações para outros PCs. As atualizações continuam chegando normalmente.",
+  "boost.tweak.delivery_p2p_off.warn":
+    "você tem vários PCs em casa e quer economizar internet baixando atualizações de um para o outro.",
+  "boost.tweak.start_web_search_off": "Pesquisa do Iniciar só no PC",
+  "boost.tweak.start_web_search_off.desc":
+    "Desliga por política as sugestões e os resultados da web na pesquisa do Iniciar e da barra de tarefas: o que você digita deixa de ir para a internet. Mais firme que Sem destaques na pesquisa.",
+  "boost.tweak.start_web_search_off.warn": "você pesquisa na web direto pelo Iniciar.",
+  "boost.tweak.account_notifications_off": "Sem avisos da conta e recomendações",
+  "boost.tweak.account_notifications_off.desc":
+    "Tira do Iniciar os avisos da conta Microsoft (backup, assinatura), as recomendações de dicas e apps novos e o lembrete para terminar de configurar o dispositivo.",
+  "boost.tweak.account_notifications_off.warn":
+    "você quer os lembretes de backup da conta Microsoft.",
+  "boost.tweak.spotlight_off": "Sem Windows Spotlight",
+  "boost.tweak.spotlight_off.desc":
+    "Para de trocar a imagem da tela de bloqueio e da área de trabalho por fotos da Microsoft com dicas e curiosidades. Home e Pro respeitam a parte da tela de bloqueio; a parte por política vale só no Enterprise e no Education.",
+  "boost.tweak.spotlight_off.warn": "você gosta das fotos diárias na tela de bloqueio.",
+  "boost.tweak.office_telemetry_off": "Office sem telemetria",
+  "boost.tweak.office_telemetry_off.desc":
+    "Pede ao Microsoft 365 (Word, Excel, Outlook), por política, que não envie dados de diagnóstico, nem os opcionais nem os obrigatórios; só os dados de serviço indispensáveis continuam. Aparece só quando o Office está instalado.",
+  "boost.tweak.office_telemetry_off.warn":
+    "o PC é gerenciado por uma empresa e o suporte de TI usa esses dados.",
+  "boost.tweak.nvidia_telemetry_off": "NVIDIA sem telemetria",
+  "boost.tweak.nvidia_telemetry_off.desc":
+    "Desliga as tarefas agendadas de relatório e telemetria que o driver da NVIDIA instalava. Drivers recentes já não têm essas tarefas; nesse caso o ajuste aparece como indisponível.",
+  "boost.tweak.nvidia_telemetry_off.warn":
+    "o suporte da NVIDIA pediu relatórios de falha automáticos.",
+  "boost.tweak.error_reporting_off": "Relatório de erros desligado",
+  "boost.tweak.error_reporting_off.desc":
+    "Desliga o Relatório de Erros do Windows: quando um programa trava, nada é coletado nem enviado à Microsoft. Em troca, somem as soluções sugeridas e os relatórios que ajudam a investigar travamentos.",
+  "boost.tweak.error_reporting_off.warn":
+    "você investiga travamentos de jogos ou drivers com os relatórios do Windows.",
+  "boost.tweak.ntfs_last_access_off": "Sem registro de último acesso",
+  "boost.tweak.ntfs_last_access_off.desc":
+    "O NTFS para de gravar a data do último acesso cada vez que um arquivo é lido. Menos gravações no disco; o ganho é pequeno, maior em HD mecânico. Em discos grandes o Windows muitas vezes já faz isso sozinho.",
+  "boost.tweak.ntfs_last_access_off.warn":
+    "você usa backup ou limpeza que dependem da data de último acesso dos arquivos.",
+  "boost.tweak.storage_sense_off": "Sensor de Armazenamento desligado",
+  "boost.tweak.storage_sense_off.desc":
+    "Impede o Windows de apagar sozinho arquivos temporários, a Lixeira e, se estiver configurado, a pasta Downloads. Você decide o que sai e quando.",
+  "boost.tweak.storage_sense_off.warn":
+    "você conta com a limpeza automática para o disco não lotar.",
+  "boost.tweak.fast_startup_off": "Inicialização rápida desligada",
+  "boost.tweak.fast_startup_off.desc":
+    "Desligar passa a desligar de verdade, sem hibernar o núcleo do Windows. Evita drivers presos num estado ruim e atualizações que não terminam. Em SSD o tempo para ligar quase não muda; em HD mecânico fica mais lento. Vale a partir do próximo desligamento.",
+  "boost.tweak.fast_startup_off.warn":
+    "o Windows está num HD mecânico e o tempo para ligar importa.",
+  "boost.tweak.network_throttling_off": "Rede sem limitação multimídia",
+  "boost.tweak.network_throttling_off.desc":
+    "Desliga o limite que o Windows impõe ao tráfego de rede enquanto toca áudio ou vídeo. Pode ajudar em redes muito rápidas; na maioria das conexões não muda nada que dê para medir.",
+  "boost.tweak.network_throttling_off.warn":
+    "o PC é antigo e o áudio começou a falhar durante downloads.",
+  "boost.tweak.wifi_power_saving_off": "Wi-Fi sem economia de energia",
+  "boost.tweak.wifi_power_saving_off.desc":
+    "O adaptador sem fio fica em desempenho máximo no plano de energia ativo, na tomada e na bateria. Menos picos de ping causados pela economia; na bateria gasta um pouco mais. Na tomada o Windows já costuma usar desempenho máximo.",
+  "boost.tweak.wifi_power_saving_off.warn":
+    "é um notebook e você quer a bateria rendendo o máximo.",
+  "boost.tweak.core_parking_off": "Núcleos sem estacionamento",
+  "boost.tweak.core_parking_off.desc":
+    "No plano de energia ativo, na tomada, mantém todos os núcleos do processador disponíveis em vez de estacionar os ociosos. Pode suavizar picos de carga em jogos; aumenta um pouco o consumo parado. Os planos Alto desempenho e Desempenho máximo já fazem isso.",
+  "boost.tweak.core_parking_off.warn":
+    "o processador é um Ryzen X3D de dois chiplets (7900X3D, 7950X3D, 9900X3D, 9950X3D): o estacionamento é o que leva os jogos para o chiplet com mais cache.",
+  "boost.tweak.transparency_off": "Sem transparência",
+  "boost.tweak.transparency_off.desc":
+    "Desliga os efeitos de transparência da barra de tarefas, do Iniciar e das janelas. A interface fica mais leve para a placa de vídeo, sem mudar o FPS em tela cheia.",
+  "boost.tweak.transparency_off.warn": "você prefere o visual translúcido do Windows.",
+  "boost.tweak.classic_context_menu": "Menu de contexto clássico",
+  "boost.tweak.classic_context_menu.desc":
+    "O clique com o botão direito no Explorer volta a abrir o menu completo, como no Windows 10, sem passar por Mostrar mais opções.",
+  "boost.tweak.classic_context_menu.warn": "você prefere o menu compacto do Windows 11.",
+  "boost.tweak.taskbar_left": "Barra de tarefas à esquerda",
+  "boost.tweak.taskbar_left.desc":
+    "Alinha o botão Iniciar e os ícones da barra de tarefas à esquerda, como no Windows 10.",
+  "boost.tweak.taskbar_left.warn": "você gosta dos ícones centralizados.",
+  "boost.tweak.notifications_off": "Notificações desligadas",
+  "boost.tweak.notifications_off.desc":
+    "Desliga todas as notificações do Windows e dos apps, os avisos no canto da tela. Menos interrupções no meio do jogo; em troca, mensagens, lembretes e alertas só aparecem quando você abre o app.",
+  "boost.tweak.notifications_off.warn":
+    "você depende de avisos de mensagens, e-mail ou calendário.",
+  "boost.tweak.alt_shift_off": "Alt+Shift não troca o idioma",
+  "boost.tweak.alt_shift_off.desc":
+    "Desliga o atalho Alt+Shift que troca o idioma do teclado, fácil de apertar sem querer no meio do jogo. Windows+Espaço continua trocando.",
+  "boost.tweak.alt_shift_off.warn": "você troca o idioma do teclado pelo Alt+Shift.",
+  "boost.tweak.narrator_shortcut_off": "Atalho do Narrador desligado",
+  "boost.tweak.narrator_shortcut_off.desc":
+    "Desliga o atalho Windows+Ctrl+Enter que liga o Narrador. O Narrador continua disponível nas Configurações.",
+  "boost.tweak.narrator_shortcut_off.warn":
+    "você, ou alguém que usa o PC, precisa ligar o Narrador pelo teclado.",
+  "boost.tweak.accessibility_shortcuts_off": "Atalhos de acessibilidade desligados",
+  "boost.tweak.accessibility_shortcuts_off.desc":
+    "Desliga os atalhos das Teclas de Aderência (Shift cinco vezes), das Teclas de Filtro (Shift direito por oito segundos) e das Teclas de Alternância (Num Lock por cinco segundos), que abrem avisos no meio do jogo. Os recursos continuam nas Configurações.",
+  "boost.tweak.accessibility_shortcuts_off.warn":
+    "você usa algum desses recursos e costuma ligá-lo pelo atalho.",
+  "tweaks.search": "Buscar ajuste",
+  "tweaks.filter.all": "Todos",
+  "tweaks.count": "{on} de {total} ativos",
+  "tweaks.apply_recommended": "Aplicar recomendados",
+  "tweaks.apply_recommended.none": "Tudo o que é recomendado para este PC já está ativo.",
+  "tweaks.applying": "Aplicando {done}/{total}…",
+  "tweaks.empty": "Nenhum ajuste com esse nome nesta categoria.",
+  "tweaks.changes": "Ver o que muda",
+  "tweaks.changes.hide": "Ocultar o que muda",
+  "tweaks.changes.loading": "Lendo a definição do ajuste…",
+  "tweaks.changes.app_only": "A lista exata aparece no app.",
+  "tweaks.changes.note": "Desfazer volta exatamente ao valor guardado antes da mudança.",
+  "tweaks.change.kind.registry": "Registro",
+  "tweaks.change.kind.service": "Serviço",
+  "tweaks.change.kind.task": "Tarefa agendada",
+  "tweaks.change.kind.power": "Energia, plano ativo",
+  "tweaks.change.kind.plan": "Plano de energia",
+  "tweaks.change.kind.feature": "Recurso do Windows",
+  "tweaks.change.kind.system": "Configuração do Windows",
+  "tweaks.change.kind.visual_fx": "Efeitos visuais",
+  "tweaks.change.removed": "removido",
+  "tweaks.change.plan": "Desempenho máximo ativo",
+  "tweaks.change.visual_fx": "17 itens de Opções de desempenho, conforme o nível",
+  "tweaks.change.disabled": "desativado",
+  "tweaks.change.manual": "manual",
+  "tweaks.toast.applied": "Ajuste aplicado: {name}",
+  "tweaks.toast.undone": "Ajuste desfeito: {name}",
+  "tweaks.toast.undo": "Desfazer",
+  "tweaks.toast.batch": "{count} ajustes aplicados",
+  "tweaks.toast.batch_undone": "{count} ajustes desfeitos",
+  "tweaks.restore.created": "Ponto de restauração criado antes de aplicar.",
+  "tweaks.restore.skipped": "Ponto de restauração pulado pelo Windows (já existe um recente).",
+  "tweaks.error.busy":
+    "Uma manutenção do Windows está em andamento. Tente de novo quando ela terminar.",
+  "debloat.subtitle":
+    "Tira o que o Windows trouxe sem você pedir: telemetria, anúncios, IA e apps de brinde. Cada item guarda o valor anterior e dá para desfazer.",
+  "debloat.level.essential": "Essencial",
+  "debloat.level.recommended": "Recomendado",
+  "debloat.level.advanced": "Avançado",
+  "debloat.level.essential.hint":
+    "Anúncios, dicas e sugestões. Sem efeito colateral para quase ninguém.",
+  "debloat.level.recommended.hint":
+    "Telemetria e IA que você provavelmente não usa. Cada item diz o que deixa de funcionar.",
+  "debloat.level.advanced.hint":
+    "Mais fundo: desliga serviços e remove componentes. Leia o aviso de cada item antes.",
+  "debloat.applied_count": "{on} de {total} aplicados",
+  "debloat.select_all": "Marcar todos",
+  "debloat.select_none": "Desmarcar todos",
+  "debloat.apply": "Aplicar selecionados ({count})",
+  "debloat.applying": "Aplicando {done}/{total}…",
+  "debloat.col.item": "Ajuste",
+  "debloat.col.state": "Estado",
+  "debloat.select": "Selecionar {name}",
+  "debloat.undo": "Desfazer",
+  "debloat.state.on": "Aplicado",
+  "debloat.state.off": "Não aplicado",
+  "debloat.elevate.hint":
+    "A maioria dos itens grava políticas do sistema e precisa do app como administrador.",
+  "debloat.confirm.title": "Aplicar {count} ajustes",
+  "debloat.confirm.body":
+    "Cada ajuste guarda o valor atual antes de mudar; Desfazer volta exatamente a ele.",
+  "debloat.confirm.restore": "Criar um ponto de restauração do sistema antes",
+  "debloat.confirm.restart":
+    "Alguns itens só valem depois de reiniciar o PC ou de sair e entrar na conta.",
+  "debloat.confirm.go": "Aplicar",
+  "debloat.ai.title": "Remover a IA do Windows",
+  "debloat.ai.body":
+    "Desliga Copilot, Recall e Click to Do, tira a IA do Paint, do Bloco de Notas e do Edge e remove o componente Recall. Tudo por política ou pela manutenção do Windows, com desfazer item a item.",
+  "debloat.ai.apply": "Desligar a IA do Windows",
+  "debloat.ai.count": "{on} de {total} itens de IA aplicados",
+  "debloat.ai.copilot_app":
+    "O app Copilot da Microsoft Store sai pela lista de apps pré-instalados, mais abaixo.",
+  "debloat.apps.title": "Apps pré-instalados",
+  "debloat.apps.help":
+    "Só apps de uma lista conferida, que saem sem quebrar o Windows e voltam pela Microsoft Store. Nunca Xbox, Game Bar, Store, Fotos, Calculadora, Terminal, Bloco de Notas, Paint, Câmera, Ferramenta de Captura nem apps de drivers.",
+  "debloat.apps.note": "Sai da sua conta. Se você usa algum, deixe desmarcado.",
+  "debloat.apps.empty": "Nenhum app da lista está instalado nesta conta.",
+  "debloat.apps.refresh": "Procurar de novo",
+  "debloat.apps.remove": "Remover selecionados ({count})",
+  "debloat.apps.confirm.title": "Remover {count} apps",
+  "debloat.apps.confirm.body":
+    "Estes apps saem da sua conta agora. Para ter algum de volta, instale pela Microsoft Store.",
+  "debloat.apps.confirm.go": "Remover",
+  "debloat.apps.removed": "{count} apps removidos.",
+  "debloat.apps.failed": "{name} não saiu: {error}",
+  "debloat.app.kind.news": "Notícias",
+  "debloat.app.kind.weather": "Clima",
+  "debloat.app.kind.tips": "Dicas",
+  "debloat.app.kind.game": "Jogo",
+  "debloat.app.kind.feedback": "Comentários",
+  "debloat.app.kind.maps": "Mapas",
+  "debloat.app.kind.viewer3d": "3D",
+  "debloat.app.kind.mixed_reality": "Realidade misturada",
+  "debloat.app.kind.mail": "Email e contatos, versão antiga",
+  "debloat.app.kind.chat": "Conversa",
+  "debloat.app.kind.ai": "Assistente de IA",
+  "debloat.app.kind.family": "Controle dos pais",
+  "debloat.app.kind.automation": "Automação",
+  "debloat.app.kind.promo": "Promoção",
+  "debloat.app.kind.video": "Editor de vídeo",
 
   // ── r9:maint · manutenção+, antivírus (agente A3) ──
 

@@ -2571,6 +2571,255 @@ export const en = {
   "gametweaks.error.bad_exe": "Pick an .exe on a drive of this PC, not a network folder.",
 
   // ── r9:tweaks · ajustes, debloat, IA do Windows (agente A2) ──
+  "boost.category.gaming": "Gaming",
+  "boost.category.ai": "AI",
+  "boost.category.system": "System",
+  "boost.reason.single_layout": "only one keyboard layout",
+  "boost.reason.x3d": "dual-CCD Ryzen X3D",
+  "boost.state.signout": "After signing out and in",
+  "boost.state.explorer": "Restart Explorer",
+  "boost.state.unknown_admin": "Unknown (needs admin)",
+  "boost.tweak.edge_background_off": "Edge not running in the background",
+  "boost.tweak.edge_background_off.desc":
+    "Stops Edge from opening hidden when Windows starts and from staying alive after you close its window. Frees memory and CPU; in exchange, Edge opens a little slower the first time.",
+  "boost.tweak.edge_background_off.warn":
+    "you rely on Edge notifications or extensions that need it running all the time.",
+  "boost.tweak.widgets_policy_off": "Widgets off for good",
+  "boost.tweak.widgets_policy_off.desc":
+    "Turns the Widgets board off (News and interests on Windows 10) by system policy, together with the process that downloads news in the background. Goes further than hiding the button.",
+  "boost.tweak.widgets_policy_off.warn": "you use the Widgets board for weather, news or stocks.",
+  "boost.tweak.teams_chat_off": "No Teams Chat button",
+  "boost.tweak.teams_chat_off.desc":
+    "Removes the Chat button, which opens personal Teams, from the taskbar. Only the first Windows 11 versions have this button.",
+  "boost.tweak.teams_chat_off.warn": "you chat through the taskbar Chat.",
+  "boost.tweak.consumer_features_off": "No sponsored apps by policy",
+  "boost.tweak.consumer_features_off.desc":
+    "Asks Windows, by policy, not to install suggested apps and games or show promotional account content. Home and Pro honor only part of this policy, so the No silently installed apps tweak, for your account, keeps working alongside.",
+  "boost.tweak.consumer_features_off.warn": "you want the apps Microsoft suggests.",
+  "boost.tweak.telemetry_min": "Telemetry at the minimum",
+  "boost.tweak.telemetry_min.desc":
+    "Sets by policy the lowest diagnostic data level your edition accepts. On Home and Pro that minimum is the Required level; on Enterprise and Education, no usage data.",
+  "boost.tweak.telemetry_min.warn":
+    "you are in the Windows Insider Program, which requires optional data.",
+  "boost.tweak.diagtrack_manual": "Telemetry only when asked",
+  "boost.tweak.diagtrack_manual.desc":
+    "Sets the telemetry service to manual: it stops starting with Windows, but whatever needs it can still start it. Gentler than turning the service off for good.",
+  "boost.tweak.diagtrack_manual.warn": "you are in the Windows Insider Program.",
+  "boost.tweak.copilot_off": "Copilot off",
+  "boost.tweak.copilot_off.desc":
+    "Turns Windows Copilot off by policy for your account and removes its taskbar button. The Copilot app from the Microsoft Store ignores this policy: remove it in the preinstalled apps list.",
+  "boost.tweak.copilot_off.warn": "you use Windows Copilot.",
+  "boost.tweak.recall_off": "Recall without snapshots",
+  "boost.tweak.recall_off.desc":
+    "Stops Recall from saving snapshots of your screen to search later. Recall only exists on Copilot+ PCs; elsewhere the policy is stored and changes nothing.",
+  "boost.tweak.recall_off.warn": "you use Recall to find things you saw on screen.",
+  "boost.tweak.click_to_do_off": "Click to Do off",
+  "boost.tweak.click_to_do_off.desc":
+    "Turns off Click to Do, which reads what is on screen to suggest actions such as copying text from an image or summarizing. Only exists on Copilot+ PCs.",
+  "boost.tweak.click_to_do_off.warn": "you use the suggested actions on what is on screen.",
+  "boost.tweak.recall_feature_off": "Remove the Recall component",
+  "boost.tweak.recall_feature_off.desc":
+    "Turns the optional Recall feature off through Windows' own servicing: the component leaves the running system, and its files stay stored so it can come back without internet. Takes a few minutes.",
+  "boost.tweak.recall_feature_off.warn":
+    "you plan to use Recall. To turn it back on, undo here and restart the PC.",
+  "boost.tweak.paint_ai_off": "Paint without AI",
+  "boost.tweak.paint_ai_off.desc":
+    "Turns Paint's AI features off by policy: Cocreator, Image Creator and generative fill. The rest of Paint stays the same. Takes effect when Paint opens again.",
+  "boost.tweak.paint_ai_off.warn": "you use Paint's AI features.",
+  "boost.tweak.notepad_ai_off": "Notepad without AI",
+  "boost.tweak.notepad_ai_off.desc":
+    "Turns Notepad's AI features off by policy, such as rewrite and summarize. Takes effect when Notepad opens again.",
+  "boost.tweak.notepad_ai_off.warn": "you use AI rewriting in Notepad.",
+  "boost.tweak.edge_ai_off": "Edge without AI",
+  "boost.tweak.edge_ai_off.desc":
+    "Turns off by policy Copilot in the Edge sidebar, its access to page content, assisted writing, the chat shortcut on the new tab page and the download of the local AI model. The whole sidebar goes away with it. Takes effect when Edge reopens.",
+  "boost.tweak.edge_ai_off.warn": "you use Copilot or other Edge sidebar tools.",
+  "boost.tweak.delivery_p2p_off": "Updates without sharing with other PCs",
+  "boost.tweak.delivery_p2p_off.desc":
+    "Windows Update downloads only from Microsoft's servers and stops sending pieces of updates to other PCs. Updates keep arriving as usual.",
+  "boost.tweak.delivery_p2p_off.warn":
+    "you have several PCs at home and want to save bandwidth by sharing updates between them.",
+  "boost.tweak.start_web_search_off": "Start search on this PC only",
+  "boost.tweak.start_web_search_off.desc":
+    "Turns off by policy web suggestions and results in Start and taskbar search: what you type no longer goes to the internet. Firmer than No search highlights.",
+  "boost.tweak.start_web_search_off.warn": "you search the web straight from Start.",
+  "boost.tweak.account_notifications_off": "No account notices or recommendations",
+  "boost.tweak.account_notifications_off.desc":
+    "Removes from Start the Microsoft account notices (backup, subscription), the recommendations for tips and new apps, and the reminder to finish setting up the device.",
+  "boost.tweak.account_notifications_off.warn": "you want the Microsoft account backup reminders.",
+  "boost.tweak.spotlight_off": "No Windows Spotlight",
+  "boost.tweak.spotlight_off.desc":
+    "Stops replacing the lock screen and desktop picture with Microsoft photos with tips and trivia. Home and Pro honor the lock screen part; the policy part only works on Enterprise and Education.",
+  "boost.tweak.spotlight_off.warn": "you enjoy the daily lock screen photos.",
+  "boost.tweak.office_telemetry_off": "Office without telemetry",
+  "boost.tweak.office_telemetry_off.desc":
+    "Asks Microsoft 365 (Word, Excel, Outlook), by policy, not to send diagnostic data, neither optional nor required; only essential service data keeps flowing. Shows up only when Office is installed.",
+  "boost.tweak.office_telemetry_off.warn":
+    "the PC is managed by a company and IT support uses that data.",
+  "boost.tweak.nvidia_telemetry_off": "NVIDIA without telemetry",
+  "boost.tweak.nvidia_telemetry_off.desc":
+    "Turns off the reporting and telemetry scheduled tasks the NVIDIA driver used to install. Recent drivers no longer have them; then the tweak shows as unavailable.",
+  "boost.tweak.nvidia_telemetry_off.warn": "NVIDIA support asked for automatic crash reports.",
+  "boost.tweak.error_reporting_off": "Error reporting off",
+  "boost.tweak.error_reporting_off.desc":
+    "Turns Windows Error Reporting off: when a program crashes, nothing is collected or sent to Microsoft. In exchange, suggested solutions and the reports that help investigate crashes go away.",
+  "boost.tweak.error_reporting_off.warn":
+    "you investigate game or driver crashes with Windows' reports.",
+  "boost.tweak.ntfs_last_access_off": "No last-access timestamps",
+  "boost.tweak.ntfs_last_access_off.desc":
+    "NTFS stops writing the last-access date every time a file is read. Fewer disk writes; the gain is small, larger on a hard disk. On large drives Windows often does this by itself already.",
+  "boost.tweak.ntfs_last_access_off.warn":
+    "you use backup or cleanup tools that depend on files' last-access date.",
+  "boost.tweak.storage_sense_off": "Storage Sense off",
+  "boost.tweak.storage_sense_off.desc":
+    "Stops Windows from deleting temporary files, the Recycle Bin and, if configured, the Downloads folder on its own. You decide what goes and when.",
+  "boost.tweak.storage_sense_off.warn":
+    "you count on automatic cleanup to keep the disk from filling up.",
+  "boost.tweak.fast_startup_off": "Fast Startup off",
+  "boost.tweak.fast_startup_off.desc":
+    "Shutting down really shuts down, without hibernating the Windows kernel. Avoids drivers stuck in a bad state and updates that never finish. On an SSD boot time barely changes; on a hard disk it gets slower. Takes effect from the next shutdown.",
+  "boost.tweak.fast_startup_off.warn": "Windows is on a hard disk and boot time matters.",
+  "boost.tweak.network_throttling_off": "Network without multimedia throttling",
+  "boost.tweak.network_throttling_off.desc":
+    "Removes the limit Windows puts on network traffic while audio or video plays. May help on very fast networks; on most connections nothing measurable changes.",
+  "boost.tweak.network_throttling_off.warn":
+    "the PC is old and audio started stuttering during downloads.",
+  "boost.tweak.wifi_power_saving_off": "Wi-Fi without power saving",
+  "boost.tweak.wifi_power_saving_off.desc":
+    "The wireless adapter stays at maximum performance in the active power plan, plugged in and on battery. Fewer ping spikes caused by power saving; on battery it uses a bit more. Plugged in, Windows usually runs it at maximum performance already.",
+  "boost.tweak.wifi_power_saving_off.warn": "it is a laptop and you want the longest battery life.",
+  "boost.tweak.core_parking_off": "No core parking",
+  "boost.tweak.core_parking_off.desc":
+    "In the active power plan, plugged in, keeps every CPU core available instead of parking idle ones. May smooth load spikes in games; idle power use goes up a little. The High performance and Ultimate Performance plans already do this.",
+  "boost.tweak.core_parking_off.warn":
+    "the CPU is a dual-CCD Ryzen X3D (7900X3D, 7950X3D, 9900X3D, 9950X3D): parking is what steers games to the chiplet with more cache.",
+  "boost.tweak.transparency_off": "No transparency",
+  "boost.tweak.transparency_off.desc":
+    "Turns transparency effects off on the taskbar, Start and windows. The interface gets lighter for the graphics card, with no change to full screen FPS.",
+  "boost.tweak.transparency_off.warn": "you prefer Windows' translucent look.",
+  "boost.tweak.classic_context_menu": "Classic context menu",
+  "boost.tweak.classic_context_menu.desc":
+    "Right-clicking in Explorer opens the full menu again, like Windows 10, without going through Show more options.",
+  "boost.tweak.classic_context_menu.warn": "you prefer the compact Windows 11 menu.",
+  "boost.tweak.taskbar_left": "Taskbar aligned left",
+  "boost.tweak.taskbar_left.desc":
+    "Aligns the Start button and taskbar icons to the left, like Windows 10.",
+  "boost.tweak.taskbar_left.warn": "you like the centered icons.",
+  "boost.tweak.notifications_off": "Notifications off",
+  "boost.tweak.notifications_off.desc":
+    "Turns off every Windows and app notification, the pop-ups in the corner of the screen. Fewer interruptions mid-game; in exchange, messages, reminders and alerts only show when you open the app.",
+  "boost.tweak.notifications_off.warn": "you depend on message, email or calendar alerts.",
+  "boost.tweak.alt_shift_off": "Alt+Shift does not switch language",
+  "boost.tweak.alt_shift_off.desc":
+    "Turns off the Alt+Shift shortcut that switches the keyboard language, easy to press by accident mid-game. Windows+Space still switches.",
+  "boost.tweak.alt_shift_off.warn": "you switch keyboard language with Alt+Shift.",
+  "boost.tweak.narrator_shortcut_off": "Narrator shortcut off",
+  "boost.tweak.narrator_shortcut_off.desc":
+    "Turns off the Windows+Ctrl+Enter shortcut that starts Narrator. Narrator stays available in Settings.",
+  "boost.tweak.narrator_shortcut_off.warn":
+    "you, or someone who uses this PC, needs to start Narrator from the keyboard.",
+  "boost.tweak.accessibility_shortcuts_off": "Accessibility shortcuts off",
+  "boost.tweak.accessibility_shortcuts_off.desc":
+    "Turns off the shortcuts for Sticky Keys (Shift five times), Filter Keys (right Shift for eight seconds) and Toggle Keys (Num Lock for five seconds), which pop up prompts mid-game. The features stay in Settings.",
+  "boost.tweak.accessibility_shortcuts_off.warn":
+    "you use one of these features and usually turn it on with the shortcut.",
+  "tweaks.search": "Search tweaks",
+  "tweaks.filter.all": "All",
+  "tweaks.count": "{on} of {total} on",
+  "tweaks.apply_recommended": "Apply recommended",
+  "tweaks.apply_recommended.none": "Everything recommended for this PC is already on.",
+  "tweaks.applying": "Applying {done}/{total}…",
+  "tweaks.empty": "No tweak with that name in this category.",
+  "tweaks.changes": "See what changes",
+  "tweaks.changes.hide": "Hide what changes",
+  "tweaks.changes.loading": "Reading the tweak's definition…",
+  "tweaks.changes.app_only": "The exact list shows in the app.",
+  "tweaks.changes.note": "Undo goes back exactly to the value saved before the change.",
+  "tweaks.change.kind.registry": "Registry",
+  "tweaks.change.kind.service": "Service",
+  "tweaks.change.kind.task": "Scheduled task",
+  "tweaks.change.kind.power": "Power, active plan",
+  "tweaks.change.kind.plan": "Power plan",
+  "tweaks.change.kind.feature": "Windows feature",
+  "tweaks.change.kind.system": "Windows setting",
+  "tweaks.change.kind.visual_fx": "Visual effects",
+  "tweaks.change.removed": "removed",
+  "tweaks.change.plan": "Ultimate Performance active",
+  "tweaks.change.visual_fx": "17 Performance Options items, by level",
+  "tweaks.change.disabled": "disabled",
+  "tweaks.change.manual": "manual",
+  "tweaks.toast.applied": "Tweak applied: {name}",
+  "tweaks.toast.undone": "Tweak undone: {name}",
+  "tweaks.toast.undo": "Undo",
+  "tweaks.toast.batch": "{count} tweaks applied",
+  "tweaks.toast.batch_undone": "{count} tweaks undone",
+  "tweaks.restore.created": "Restore point created before applying.",
+  "tweaks.restore.skipped": "Restore point skipped by Windows (a recent one exists).",
+  "tweaks.error.busy": "A Windows maintenance task is running. Try again when it finishes.",
+  "debloat.subtitle":
+    "Removes what Windows brought without you asking: telemetry, ads, AI and freebie apps. Every item saves the previous value and can be undone.",
+  "debloat.level.essential": "Essential",
+  "debloat.level.recommended": "Recommended",
+  "debloat.level.advanced": "Advanced",
+  "debloat.level.essential.hint": "Ads, tips and suggestions. No side effect for almost anyone.",
+  "debloat.level.recommended.hint":
+    "Telemetry and AI you probably do not use. Each item says what stops working.",
+  "debloat.level.advanced.hint":
+    "Deeper: turns services off and removes components. Read each item's warning first.",
+  "debloat.applied_count": "{on} of {total} applied",
+  "debloat.select_all": "Select all",
+  "debloat.select_none": "Clear selection",
+  "debloat.apply": "Apply selected ({count})",
+  "debloat.applying": "Applying {done}/{total}…",
+  "debloat.col.item": "Tweak",
+  "debloat.col.state": "State",
+  "debloat.select": "Select {name}",
+  "debloat.undo": "Undo",
+  "debloat.state.on": "Applied",
+  "debloat.state.off": "Not applied",
+  "debloat.elevate.hint": "Most items write system policies and need the app as administrator.",
+  "debloat.confirm.title": "Apply {count} tweaks",
+  "debloat.confirm.body":
+    "Each tweak saves the current value before changing it; Undo goes back exactly to it.",
+  "debloat.confirm.restore": "Create a system restore point first",
+  "debloat.confirm.restart":
+    "Some items only take effect after restarting the PC or signing out and in.",
+  "debloat.confirm.go": "Apply",
+  "debloat.ai.title": "Remove AI from Windows",
+  "debloat.ai.body":
+    "Turns Copilot, Recall and Click to Do off, removes AI from Paint, Notepad and Edge, and removes the Recall component. All by policy or through Windows servicing, with undo item by item.",
+  "debloat.ai.apply": "Turn Windows AI off",
+  "debloat.ai.count": "{on} of {total} AI items applied",
+  "debloat.ai.copilot_app":
+    "The Copilot app from the Microsoft Store goes through the preinstalled apps list below.",
+  "debloat.apps.title": "Preinstalled apps",
+  "debloat.apps.help":
+    "Only apps from a reviewed list, which leave without breaking Windows and come back from the Microsoft Store. Never Xbox, Game Bar, Store, Photos, Calculator, Terminal, Notepad, Paint, Camera, Snipping Tool or driver apps.",
+  "debloat.apps.note": "Leaves your account. If you use one, keep it unchecked.",
+  "debloat.apps.empty": "No app from the list is installed for this account.",
+  "debloat.apps.refresh": "Look again",
+  "debloat.apps.remove": "Remove selected ({count})",
+  "debloat.apps.confirm.title": "Remove {count} apps",
+  "debloat.apps.confirm.body":
+    "These apps leave your account now. To get one back, install it from the Microsoft Store.",
+  "debloat.apps.confirm.go": "Remove",
+  "debloat.apps.removed": "{count} apps removed.",
+  "debloat.apps.failed": "{name} did not leave: {error}",
+  "debloat.app.kind.news": "News",
+  "debloat.app.kind.weather": "Weather",
+  "debloat.app.kind.tips": "Tips",
+  "debloat.app.kind.game": "Game",
+  "debloat.app.kind.feedback": "Feedback",
+  "debloat.app.kind.maps": "Maps",
+  "debloat.app.kind.viewer3d": "3D",
+  "debloat.app.kind.mixed_reality": "Mixed reality",
+  "debloat.app.kind.mail": "Mail and contacts, old version",
+  "debloat.app.kind.chat": "Chat",
+  "debloat.app.kind.ai": "AI assistant",
+  "debloat.app.kind.family": "Parental controls",
+  "debloat.app.kind.automation": "Automation",
+  "debloat.app.kind.promo": "Promotion",
+  "debloat.app.kind.video": "Video editor",
 
   // ── r9:maint · manutenção+, antivírus (agente A3) ──
 

@@ -1,26 +1,17 @@
-import {
-  AudioWaveform,
-  Cpu,
-  Eraser,
-  Gauge as GaugeIcon,
-  Keyboard,
-  Lightbulb,
-  Lock,
-  Monitor,
-  MousePointer2,
-  Network,
-  Plug,
-  RefreshCw,
-  Search,
-  Server,
-  Shield,
-  ShieldCheck,
-  Zap,
-} from "lucide-react";
+import { Eraser, Lock, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { PowerTab } from "@/components/boost/power-tab";
 import { BootCard, PrivacyTab } from "@/components/boost/privacy-boot";
 import { ProcsTab } from "@/components/boost/procs-tab";
+import {
+  RestartBadge,
+  type StateMap,
+  setTweak,
+  TweakChanges,
+  unknownNeedsAdmin,
+  useTweakErrorText,
+  useTweakStates,
+} from "@/components/boost/tweak-kit";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
 import { LuliCard } from "@/components/luli-card";
@@ -30,6 +21,7 @@ import {
   Button,
   Card,
   CardTitle,
+  EmptyState,
   HelpHint,
   Skeleton,
   Switch,
@@ -39,12 +31,15 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/primitives";
+import { toast } from "@/components/ui/toast";
 import {
   categoryKey,
   FX_LEVELS,
   PRESET_FX_LEVEL,
+  PRESET_MANAGED,
   type Preset,
   reasonKey,
+  TWEAK_CATEGORIES,
   TWEAKS,
   type Tweak,
   tweakDesc,
@@ -65,36 +60,15 @@ import {
   type RoutineStatus,
   type Settings,
   type StartupItem,
+  type TweakCategory,
   type TweakState,
 } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
-const ICONS: Record<string, typeof Zap> = {
-  visual_fx: Monitor,
-  game_mode: Zap,
-  input_lag: MousePointer2,
-  windowed_optimizations: Monitor,
-  keyboard: Keyboard,
-  tips: Lightbulb,
-  mouse: MousePointer2,
-  svc_sysmain: Server,
-  svc_telemetry: Shield,
-  power_plan: Plug,
-  hags: GaugeIcon,
-  mmcss: AudioWaveform,
-  network_latency: Network,
-  svc_search: Search,
-  svc_xbox: Server,
-  priority_sep: Cpu,
-  perf_counters: Cpu,
-  winsat_task_off: GaugeIcon,
-  feedback_tasks_off: Shield,
-  svc_spooler: Server,
-};
-
-type StateMap = Record<string, TweakState>;
+/** Case- and accent-insensitive search text. */
+const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 export function BoostPage() {
   const { t } = useI18n();
@@ -179,10 +153,11 @@ function PageHeaderWithTabs({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Which preset the live state matches exactly (checked from the largest set down). */
+/** Which preset the live state matches exactly (checked from the largest set down). Only preset
+ *  members count: debloat and Windows tweaks are the user's own and never make it "custom". */
 function activePreset(states: StateMap): Preset {
   for (const p of ["high", "default"] as const) {
-    const ok = TWEAKS.every((tw) => {
+    const ok = PRESET_MANAGED.every((tw) => {
       const s = states[tw.id];
       if (!s || s.status === "unavailable") return true;
       if (tw.id === "visual_fx") return s.level === PRESET_FX_LEVEL[p];
@@ -193,10 +168,12 @@ function activePreset(states: StateMap): Preset {
   return "custom";
 }
 
+type Step = { tw: Tweak; on: boolean; level?: FxLevel };
+
 function TweaksTab({ elevated }: { elevated: boolean }) {
   const { t } = useI18n();
-  const errorText = useErrorText();
-  const [states, setStates] = useState<StateMap | null>(null);
+  const errorText = useTweakErrorText();
+  const { states, put } = useTweakStates();
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [run, setRun] = useState<{ done: number; total: number } | null>(null);
@@ -204,22 +181,9 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
   const [recs, setRecs] = useState<Record<string, Recommendation>>({});
   const [restoreBefore, setRestoreBefore] = useState(true);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<TweakCategory | "all">("all");
 
-  const refresh = useCallback(async () => {
-    const list = await backend.boostState();
-    if (list) setStates(Object.fromEntries(list.map((s) => [s.id, s])));
-  }, []);
-  useEffect(() => {
-    refresh();
-    // Changed something in Windows Settings meanwhile? Re-read when the window comes back.
-    const onBack = () => document.visibilityState === "visible" && refresh();
-    window.addEventListener("focus", onBack);
-    document.addEventListener("visibilitychange", onBack);
-    return () => {
-      window.removeEventListener("focus", onBack);
-      document.removeEventListener("visibilitychange", onBack);
-    };
-  }, [refresh]);
   useEffect(() => {
     backend
       .recommendations()
@@ -227,20 +191,12 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
     backend.settingsGet().then((s) => s && setRestoreBefore(s.restore_before_preset));
   }, []);
 
-  const put = (s: TweakState) => setStates((m) => ({ ...(m ?? {}), [s.id]: s }));
-
   /** One tweak on/off (visual effects take a level). Returns false on failure. */
-  const setTweak = async (tw: Tweak, on: boolean, level?: FxLevel): Promise<boolean> => {
+  const one = async ({ tw, on, level }: Step): Promise<boolean> => {
     setBusy(tw.id);
     setErrors((e) => ({ ...e, [tw.id]: "" }));
     try {
-      const next =
-        tw.id === "visual_fx"
-          ? on
-            ? await backend.boostVisualFx(level ?? "balanced")
-            : await backend.boostVisualFxRevert()
-          : await backend.boostApply(tw.id, on);
-      put(next);
+      put(await setTweak(tw.id, on, level));
       return true;
     } catch (e) {
       setErrors((m) => ({ ...m, [tw.id]: errorText(e) }));
@@ -250,15 +206,24 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
     }
   };
 
-  const applyPreset = async (p: Preset) => {
-    if (p === "custom" || !states) return;
-    const todo = TWEAKS.filter((tw) => {
-      const s = states[tw.id];
-      if (!s || s.status === "unavailable") return false;
-      if (tw.id === "visual_fx") return s.level !== PRESET_FX_LEVEL[p];
-      return (s.status === "on") !== tw.presets.includes(p);
-    });
-    if (restoreBefore && elevated && todo.length > 0) {
+  /** A card's own switch: toast, with undo when it turned something on. */
+  const toggle = async (step: Step) => {
+    if (!(await one(step))) return;
+    const name = t(tweakName(step.tw.id));
+    if (step.on) {
+      toast(t("tweaks.toast.applied", { name }), {
+        tone: "success",
+        action: { label: t("tweaks.toast.undo"), run: () => void one({ tw: step.tw, on: false }) },
+      });
+    } else {
+      toast(t("tweaks.toast.undone", { name }));
+    }
+  };
+
+  /** Several in a row, after a restore point when the setting asks for one. */
+  const runBatch = async (steps: Step[]): Promise<Tweak[]> => {
+    if (steps.length === 0) return [];
+    if (restoreBefore && elevated) {
       try {
         const out = await backend.restoreCreate(t("dash.restore.description"));
         setRestoreMsg(
@@ -268,18 +233,62 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
         setRestoreMsg(errorText(e));
       }
     }
-    const runnable = todo.filter((tw) => !tw.admin || elevated);
-    setSkipped(todo.length - runnable.length);
-    setRun({ done: 0, total: runnable.length });
-    let done = 0;
-    for (const tw of runnable) {
-      await setTweak(tw, tw.presets.includes(p), PRESET_FX_LEVEL[p]);
-      done += 1;
-      setRun({ done, total: runnable.length });
+    const done: Tweak[] = [];
+    setRun({ done: 0, total: steps.length });
+    for (const [i, step] of steps.entries()) {
+      if (await one(step)) done.push(step.tw);
+      setRun({ done: i + 1, total: steps.length });
     }
     setRun(null);
+    return done;
   };
 
+  const applyPreset = async (p: Preset) => {
+    if (p === "custom" || !states) return;
+    const todo = PRESET_MANAGED.filter((tw) => {
+      const s = states[tw.id];
+      if (!s || s.status === "unavailable") return false;
+      if (tw.id === "visual_fx") return s.level !== PRESET_FX_LEVEL[p];
+      return (s.status === "on") !== tw.presets.includes(p);
+    });
+    const runnable = todo.filter((tw) => !tw.admin || elevated);
+    setSkipped(todo.length - runnable.length);
+    await runBatch(
+      runnable.map((tw) => ({ tw, on: tw.presets.includes(p), level: PRESET_FX_LEVEL[p] })),
+    );
+  };
+
+  /** Recommended for this PC and not fully on yet (what the dashboard score counts). */
+  const pending = TWEAKS.filter((tw) => {
+    const s = states?.[tw.id];
+    return recs[tw.id]?.recommended && s && s.status !== "on" && s.status !== "unavailable";
+  });
+  const pendingRunnable = pending.filter((tw) => !tw.admin || elevated);
+  const applyRecommended = async () => {
+    setSkipped(pending.length - pendingRunnable.length);
+    const done = await runBatch(pendingRunnable.map((tw) => ({ tw, on: true })));
+    if (done.length > 0) {
+      toast(t("tweaks.toast.batch", { count: done.length }), {
+        tone: "success",
+        action: {
+          label: t("tweaks.toast.undo"),
+          run: () => void runBatch([...done].reverse().map((tw) => ({ tw, on: false }))),
+        },
+      });
+    }
+  };
+
+  const q = fold(query.trim());
+  const shown = TWEAKS.filter(
+    (tw) =>
+      (category === "all" || tw.category === category) &&
+      (!q || fold(`${t(tweakName(tw.id))} ${t(tweakDesc(tw.id))} ${tw.id}`).includes(q)),
+  );
+  const present = shown.filter((tw) => {
+    const s = states?.[tw.id];
+    return s?.status !== "unavailable" || unknownNeedsAdmin(s);
+  });
+  const active = shown.filter((tw) => states?.[tw.id]?.status === "on").length;
   const preset: Preset = states ? activePreset(states) : "custom";
 
   return (
@@ -323,7 +332,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
         {restoreMsg ? <p className="w-full text-xs text-muted-foreground">{restoreMsg}</p> : null}
         {run ? (
           <p className="w-full text-xs text-muted-foreground">
-            {t("boost.preset.applying", { done: run.done, total: run.total })}
+            {t("tweaks.applying", { done: run.done, total: run.total })}
           </p>
         ) : null}
         {!run && skipped > 0 ? (
@@ -332,26 +341,91 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
           </p>
         ) : null}
       </Card>
+
+      <Card className="animate-rise flex flex-col gap-3 py-4" style={rise(1)}>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative min-w-60 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("tweaks.search")}
+              aria-label={t("tweaks.search")}
+              className={cn(selectClass, "w-full pl-9")}
+            />
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {t("tweaks.count", { on: active, total: present.length })}
+          </span>
+          <Button
+            variant="primary"
+            tactile
+            disabled={!states || run !== null || pendingRunnable.length === 0}
+            onClick={() => void applyRecommended()}
+            title={pending.length === 0 ? t("tweaks.apply_recommended.none") : undefined}
+          >
+            {t("tweaks.apply_recommended")}
+            {pendingRunnable.length > 0 ? (
+              <span className="num rounded bg-black/20 px-1.5 text-xs">
+                {pendingRunnable.length}
+              </span>
+            ) : null}
+          </Button>
+        </div>
+        <fieldset className="flex flex-wrap gap-1.5">
+          <legend className="sr-only">{t("tweaks.search")}</legend>
+          {(["all", ...TWEAK_CATEGORIES] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={category === c}
+              onClick={() => setCategory(c)}
+              className={cn(
+                "press rounded-full border px-3 py-1 text-xs font-semibold transition-colors duration-200 ease-out-expo",
+                category === c
+                  ? "border-border-strong bg-foreground/8 text-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {c === "all" ? t("tweaks.filter.all") : t(categoryKey(c))}
+              <span className="num ml-1.5 text-muted-foreground/70">
+                {c === "all" ? TWEAKS.length : TWEAKS.filter((tw) => tw.category === c).length}
+              </span>
+            </button>
+          ))}
+        </fieldset>
+      </Card>
+
       {!inTauri ? <p className="text-xs text-muted-foreground">{t("common.soon")}</p> : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
-        {TWEAKS.map((tw, i) => (
-          <TweakCard
-            key={tw.id}
-            tw={tw}
-            index={i}
-            state={states?.[tw.id]}
-            loading={inTauri && states === null}
-            elevated={elevated}
-            busy={busy === tw.id || run !== null}
-            error={errors[tw.id]}
-            rec={recs[tw.id]}
-            onToggle={(on, level) => setTweak(tw, on, level)}
-          />
-        ))}
-      </div>
+      {shown.length === 0 ? (
+        <Card>
+          <EmptyState icon={<Search className="size-5" />} title={t("tweaks.empty")} />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          {shown.map((tw, i) => (
+            <TweakCard
+              key={tw.id}
+              tw={tw}
+              index={i}
+              state={states?.[tw.id]}
+              loading={inTauri && states === null}
+              elevated={elevated}
+              busy={busy === tw.id || run !== null}
+              error={errors[tw.id]}
+              rec={recs[tw.id]}
+              onToggle={(on, level) => void toggle({ tw, on, level })}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }
+
+/** Detail codes the state badge already explains (everything else is shown, e.g. the plan name). */
+const QUIET_DETAILS = new Set(["reboot_pending", "not_present", "needs_admin", "busy"]);
 
 function TweakCard({
   tw,
@@ -375,7 +449,8 @@ function TweakCard({
   onToggle: (on: boolean, level?: FxLevel) => void;
 }) {
   const { t } = useI18n();
-  const Icon = ICONS[tw.id] ?? Zap;
+  const [changes, setChanges] = useState(false);
+  const Icon = tw.icon;
   const locked = (tw.admin && !elevated) || !state || state.status === "unavailable";
   const on = state?.status === "on";
   const isFx = tw.id === "visual_fx";
@@ -450,16 +525,24 @@ function TweakCard({
 
       {state?.detail === "reboot_pending" ? (
         <p className="text-[11px] text-warning">{t("boost.state.reboot_pending")}</p>
-      ) : state?.detail ? (
+      ) : state?.detail && !QUIET_DETAILS.has(state.detail) ? (
         <p className="text-[11px] text-muted-foreground">{state.detail}</p>
       ) : null}
 
-      <details className="text-[11px]">
-        <summary className="cursor-pointer text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground">
-          {t("common.not_recommended")}
-        </summary>
-        <p className="mt-1 text-muted-foreground">{t(tweakWarn(tw.id))}</p>
-      </details>
+      <div className="flex flex-col gap-1.5 text-[11px]">
+        <details>
+          <summary className="cursor-pointer text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground">
+            {t("common.not_recommended")}
+          </summary>
+          <p className="mt-1 text-muted-foreground">{t(tweakWarn(tw.id))}</p>
+        </details>
+        <details onToggle={(e) => setChanges(e.currentTarget.open)}>
+          <summary className="cursor-pointer text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground">
+            {t("tweaks.changes")}
+          </summary>
+          {changes ? <TweakChanges id={tw.id} className="mt-1.5" /> : null}
+        </details>
+      </div>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
@@ -476,10 +559,12 @@ function TweakCard({
               state.status === "on" ? "success" : state.status === "partial" ? "warning" : "neutral"
             }
           >
-            {t(`boost.state.${state.status}` as const)}
+            {unknownNeedsAdmin(state)
+              ? t("boost.state.unknown_admin")
+              : t(`boost.state.${state.status}` as const)}
           </Badge>
         ) : null}
-        {state ? <Badge tone="neutral">{t(categoryKey(state.category))}</Badge> : null}
+        <Badge tone="neutral">{t(categoryKey(tw.category))}</Badge>
         {rec && !rec.recommended && rec.reason ? (
           <Badge
             tone="warning"
@@ -489,7 +574,7 @@ function TweakCard({
           </Badge>
         ) : null}
         {tw.admin ? <Badge tone="neutral">{t("common.admin_required")}</Badge> : null}
-        {tw.reboot ? <Badge tone="neutral">{t("boost.state.reboot")}</Badge> : null}
+        <RestartBadge restart={tw.restart} />
         {state?.has_backup ? (
           <Badge tone="success" title={t("boost.state.backup.hint")}>
             {t("boost.state.backup")}
