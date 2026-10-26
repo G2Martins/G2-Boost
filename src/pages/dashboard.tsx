@@ -1,12 +1,15 @@
 import {
   Activity,
+  ArrowRight,
   BrushCleaning,
+  Check,
   Cpu,
   Gauge as GaugeIcon,
   HardDrive,
   MemoryStick,
   Monitor,
   Network,
+  Rocket,
   RotateCcw,
   ShieldCheck,
   Zap,
@@ -18,7 +21,16 @@ import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Gauge } from "@/components/ui/gauge";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { LiveLine } from "@/components/ui/live-line";
-import { Badge, Button, Card, CardTitle, EmptyState } from "@/components/ui/primitives";
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  EmptyState,
+  Modal,
+  Switch,
+} from "@/components/ui/primitives";
+import { toast } from "@/components/ui/toast";
 import { CLEANUP_CATALOG, categoryKey, TWEAKS, tweakName } from "@/data/catalogs";
 import {
   type AppInfo,
@@ -81,6 +93,9 @@ function Overview({ elevated }: { elevated: boolean }) {
   const [busyRestore, setBusyRestore] = useState(false);
   const [busyRam, setBusyRam] = useState(false);
   const [restoreBefore, setRestoreBefore] = useState(true);
+  const [confirmBoost, setConfirmBoost] = useState(false);
+  const [boostClean, setBoostClean] = useState(true);
+  const [boostRam, setBoostRam] = useState(true);
 
   const loadRecs = useCallback(async () => {
     const r = await backend.recommendations();
@@ -116,16 +131,9 @@ function Overview({ elevated }: { elevated: boolean }) {
   const last = samples.at(-1) ?? null;
   const score = recs?.score ?? null;
   const pending = score?.pending ?? [];
-  const tone = score
-    ? score.percent >= 80
-      ? "success"
-      : score.percent >= 50
-        ? "warning"
-        : "danger"
-    : "neutral";
 
-  const boostNow = async () => {
-    if (!score || pending.length === 0) return;
+  const boostNow = async (extras: { clean: boolean; ram: boolean }) => {
+    if (!score) return;
     const todo = pending
       .map((id) => TWEAKS.find((tw) => tw.id === id))
       .filter((tw): tw is NonNullable<typeof tw> => !!tw);
@@ -156,7 +164,19 @@ function Overview({ elevated }: { elevated: boolean }) {
       done += 1;
       setBoosting({ done, total: runnable.length });
     }
+    if (extras.clean) {
+      try {
+        const tok = await backend.cleanupConfirm(DEFAULT_CLEANUP);
+        await backend.cleanupExecute(tok.token, DEFAULT_CLEANUP);
+        const items = await backend.cleanupPreview(DEFAULT_CLEANUP);
+        setCleanupBytes(items.reduce((sum, i) => sum + i.bytes, 0));
+      } catch (e) {
+        setMsg(errorText(e));
+      }
+    }
+    if (extras.ram && elevated) await backend.ramPurge().catch(() => undefined);
     setBoosting(null);
+    toast(t("dash.boost.done"), { tone: "success" });
     await loadRecs();
     backend.restoreStatus().then((r) => r && setRestore(r));
   };
@@ -214,50 +234,114 @@ function Overview({ elevated }: { elevated: boolean }) {
     <>
       {!inTauri ? <p className="text-xs text-muted-foreground">{t("common.soon")}</p> : null}
       {msg ? <p className="animate-rise text-xs text-foreground/90">{msg}</p> : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
-        <KpiCard
-          icon={GaugeIcon}
-          label={t("dash.kpi.score")}
-          value="—"
-          count={inTauri ? (score?.percent ?? null) : undefined}
-          format={(n) => `${Math.round(n)}%`}
-          tone={tone}
-          caption={
-            score
-              ? t("dash.kpi.score.caption", { active: score.active, total: score.recommended })
-              : t("dash.monitor.waiting")
-          }
-          action={{
-            label: boosting
-              ? t("dash.applying", { done: boosting.done, total: boosting.total })
-              : pending.length > 0
-                ? t("dash.kpi.score.action", { count: pending.length })
-                : t("dash.kpi.score.done"),
-            onClick: boostNow,
-            disabled: !score || pending.length === 0 || boosting !== null,
-            primary: pending.length > 0,
-          }}
-          className="animate-rise"
-        >
-          <div className="h-1.5 w-full overflow-hidden rounded bg-border/60">
-            <div
-              className={cn(
-                "h-full rounded transition-[width] duration-700 ease-out-expo",
-                tone === "success"
-                  ? "bg-success"
-                  : tone === "warning"
-                    ? "bg-warning"
-                    : "bg-destructive",
-              )}
-              style={{ width: `${score?.percent ?? 0}%` }}
-            />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <Card className="animate-rise halo panel-hover flex flex-col items-center gap-5 sm:flex-row">
+          <Gauge
+            value={score?.percent ?? 0}
+            max={100}
+            label={
+              score
+                ? t(
+                    score.percent >= 80
+                      ? "dash.score.state.good"
+                      : score.percent >= 50
+                        ? "dash.score.state.ok"
+                        : "dash.score.state.low",
+                  )
+                : t("dash.score.state.none")
+            }
+            valueText={score ? `${score.percent}%` : "—"}
+            format={score ? (n) => `${Math.round(n)}%` : undefined}
+            tone="download"
+            className="frame-ticks shrink-0 p-2"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-3 self-stretch sm:justify-center">
+            <header>
+              <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                <GaugeIcon className="size-4 text-primary" />
+                {t("dash.kpi.score")}
+              </p>
+              <p className="mt-1.5 text-[13px] leading-snug">
+                {score
+                  ? t("dash.kpi.score.caption", { active: score.active, total: score.recommended })
+                  : t("dash.monitor.waiting")}
+              </p>
+            </header>
+            {pending.length > 0 || (ramPct !== null && ramPct > 85) ? (
+              <div className="flex flex-wrap gap-1.5">
+                {pending.length > 0 ? (
+                  <Badge tone="warning">
+                    {t("dash.pending.tweaks", { count: pending.length })}
+                  </Badge>
+                ) : null}
+                {ramPct !== null && ramPct > 85 ? (
+                  <Badge tone="danger">{t("dash.pending.ram")}</Badge>
+                ) : null}
+              </div>
+            ) : null}
+            <Button
+              variant="primary"
+              size="lg"
+              tactile
+              className="self-start"
+              disabled={!score || boosting !== null || (pending.length === 0 && !cleanupBytes)}
+              onClick={() => setConfirmBoost(true)}
+            >
+              <Zap className="size-4" />
+              {boosting
+                ? t("dash.applying", { done: boosting.done, total: boosting.total })
+                : pending.length > 0
+                  ? t("dash.kpi.score.action", { count: pending.length })
+                  : cleanupBytes
+                    ? t("dash.boost.label")
+                    : t("dash.kpi.score.done")}
+            </Button>
+            {skipped > 0 && !boosting ? (
+              <p className="text-[11px] text-warning">
+                {t("dash.skipped_admin", { count: skipped })}
+              </p>
+            ) : null}
           </div>
-          {skipped > 0 && !boosting ? (
-            <p className="text-[11px] text-warning">
-              {t("dash.skipped_admin", { count: skipped })}
-            </p>
-          ) : null}
-        </KpiCard>
+        </Card>
+        <Card className="animate-rise relative flex flex-col gap-4 overflow-hidden" style={rise(1)}>
+          <div className="banner pointer-events-none absolute inset-0 opacity-70" aria-hidden />
+          <div className="relative flex items-start gap-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border-strong bg-background">
+              <Rocket className="size-5 text-primary" />
+            </span>
+            <div className="min-w-0">
+              <Badge tone="accent">{t("dash.setup.badge")}</Badge>
+              <h3 className="mt-2 font-display text-[15px] font-semibold tracking-wide">
+                {t("dash.setup.title")}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">{t("dash.setup.body")}</p>
+            </div>
+          </div>
+          <ul className="relative grid gap-1.5 text-xs">
+            {(
+              [
+                "dash.setup.point.apps",
+                "dash.setup.point.debloat",
+                "dash.setup.point.extras",
+              ] as const
+            ).map((k) => (
+              <li key={k} className="flex items-center gap-2">
+                <Check className="size-3.5 text-success" />
+                {t(k)}
+              </li>
+            ))}
+          </ul>
+          <Button
+            variant="outline"
+            className="relative mt-auto self-start"
+            onClick={() => navigate("setup")}
+          >
+            {t("dash.setup.go")}
+            <ArrowRight className="size-4" />
+          </Button>
+        </Card>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <KpiCard
           icon={RotateCcw}
           label={t("dash.kpi.restore")}
@@ -332,6 +416,74 @@ function Overview({ elevated }: { elevated: boolean }) {
           </div>
         </KpiCard>
       </div>
+
+      <Modal
+        open={confirmBoost}
+        onClose={() => setConfirmBoost(false)}
+        title={t("dash.boost.confirm.title")}
+        closeLabel={t("common.close")}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmBoost(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setConfirmBoost(false);
+                void boostNow({ clean: boostClean && !!cleanupBytes, ram: boostRam });
+              }}
+            >
+              <Zap className="size-4" />
+              {t("dash.boost.confirm.go")}
+            </Button>
+          </>
+        }
+      >
+        {pending.length > 0 ? (
+          <>
+            <p>{t("dash.boost.confirm.body", { count: pending.length })}</p>
+            <ul className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+              {pending.slice(0, 8).map((id) => (
+                <li key={id} className="flex items-center gap-2">
+                  <Check className="size-3.5 shrink-0 text-success" />
+                  {t(tweakName(id))}
+                </li>
+              ))}
+            </ul>
+            {pending.length > 8 ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("dash.boost.confirm.more", { count: pending.length - 8 })}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        <div className="mt-4 grid gap-2.5 text-xs">
+          {cleanupBytes ? (
+            <div className="flex items-center gap-2.5">
+              <Switch
+                checked={boostClean}
+                onCheckedChange={setBoostClean}
+                aria-label={t("dash.boost.clean", { size: formatBytes(cleanupBytes, locale) })}
+              />
+              {t("dash.boost.clean", { size: formatBytes(cleanupBytes, locale) })}
+            </div>
+          ) : null}
+          {elevated ? (
+            <div className="flex items-center gap-2.5">
+              <Switch
+                checked={boostRam}
+                onCheckedChange={setBoostRam}
+                aria-label={t("dash.boost.ram")}
+              />
+              {t("dash.boost.ram")}
+            </div>
+          ) : null}
+          {elevated && restoreBefore ? (
+            <p className="text-muted-foreground">{t("dash.boost.restore")}</p>
+          ) : null}
+        </div>
+      </Modal>
 
       <MonitorCard samples={samples} metric={metric} setMetric={setMetric} profile={profile} />
 
