@@ -2633,6 +2633,7 @@ pub fn run() {
             maint_cmds::maint_plan_status,
             maint_cmds::maint_plan_history,
             maint_cmds::maint_print_status,
+            maint_cmds::maint_wu_backups,
             maint_cmds::maint_fix_run,
             maint_cmds::maint_fix_history,
             maint_cmds::av_status,

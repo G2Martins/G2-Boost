@@ -3851,6 +3851,18 @@ export const ptBR = {
   "periph.error.app_only": "Disponível só no app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "maint3.fix.wu_backups.title": "Apagar os backups do reset do Windows Update",
+  "maint3.fix.wu_backups.body":
+    "Quando o reset renomeia as pastas, o Windows cria outras do zero. As antigas ficam guardadas só para desfazer; depois que o Windows Update voltou a funcionar, só ocupam espaço.",
+  "maint3.fix.wu_backups.cost": "Não dá para voltar ao estado de antes do reset depois de apagar.",
+  "maint3.fix.wu_backups.inside":
+    "Apaga só as pastas SoftwareDistribution.bak e catroot2.bak criadas pelo reset, sem seguir atalhos de pasta.",
+  "maint3.fix.wu_backups.time": "segundos",
+  "maint3.fix.wu_backups.confirm": "Apagar estas pastas de backup para sempre?",
+  "maint3.fix.wu_backups.button": "Apagar backups",
+  "maint3.do.delete": "{target} apagada",
+  "maint3.do.delete.fail": "{target} não foi apagada por inteiro: {why}",
+  "maint3.do.delete.reparse_point": "{target} aponta para outra pasta: ficou como estava",
   "boost.error.blocked":
     "O Windows ou o antivírus protege esta configuração neste PC e recusou a mudança, mesmo como administrador. Nada foi alterado; dá para mudar pelas Configurações do Windows.",
   "setup.subtitle":

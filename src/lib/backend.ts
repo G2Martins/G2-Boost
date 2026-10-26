@@ -1133,6 +1133,7 @@ export const backend = {
   maintPlanStatus: () => call<MaintPlanRunning | null>("maint_plan_status"),
   maintPlanHistory: () => call<MaintPlanOutcome[]>("maint_plan_history"),
   maintPrintStatus: () => call<PrintStatus>("maint_print_status"),
+  maintWuBackups: () => call<WuBackup[]>("maint_wu_backups"),
   maintFixRun: (fix: MaintFix) => callOrThrow<MaintFixOutcome>("maint_fix_run", { fix }),
   maintFixHistory: () => call<MaintFixOutcome[]>("maint_fix_history"),
   avStatus: () => call<AvStatus>("av_status"),
@@ -1406,9 +1407,11 @@ export type MaintPlanRunning = {
   /** Steps already finished in this run. */
   done: MaintStepOutcome[];
 };
-export type MaintFix = "wu_reset" | "print_queue" | "audio";
+export type MaintFix = "wu_reset" | "print_queue" | "audio" | "wu_backups";
+/** Folders an earlier Windows Update reset set aside. */
+export type WuBackup = { name: string; bytes: number };
 export type MaintFixStep = {
-  action: "stop" | "start" | "rename" | "purge" | "check";
+  action: "stop" | "start" | "rename" | "purge" | "check" | "delete";
   target: string;
   ok: boolean;
   code: number;

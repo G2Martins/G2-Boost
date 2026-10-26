@@ -1,6 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "G2 Boost",
+  "mainBinaryName": "G2 Boost",
   "version": "0.9.1",
   "identifier": "com.grovicdata.g2boost",
   "build": {

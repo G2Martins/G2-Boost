@@ -3830,6 +3830,19 @@ export const en = {
   "periph.error.app_only": "Only available in the app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "maint3.fix.wu_backups.title": "Delete the Windows Update reset backups",
+  "maint3.fix.wu_backups.body":
+    "When the reset renames the folders, Windows creates fresh ones. The old ones are kept only for an undo; once Windows Update works again, they just take space.",
+  "maint3.fix.wu_backups.cost":
+    "After deleting, there is no going back to the state before the reset.",
+  "maint3.fix.wu_backups.inside":
+    "Deletes only the SoftwareDistribution.bak and catroot2.bak folders the reset created, never following folder links.",
+  "maint3.fix.wu_backups.time": "seconds",
+  "maint3.fix.wu_backups.confirm": "Delete these backup folders for good?",
+  "maint3.fix.wu_backups.button": "Delete backups",
+  "maint3.do.delete": "{target} deleted",
+  "maint3.do.delete.fail": "{target} was not fully deleted: {why}",
+  "maint3.do.delete.reparse_point": "{target} points to another folder: left as it was",
   "boost.error.blocked":
     "Windows or the antivirus protects this setting on this PC and refused the change, even as administrator. Nothing was changed; you can change it in Windows Settings.",
   "setup.subtitle": "Just reinstalled? Pick the apps and tweaks and get Windows ready at once.",

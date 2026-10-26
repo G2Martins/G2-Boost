@@ -42,6 +42,11 @@ pub async fn maint_fix_run(fix: troubleshoot::Fix) -> Result<troubleshoot::Outco
 }
 
 #[tauri::command]
+pub async fn maint_wu_backups() -> Result<Vec<troubleshoot::WuBackup>, String> {
+    blocking(|| Ok::<_, String>(troubleshoot::wu_backups())).await
+}
+
+#[tauri::command]
 pub fn maint_fix_history() -> Vec<troubleshoot::Outcome> {
     troubleshoot::history()
 }

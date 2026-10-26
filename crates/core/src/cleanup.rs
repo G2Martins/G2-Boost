@@ -340,7 +340,7 @@ pub(crate) fn measure_dir(dir: &Path, t: &mut Tally) {
 }
 
 /// Delete files under `dir` and then the emptied subdirectories (bottom-up). `dir` itself stays.
-fn delete_dir_contents(dir: &Path, t: &mut Tally) {
+pub(crate) fn delete_dir_contents(dir: &Path, t: &mut Tally) {
     let Ok(rd) = fs::read_dir(dir) else {
         return;
     };

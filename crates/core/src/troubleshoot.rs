@@ -49,6 +49,8 @@ pub enum Fix {
     WuReset,
     PrintQueue,
     Audio,
+    /// Delete the folders earlier resets set aside (Windows rebuilt both, they only cost space).
+    WuBackups,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +62,8 @@ pub enum Action {
     Purge,
     /// Print queue: jobs left at the end.
     Check,
+    /// A Windows Update reset backup folder removed.
+    Delete,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,6 +154,11 @@ pub fn run(fix: Fix) -> Result<Outcome, FixError> {
         }
         Fix::PrintQueue => print_queue(&mut steps)?,
         Fix::Audio => restart(&AUDIO_SERVICES, &mut steps),
+        Fix::WuBackups => {
+            for b in wu_backup_dirs() {
+                steps.push(delete_backup(&b));
+            }
+        }
     }
     let out = Outcome { fix, at: registry::now_unix(), duration_ms: t0.elapsed().as_millis() as u64, ok: steps.iter().all(|s| s.ok), steps };
     record(&out);
@@ -249,6 +258,63 @@ fn wu_reset(steps: &mut Vec<Step>) {
         steps.push(rename_aside(&repair::system32().join("catroot2"), &stamp));
     }
     start_again(&order, &WU_SERVICES, &stopped, steps);
+}
+
+/// `SoftwareDistribution.bak-<stamp>` / `catroot2.bak-<stamp>` exactly as `rename_aside` names them.
+pub(crate) fn is_backup_name(name: &str, base: &str) -> bool {
+    name.strip_prefix(base).and_then(|r| r.strip_prefix(".bak-")).is_some_and(|s| {
+        let b = s.as_bytes();
+        b.len() == 13 && b[8] == b'-' && b.iter().enumerate().all(|(i, c)| i == 8 || c.is_ascii_digit())
+    })
+}
+
+/// The backup folders earlier resets left (real folders only, never a reparse point).
+fn wu_backup_dirs() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for (dir, base) in [(repair::windows_dir(), "SoftwareDistribution"), (repair::system32(), "catroot2")] {
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        for e in rd.flatten() {
+            let ok = e.file_name().to_str().is_some_and(|n| is_backup_name(n, base))
+                && std::fs::symlink_metadata(e.path()).is_ok_and(|md| md.is_dir() && !safety::is_reparse(&md));
+            if ok {
+                out.push(e.path());
+            }
+        }
+    }
+    out
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WuBackup {
+    pub name: String,
+    pub bytes: u64,
+}
+
+/// What "apagar os backups do reset" would remove (sizes measured without crossing reparse points).
+pub fn wu_backups() -> Vec<WuBackup> {
+    wu_backup_dirs()
+        .into_iter()
+        .map(|p| {
+            let mut t = crate::cleanup::Tally::default();
+            crate::cleanup::measure_dir(&p, &mut t);
+            WuBackup { name: p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), bytes: t.bytes }
+        })
+        .collect()
+}
+
+/// Empty the folder (never following reparse points) and remove it; files in use stay and the
+/// step reports it.
+pub(crate) fn delete_backup(dir: &Path) -> Step {
+    let step = Step::new(Action::Delete, &dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    if std::fs::symlink_metadata(dir).is_ok_and(|md| safety::is_reparse(&md)) {
+        return step.refuse("reparse_point");
+    }
+    let mut t = crate::cleanup::Tally::default();
+    crate::cleanup::delete_dir_contents(dir, &mut t);
+    match std::fs::remove_dir(dir) {
+        Ok(()) => step,
+        Err(e) => step.fail(e.raw_os_error().unwrap_or(32) as u32),
+    }
 }
 
 /* ---------------- print queue ---------------- */
@@ -411,6 +477,48 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn backup_names_are_exactly_what_the_reset_writes() {
+        assert!(is_backup_name("SoftwareDistribution.bak-20261025-2337", "SoftwareDistribution"));
+        assert!(is_backup_name("catroot2.bak-20261025-2337", "catroot2"));
+        for bad in [
+            "SoftwareDistribution",
+            "SoftwareDistribution.bak-",
+            "SoftwareDistribution.bak-2026",
+            "SoftwareDistribution.bak-20261025-2337x",
+            "SoftwareDistribution.bak-202610252337",
+            "SoftwareDistribution.bak-../../x123",
+            "SoftwareDistribution.old",
+            "catroot.bak-20261025-2337",
+        ] {
+            assert!(!is_backup_name(bad, "SoftwareDistribution") && !is_backup_name(bad, "catroot2"), "{bad}");
+        }
+    }
+
+    #[test]
+    fn delete_backup_removes_the_folder_but_never_crosses_a_junction() {
+        let base = std::env::temp_dir().join(format!("g2b-wubak-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let outside = base.join("outside");
+        let bak = base.join("SoftwareDistribution.bak-20261025-2337");
+        std::fs::create_dir_all(bak.join(r"Download\sub")).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(bak.join(r"Download\sub\a.cab"), b"x").unwrap();
+        std::fs::write(outside.join("keep.txt"), b"keep").unwrap();
+        // A junction inside is neither followed nor removed: the folder stays and the step says so.
+        crate::cleanup::tests::make_junction(&bak.join("link"), &outside);
+        let s = delete_backup(&bak);
+        assert!(!s.ok, "{s:?}");
+        assert!(outside.join("keep.txt").exists(), "a junction inside must never be followed");
+        assert!(!bak.join(r"Download\sub\a.cab").exists(), "the real files are gone");
+        // Without it, the whole folder goes.
+        std::fs::remove_dir(bak.join("link")).unwrap();
+        assert!(delete_backup(&bak).ok);
+        assert!(!bak.exists());
+        assert!(outside.join("keep.txt").exists());
+        std::fs::remove_dir_all(&base).unwrap();
     }
 
     #[test]

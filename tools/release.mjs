@@ -3,7 +3,7 @@
 // and writes SHA256SUMS.txt. Output: release/ (gitignored). Run with `node`, not bun (dev tool).
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const { version } = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
@@ -48,7 +48,10 @@ the app (Profiles and restore) before deleting the folder: the backups live in i
 // Portable zip: the app exe already embeds the whole interface.
 const stage = join(out, "portable");
 mkdirSync(stage);
-copyFileSync("target/release/g2-boost.exe", join(stage, "G2 Boost.exe"));
+// `mainBinaryName` makes tauri build rename the cargo binary (g2-boost.exe) to "G2 Boost.exe".
+const exe = ["target/release/G2 Boost.exe", "target/release/g2-boost.exe"].find((p) => existsSync(p));
+if (!exe) throw new Error("app exe not found in target/release");
+copyFileSync(exe, join(stage, "G2 Boost.exe"));
 writeFileSync(join(stage, "portable.txt"), PORTABLE_TXT.replaceAll("\n", "\r\n"));
 const zip = `G2-Boost_${version}_x64-portable.zip`;
 // Windows' own bsdtar writes zip (-a picks the format from the extension); Git's GNU tar can't.
