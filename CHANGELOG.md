@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.2 (2026-10-26): FPS do overlay, exe com o nome do app e mais testes reais
+
+- **Overlay de jogo: o FPS agora aparece.** Nas versões 0.9.0 e 0.9.1 o contador nunca mostrava quadros: os horários dos eventos do Windows chegavam num relógio diferente do usado na conta. Conferido como administrador: uma animação no Edge marcou 120 FPS num monitor de 120 Hz, com 1% low de 117.
+- **O exe instalado se chama "G2 Boost.exe"** (antes `g2-boost.exe`). É o nome que a janela de permissão do Windows mostra para apps sem assinatura.
+- **Manutenção:** novo card para apagar os backups que o "Redefinir o Windows Update" deixa (pastas `.bak`), com tamanho e confirmação; aparece só quando há backups.
+- **Claude / MCP:** três ferramentas novas de leitura: check-up, sensores de hardware e antivírus (60 no total).
+- **Testado de verdade, como administrador:** instalador e MSI (instalar, abrir, desinstalar sem sobras), "Preparar e jogar" abrindo o programa sem administrador, reiniciar o áudio, esvaziar a fila de impressão, redefinir o Windows Update e apagar os backups, tela de permissão antes do UAC.
+- Atualizando de 0.9.0 ou 0.9.1 com "Iniciar com o Windows" ligado: desligue e ligue de novo em Configurações (o nome do exe mudou).
+
 ## 0.9.1 (2026-10-25): correções achadas nos testes como administrador
 
 - **Ajustes protegidos pelo Windows:** quando o Windows (proteção de configurações do usuário) ou o antivírus recusa uma chave mesmo com administrador, como a política dos Widgets no Windows 11 24H2+, o app avisa "bloqueado", desfaz o que tiver gravado pela metade e não deixa nada alterado. Antes aparecia o erro cru `access_denied`.

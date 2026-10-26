@@ -445,6 +445,27 @@ Read-only; uninstalling is done in G2 Boost > Desinstalar apps, which also remov
         .await
     }
 
+    #[tool(description = "Check-up of this PC: about 20 measurements against a limit (free space on C:, RAM in use, disk health, antivirus, firewall, UAC, Secure Boot, TPM, Windows activation, internet, unexpected shutdowns, app crashes, startup apps, pending reboot, last Windows Update, GPU driver and BIOS age, XMP, Resizable BAR), each ok / attention / no reading, plus the summary. Read-only; it only measures (the user fixes things in G2 Boost).")]
+    async fn get_checkup(&self) -> Result<String, String> {
+        blocking(|| g2boost_core::checkup::run(&g2boost_core::hardware::profile())).await
+    }
+
+    #[tool(description = "Hardware sensors right now as a tree (device > group > sensor with value and unit): CPU load and effective clock per thread, package power, NVIDIA GPU temperature/clocks/power/utilization/VRAM/fan, memory, each disk (active time, read/write, temperature), each network adapter, plus every HWiNFO / LibreHardwareMonitor reading when they run. Takes about one second (rates need two samples). Read-only.")]
+    async fn get_hardware_sensors(&self) -> Result<String, String> {
+        blocking(|| {
+            let mut s = g2boost_core::hwsensors::Sampler::new();
+            let _ = s.sample();
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+            s.sample()
+        })
+        .await
+    }
+
+    #[tool(description = "Antivirus products Windows knows about (Security Center): name, enabled, definitions up to date, which one is active (Defender is passive when another runs), and whether G2 Boost is excluded in Defender. Read-only; G2 Boost never disables an antivirus.")]
+    async fn get_antivirus(&self) -> Result<String, String> {
+        blocking(g2boost_core::antivirus::status).await
+    }
+
     #[tool(description = "Installed games from every launcher (Steam, Epic, EA app, Riot, Battle.net, Ubisoft, GOG, \
 Rockstar, added by hand), which are running now, which have Game Mode on, and the Game Mode session in progress \
 (what was applied: power plan, priority, RAM). Read-only; the user turns Game Mode on in G2 Boost > Jogos.")]
