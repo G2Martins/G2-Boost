@@ -464,7 +464,7 @@ function Pick({
     >
       <input
         type="checkbox"
-        className="mt-0.5 accent-[hsl(var(--primary))]"
+        className="mt-0.5 accent-primary"
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
