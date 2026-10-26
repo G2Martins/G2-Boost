@@ -29,7 +29,7 @@ Tabela recolhível (`<table>` semântica, `aria-expanded` nos nós) com **Sensor
 
 ### CSV (`hwcsv.rs`)
 
-`Documentos\G2 Boost - sensores - AAAA-MM-DD HH-MM-SS.csv` (pasta conhecida `FOLDERID_Documents`, vale o OneDrive redirecionado), UTF-8 **com BOM**, `\r\n`. Português: `;` e vírgula decimal (o que o Excel em português abre com duplo clique); outros idiomas: `,` e ponto. Colunas: dispositivo, grupo, sensor, valor, mínimo, máximo, unidade (títulos no idioma da UI). Depois de gravar, o Explorer abre com o arquivo selecionado (`reveal_item_in_dir`).
+`Documentos\G2 Boost\G2 Boost - sensores - AAAA-MM-DD HH-MM-SS.csv` (pasta conhecida `FOLDERID_Documents`, vale o OneDrive redirecionado; a subpasta é criada se faltar), UTF-8 **com BOM**, `\r\n`. Português: `;` e vírgula decimal (o que o Excel em português abre com duplo clique); outros idiomas: `,` e ponto. Colunas: dispositivo, grupo, sensor, valor, mínimo, máximo, unidade (títulos no idioma da UI). Depois de gravar, o Explorer abre com o arquivo selecionado (`reveal_item_in_dir`).
 
 O pedido da UI é hostil: no máximo 5000 linhas e 7 colunas de título; células sem caracteres de controle, cortadas em 200; **fórmulas neutralizadas** (célula de texto começando por `=`, `+`, `-` ou `@` ganha um apóstrofo, e um trilho chamado `-12V` paga esse preço); aspas dobradas e célula entre aspas quando tem o separador. O nome e a pasta são do core; o arquivo é criado com `create_new` (se existir, `(2)`, `(3)`…: nunca sobrescreve).
 
