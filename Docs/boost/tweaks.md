@@ -1,8 +1,39 @@
 # PC Boost — tweaks, efeitos visuais, serviços, RAM
 
-**Última revisão:** 2026-10-22 (tarefas WinSAT/diagnóstico/feedback, Spooler) · 2026-10-18 · Código: `crates/core/src/boost.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
+**Última revisão:** 2026-10-25 (rodada 9: modelo novo, 34 ajustes de debloat e do Windows, busca/filtros/"Ver o que muda", presets só gerenciam os próprios membros, revert endurecido) · 2026-10-22 (tarefas WinSAT/diagnóstico/feedback, Spooler) · 2026-10-18 · Código: `crates/core/src/boost.rs`, `winfeature.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, `src/components/boost/tweak-kit.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
 
-> Planos de energia e Gerenciador de tarefas (abas Energia e Processos) → [power-processes.md](power-processes.md).
+> Planos de energia e Gerenciador de tarefas (abas Energia e Processos) → [power-processes.md](power-processes.md). Página Debloat (níveis, IA do Windows, apps pré-instalados) → [debloat.md](debloat.md).
+
+## Rodada 9 (2026-10-25): modelo e aba Ajustes de sistema
+
+- **Categorias:** Desempenho, Jogos, Privacidade, IA, Aparência, Rede, Sistema (`Category` no core; `category` no catálogo da UI). Remapeadas: modo de jogo, input lag, otimizações em janela, teclado, mouse, HAGS, MMCSS e `priority_sep` → Jogos. O card de ações do Painel lê a categoria do catálogo.
+- **Igualdade core × UI testada:** `catalog_matches_the_ui_and_the_dictionaries` lê `catalogs.ts` e os dois dicionários: mesmos ids, categoria, admin e beta, e nome/descrição/aviso em pt-BR e en.
+- **Disponibilidade (`gate`):** Windows 11 (`classic_context_menu`, `taskbar_left`), builds com botão Chat (`teams_chat_off`), Office instalado (`office_telemetry_off`), adaptador Wi-Fi (`wifi_power_saving_off`). Fora disso: `unavailable` + `detail = not_present`, não conta na pontuação.
+- **Serviço com alvo:** `Svc.target` = Desativado ou Manual. Nunca afrouxa: alvo Manual com o serviço já Desativado não mexe e conta como ativo; só alvo Desativado para o serviço.
+- **Tipos novos:** `PowerSetting` (AC/DC no plano ativo, reaplica o plano; backup guarda o plano alterado; sem backup grava o padrão da personalidade Equilibrado via `PowerReadAC/DCDefaultIndex`), `AccessKeys` (bit `HOTKEYACTIVE` de Aderência/Filtro/Alternância por SPI), `EmptyKey` (chave HKCU com padrão vazio; desfazer apaga a árvore só se fomos nós que criamos), `Feature` (recurso opcional pela DismApi, ver [debloat.md](debloat.md)) e DWORD por bit (`NtfsDisableLastAccessUpdate`: o 0x80000003 do próprio Windows conta como ligado).
+- **Reinício (`restart` no catálogo):** `reboot`, `signout` ou `explorer`, mostrado como selo. Depois de aplicar, `refresh` manda `WM_SETTINGCHANGE` com `TraySettings` (barra) ou `ImmersiveColorSet` (transparência) e `SPI_SETLANGTOGGLE` (Alt+Shift).
+- **"Ver o que muda":** `boost::changes(id)` deriva da própria definição (registro, serviço + tipo de início, tarefas, energia, recurso); o comando `tweak_changes` entrega à UI.
+- **Revert endurecido:** o backup JSON é gravável pelo usuário; `restore_entries` só repete entradas que uma captura nova do mesmo ajuste também produziria (mesma raiz, caminho e nome). Entrada plantada é ignorada (teste).
+- **Presets:** Padrão/Alto desempenho só ligam ou desligam membros de algum preset (`PRESET_MANAGED`); debloat, ajustes do Windows e os "Personalizado" ficam como o usuário deixou. Antes, aplicar um preset desligava tudo que não era dele.
+- **Aba Ajustes de sistema:** busca (sem acento/caixa), chips de categoria com contagem, "N de M ativos", **Aplicar recomendados** (ponto de restauração antes conforme a configuração, toast com Desfazer do lote), ícone de catálogo em todo card, "Ver o que muda" em todo card.
+
+| id | O que faz | Mecanismo | Admin | Categoria |
+|---|---|---|---|---|
+| `ntfs_last_access_off` | sem data de último acesso | HKLM `FileSystem\NtfsDisableLastAccessUpdate=0x80000001` | sim | Desempenho |
+| `storage_sense_off` | Sensor de Armazenamento off | HKCU `StoragePolicy\01=0` (ausente = já desligado) | não | Sistema |
+| `fast_startup_off` | inicialização rápida off | HKLM `Session Manager\Power\HiberbootEnabled=0` | sim | Sistema |
+| `network_throttling_off` | sem limitação de rede multimídia | HKLM `SystemProfile\NetworkThrottlingIndex=0xFFFFFFFF` | sim | Rede |
+| `wifi_power_saving_off` | Wi-Fi em desempenho máximo (AC e DC) | plano ativo `19cbb8fa…\12bbebe6…` = 0 | sim | Rede |
+| `core_parking_off` | núcleos sem estacionar (AC) | plano ativo `SUB_PROCESSOR\CPMINCORES` = 100 | sim | Desempenho |
+| `transparency_off` | sem transparência | HKCU `Personalize\EnableTransparency=0` | não | Aparência |
+| `classic_context_menu` | menu completo no clique direito | HKCU `Classes\CLSID\{86ca1aa0-…}\InprocServer32` vazio | não | Aparência |
+| `taskbar_left` | barra à esquerda | HKCU `TaskbarAl=0` | não | Aparência |
+| `notifications_off` | notificações off | HKCU `PushNotifications\ToastEnabled=0` | não | Sistema |
+| `alt_shift_off` | Alt+Shift não troca idioma | HKCU `Keyboard Layout\Toggle`: `Language Hotkey`/`Hotkey`="3" | não | Jogos |
+| `narrator_shortcut_off` | Win+Ctrl+Enter não liga o Narrador | HKCU `Narrator\NoRoam\WinEnterLaunchEnabled=0` | não | Jogos |
+| `accessibility_shortcuts_off` | atalhos de Aderência/Filtro/Alternância off | SPI, bit `HOTKEYACTIVE` | não | Jogos |
+
+Debloat e IA (`edge_background_off` … `error_reporting_off`): tabela em [debloat.md](debloat.md). **Compressão de memória ficou de fora:** só existe pelo módulo MMAgent do PowerShell (CDXML sobre uma classe WMI sem documentação própria) e não ajuda com 16 GB ou mais ([../references/debloat-sources.md](../references/debloat-sources.md)).
 
 ## Modelo
 
