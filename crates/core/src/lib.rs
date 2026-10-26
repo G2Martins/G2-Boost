@@ -75,6 +75,8 @@ pub mod hwcsv;
 pub mod hwsensors;
 
 // r9:install
+pub mod catalog;
+pub mod install;
 
 // r9:tools
 pub mod pktloss;

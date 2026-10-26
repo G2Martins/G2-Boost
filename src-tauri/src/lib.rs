@@ -42,6 +42,7 @@ mod games_cmds;
 mod hw_cmds;
 
 // r9:install mod
+mod install_cmds;
 
 // r9:tools mod
 mod tools_cmds;
@@ -2638,6 +2639,13 @@ pub fn run() {
             hw_cmds::checkup_run,
 
             // r9:install
+            install_cmds::install_catalog,
+            install_cmds::install_essentials,
+            install_cmds::install_status,
+            install_cmds::install_confirm,
+            install_cmds::install_run,
+            install_cmds::install_cancel,
+            install_cmds::install_history,
 
             // r9:tools
             tools_cmds::packetloss_run,

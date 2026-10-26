@@ -201,6 +201,65 @@ pub fn upgrades() -> Result<Vec<Package>, WingetError> {
     Ok(packages(&out, true))
 }
 
+/// One row of `winget list`: an installed app winget matched to its own catalog.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Listed {
+    /// The catalog id. A cell cut short by the console width ends in `…`.
+    pub id: String,
+    /// The name Windows shows for the app (its Uninstall entry), also possibly cut with `…`.
+    pub name: String,
+    /// Installed version; winget prefixes inexact ones with `>`, `<` or `~` (removed here).
+    pub version: String,
+    /// A newer version in the catalog, when winget shows one.
+    pub available: Option<String>,
+}
+
+/// Installed apps winget matched to its catalog (`winget list`), one entry per id. Read-only.
+pub fn list() -> Result<Vec<Listed>, WingetError> {
+    let mut args = vec!["list"];
+    args.extend_from_slice(COMMON);
+    let (_, out) = run(&args, Duration::from_secs(120))?;
+    Ok(listed(&out))
+}
+
+/// `winget list` always shows Name, Id and Version; Available and Source appear only when some row
+/// has one, and the headers are localized. So the columns are told apart by position and by what
+/// they hold: a version has a digit, a source name ("winget") does not.
+pub(crate) fn listed(raw: &[u8]) -> Vec<Listed> {
+    let mut out: Vec<Listed> = Vec::new();
+    for r in table(raw) {
+        if r.len() < 3 {
+            continue;
+        }
+        let id = r[1].trim();
+        // `…` is how winget marks a cell it had to cut; the stem before it must still look like an id.
+        if !valid_id(id.strip_suffix('…').unwrap_or(id)) {
+            continue;
+        }
+        let available = r
+            .get(3)
+            .map(|c| c.trim())
+            .filter(|c| c.chars().any(|ch| ch.is_ascii_digit()))
+            .map(str::to_string);
+        let row = Listed {
+            id: id.to_string(),
+            name: r[0].trim().to_string(),
+            version: r[2].trim().trim_start_matches(['>', '<', '~', ' ']).to_string(),
+            available,
+        };
+        // The same package can be listed more than once (one row per installed architecture).
+        match out.iter_mut().find(|o| o.id.eq_ignore_ascii_case(&row.id)) {
+            Some(o) => {
+                if o.available.is_none() {
+                    o.available = row.available;
+                }
+            }
+            None => out.push(row),
+        }
+    }
+    out
+}
+
 /// The one catalog package with exactly this id (the preview before installing).
 pub fn exact(id: &str) -> Result<Package, WingetError> {
     if !valid_id(id) {
@@ -285,6 +344,93 @@ GitHub CLI      GitHub.cli          2.101.0      2.102.0\r\n\
         // Older builds: OEM code page (CP850 "ã" = 0xC6) still decodes to one character.
         assert_eq!(decode(b"Vers\xC6o").chars().count(), 6);
         assert!(table(b"----------\r\nx").is_empty(), "no header");
+    }
+
+    /// A table laid out the way winget does it: the header, a dash line, then the rows, each column
+    /// padded to its widest cell (counted in characters). Short rows leave the last cells empty.
+    fn grid(rows: &[&[&str]]) -> Vec<u8> {
+        let width: Vec<usize> = (0..rows[0].len())
+            .map(|c| rows.iter().map(|r| r.get(c).map_or(0, |s| s.chars().count())).max().unwrap_or(0) + 3)
+            .collect();
+        let line = |r: &[&str]| {
+            let s: String = r.iter().enumerate().map(|(c, s)| format!("{s:<w$}", w = width[c])).collect();
+            format!("{}\r\n", s.trim_end())
+        };
+        let mut out = line(rows[0]);
+        out.push_str(&format!("{}\r\n", "-".repeat(width.iter().sum::<usize>() - 3)));
+        for r in &rows[1..] {
+            out.push_str(&line(r));
+        }
+        out.into_bytes()
+    }
+
+    #[test]
+    fn list_reads_the_pt_br_table_with_an_available_column() {
+        // Shape of this PC's real `winget list --source winget` (winget 1.29, pt-BR): no Source
+        // column, Available only on the rows with an update, repeated rows, "> " on inexact versions.
+        let raw = grid(&[
+            &["Nome", "ID", "Versão", "Disponível"],
+            &["Claude", "Anthropic.Claude", "3.6556.2.0"],
+            &["DirectX", "Microsoft.DirectX", "9.29.1974.0"],
+            &["DirectX", "Microsoft.DirectX", "9.29.1974.0"],
+            &["WindowsAppRuntime.1.8", "Microsoft.WindowsAppRuntime.1.8", "> 1.8.10"],
+            &["Git", "Git.Git", "2.56.0.2", "2.56.0.3"],
+            &["WinRAR 7.23 (64-bit)", "RARLab.WinRAR", "7.23.0"],
+        ]);
+        let l = listed(&raw);
+        let ids: Vec<&str> = l.iter().map(|r| r.id.as_str()).collect();
+        assert_eq!(ids, ["Anthropic.Claude", "Microsoft.DirectX", "Microsoft.WindowsAppRuntime.1.8", "Git.Git", "RARLab.WinRAR"]);
+        assert_eq!(l[0], Listed { id: "Anthropic.Claude".into(), name: "Claude".into(), version: "3.6556.2.0".into(), available: None });
+        assert_eq!(l[2].version, "1.8.10", "the inexact-version marker is dropped");
+        assert_eq!((l[3].version.as_str(), l[3].available.as_deref()), ("2.56.0.2", Some("2.56.0.3")));
+        assert_eq!(l[4].name, "WinRAR 7.23 (64-bit)");
+    }
+
+    #[test]
+    fn list_tells_available_from_source_by_content_in_any_language() {
+        // 4 columns, the last one is Source (nothing to update): its value has no digit.
+        let with_source = grid(&[
+            &["Name", "Id", "Version", "Source"],
+            &["Git", "Git.Git", "2.56.0.2", "winget"],
+            &["Steam", "Valve.Steam", "2.10", "winget"],
+        ]);
+        assert!(listed(&with_source).iter().all(|r| r.available.is_none()));
+        // 3 columns: nothing to update, no source column.
+        let plain = grid(&[&["Name", "Id", "Version"], &["Git", "Git.Git", "2.56.0.2"]]);
+        assert_eq!(listed(&plain).len(), 1);
+        // 5 columns in German and French: Available is cell 3 and Source cell 4, empty cells allowed.
+        for head in [["Name", "ID", "Version", "Verfügbar", "Quelle"], ["Nom", "ID", "Version", "Disponible", "Source"]] {
+            let raw = grid(&[
+                &head,
+                &["Git", "Git.Git", "2.56.0.2", "2.56.0.3", "winget"],
+                &["Steam", "Valve.Steam", "2.10", "", "winget"],
+                &["Discord", "Discord.Discord", "1.0.9", "", ""],
+            ]);
+            let l = listed(&raw);
+            assert_eq!(l.iter().map(|r| r.available.as_deref()).collect::<Vec<_>>(), [Some("2.56.0.3"), None, None], "{head:?}");
+            assert_eq!(l[2].version, "1.0.9");
+        }
+    }
+
+    #[test]
+    fn list_survives_noise_cut_cells_and_hostile_rows() {
+        let mut raw = b"   - \r   \\ \rFailed when searching source; results will not be included: msstore\r\n".to_vec();
+        raw.extend(grid(&[
+            &["Name", "Id", "Version"],
+            &["Visual Studio Code Insid…", "Microsoft.VisualStudioCode.Insid…", "1.99.0"],
+            &["bad", "evil id; calc", "1.0"],
+            &["bad", "-rf", "1.0"],
+            &["bad", ".hidden", "1.0"],
+            &["bad", "…", "1.0"],
+            &["bad", "x", "1.0"],
+            &["fine", "Good.App", ""],
+        ]));
+        raw.extend_from_slice(b"\r\n3 packages installed.\r\n");
+        let l = listed(&raw);
+        assert_eq!(l.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), ["Microsoft.VisualStudioCode.Insid…", "Good.App"]);
+        assert_eq!(l[1].version, "");
+        assert!(listed(b"").is_empty() && listed(b"No installed package found.\r\n").is_empty());
+        assert!(listed(&grid(&[&["Name", "Id", "Version"]])).is_empty(), "a header with no rows");
     }
 
     /// Talks to the real winget: run by hand (`cargo test -- --ignored winget`).

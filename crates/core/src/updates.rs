@@ -104,11 +104,12 @@ fn token_ids(kind: &str, ids: &[String]) -> Vec<String> {
     ids.iter().map(|i| format!("updates:{kind}:{i}")).collect()
 }
 
-/// Held while a batch/search/install runs; released on drop (also on panic).
-struct Busy(&'static AtomicBool);
+/// Held while a batch/search/install runs; released on drop (also on panic). The Instalar tab's
+/// batch takes the same flag as "update all": winget runs one install at a time.
+pub(crate) struct Busy(&'static AtomicBool);
 
 impl Busy {
-    fn take(flag: &'static AtomicBool) -> Result<Self, UpdatesError> {
+    pub(crate) fn take(flag: &'static AtomicBool) -> Result<Self, UpdatesError> {
         if flag.swap(true, Ordering::SeqCst) { Err(UpdatesError::Busy) } else { Ok(Self(flag)) }
     }
 }
@@ -138,7 +139,7 @@ pub struct AppUpdate {
 }
 
 static APPS_LAST: Mutex<Vec<AppUpdate>> = Mutex::new(Vec::new());
-static APPS_BUSY: AtomicBool = AtomicBool::new(false);
+pub(crate) static APPS_BUSY: AtomicBool = AtomicBool::new(false);
 static APPS_CANCEL: AtomicBool = AtomicBool::new(false);
 
 const MAX_EXCLUDED: usize = 300;
@@ -818,15 +819,19 @@ fn history_file() -> std::path::PathBuf {
 
 /// Runs of both kinds, oldest first. The file is hostile: bounded, re-validated field by field.
 pub fn history() -> Vec<Batch> {
-    let f = history_file();
-    if std::fs::metadata(&f).map_or(true, |m| m.len() > 2 << 20) {
+    read_history(&history_file(), &["apps", "windows"])
+}
+
+/// The runs of the given `kinds` recorded in `f`, oldest first (also the Instalar tab's history).
+pub(crate) fn read_history(f: &std::path::Path, kinds: &[&str]) -> Vec<Batch> {
+    if std::fs::metadata(f).map_or(true, |m| m.len() > 2 << 20) {
         return Vec::new();
     }
-    let all: Vec<Batch> = std::fs::read_to_string(&f).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let all: Vec<Batch> = std::fs::read_to_string(f).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     let skip = all.len().saturating_sub(HISTORY_MAX);
     all.into_iter()
         .skip(skip)
-        .filter(|b| matches!(b.kind.as_str(), "apps" | "windows"))
+        .filter(|b| kinds.contains(&b.kind.as_str()))
         .map(|b| Batch {
             items: b
                 .items
@@ -846,13 +851,17 @@ pub fn history() -> Vec<Batch> {
 }
 
 fn record(b: &Batch) {
-    let mut all = history();
+    append_history(&history_file(), &["apps", "windows"], b);
+}
+
+/// Add `b` to the runs in `f` (keeping only the last `HISTORY_MAX` of the given `kinds`).
+pub(crate) fn append_history(f: &std::path::Path, kinds: &[&str], b: &Batch) {
+    let mut all = read_history(f, kinds);
     all.push(b.clone());
     let n = all.len();
     if n > HISTORY_MAX {
         all.drain(..n - HISTORY_MAX);
     }
-    let f = history_file();
     if let Some(d) = f.parent() {
         let _ = std::fs::create_dir_all(d);
     }

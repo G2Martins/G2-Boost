@@ -228,7 +228,7 @@ const counts = (b: UpdateBatch) => ({
 });
 
 /** Thin rail: determinate when a percentage is known, a sweep otherwise. */
-function Rail({ percent }: { percent: number | null }) {
+export function Rail({ percent }: { percent: number | null }) {
   return (
     <span
       className="relative block h-1 flex-1 overflow-hidden rounded-full bg-border"

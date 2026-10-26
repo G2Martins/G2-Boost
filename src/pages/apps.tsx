@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { InstallTab } from "@/components/apps/install-tab";
 import { UpdatesTab } from "@/components/apps/updates-tab";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
@@ -64,16 +65,21 @@ const SWEEP_ID = "sweep:unowned";
 export function AppsPage() {
   const { t } = useI18n();
   const [autoScan, setAutoScan] = useState(() => takeOpenOrphans());
-  // Dev aid: G2BOOST_START_TAB=orphans (or `unowned`, which also starts the every-drive sweep),
-  // `updates` for the Updates tab.
-  const [tab, setTab] = useState(
+  const [drop, setDrop] = useState<string | null>(() => takeDrop());
+  // An installed app handed over by the Install tab: the Installed tab selects it.
+  const [focus, setFocus] = useState<string | null>(null);
+  // Tab on arrival: the SmartDelete banner opens the leftovers sweep and a dropped .exe the
+  // Installed tab; otherwise the first tab. Dev aid: G2BOOST_START_TAB=install, installed,
+  // orphans (or `unowned`, which also starts the every-drive sweep) or updates.
+  const [tab, setTab] = useState(() =>
     autoScan || boot.startTab === "orphans" || boot.startTab === "unowned"
       ? "orphans"
-      : boot.startTab === "updates"
-        ? "updates"
-        : "installed",
+      : drop || boot.startTab === "installed"
+        ? "installed"
+        : boot.startTab === "updates"
+          ? "updates"
+          : "install",
   );
-  const [drop, setDrop] = useState<string | null>(() => takeDrop());
   useEffect(
     () =>
       onDrop((p) => {
@@ -98,10 +104,22 @@ export function AppsPage() {
       tabs={
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
+            <TabsTrigger value="install">{t("install.tab")}</TabsTrigger>
             <TabsTrigger value="installed">{t("apps.tab.installed")}</TabsTrigger>
             <TabsTrigger value="orphans">{t("apps.tab.orphans")}</TabsTrigger>
             <TabsTrigger value="updates">{t("updates.tab")}</TabsTrigger>
           </TabsList>
+          <TabsContent value="install">
+            <PageBody className="px-0 pb-0">
+              <InstallTab
+                onUninstall={(id) => {
+                  setFocus(id);
+                  setTab("installed");
+                }}
+                onOpenUpdates={() => setTab("updates")}
+              />
+            </PageBody>
+          </TabsContent>
           <TabsContent value="installed">
             <PageBody className="px-0 pb-0">
               <LuliCard
@@ -110,7 +128,12 @@ export function AppsPage() {
                   { label: "luli.ask.apps.heavy", data: ["apps"] },
                 ]}
               />
-              <InstalledTab drop={drop} onDropHandled={() => setDrop(null)} />
+              <InstalledTab
+                drop={drop}
+                onDropHandled={() => setDrop(null)}
+                focus={focus}
+                onFocusHandled={() => setFocus(null)}
+              />
             </PageBody>
           </TabsContent>
           <TabsContent value="orphans">
@@ -166,7 +189,17 @@ function fmtDate(d: string | null, locale: string) {
   return date.toLocaleDateString(locale === "en" ? "en-US" : "pt-BR");
 }
 
-function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHandled: () => void }) {
+function InstalledTab({
+  drop,
+  onDropHandled,
+  focus,
+  onFocusHandled,
+}: {
+  drop: string | null;
+  onDropHandled: () => void;
+  focus: string | null;
+  onFocusHandled: () => void;
+}) {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
   const [apps, setApps] = useState<AppEntry[] | null>(null);
@@ -203,6 +236,16 @@ function InstalledTab({ drop, onDropHandled }: { drop: string | null; onDropHand
       onDropHandled();
     });
   }, [drop, apps, onDropHandled, t]);
+
+  // An app picked in the Install tab: select it once the list is loaded.
+  useEffect(() => {
+    if (!focus || !apps) return;
+    if (apps.some((a) => a.id === focus)) {
+      setSelected(focus);
+      setMsg(null);
+    } else setMsg(t("apps.error.stale"));
+    onFocusHandled();
+  }, [focus, apps, onFocusHandled, t]);
 
   // After starting an uninstaller: poll until its Uninstall entry is gone, then re-check leftovers.
   useEffect(() => {
