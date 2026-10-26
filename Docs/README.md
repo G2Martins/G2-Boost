@@ -36,7 +36,7 @@ comportamento.
 | [boost/routines.md](./boost/routines.md) | Iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja, configurações validadas. |
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [cleanup/system-files.md](./cleanup/system-files.md) | Arquivos do sistema pelos handlers da Limpeza de Disco do Windows (WinSxS, Windows.old, drivers antigos, logs), allowlist e defesa contra handler plantado. |
-| [core/maintenance.md](./core/maintenance.md) | Manutenção: DISM pela DismApi (verificar/reparar imagem), SFC e MRT pela exceção da §1.3, parsers do CBS.log/mrt.log, passos de verificação elevada. |
+| [core/maintenance.md](./core/maintenance.md) | Manutenção: DISM pela DismApi (verificar/reparar imagem), SFC e MRT pela exceção da §1.3, parsers do CBS.log/mrt.log, revisão semanal e reparo completo numa vaga só, consertos rápidos (Windows Update, impressora, áudio), passos de verificação elevada. |
 | [core/updates.md](./core/updates.md) | Atualizações: apps pelo winget (um pacote validado por vez, nunca `--all`; seleção, exclusões, token amarrado à lista, cancelar, histórico) e Windows Update pela API do Windows (procurar sem admin, instalar com admin, histórico, reiniciar só com confirmação). |
 | [core/install-apps.md](./core/install-apps.md) | Apps › Instalar: catálogo curado de 166 apps do winget (allowlist, ids conferidos na fonte oficial), o que já está instalado (`winget list` + registro, ícones reais), lote em ordem com token amarrado à lista, parar entre pacotes, histórico, desinstalação pelo fluxo nativo e o preset de essenciais para o assistente pós-formatação. |
 | [disk/analyzer.md](./disk/analyzer.md) | Varredura, treemap, filtros (`*.mp4 >1gb >6m`), mostrar na pasta, Lixeira com guarda, essenciais grandes. |
@@ -53,6 +53,7 @@ comportamento.
 | [release/distribution-and-trust.md](./release/distribution-and-trust.md) | Assinatura de código e SmartScreen/Smart App Control, Tauri (signCommand, updater), Store e winget, falso positivo de antivírus, teste em máquina limpa, checklist até a v1, **estado atual e como instalar em outro PC**. |
 | [security/kernel-driver-options.md](./security/kernel-driver-options.md) | Sensores de CPU sem driver próprio: v1 lê HWiNFO/LibreHardwareMonitor (feito), v2 PawnIO opt-in, v3 driver KMDF só leitura; WinRing0 proibido. |
 | [security/exposure-audit.md](./security/exposure-audit.md) | Segurança › Exposição: RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall, portas abertas no roteador (UPnP), apps de acesso remoto, escutas e conexões de entrada, sessões, tarefas/serviços sem assinatura; correções com backup e desfazer; monitor no laço de rotinas. Não é antivírus. |
+| [security/antivirus.md](./security/antivirus.md) | Segurança › Antivírus: produtos da Central de Segurança, liberação do próprio exe no Defender (só em Program Files fechado a usuários, com leitura de volta e desfazer), guias por fabricante, aviso do SmartScreen. Nunca enfraquece o antivírus. |
 | [security/kaspersky-false-positive.md](./security/kaspersky-false-positive.md) | Por que antivírus marcaram os scripts antigos e como o app evita os mesmos padrões. |
 
 ## references/ — Pesquisa

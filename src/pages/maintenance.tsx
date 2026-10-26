@@ -11,8 +11,10 @@ import {
 import { useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { BootOptionsCard, DriveTools } from "@/components/maintenance/drive-tools";
+import { Inside, QuickFixes, SectionRule } from "@/components/maintenance/quick-fixes";
+import { codeKey, elapsed, hex, WeeklyReview } from "@/components/maintenance/weekly-review";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
-import { Badge, Button, Card, CardTitle, EmptyState, HelpHint } from "@/components/ui/primitives";
+import { Badge, Button, Card, CardTitle, EmptyState } from "@/components/ui/primitives";
 import {
   backend,
   inTauri,
@@ -55,22 +57,6 @@ const TONE: Record<RepairVerdict, "success" | "warning" | "danger" | "neutral"> 
   unknown: "neutral",
 };
 
-/** Codes worth a sentence of their own; anything else shows the raw code. */
-function codeKey(code: number): I18nKey | null {
-  if (code === 1460) return "maintenance.code.timeout";
-  if ([0x800f081f, 0x800f0906, 0x800f0907, 0x800f0950].includes(code))
-    return "maintenance.code.source";
-  if (code === 0x800f082f) return "maintenance.code.pending";
-  return null;
-}
-
-const hex = (code: number) => `0x${code.toString(16).toUpperCase().padStart(8, "0")}`;
-
-function elapsed(ms: number) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
 export function MaintenancePage() {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
@@ -89,15 +75,21 @@ export function MaintenancePage() {
   const [, tick] = useState(0);
   /** A disk check / optimize holds the same servicing slot. */
   const [volBusy, setVolBusy] = useState(false);
+  /** So does the weekly review / full repair (its steps show in its own card). */
+  const [planBusy, setPlanBusy] = useState(false);
+  const reloadHistory = () => {
+    backend.repairHistory().then((h) => h && setHistory(h));
+  };
 
   useEffect(() => {
     backend.appInfo().then((i) => i && setElevated(i.elevated));
     backend.repairHistory().then((h) => h && setHistory(h));
-    backend.repairStatus().then((s) => {
+    Promise.all([backend.repairStatus(), backend.maintPlanStatus()]).then(([s, plan]) => {
       if (!s) return;
       setStatus(s);
-      // Came back to the page mid-run: keep showing it (start time unknown → from now).
-      if (s.running)
+      // Came back to the page mid-run: keep showing it (start time unknown → from now). A step
+      // of the weekly review is shown by its own card, not here.
+      if (s.running && !plan)
         setRun({ tool: s.running, percent: s.percent, since: Date.now(), adopted: true });
     });
     let off: (() => void) | null = null;
@@ -174,7 +166,7 @@ export function MaintenancePage() {
     return null;
   };
 
-  const blocked = !inTauri || !elevated || run !== null || volBusy;
+  const blocked = !inTauri || !elevated || run !== null || volBusy || planBusy;
   const mrtMissing = status !== null && !status.mrt_present;
 
   return (
@@ -195,30 +187,17 @@ export function MaintenancePage() {
           </Card>
         ) : null}
 
-        {/* The recommended order as a rail: each step feeds the next. */}
-        <Card className="animate-rise py-4" style={rise(1)}>
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {t("maintenance.order.title")}
-            <HelpHint text={t("maintenance.order.hint")} />
-          </div>
-          <ol className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-            {[1, 2, 3].map((n) => (
-              <li key={n} className="relative flex items-center gap-3">
-                <span className="num flex size-7 shrink-0 items-center justify-center rounded-full font-display text-[13px] font-semibold ring-1 ring-border-strong ring-inset">
-                  {n}
-                </span>
-                <span className="text-[13px]">{t(`maintenance.order.${n}` as I18nKey)}</span>
-                {n < 3 ? (
-                  <span
-                    aria-hidden
-                    className="ml-auto hidden h-px flex-1 bg-linear-to-r from-border-strong to-transparent md:block"
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </Card>
+        <WeeklyReview
+          elevated={elevated}
+          blocked={!inTauri || !elevated || run !== null || volBusy}
+          index={1}
+          onRunning={setPlanBusy}
+          onFinished={reloadHistory}
+        />
 
+        <QuickFixes elevated={elevated} servicing={run !== null || volBusy || planBusy} index={2} />
+
+        <SectionRule title={t("maint3.section.tools")} help={t("maintenance.order.hint")} />
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {CARDS.map((c, i) => {
             const prev = last(c.tools);
@@ -233,7 +212,7 @@ export function MaintenancePage() {
                   "panel-hover animate-rise flex flex-col gap-3",
                   mine && "border-primary/40",
                 )}
-                style={rise(i + 2)}
+                style={rise(i + 5)}
               >
                 <div className="flex items-start gap-3">
                   <span className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/5 text-muted-foreground ring-1 ring-foreground/10 ring-inset">
@@ -264,6 +243,7 @@ export function MaintenancePage() {
                   </div>
                 </div>
 
+                <Inside text={t(`maint3.inside.${c.key}` as I18nKey)} />
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                   {c.tools.map((tool) => (
                     <span key={tool} className="inline-flex items-center gap-1.5">
@@ -363,13 +343,13 @@ export function MaintenancePage() {
 
         <DriveTools
           elevated={elevated}
-          repairRunning={run !== null}
+          repairRunning={run !== null || planBusy}
           onRunning={setVolBusy}
-          index={CARDS.length + 2}
+          index={CARDS.length + 5}
         />
-        <BootOptionsCard elevated={elevated} index={CARDS.length + 4} />
+        <BootOptionsCard elevated={elevated} index={CARDS.length + 7} />
 
-        <Card className="animate-rise" style={rise(CARDS.length + 5)}>
+        <Card className="animate-rise" style={rise(CARDS.length + 8)}>
           <CardTitle>
             <History className="size-4" />
             {t("maintenance.history")}

@@ -241,7 +241,8 @@ fn win(e: windows::core::Error) -> ExposureError {
 }
 
 /// One line, no control characters, bounded (system and router strings are hostile).
-fn clean(s: &str) -> String {
+/// Names from the PC, the router or a product are data: no control characters, ≤ 160 chars.
+pub(crate) fn clean(s: &str) -> String {
     s.chars().filter(|c| !c.is_control()).take(160).collect::<String>().trim().to_string()
 }
 

@@ -70,6 +70,9 @@ pub mod debloat;
 pub mod winfeature;
 
 // r9:maint
+pub mod antivirus;
+pub mod svc;
+pub mod troubleshoot;
 
 // r9:hw
 pub mod checkup;

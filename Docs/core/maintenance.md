@@ -1,6 +1,6 @@
 # Manutenção — verificar e reparar o Windows (DISM, SFC, MRT, disco, unidades, opções de inicialização)
 
-**Última revisão:** 2026-10-23 (Manutenção+: verificar disco, otimizar unidades, reiniciar nas opções avançadas) · 2026-10-22 · Código: `crates/core/src/repair.rs`, `volumes.rs`, `firmware.rs` (`reboot_to_boot_options`) · Shell: `repair_run(tool)`, `repair_cancel`, `repair_status`, `repair_history`, evento `maintenance:progress {tool, percent}`; `volumes_list`, `volumes_run(op, volume)`, `volumes_status`, `volumes_history`, evento `maintenance:volume-progress {op, volume, percent}`; `boot_options_reboot` · UI: página **Manutenção** (rota `maintenance`, ícone `Wrench`, logo depois de Limpeza) em `src/pages/maintenance.tsx` + `src/components/maintenance/drive-tools.tsx` · MCP: `get_maintenance_status`, `get_volumes` (só leitura) · Limpeza de arquivos do sistema (mesma vaga de execução): [../cleanup/system-files.md](../cleanup/system-files.md).
+**Última revisão:** 2026-10-25 (rodada 9: revisão semanal, reparo completo, consertos rápidos de Windows Update, impressora e áudio) · 2026-10-23 (Manutenção+: verificar disco, otimizar unidades, reiniciar nas opções avançadas) · 2026-10-22 · Código: `crates/core/src/repair.rs`, `volumes.rs`, `firmware.rs` (`reboot_to_boot_options`) · Shell: `repair_run(tool)`, `repair_cancel`, `repair_status`, `repair_history`, evento `maintenance:progress {tool, percent}`; `volumes_list`, `volumes_run(op, volume)`, `volumes_status`, `volumes_history`, evento `maintenance:volume-progress {op, volume, percent}`; `boot_options_reboot` · UI: página **Manutenção** (rota `maintenance`, ícone `Wrench`, logo depois de Limpeza) em `src/pages/maintenance.tsx` + `src/components/maintenance/drive-tools.tsx` · MCP: `get_maintenance_status`, `get_volumes` (só leitura) · Limpeza de arquivos do sistema (mesma vaga de execução): [../cleanup/system-files.md](../cleanup/system-files.md).
 
 ## Ferramentas
 
@@ -11,7 +11,35 @@
 | `sfc` | Verificar arquivos do sistema | `%windir%\System32\sfc.exe /scannow` | 10 a 20 min | 90 min |
 | `mrt_quick` / `mrt_full` | Verificação de malware (complementar, **não é antivírus**, dito na tela) | `%windir%\System32\MRT.exe /Q` (`/F` na completa) | 3 a 10 min / 30 min a horas | 90 min / 8 h |
 
-Ordem recomendada na tela: verificar imagem → reparar se precisar → verificar arquivos (o SFC copia as peças boas da imagem; imagem danificada primeiro).
+Ordem recomendada na tela: verificar imagem → reparar se precisar → verificar arquivos (o SFC copia as peças boas da imagem; imagem danificada primeiro). Cada cartão mostra "Por dentro" (a chamada real, ex.: `DismCheckImageHealth` = `DISM /ScanHealth`) e o tempo honesto.
+
+## Revisão semanal e reparo completo (rodada 9, `repair::run_plan`)
+
+Shell: `maint_plan_run(plan, label)`, `maint_plan_status`, `maint_plan_history`, evento `maintenance:plan-progress {plan, step, index, total, percent, done}`; Parar = `repair_cancel`. UI: `src/components/maintenance/weekly-review.tsx` (cartão herói da página, o único CTA `tactile`).
+
+| `plan` | Passos (fixos no core, `plan_steps`) | Tempo mostrado |
+|---|---|---|
+| `weekly` | ponto de restauração (`restore::create`, rótulo vindo da UI sem caracteres de controle, ≤ 120) → verificação online do disco do Windows (`volumes::run_held(Scan)`) → SFC → DISM scan | 20 a 45 min |
+| `full_repair` | DISM RestoreHealth → SFC | 20 a 50 min |
+
+- **Uma vaga só**: o plano pega `repair::exclusive()` uma vez e roda cada ferramenta por dentro (`run_in_slot` / `volumes::run_held`), então nada começa no meio. Cada ferramenta continua indo para o próprio histórico (`repair-history.json`, `volume-history.json`); o plano vai para `review-history.json` (últimos 20).
+- **Estado por passo** (`StepState`): `ok`, `attention` (imagem reparável, arquivos sem reparo, erros no disco, Proteção do Sistema desligada), `failed`, `skipped` (ponto de restauração recusado pelo limite do Windows de 1 por 24 h = `throttled`, disco sem verificação online = `unsupported`), `cancelled` (o passo em curso para e os seguintes ficam cancelados).
+- **Nunca um reparo longo sozinho**: a revisão semanal só verifica. `offer_repair` (imagem `repairable` ou SFC `non_repairable`) faz a UI oferecer o reparo completo com confirmação em modal.
+- `PlanRunning.done` leva os passos já terminados, para a tela mostrar o veredito de cada um enquanto o resto roda; ao reabrir a página no meio, `maint_plan_status` adota a execução (e o cartão de SFC/DISM não a duplica).
+
+## Consertos rápidos (rodada 9, `troubleshoot.rs` + `svc.rs`)
+
+Shell: `maint_fix_run(fix)`, `maint_fix_history`, `maint_print_status`. UI: `src/components/maintenance/quick-fixes.tsx`. Admin (`needs_admin`), um por vez (`busy`), cada passo reportado (`Step {action, target, ok, code, note, jobs}`), histórico em `fixes-history.json` (últimos 50; só nomes de serviço, pasta e impressora). Nada do chamador vira nome ou caminho: só o enum `Fix` (desconhecido = recusado pelo serde).
+
+| `fix` | O que faz | Por quê assim |
+|---|---|---|
+| `wu_reset` | Para `wuauserv`, `bits`, `cryptsvc` (dependentes ativos primeiro), renomeia `%windir%\SoftwareDistribution` e `%windir%\System32\catroot2` para `<nome>.bak-<aaaammdd-hhmm>` com `MoveFileExW` sem flags, liga os serviços de novo | Pega a vaga de manutenção (o RestoreHealth baixa pelo Windows Update). **Nunca apaga**: pasta ausente = nada a fazer; reparse point, arquivo no lugar da pasta ou `.bak` com o mesmo horário = recusado. Renomeia só se todos os serviços pararam. Caminhos da API (`GetWindowsDirectoryW`/`GetSystemDirectoryW`), nunca do ambiente |
+| `print_queue` | Esvazia cada fila **local** (`EnumPrintersW(PRINTER_ENUM_LOCAL, 2)` + `OpenPrinterW(PRINTER_ACCESS_ADMINISTER)` + `SetPrinterW(PRINTER_CONTROL_PURGE)`); se em 5 s ainda há trabalhos (ou o spooler não respondeu), reinicia o `Spooler` e esvazia de novo | Nunca mexe em `System32\spool`. Impressoras de rede (conexões) ficam de fora: o purge apagaria trabalhos de outras pessoas no servidor. Spooler **desativado** (pelo usuário ou pelo ajuste `svc_spooler`) = `spooler_disabled`, não religa; parado = liga |
+| `audio` | Reinicia `Audiosrv` e `AudioEndpointBuilder` e o que roda em cima deles | Ordem de parada pelo SCM (`EnumDependentServicesW(SERVICE_ACTIVE)`) |
+
+- **Serviços** (`svc.rs`, cópia própria dos helpers do `boost.rs`, que são privados e donos dos backups dos ajustes): `query` (desativado/rodando), `active_dependents`, `stop`/`start` com prazo de 30 s (1053 = não respondeu; parou logo depois de iniciar = 1067). `stop_order` (pura) põe os dependentes antes de cada alvo, cada serviço uma vez. Religar = ordem inversa: todo alvo (mesmo o que estava parado, que costuma ser o problema) e todo dependente que paramos; serviço **desativado** fica desligado.
+- **Antivírus**: parar `wuauserv`/`bits` é um dos padrões que o System Watcher pontuou nos scripts antigos ([kaspersky-false-positive.md](../security/kaspersky-false-positive.md)). Aqui é API do SCM, por clique, com o app já elevado, e os serviços voltam ao fim; mesmo assim, o primeiro teste com o Kaspersky ativo fica para o dono.
+- **Limite conhecido**: o reset não sabe se uma instalação do Windows Update (página Atualizações) está em curso; a confirmação pede para não usar durante uma. Próximo passo: expor `updates::wu_busy()` e recusar com `busy`.
 
 ## DISM pela `DismApi.dll` (sem `DISM.exe`)
 
@@ -71,6 +99,9 @@ Nada aqui repete a cadeia que o System Watcher pontuou nos scripts antigos ([kas
 - `parse_mrt`: formato real do `mrt.log` desta máquina (2026-10-14) + bloco infectado fabricado; só o último bloco conta; nomes sem caminho; deduplicado.
 - `Tool` desconhecido recusado pelo serde; caminhos do System32/Windows vêm da API; sem admin = `needs_admin`; vaga única (segunda tarefa recusada).
 - `dism_api_initialises` (`#[ignore]`, **elevado**): carrega e inicializa a DismApi.
+- Rodada 9: `plan_steps` (ordem fixa; RestoreHealth nunca na semanal), `tool_state`/`drive_state`, `offer_repair`, veredito em texto, histórico antigo sem contagens carrega, sem admin = `needs_admin`; `#[ignore]` `live_weekly_review_elevated` (`G2BOOST_LIVE_ACTIONS=1`).
+- `svc.rs`: `stop_order` com o formato real desta máquina (Audiosrv sobre AudioEndpointBuilder, dependente de terceiro, caixa diferente, `cryptsvc` com AppIDSvc); `query` sem admin; parar sem admin = 5.
+- `troubleshoot.rs`: `stamp`/`aside_path`; sandbox real: renomeia sem apagar, `.bak` existente não é sobrescrito, pasta ausente, arquivo no lugar, **junção NTFS** recusada (alvo intacto); `Fix` desconhecido recusado; sem admin = `needs_admin`; `print_status` sem admin. `#[ignore]` `live_fixes_elevated` (`G2BOOST_LIVE_ACTIONS=1`; o reset do Windows Update só com `G2BOOST_LIVE_WU=1`).
 
 ## Verificação elevada
 
@@ -83,3 +114,4 @@ Não rodado pelo agente (exige UAC). Com o binário de teste já compilado (`car
 5. Com o Kaspersky ativo: nenhuma detecção durante SFC/MRT/DISM/limpeza.
 6. **Disco (2026-10-23)**, app elevado, página Manutenção: "Verificar" em C: (barra; resultado `Sem erros` ou contagem; conferir se veio progresso em % ou só indeterminado), "Analisar" em D: (fragmentação no resultado), "Otimizar (TRIM)" em C: ou G: (`Concluído`), "Parar" no meio de uma análise (`Parado`, slot liberado: DISM volta a começar), conferir `volume-history.json` e `prompted: false`. Se um dia aparecer "Corrigir erros", rodar em unidade de dados e anotar se o provedor perguntou algo (`prompted`).
 7. **Reiniciar nas opções avançadas**: fica para o dono testar à mão (reinicia o PC; voltar com "Continuar").
+8. **Rodada 9 (2026-10-25, não rodado elevado pelo agente)**: "Fazer a revisão" até o fim (ponto criado ou `throttled`, C: verificado, SFC, DISM scan; Parar no meio = passos seguintes `cancelled`, vaga liberada); "Reparo completo" com internet; consertos rápidos: áudio (som volta), impressora com um trabalho preso, reset do Windows Update (conferir `SoftwareDistribution.bak-*` e `catroot2.bak-*`, serviços ligados de novo, uma busca de atualizações funcionando). Tudo com o Kaspersky ativo, anotando qualquer alerta do System Watcher.
