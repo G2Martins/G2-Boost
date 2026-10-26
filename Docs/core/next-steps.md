@@ -40,7 +40,9 @@ Decisões do dono: tudo, inclusive o overlay; antivírus = detectar qual está a
 | Tela antes do UAC | "Sempre abrir como administrador" mostra a explicação do G2 Boost e só então pede o UAC; recusar abre em modo limitado | ✅ |
 | Release | v0.9.0: instalador NSIS (por máquina) + MSI pt-BR/en + zip portátil + SHA256, WebView2 embutido, README com FAQ | ✅ |
 
-**Pendente do dono (precisa de admin ou de hardware):** Preparar e jogar elevado, overlay com FPS real num jogo, Debloat/IA do Windows/recurso Recall e apps de brinde elevados, revisão semanal e consertos rápidos, exclusão no Defender (instalação por máquina), um `bun run release` testado com o Kaspersky ativo. Antes de o Kaspersky reagir a gravações em `Policies` ou à parada de `wuauserv`, registrar em [../security/kaspersky-false-positive.md](../security/kaspersky-false-positive.md).
+**Verificado na máquina do dono (2026-10-25/26, elevado):** ida e volta dos 33 ajustes da rodada 9 (2 bugs achados e corrigidos na 0.9.1: chave do Widgets protegida pelo UCPD, núcleos mínimos com faixa 0..0), revisão semanal completa (DISM = reparável), Preparar e jogar abre o programa sem admin, overlay conta FPS (Edge = 120 FPS em 120 Hz; bug de horário do ETW corrigido na 0.9.2), áudio + impressora + redefinir Windows Update + apagar backups, instalar/abrir/desinstalar NSIS e MSI, tela antes do UAC, 3 ferramentas MCP novas por JSON-RPC.
+
+**Pendente do dono:** remover o componente Recall de verdade (pede reinício), apps de brinde removidos de verdade, exclusão no Defender numa máquina sem outro antivírus, FPS num jogo real. Antes de o Kaspersky reagir a gravações em `Policies` ou à parada de `wuauserv`, registrar em [../security/kaspersky-false-positive.md](../security/kaspersky-false-positive.md).
 
 ## Rodada 8 (2026-10-23, pedido do dono: "winget upgrade --all", cheatsheet de comandos, ponytail, sempre admin)
 
