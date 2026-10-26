@@ -1210,7 +1210,7 @@ dependencies = [
 
 [[package]]
 name = "g2-boost"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "g2boost-core",
  "g2boost-mcp",
@@ -1224,7 +1224,7 @@ dependencies = [
 
 [[package]]
 name = "g2boost-core"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "rayon",
  "serde",
@@ -1236,7 +1236,7 @@ dependencies = [
 
 [[package]]
 name = "g2boost-mcp"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "g2boost-core",
  "rmcp",

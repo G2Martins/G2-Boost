@@ -28,7 +28,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{self, SyncSender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::{self, JoinHandle};
@@ -40,7 +40,7 @@ use windows::Win32::System::Diagnostics::Etw::{
     EVENT_CONTROL_CODE_ENABLE_PROVIDER, EVENT_FILTER_DESCRIPTOR, EVENT_FILTER_TYPE_EVENT_ID,
     EVENT_HEADER_FLAG_32_BIT_HEADER, EVENT_RECORD, EVENT_TRACE_CONTROL_FLUSH, EVENT_TRACE_CONTROL_STOP,
     EVENT_TRACE_LOGFILEW, EVENT_TRACE_PROPERTIES, EVENT_TRACE_REAL_TIME_MODE, EnableTraceEx2, OpenTraceW,
-    PROCESS_TRACE_MODE_EVENT_RECORD, PROCESS_TRACE_MODE_REAL_TIME, PROCESSTRACE_HANDLE, ProcessTrace, StartTraceW,
+    PROCESS_TRACE_MODE_EVENT_RECORD, PROCESS_TRACE_MODE_RAW_TIMESTAMP, PROCESS_TRACE_MODE_REAL_TIME, PROCESSTRACE_HANDLE, ProcessTrace, StartTraceW,
     TRACE_LEVEL_INFORMATION,
 };
 use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
@@ -225,6 +225,9 @@ struct Shared {
     /// Process whose presents count (0 = none).
     target: AtomicU32,
     tracker: Mutex<Tracker>,
+    /// Diagnostics: events delivered to the callback, and those of the target.
+    seen: AtomicU64,
+    seen_target: AtomicU64,
 }
 
 /// Live session. Dropping it stops the ETW session and joins the consumer thread.
@@ -298,6 +301,7 @@ impl Monitor {
             // EVENT_TRACE_PROPERTIES; nothing else borrows it in this scope.
             let p = unsafe { &mut *buf.as_mut_ptr().cast::<EVENT_TRACE_PROPERTIES>() };
             p.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+            p.Wnode.ClientContext = 1; // QPC timestamps (compared with QueryPerformanceCounter)
             p.FlushTimer = 1; // seconds; reads also flush
             p.BufferSize = 64; // KB
             p.MaximumBuffers = (2 * cpus + 16).min(512);
@@ -322,7 +326,7 @@ impl Monitor {
         let _ = enable(session, &D3D9, KW_EVENTS, D3D9_PRESENTS);
         let _ = enable(session, &DXGKRNL, KW_PRESENT, KERNEL_EVENTS);
 
-        let shared = Arc::new(Shared { target: AtomicU32::new(0), tracker: Mutex::default() });
+        let shared = Arc::new(Shared { target: AtomicU32::new(0), tracker: Mutex::default(), seen: AtomicU64::new(0), seen_target: AtomicU64::new(0) });
         let ctx = Arc::clone(&shared);
         let (tx, rx) = mpsc::sync_channel(1);
         let thread = thread::Builder::new()
@@ -347,6 +351,11 @@ impl Monitor {
         if self.shared.target.swap(pid, Ordering::SeqCst) != pid {
             *self.shared.tracker.lock().unwrap_or_else(PoisonError::into_inner) = Tracker::default();
         }
+    }
+
+    /// Diagnostics: (events delivered, events of the target) since the session started.
+    pub fn counters(&self) -> (u64, u64) {
+        (self.shared.seen.load(Ordering::Relaxed), self.shared.seen_target.load(Ordering::Relaxed))
     }
 
     /// Statistics of the target right now (`None` while it is not drawing).
@@ -379,7 +388,10 @@ impl Drop for Monitor {
 fn consume(ctx: &Shared, tx: &SyncSender<Result<u64, u32>>) {
     let mut name = crate::registry::wide(SESSION_NAME);
     let mut log = EVENT_TRACE_LOGFILEW { LoggerName: PWSTR(name.as_mut_ptr()), ..Default::default() };
-    log.Anonymous1.ProcessTraceMode = PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
+    // RAW_TIMESTAMP: keep the session's QPC ticks. Without it the consumer gets system time
+    // (FILETIME), never comparable with QueryPerformanceCounter: every frame looked like the future.
+    log.Anonymous1.ProcessTraceMode =
+        PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
     log.Anonymous2.EventRecordCallback = Some(on_event);
     log.Context = (ctx as *const Shared).cast_mut().cast::<c_void>();
     // SAFETY: `log` and `name` live on this stack frame until ProcessTrace returns.
@@ -407,9 +419,11 @@ extern "system" fn on_event(rec: *mut EVENT_RECORD) {
     let shared = unsafe { &*rec.UserContext.cast::<Shared>() };
     let h = &rec.EventHeader;
     let target = shared.target.load(Ordering::Relaxed);
+    shared.seen.fetch_add(1, Ordering::Relaxed);
     if target == 0 || h.ProcessId != target {
         return;
     }
+    shared.seen_target.fetch_add(1, Ordering::Relaxed);
     let data: &[u8] = if rec.UserData.is_null() {
         &[]
     } else {
@@ -620,7 +634,7 @@ mod tests {
             mon.set_target(pid);
             for second in 1..=5 {
                 std::thread::sleep(std::time::Duration::from_secs(1));
-                log.push(format!("t+{second}s pid {pid}: {:?}", mon.stats()));
+                log.push(format!("t+{second}s pid {pid}: {:?} events {:?}", mon.stats(), mon.counters()));
             }
         } else {
             log.push("G2BOOST_FPS_PID not set: session start/stop only".into());
@@ -643,6 +657,61 @@ mod tests {
             return Err("no frames counted for the target".into());
         }
         Ok(())
+    }
+
+    /// Self-contained live check (elevated): this test process creates a hidden window with a
+    /// Direct3D 11 swap chain and presents ~2 s; the session must count those frames.
+    /// `cargo test -p g2boost-core -- --ignored fps_selftest_elevated --nocapture` elevated.
+    #[test]
+    #[ignore = "live ETW; run elevated"]
+    fn fps_selftest_elevated() {
+        use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_HARDWARE;
+        use windows::Win32::Graphics::Direct3D11::{D3D11_CREATE_DEVICE_FLAG, D3D11_SDK_VERSION, D3D11CreateDeviceAndSwapChain};
+        use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_MODE_DESC, DXGI_SAMPLE_DESC};
+        use windows::Win32::Graphics::Dxgi::{DXGI_PRESENT, DXGI_SWAP_CHAIN_DESC, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT, IDXGISwapChain};
+        use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, DestroyWindow, WINDOW_EX_STYLE, WS_OVERLAPPEDWINDOW};
+        let mon = match Monitor::start() {
+            Err(EtwError::NeedsAdmin) => {
+                println!("skip: not elevated");
+                return;
+            }
+            r => r.expect("session start"),
+        };
+        mon.set_target(std::process::id());
+        let presenter = std::thread::spawn(|| {
+            // SAFETY: plain Win32/D3D calls on this thread; every out-param is a local.
+            unsafe {
+                let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), windows::core::w!("STATIC"), windows::core::w!("g2boost-fps-selftest"), WS_OVERLAPPEDWINDOW, 0, 0, 64, 64, None, None, None, None)
+                    .expect("window");
+                let desc = DXGI_SWAP_CHAIN_DESC {
+                    BufferDesc: DXGI_MODE_DESC { Width: 64, Height: 64, Format: DXGI_FORMAT_R8G8B8A8_UNORM, ..Default::default() },
+                    SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+                    BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                    BufferCount: 2,
+                    OutputWindow: hwnd,
+                    Windowed: true.into(),
+                    SwapEffect: DXGI_SWAP_EFFECT_FLIP_DISCARD,
+                    ..Default::default()
+                };
+                let mut swap: Option<IDXGISwapChain> = None;
+                D3D11CreateDeviceAndSwapChain(None, D3D_DRIVER_TYPE_HARDWARE, Default::default(), D3D11_CREATE_DEVICE_FLAG(0), None, D3D11_SDK_VERSION, Some(&desc), Some(&mut swap), None, None, None)
+                    .expect("d3d11");
+                let swap = swap.expect("swap chain");
+                let t0 = std::time::Instant::now();
+                let mut n = 0u32;
+                while t0.elapsed() < std::time::Duration::from_millis(2500) {
+                    let _ = swap.Present(0, DXGI_PRESENT(0));
+                    n += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                let _ = DestroyWindow(hwnd);
+                n
+            }
+        });
+        let presented = presenter.join().unwrap();
+        let s = mon.stats();
+        println!("presented {presented}, events {:?}, stats {s:?}", mon.counters());
+        assert!(s.is_some_and(|s| s.fps > 30.0), "frames presented by this process must be counted");
     }
 
     /// Live check of the ETW path. Needs administrator and something drawing:
