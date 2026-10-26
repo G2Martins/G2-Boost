@@ -12,6 +12,7 @@ export function useErrorText() {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg === "needs_admin") return t("boost.error.needs_admin");
       if (msg === "cancelled") return t("boost.error.cancelled");
+      if (msg === "blocked") return t("boost.error.blocked");
       if (msg === "bad_token") return t("cleanup.error.bad_token");
       if (msg === "protected_item") return t("boost.startup.protected");
       if (msg === "protected_path") return t("disk.recycle.protected");

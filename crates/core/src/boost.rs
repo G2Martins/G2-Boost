@@ -22,8 +22,8 @@ use windows::Win32::Security::{
 use windows::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, IF_TYPE_IEEE80211, MIB_IF_TABLE2};
 use windows::Win32::System::Power::{
     ACCESS_SCHEME, PowerDuplicateScheme, PowerEnumerate, PowerGetActiveScheme, PowerReadACDefaultIndex,
-    PowerReadACValueIndex, PowerReadDCDefaultIndex, PowerReadDCValueIndex, PowerReadFriendlyName, PowerSetActiveScheme,
-    PowerWriteACValueIndex, PowerWriteDCValueIndex,
+    PowerReadACValueIndex, PowerReadDCDefaultIndex, PowerReadDCValueIndex, PowerReadFriendlyName, PowerReadValueMax,
+    PowerReadValueMin, PowerSetActiveScheme, PowerWriteACValueIndex, PowerWriteDCValueIndex,
 };
 use windows::Win32::System::Services::{
     ChangeServiceConfigW, CloseServiceHandle, ControlService, ENUM_SERVICE_TYPE, OpenSCManagerW,
@@ -62,6 +62,10 @@ pub enum BoostError {
     /// The user dismissed the UAC prompt.
     #[error("cancelled")]
     Cancelled,
+    /// Denied even with administrator: Windows' own protection of some settings (UCPD, e.g. the
+    /// Widgets policy on 24H2+) or an antivirus. Nothing stays changed (partial writes go back).
+    #[error("blocked")]
+    Blocked,
     #[error("{0}")]
     Registry(#[from] registry::RegError),
     #[error("{0}")]
@@ -825,6 +829,11 @@ pub fn detect(t: &Tweak) -> TweakState {
             // Reading needs administrator (or the servicing slot is busy): unknown, not "off".
             Err(e) => st.detail = Some(e.to_string()),
         },
+        // Some PCs declare a range that excludes the target (core parking reads 0..0 on CPUs Windows
+        // manages itself): writing would fail, so the tweak means nothing here.
+        Kind::PowerSetting(ops) if ops.iter().any(|o| [o.ac, o.dc].into_iter().flatten().any(|v| !power_in_range(o, v))) => {
+            st.status = Status::Unavailable;
+        }
         Kind::PowerSetting(ops) => {
             if let Ok(scheme) = active_scheme() {
                 let (mut matches, mut total) = (0, 0);
@@ -1014,7 +1023,17 @@ pub fn apply(id: &str, on: bool) -> Result<TweakState, BoostError> {
     }
     if on {
         ensure_backup(t)?;
-        apply_on(t)?;
+        if let Err(e) = apply_on(t) {
+            // One key of several can be denied: put back what was written so it's all or nothing.
+            if let Some(b) = registry::load_backup(t.id) {
+                let _ = restore_entries(t, &b.entries);
+                registry::delete_backup(t.id);
+            }
+            return Err(match e {
+                BoostError::Registry(registry::RegError::AccessDenied) if system::is_elevated() => BoostError::Blocked,
+                other => other,
+            });
+        }
     } else if let Some(b) = registry::load_backup(t.id) {
         restore_entries(t, &b.entries)?;
         registry::delete_backup(t.id);
@@ -1492,6 +1511,18 @@ fn power_read(scheme: &GUID, o: &PowerOp, ac: bool) -> Option<u32> {
         }
     };
     ok.then_some(v)
+}
+
+/// The value lies in the range this PC declares for the setting (outside it the write fails with
+/// ERROR_INVALID_DATA).
+fn power_in_range(o: &PowerOp, v: u32) -> bool {
+    let (mut min, mut max) = (0u32, 0u32);
+    // SAFETY: GUID pointers outlive the calls; the out-params are plain u32.
+    unsafe {
+        PowerReadValueMin(None, Some(&o.subgroup), Some(&o.setting), &mut min) == ERROR_SUCCESS
+            && PowerReadValueMax(None, Some(&o.subgroup), Some(&o.setting), &mut max) == ERROR_SUCCESS
+            && (min..=max).contains(&v)
+    }
 }
 
 fn power_write(scheme: &GUID, o: &PowerOp, ac: Option<u32>, dc: Option<u32>) -> Result<(), BoostError> {
@@ -2112,7 +2143,16 @@ mod tests {
                 continue;
             }
             let on = before == Status::On;
-            assert_eq!(apply(t.id, !on).unwrap().status, if on { Status::Off } else { Status::On }, "{} flip", t.id);
+            let flipped = match apply(t.id, !on) {
+                Err(BoostError::Blocked) => {
+                    // Windows (UCPD) or the antivirus guards this key: the state must be untouched.
+                    assert_eq!(detect(t).status, before, "{} after blocked", t.id);
+                    println!("{}: blocked by Windows/antivirus, unchanged", t.id);
+                    continue;
+                }
+                r => r.unwrap(),
+            };
+            assert_eq!(flipped.status, if on { Status::Off } else { Status::On }, "{} flip", t.id);
             assert_eq!(apply(t.id, on).unwrap().status, before, "{} back", t.id);
             println!("{}: {before:?} -> flipped -> back ok", t.id);
         }

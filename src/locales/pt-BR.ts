@@ -3851,6 +3851,8 @@ export const ptBR = {
   "periph.error.app_only": "Disponível só no app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "boost.error.blocked":
+    "O Windows ou o antivírus protege esta configuração neste PC e recusou a mudança, mesmo como administrador. Nada foi alterado; dá para mudar pelas Configurações do Windows.",
   "setup.subtitle":
     "Acabou de formatar? Escolha os apps e os ajustes e deixe o Windows pronto de uma vez.",
   "setup.step.apps": "Apps",

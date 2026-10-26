@@ -3830,6 +3830,8 @@ export const en = {
   "periph.error.app_only": "Only available in the app.",
 
   // ── r9:setup · pós-formatação, painel (rodada 9, fim) ──
+  "boost.error.blocked":
+    "Windows or the antivirus protects this setting on this PC and refused the change, even as administrator. Nothing was changed; you can change it in Windows Settings.",
   "setup.subtitle": "Just reinstalled? Pick the apps and tweaks and get Windows ready at once.",
   "setup.step.apps": "Apps",
   "setup.step.apps.hint":
