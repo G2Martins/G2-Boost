@@ -29,3 +29,36 @@ test("maintenance shows disk check, drive optimization and the boot options rest
   await expect(page.getByText(t["maint2.boot.step.startup"]).first()).toBeVisible();
   await expect(page.getByText(t["maint2.boot.bitlocker"])).toBeVisible();
 });
+
+test("maintenance offers the weekly review and the quick fixes, locked without admin", async ({
+  page,
+}) => {
+  await open(page, "maintenance", t["maintenance.title"]);
+  await expect(
+    page.getByRole("heading", { level: 2, name: t["maint3.review.title"] }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: t["maint3.review.start"] })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: t["maint3.repair.button"], exact: true }),
+  ).toBeDisabled();
+  for (const key of [
+    "maint3.step.restore_point",
+    "maint3.step.drive_scan",
+    "maint3.step.sfc",
+    "maint3.step.dism_scan",
+  ] as const) {
+    await expect(page.getByText(t[key], { exact: true }).first()).toBeVisible();
+  }
+  await expect(page.getByText(t["maint3.review.never"])).toBeVisible();
+  for (const key of [
+    "maint3.fix.wu_reset.title",
+    "maint3.fix.print_queue.title",
+    "maint3.fix.audio.title",
+  ] as const) {
+    await expect(page.getByRole("heading", { level: 3, name: t[key] })).toBeVisible();
+  }
+  // Each tool says what it runs; nothing can start in the browser.
+  await expect(page.getByText(t["maint3.inside.sfc"])).toBeVisible();
+  await expect(page.getByText(t["maint3.fix.wu_reset.inside"])).toBeVisible();
+  await expect(page.getByRole("button", { name: t["maint3.fix.audio.button"] })).toBeDisabled();
+});

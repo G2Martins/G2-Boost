@@ -180,7 +180,9 @@ export function WeeklyReview({
   const shown = running ? running.done : last?.plan === plan ? last.steps : [];
   const lastWeekly = history ? [...history].reverse().find((o) => o.plan === "weekly") : undefined;
   const days = lastWeekly ? Math.floor((Date.now() / 1000 - lastWeekly.at) / 86400) : null;
-  const flagged = last ? last.steps.filter((s) => s.state === "attention" || s.state === "failed") : [];
+  const flagged = last
+    ? last.steps.filter((s) => s.state === "attention" || s.state === "failed")
+    : [];
   const summary = !last
     ? null
     : last.steps.some((s) => s.state === "cancelled")

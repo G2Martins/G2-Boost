@@ -212,7 +212,8 @@ export function QuickFixes({
                   <ul className="mt-2 space-y-1">
                     {last.steps.map((s, k) => {
                       const skipped =
-                        s.ok && (s.note === "missing" || s.note === "disabled" || s.note === "empty");
+                        s.ok &&
+                        (s.note === "missing" || s.note === "disabled" || s.note === "empty");
                       const StepIcon = !s.ok ? CircleX : skipped ? CircleMinus : CircleCheck;
                       return (
                         // biome-ignore lint/suspicious/noArrayIndexKey: a fixed log, never reordered (the same service can appear twice)
@@ -293,7 +294,7 @@ function PrintPreview({
   const { t } = useI18n();
   if (!inTauri) return <p className="text-[11px] text-muted-foreground">{t("common.app_only")}</p>;
   if (loading && !status) return <Skeleton className="h-12 w-full" />;
-  if (!status || status.spooler !== "running") {
+  if (status?.spooler !== "running") {
     const s = status?.spooler ?? "unknown";
     return (
       <p
@@ -302,7 +303,7 @@ function PrintPreview({
           s === "stopped" ? "text-muted-foreground" : "text-warning",
         )}
       >
-        {t(`maint3.print.spooler.${s === "running" ? "unknown" : s}` as I18nKey)}
+        {t(`maint3.print.spooler.${s}` as I18nKey)}
       </p>
     );
   }

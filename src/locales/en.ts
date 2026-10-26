@@ -2572,7 +2572,8 @@ export const en = {
   "maint3.verdict.throttled": "One from the last 24 h exists",
   "maint3.verdict.protection_off": "System protection off",
   "maint3.verdict.unsupported": "No online scan on this drive",
-  "maint3.detail.protection_off": "Turn on System Protection on the Windows drive to get restore points.",
+  "maint3.detail.protection_off":
+    "Turn on System Protection on the Windows drive to get restore points.",
   "maint3.inside": "Under the hood",
   "maint3.inside.dism_scan": "DismCheckImageHealth with a full scan, the same as DISM /ScanHealth.",
   "maint3.inside.dism_restore":
@@ -2605,7 +2606,8 @@ export const en = {
   "maint3.fix.audio.title": "Restart Windows audio",
   "maint3.fix.audio.body":
     "For when the sound is gone, crackles or a connected headset does not show up. Restarts both Windows audio services in the right order.",
-  "maint3.fix.audio.cost": "Sound drops for a few seconds; open calls and games may need to be reopened.",
+  "maint3.fix.audio.cost":
+    "Sound drops for a few seconds; open calls and games may need to be reopened.",
   "maint3.fix.audio.inside":
     "Stops Audiosrv and AudioEndpointBuilder (and whatever depends on them) and starts them again in reverse order, through the service manager.",
   "maint3.fix.audio.time": "seconds",
@@ -2633,7 +2635,8 @@ export const en = {
   "maint3.do.rename": "{target} kept as {note}",
   "maint3.do.rename.missing": "{target} did not exist; Windows creates it again",
   "maint3.do.rename.reparse_point": "{target} points to another folder: left as it was",
-  "maint3.do.rename.target_exists": "A copy of {target} with this time already exists: left as it was",
+  "maint3.do.rename.target_exists":
+    "A copy of {target} with this time already exists: left as it was",
   "maint3.do.rename.not_a_folder": "{target} is not a folder: left as it was",
   "maint3.do.rename.fail": "Could not rename {target}: {why}",
   "maint3.do.purge": "Emptied {target} ({n} queued)",
@@ -2713,7 +2716,8 @@ export const en = {
   "av.vendor.trend": "Trend Micro",
   "av.vendor.panda": "Panda Dome",
   "av.vendor.other": "Another antivirus",
-  "av.guide.kaspersky.1": "Open Kaspersky and click the gear (Settings) at the bottom of the window.",
+  "av.guide.kaspersky.1":
+    "Open Kaspersky and click the gear (Settings) at the bottom of the window.",
   "av.guide.kaspersky.2": "Security settings › Exclusions and actions on object detection.",
   "av.guide.kaspersky.3": "Manage exclusions › Add › Browse, and pick the G2 Boost file.",
   "av.guide.kaspersky.4": "Leave the status Active and click Add.",
@@ -2754,7 +2758,8 @@ export const en = {
   "av.guide.other.1":
     "Open your antivirus and look for Exclusions, Exceptions, Allow list or Trusted applications.",
   "av.guide.other.2": "Add a file (not a whole folder) and pick the G2 Boost file.",
-  "av.guide.other.3": "Save. If the antivirus already moved G2 Boost to quarantine, restore it from there.",
+  "av.guide.other.3":
+    "Save. If the antivirus already moved G2 Boost to quarantine, restore it from there.",
   "av.smartscreen.title": "Windows warning when opening G2 Boost",
   "av.smartscreen.body":
     "If “Windows protected your PC” appears, click More info and then Run anyway. The warning shows because the installer has no digital signature yet; no protection is turned off.",

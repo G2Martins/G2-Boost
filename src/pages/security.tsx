@@ -12,6 +12,7 @@ import {
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
+import { AntivirusTab } from "@/components/security/antivirus-tab";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { ExeIcon } from "@/components/ui/exe-icon";
 import {
@@ -22,6 +23,10 @@ import {
   EmptyState,
   Modal,
   Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui/primitives";
 import {
   backend,
@@ -34,6 +39,7 @@ import {
   type ExposureSeverity,
   inTauri,
 } from "@/lib/backend";
+import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { usePageData } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
@@ -75,6 +81,7 @@ const isIssue = (c: ExposureCheck) => c.state === "exposed" && c.severity !== "i
 export function SecurityPage() {
   const { t } = useI18n();
   const errorText = useErrorText();
+  const [tab, setTab] = useState(boot.startTab === "antivirus" ? "antivirus" : "exposure");
   const [report, setReport] = useState<ExposureReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [alerts, setAlerts] = useState<ExposureAlert[]>([]);
@@ -151,133 +158,153 @@ export function SecurityPage() {
         title={t("security.title")}
         subtitle={t("security.subtitle")}
         actions={
-          <Button variant="outline" size="sm" disabled={busy || !inTauri} onClick={load}>
-            <RefreshCw className={cn("size-4", busy && "animate-spin")} />
-            {busy ? t("security.scanning") : t("security.refresh")}
-          </Button>
+          tab === "exposure" ? (
+            <Button variant="outline" size="sm" disabled={busy || !inTauri} onClick={load}>
+              <RefreshCw className={cn("size-4", busy && "animate-spin")} />
+              {busy ? t("security.scanning") : t("security.refresh")}
+            </Button>
+          ) : null
+        }
+        tabs={
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="exposure">{t("av.tab.exposure")}</TabsTrigger>
+              <TabsTrigger value="antivirus">{t("av.tab.antivirus")}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="antivirus">
+              <PageBody className="px-0 pb-0">
+                <AntivirusTab />
+              </PageBody>
+            </TabsContent>
+            <TabsContent value="exposure">
+              <PageBody className="px-0 pb-0">
+                <p className="animate-rise flex items-center gap-2 text-xs text-muted-foreground">
+                  <Shield className="size-3.5 shrink-0" />
+                  {t("security.disclaimer")}
+                </p>
+                {note ? (
+                  <p className={cn("text-xs", note.ok ? "text-success" : "text-destructive")}>
+                    {note.text}
+                  </p>
+                ) : null}
+
+                {!inTauri ? (
+                  <Card className="animate-rise">
+                    <EmptyState
+                      icon={<ShieldQuestionMark className="size-5" />}
+                      title={t("security.empty")}
+                    />
+                  </Card>
+                ) : (
+                  <>
+                    <LuliCard
+                      findings={[
+                        "rdp_open",
+                        "nla_off",
+                        "firewall_off",
+                        "smb1_on",
+                        "upnp_open",
+                        "remote_inbound",
+                        "av_off",
+                      ]}
+                      asks={[
+                        { label: "security.ask.explain", data: ["security.report"] },
+                        { label: "security.ask.remote", data: ["security.report"] },
+                      ]}
+                    />
+                    <Summary
+                      checks={report ? checks : null}
+                      elevated={elevated}
+                      tookMs={report?.took_ms ?? null}
+                      onFix={ask}
+                    />
+                    {alerts.length > 0 ? (
+                      <AlertsCard
+                        alerts={alerts}
+                        onAck={() => {
+                          void backend.exposureAlertsClear();
+                          setAlerts([]);
+                        }}
+                      />
+                    ) : null}
+                    {report && report.reverts.length > 0 ? (
+                      <Card className="animate-rise">
+                        <CardTitle>
+                          <Undo2 className="size-4" />
+                          {t("security.reverts.title")}
+                        </CardTitle>
+                        <ul className="divide-y divide-border">
+                          {report.reverts.map((f) => (
+                            <li
+                              key={JSON.stringify(f)}
+                              className="flex items-center gap-3 py-2 text-sm"
+                            >
+                              <span className="min-w-0 flex-1 truncate">
+                                {t(`security.done.${f.kind}` as const, fixText(f))}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={working || (needsAdmin(f) && !elevated)}
+                                onClick={() =>
+                                  void run(() => backend.exposureRevert(f), "security.reverted")
+                                }
+                              >
+                                <Undo2 className="size-4" />
+                                {t("security.reverts.undo")}
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </Card>
+                    ) : null}
+                    {GROUPS.map((g, gi) => (
+                      <Card key={g.id} className="animate-rise" style={rise(gi + 2)}>
+                        <CardTitle help={t(`security.group.${g.id}.hint` as const)}>
+                          {t(`security.group.${g.id}` as const)}
+                        </CardTitle>
+                        <ul className="divide-y divide-border">
+                          {g.checks.map((id) => {
+                            const c = report?.checks.find((x) => x.id === id);
+                            return c ? (
+                              <CheckRow
+                                key={id}
+                                check={c}
+                                elevated={elevated}
+                                busy={working}
+                                onFix={ask}
+                                onError={(e) => setNote({ ok: false, text: fail(e) })}
+                              />
+                            ) : (
+                              <li key={id} className="flex items-center gap-3 py-3.5">
+                                <Skeleton className="size-8 rounded-md" />
+                                <div className="flex-1 space-y-1.5">
+                                  <Skeleton className="h-3.5 w-48" />
+                                  <Skeleton className="h-3 w-80 max-w-full" />
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </Card>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      {monitor === false ? t("security.monitor.off") : t("security.monitor.on")}{" "}
+                      <button
+                        type="button"
+                        onClick={() => navigate("settings")}
+                        className="underline underline-offset-2 hover:text-foreground"
+                      >
+                        {t("security.monitor.settings")}
+                      </button>
+                    </p>
+                  </>
+                )}
+              </PageBody>
+            </TabsContent>
+          </Tabs>
         }
       />
-      <PageBody>
-        <p className="animate-rise flex items-center gap-2 text-xs text-muted-foreground">
-          <Shield className="size-3.5 shrink-0" />
-          {t("security.disclaimer")}
-        </p>
-        {note ? (
-          <p className={cn("text-xs", note.ok ? "text-success" : "text-destructive")}>
-            {note.text}
-          </p>
-        ) : null}
-
-        {!inTauri ? (
-          <Card className="animate-rise">
-            <EmptyState
-              icon={<ShieldQuestionMark className="size-5" />}
-              title={t("security.empty")}
-            />
-          </Card>
-        ) : (
-          <>
-            <LuliCard
-              findings={[
-                "rdp_open",
-                "nla_off",
-                "firewall_off",
-                "smb1_on",
-                "upnp_open",
-                "remote_inbound",
-                "av_off",
-              ]}
-              asks={[
-                { label: "security.ask.explain", data: ["security.report"] },
-                { label: "security.ask.remote", data: ["security.report"] },
-              ]}
-            />
-            <Summary
-              checks={report ? checks : null}
-              elevated={elevated}
-              tookMs={report?.took_ms ?? null}
-              onFix={ask}
-            />
-            {alerts.length > 0 ? (
-              <AlertsCard
-                alerts={alerts}
-                onAck={() => {
-                  void backend.exposureAlertsClear();
-                  setAlerts([]);
-                }}
-              />
-            ) : null}
-            {report && report.reverts.length > 0 ? (
-              <Card className="animate-rise">
-                <CardTitle>
-                  <Undo2 className="size-4" />
-                  {t("security.reverts.title")}
-                </CardTitle>
-                <ul className="divide-y divide-border">
-                  {report.reverts.map((f) => (
-                    <li key={JSON.stringify(f)} className="flex items-center gap-3 py-2 text-sm">
-                      <span className="min-w-0 flex-1 truncate">
-                        {t(`security.done.${f.kind}` as const, fixText(f))}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={working || (needsAdmin(f) && !elevated)}
-                        onClick={() =>
-                          void run(() => backend.exposureRevert(f), "security.reverted")
-                        }
-                      >
-                        <Undo2 className="size-4" />
-                        {t("security.reverts.undo")}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ) : null}
-            {GROUPS.map((g, gi) => (
-              <Card key={g.id} className="animate-rise" style={rise(gi + 2)}>
-                <CardTitle help={t(`security.group.${g.id}.hint` as const)}>
-                  {t(`security.group.${g.id}` as const)}
-                </CardTitle>
-                <ul className="divide-y divide-border">
-                  {g.checks.map((id) => {
-                    const c = report?.checks.find((x) => x.id === id);
-                    return c ? (
-                      <CheckRow
-                        key={id}
-                        check={c}
-                        elevated={elevated}
-                        busy={working}
-                        onFix={ask}
-                        onError={(e) => setNote({ ok: false, text: fail(e) })}
-                      />
-                    ) : (
-                      <li key={id} className="flex items-center gap-3 py-3.5">
-                        <Skeleton className="size-8 rounded-md" />
-                        <div className="flex-1 space-y-1.5">
-                          <Skeleton className="h-3.5 w-48" />
-                          <Skeleton className="h-3 w-80 max-w-full" />
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Card>
-            ))}
-            <p className="text-xs text-muted-foreground">
-              {monitor === false ? t("security.monitor.off") : t("security.monitor.on")}{" "}
-              <button
-                type="button"
-                onClick={() => navigate("settings")}
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                {t("security.monitor.settings")}
-              </button>
-            </p>
-          </>
-        )}
-      </PageBody>
 
       <Modal
         open={pending !== null}

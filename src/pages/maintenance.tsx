@@ -187,30 +187,17 @@ export function MaintenancePage() {
           </Card>
         ) : null}
 
-        {/* The recommended order as a rail: each step feeds the next. */}
-        <Card className="animate-rise py-4" style={rise(1)}>
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {t("maintenance.order.title")}
-            <HelpHint text={t("maintenance.order.hint")} />
-          </div>
-          <ol className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-            {[1, 2, 3].map((n) => (
-              <li key={n} className="relative flex items-center gap-3">
-                <span className="num flex size-7 shrink-0 items-center justify-center rounded-full font-display text-[13px] font-semibold ring-1 ring-border-strong ring-inset">
-                  {n}
-                </span>
-                <span className="text-[13px]">{t(`maintenance.order.${n}` as I18nKey)}</span>
-                {n < 3 ? (
-                  <span
-                    aria-hidden
-                    className="ml-auto hidden h-px flex-1 bg-linear-to-r from-border-strong to-transparent md:block"
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </Card>
+        <WeeklyReview
+          elevated={elevated}
+          blocked={!inTauri || !elevated || run !== null || volBusy}
+          index={1}
+          onRunning={setPlanBusy}
+          onFinished={reloadHistory}
+        />
 
+        <QuickFixes elevated={elevated} servicing={run !== null || volBusy || planBusy} index={2} />
+
+        <SectionRule title={t("maint3.section.tools")} help={t("maintenance.order.hint")} />
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {CARDS.map((c, i) => {
             const prev = last(c.tools);
@@ -225,7 +212,7 @@ export function MaintenancePage() {
                   "panel-hover animate-rise flex flex-col gap-3",
                   mine && "border-primary/40",
                 )}
-                style={rise(i + 2)}
+                style={rise(i + 5)}
               >
                 <div className="flex items-start gap-3">
                   <span className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-foreground/5 text-muted-foreground ring-1 ring-foreground/10 ring-inset">
@@ -256,6 +243,7 @@ export function MaintenancePage() {
                   </div>
                 </div>
 
+                <Inside text={t(`maint3.inside.${c.key}` as I18nKey)} />
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                   {c.tools.map((tool) => (
                     <span key={tool} className="inline-flex items-center gap-1.5">
@@ -355,13 +343,13 @@ export function MaintenancePage() {
 
         <DriveTools
           elevated={elevated}
-          repairRunning={run !== null}
+          repairRunning={run !== null || planBusy}
           onRunning={setVolBusy}
-          index={CARDS.length + 2}
+          index={CARDS.length + 5}
         />
-        <BootOptionsCard elevated={elevated} index={CARDS.length + 4} />
+        <BootOptionsCard elevated={elevated} index={CARDS.length + 7} />
 
-        <Card className="animate-rise" style={rise(CARDS.length + 5)}>
+        <Card className="animate-rise" style={rise(CARDS.length + 8)}>
           <CardTitle>
             <History className="size-4" />
             {t("maintenance.history")}

@@ -2749,14 +2749,14 @@ export const ptBR = {
     "Gerenciar exceções › Adicionar uma exceção, e cole o caminho do arquivo do G2 Boost.",
   "av.guide.bitdefender.4":
     "Ligue a chave Antivírus (e Defesa avançada contra ameaças, se ela também bloquear) e clique em Salvar.",
-  "av.guide.mcafee.1":
-    "Abra o McAfee e procure a verificação em tempo real (Real-Time Scanning).",
+  "av.guide.mcafee.1": "Abra o McAfee e procure a verificação em tempo real (Real-Time Scanning).",
   "av.guide.mcafee.2": "Abra Arquivos excluídos (Excluded Files) e clique em Adicionar arquivo.",
   "av.guide.mcafee.3": "Escolha o arquivo do G2 Boost e confirme.",
   "av.guide.mcafee.4": "Depois de atualizar o G2 Boost, confira se a exclusão continua na lista.",
   "av.guide.malwarebytes.1":
     "Abra o Malwarebytes e clique no cartão Histórico de detecções (Detection History).",
-  "av.guide.malwarebytes.2": "Vá para a aba Lista de permissões (Allow list) e clique em Adicionar.",
+  "av.guide.malwarebytes.2":
+    "Vá para a aba Lista de permissões (Allow list) e clique em Adicionar.",
   "av.guide.malwarebytes.3": "Escolha permitir um arquivo e selecione o arquivo do G2 Boost.",
   "av.guide.malwarebytes.4": "Marque a confirmação de risco e salve.",
   "av.guide.trend.1": "Abra o Trend Micro e clique em Configurações (Settings).",
@@ -2769,7 +2769,8 @@ export const ptBR = {
   "av.guide.panda.3": "Escolha o arquivo do G2 Boost, marque a caixa ao lado dele e clique em OK.",
   "av.guide.other.1":
     "Abra o seu antivírus e procure Exclusões, Exceções, Lista de permissões ou Aplicativos confiáveis.",
-  "av.guide.other.2": "Adicione um arquivo (não uma pasta inteira) e escolha o arquivo do G2 Boost.",
+  "av.guide.other.2":
+    "Adicione um arquivo (não uma pasta inteira) e escolha o arquivo do G2 Boost.",
   "av.guide.other.3":
     "Salve. Se o antivírus já tinha movido o G2 Boost para a quarentena, restaure ele de lá.",
   "av.smartscreen.title": "Aviso do Windows ao abrir o G2 Boost",

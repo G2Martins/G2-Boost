@@ -1348,7 +1348,11 @@ export type AvProduct = {
   defender: boolean;
   vendor: AvVendor | null;
 };
-export type AvBlock = "defender_inactive" | "unknown_exe" | "not_protected_folder" | "user_writable";
+export type AvBlock =
+  | "defender_inactive"
+  | "unknown_exe"
+  | "not_protected_folder"
+  | "user_writable";
 export type AvStatus = {
   products: AvProduct[];
   defender_active: boolean;
