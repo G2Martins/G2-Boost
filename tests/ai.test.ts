@@ -4,6 +4,8 @@ import {
   type Answer,
   extractActions,
   HttpError,
+  isBusy,
+  isQuota,
   normalizeAnswer,
   MAX_ACTIONS,
   MAX_FOLLOWUPS,
@@ -101,7 +103,7 @@ test("providers without web search never get a permission request", () => {
   expect(p).not.toContain("Web search is ON");
 });
 
-test("busy providers are retried, then Gemini falls back to the next free model", async () => {
+test("busy providers are retried, then Gemini falls back to the next free model; quota is not retried", async () => {
   let calls = 0;
   const ok = await withRetry(
     async () => {
@@ -144,17 +146,35 @@ test("busy providers are retried, then Gemini falls back to the next free model"
   expect(a.text).toBe("from m2");
   expect(a.model).toBe("m2");
   expect(tried).toEqual(["m1", "m1", "m2"]);
-  await expect(
-    withFallback(
-      "x",
-      ["y"],
-      async () => {
-        throw new HttpError(429, "quota");
-      },
-      undefined,
-      [],
-    ),
-  ).rejects.toThrow("busy");
+  // Out of quota (429): no retry on the same model, the next model is still tried, and the
+  // provider's own error reaches the UI (it used to become a generic "busy").
+  const quota: string[] = [];
+  const err = await withFallback(
+    "x",
+    ["y"],
+    async (m) => {
+      quota.push(m);
+      throw new HttpError(429, "quota exceeded");
+    },
+    undefined,
+    [0, 0],
+  ).catch((e: unknown) => e);
+  expect(quota).toEqual(["x", "y"]);
+  expect(isQuota(err)).toBe(true);
+  expect(isBusy(err)).toBe(false);
+  expect((err as Error).message).toBe("quota exceeded");
+  // Overloaded everywhere: the last 503 comes back, still "busy" for the UI.
+  const busy = await withFallback(
+    "x",
+    ["y"],
+    async () => {
+      throw new HttpError(503, "high demand");
+    },
+    undefined,
+    [],
+  ).catch((e: unknown) => e);
+  expect(isBusy(busy)).toBe(true);
+  expect(isQuota(busy)).toBe(false);
 });
 
 test("memory and instructions reach the prompt; saved answers are re-validated", () => {

@@ -410,7 +410,10 @@ export const ptBR = {
   "ai.error.generic": "Falhou: {error}",
   "ai.error.busy":
     "O provedor está sobrecarregado agora (comum na camada grátis do Gemini). Tentei de novo e com outros modelos grátis; espere alguns minutos e pergunte de novo.",
-  "ai.fallback_model": "Respondido pelo {model}: o modelo escolhido estava sobrecarregado.",
+  "ai.error.quota":
+    "O provedor recusou por limite de uso (cota da chave ou da camada grátis). Se a cota do dia acabou, esperar alguns minutos não resolve: troque o modelo ou o provedor, ou confira o plano da chave. Detalhe: {error}",
+  "ai.fallback_model":
+    "Respondido pelo {model}: o modelo escolhido estava sobrecarregado ou sem cota.",
   "console.cmd.winget":
     "Buscar, ver atualizações e instalar apps pelo winget (instalar pede confirmação)",
   "console.col.available": "disponível",

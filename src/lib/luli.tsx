@@ -22,6 +22,7 @@ import {
   ClaudeChat,
   DEFAULT_MODELS,
   isBusy,
+  isQuota,
   isTimeout,
   normalizeAnswer,
   PROVIDER_WEB,
@@ -465,9 +466,11 @@ function useLuliState() {
                 ? t("ai.key.missing")
                 : msg === "empty_response"
                   ? t("ai.error.empty")
-                  : msg === "busy" || isBusy(e)
-                    ? t("ai.error.busy")
-                    : t("ai.error.generic", { error: msg });
+                  : isQuota(e)
+                    ? t("ai.error.quota", { error: msg })
+                    : msg === "busy" || isBusy(e)
+                      ? t("ai.error.busy")
+                      : t("ai.error.generic", { error: msg });
           setMessages((m) => [...m, { role: "assistant", text: "", error: text }]);
         }
         claude.current = null; // start clean after a failed Claude turn (history stays append-only)

@@ -91,9 +91,17 @@ export class HttpError extends Error {
   }
 }
 
-/** Overloaded or rate-limited: worth a retry (Gemini's free tier answers 503 at peaks). */
+/** Overloaded right now: worth retrying the same model (Gemini's free tier answers 503 at peaks). */
 export function isBusy(e: unknown): boolean {
-  return e instanceof HttpError && [429, 500, 502, 503, 504].includes(e.status);
+  return e instanceof HttpError && [500, 502, 503, 504].includes(e.status);
+}
+
+/**
+ * Rate limit or quota (429), e.g. the free tier's daily quota. Retrying the same model at once
+ * only spends more of it; another Gemini model has its own quota, so the fallback still tries it.
+ */
+export function isQuota(e: unknown): boolean {
+  return e instanceof HttpError && e.status === 429;
 }
 
 function wait(ms: number, signal?: AbortSignal): Promise<void> {
@@ -124,10 +132,13 @@ export async function withRetry<T>(
   }
 }
 
-/** Free-tier Gemini models tried in order when the chosen one stays overloaded. */
+/** Free-tier Gemini models tried in order when the chosen one stays overloaded or out of quota. */
 export const GEMINI_FALLBACKS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
 
-/** The chosen model first, then the other free ones; `busy` when all of them stay overloaded. */
+/**
+ * The chosen model first, then the other free ones. When all of them stay overloaded or out of
+ * quota, the last provider error is thrown as is, so the UI can tell "busy" from "quota".
+ */
 export async function withFallback(
   model: string,
   fallbacks: string[],
@@ -136,15 +147,17 @@ export async function withFallback(
   delays?: number[],
 ): Promise<Answer> {
   const chain = [model, ...fallbacks.filter((m) => m !== model)];
+  let last: unknown;
   for (const m of chain) {
     try {
       const a = await withRetry(() => call(m), signal, delays);
       return m === model ? a : { ...a, model: m };
     } catch (e) {
-      if (!isBusy(e)) throw e;
+      if (!isBusy(e) && !isQuota(e)) throw e;
+      last = e;
     }
   }
-  throw new Error("busy");
+  throw last;
 }
 export type Turn = { role: "user" | "assistant"; text: string };
 

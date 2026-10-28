@@ -410,7 +410,9 @@ export const en = {
   "ai.error.generic": "Failed: {error}",
   "ai.error.busy":
     "The provider is overloaded right now (common on Gemini's free tier). I retried, also with other free models; wait a few minutes and ask again.",
-  "ai.fallback_model": "Answered by {model}: the chosen model was overloaded.",
+  "ai.error.quota":
+    "The provider refused because of a usage limit (your key's quota or the free tier). If the daily quota ran out, waiting a few minutes will not help: switch model or provider, or check the key's plan. Details: {error}",
+  "ai.fallback_model": "Answered by {model}: the chosen model was overloaded or out of quota.",
   "console.cmd.winget":
     "Search, list updates and install apps with winget (installing asks for confirmation)",
   "console.col.available": "available",
