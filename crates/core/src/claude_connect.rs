@@ -1,7 +1,8 @@
 //! Register G2 Boost's MCP server (`"<this exe>" --mcp`) with the user's Claude apps, on their
 //! click: Claude Desktop (standard install and the Microsoft Store/MSIX one, whose config lives
-//! under `%LOCALAPPDATA%\Packages\Claude_*`; Cowork runs inside Desktop) and Claude Code (user
-//! scope, top-level `mcpServers` in `~/.claude.json`).
+//! in `%LOCALAPPDATA%\Claude-Data\claude_*` or, before the app moved it out of the package, under
+//! `%LOCALAPPDATA%\Packages\Claude_*`; Cowork runs inside Desktop) and Claude Code (user scope,
+//! top-level `mcpServers` in `~/.claude.json`).
 //!
 //! Those files belong to other apps and are hostile input: parsed strictly, never rewritten when
 //! they are not a JSON object we understand, never followed through a symlink, backed up to
@@ -50,28 +51,49 @@ fn io(e: std::io::Error) -> ConnectError {
     ConnectError::Io(e.to_string())
 }
 
-/// Claude Desktop config files: the standard `%APPDATA%\Claude` and every MSIX package folder.
+/// Claude Desktop config files: the standard `%APPDATA%\Claude`, the MSIX data folders in
+/// `%LOCALAPPDATA%\Claude-Data` and the old in-package MSIX folders the app still reads.
 fn desktop_paths() -> Vec<PathBuf> {
+    let var = |k: &str| std::env::var_os(k).map(PathBuf::from);
+    desktop_paths_in(var("APPDATA"), var("LOCALAPPDATA"))
+}
+
+fn desktop_paths_in(appdata: Option<PathBuf>, local: Option<PathBuf>) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    if let Some(appdata) = std::env::var_os("APPDATA") {
-        let dir = PathBuf::from(appdata).join("Claude");
+    if let Some(appdata) = appdata {
+        let dir = appdata.join("Claude");
         if dir.is_dir() {
             out.push(dir.join("claude_desktop_config.json"));
         }
     }
-    if let Some(local) = std::env::var_os("LOCALAPPDATA")
-        && let Ok(rd) = std::fs::read_dir(PathBuf::from(local).join("Packages"))
-    {
+    let Some(local) = local else { return out };
+    // The MSIX app keeps its data outside the package since 2026-10: one folder per package
+    // family, lower case (`claude_pzs8sxrjxfjjc`).
+    if let Ok(rd) = std::fs::read_dir(local.join("Claude-Data")) {
+        for e in rd.flatten() {
+            if e.file_name().to_string_lossy().to_ascii_lowercase().starts_with("claude_") && e.path().is_dir() {
+                out.push(e.path().join("claude_desktop_config.json"));
+            }
+        }
+    }
+    if let Ok(rd) = std::fs::read_dir(local.join("Packages")) {
         for e in rd.flatten() {
             if e.file_name().to_string_lossy().starts_with("Claude_") {
                 let dir = e.path().join(r"LocalCache\Roaming\Claude");
-                if dir.is_dir() {
+                if dir.is_dir() && !data_moved_out(&dir) {
                     out.push(dir.join("claude_desktop_config.json"));
                 }
             }
         }
     }
     out
+}
+
+/// The MSIX app moved its data out of this folder and left a `.user-data-left.<family>` marker;
+/// a config written here is never read again.
+fn data_moved_out(dir: &Path) -> bool {
+    std::fs::read_dir(dir)
+        .is_ok_and(|rd| rd.flatten().any(|e| e.file_name().to_string_lossy().starts_with(".user-data-left.")))
 }
 
 /// `~/.claude.json`, only when Claude Code already created it.
@@ -312,6 +334,33 @@ mod tests {
         std::fs::write(&bom, "\u{feff}{\"a\":1}").unwrap();
         connect_file(&bom, Client::Desktop, exe, true).unwrap();
         assert_eq!(status_file(&bom, exe), (true, true));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn desktop_paths_follow_the_msix_data_move() {
+        let d = sandbox("paths");
+        let (appdata, local) = (d.join("Roaming"), d.join("Local"));
+        // Data moved out: Claude-Data has the live folder, the old package folder keeps the marker.
+        let live = local.join("Claude-Data").join("claude_pzs8sxrjxfjjc");
+        let left = local.join("Packages").join("Claude_pzs8sxrjxfjjc").join(r"LocalCache\Roaming\Claude");
+        // Another install that never moved: still read from the package.
+        let kept = local.join("Packages").join("Claude_other").join(r"LocalCache\Roaming\Claude");
+        for dir in [&live, &left, &kept, &local.join("Claude-Data").join("not-claude")] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        std::fs::write(left.join(".user-data-left.claude_pzs8sxrjxfjjc"), "{}").unwrap();
+        std::fs::write(local.join("Claude-Data").join("README.txt"), "x").unwrap();
+
+        let got = desktop_paths_in(Some(appdata.clone()), Some(local.clone()));
+        let want = [live.join("claude_desktop_config.json"), kept.join("claude_desktop_config.json")];
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(want.iter().all(|w| got.contains(w)), "{got:?}");
+
+        // Standard install: %APPDATA%\Claude comes first.
+        std::fs::create_dir_all(appdata.join("Claude")).unwrap();
+        let got = desktop_paths_in(Some(appdata.clone()), None);
+        assert_eq!(got, [appdata.join("Claude").join("claude_desktop_config.json")]);
         let _ = std::fs::remove_dir_all(&d);
     }
 }
