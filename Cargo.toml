@@ -4,7 +4,7 @@ members = ["src-tauri", "crates/core", "crates/mcp"]
 exclude = ["tools/vswhom-sys-stub"]
 
 [workspace.package]
-version = "0.9.2"
+version = "0.9.3"
 edition = "2024"
 authors = ["Gustavo Martins Gripaldi"]
 license = "UNLICENSED"

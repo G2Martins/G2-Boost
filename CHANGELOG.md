@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.3 (2026-10-28): Conectar ao Claude volta a funcionar e a Luli explica o limite de uso
+
+- **Conectar ao Claude:** o Claude Desktop da Microsoft Store passou a guardar a configuração em `%LOCALAPPDATA%\Claude-Data`. O G2 Boost continuava gravando na pasta antiga, mostrava "Conectado" e o Claude não carregava o G2 Boost. Agora ele grava na pasta nova e ignora a antiga quando o Claude saiu dela. Quem já tinha conectado: clique em Conectar de novo e reabra o Claude Desktop pela bandeja.
+- **Luli com limite de uso:** quando o provedor recusa por cota (a camada grátis do Gemini tem limite por minuto e por dia), a mensagem agora diz que é limite de uso e mostra o detalhe do provedor. Antes aparecia "sobrecarregado, espere alguns minutos" mesmo com a cota do dia esgotada.
+- **Menos pedidos gastos:** com limite de uso o app não repete o mesmo modelo na hora; passa direto para o próximo modelo grátis do Gemini, que tem cota própria.
+
 ## 0.9.2 (2026-10-26): FPS do overlay, exe com o nome do app e mais testes reais
 
 - **Overlay de jogo: o FPS agora aparece.** Nas versões 0.9.0 e 0.9.1 o contador nunca mostrava quadros: os horários dos eventos do Windows chegavam num relógio diferente do usado na conta. Conferido como administrador: uma animação no Edge marcou 120 FPS num monitor de 120 Hz, com 1% low de 117.
