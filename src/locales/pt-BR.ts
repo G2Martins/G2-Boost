@@ -1001,6 +1001,19 @@ export const ptBR = {
     "Vai apagar {size} em {count} categoria(s). Arquivos em uso são pulados. A Lixeira é irreversível.",
   "cleanup.confirm.go": "Apagar agora",
   "cleanup.running": "Limpando {done}/{total}…",
+  "cleanup.live.measuring": "Medindo {done} de {total}",
+  "cleanup.live.cleaning": "Limpando {done} de {total}",
+  "cleanup.live.found": "{files} arquivos encontrados até agora",
+  "cleanup.live.freed": "liberados, {files} arquivos apagados",
+  "cleanup.live.now": "Agora: {item} · há {secs} s",
+  "cleanup.live.slow":
+    "Item grande: pode levar alguns minutos. O G2 Boost continua trabalhando, o relógio acima mostra.",
+  "cleanup.live.component":
+    "O Windows está limpando os componentes do sistema, pode levar até 30 minutos. Parar deixa a tarefa terminar sozinha em segundo plano.",
+  "cleanup.live.stop": "Parar",
+  "cleanup.live.stopping": "Parando…",
+  "cleanup.live.queue": "Categorias desta limpeza",
+  "cleanup.error.background": "segue em segundo plano no Windows",
   "cleanup.result.title": "Resultado",
   "cleanup.result.freed": "{size} liberados",
   "cleanup.result.skipped": "{count} em uso",
@@ -1687,8 +1700,6 @@ export const ptBR = {
     "Quem apaga é o próprio módulo de limpeza do Windows (o mesmo da Limpeza de Disco), com prévia e confirmação. Só módulos originais do Windows são aceitos.",
   "volcache.needs_admin":
     "O Windows só deixa medir e limpar arquivos do sistema como administrador.",
-  "volcache.measuring": "Medindo {done}/{total}…",
-  "volcache.slow": "Alguns itens levam minutos.",
   "volcache.nothing": "Nada a limpar",
   "volcache.error.missing": "Não existe neste Windows",
   "volcache.error.untrusted": "Bloqueado: o módulo não é o original do Windows",

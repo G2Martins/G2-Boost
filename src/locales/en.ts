@@ -996,6 +996,19 @@ export const en = {
     "This deletes {size} across {count} category(ies). Files in use are skipped. The Recycle Bin cannot be undone.",
   "cleanup.confirm.go": "Delete now",
   "cleanup.running": "Cleaning {done}/{total}…",
+  "cleanup.live.measuring": "Measuring {done} of {total}",
+  "cleanup.live.cleaning": "Cleaning {done} of {total}",
+  "cleanup.live.found": "{files} files found so far",
+  "cleanup.live.freed": "freed, {files} files deleted",
+  "cleanup.live.now": "Now: {item} · {secs} s",
+  "cleanup.live.slow":
+    "Big item: this can take a few minutes. G2 Boost is still working, the clock above shows it.",
+  "cleanup.live.component":
+    "Windows is cleaning up system components, this can take up to 30 minutes. Stop lets the task finish on its own in the background.",
+  "cleanup.live.stop": "Stop",
+  "cleanup.live.stopping": "Stopping…",
+  "cleanup.live.queue": "Categories in this cleanup",
+  "cleanup.error.background": "still running in the background in Windows",
   "cleanup.result.title": "Result",
   "cleanup.result.freed": "{size} freed",
   "cleanup.result.skipped": "{count} in use",
@@ -1681,8 +1694,6 @@ export const en = {
     "Windows' own cleanup modules (the ones Disk Cleanup uses) do the deleting, with a preview and a confirmation. Only original Windows modules are accepted.",
   "volcache.needs_admin":
     "Windows only lets system files be measured and cleaned as administrator.",
-  "volcache.measuring": "Measuring {done}/{total}…",
-  "volcache.slow": "Some items take minutes.",
   "volcache.nothing": "Nothing to clean",
   "volcache.error.missing": "Not on this Windows",
   "volcache.error.untrusted": "Blocked: the module is not the original Windows one",

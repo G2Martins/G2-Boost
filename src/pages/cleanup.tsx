@@ -1,5 +1,6 @@
 import { BrushCleaning, Eye, History, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LivePanel } from "@/components/cleanup/live-panel";
 import { SystemFilesPanel } from "@/components/cleanup/system-files";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
@@ -64,7 +65,9 @@ export function CleanupPage() {
   });
   const [preview, setPreview] = useState<Record<string, PreviewItem>>({});
   const [phase, setPhase] = useState<Phase>("idle");
-  const [progress, setProgress] = useState<CleanupProgress | null>(null);
+  // What the core is doing right now (preview or run) and since when: the live panel.
+  const [live, setLive] = useState<CleanupProgress | null>(null);
+  const [startedAt, setStartedAt] = useState(0);
   const [result, setResult] = useState<RunRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<RunRecord[]>([]);
@@ -75,11 +78,13 @@ export function CleanupPage() {
     backend.cleanupHistory().then((h) => h && setHistory(h));
   }, []);
   useEffect(() => {
-    let off: (() => void) | null = null;
-    backend.on<CleanupProgress>("cleanup:progress", setProgress).then((u) => {
-      off = u;
-    });
-    return () => off?.();
+    const offs: (() => void)[] = [];
+    for (const ev of ["cleanup:measure", "cleanup:progress"]) {
+      backend.on<CleanupProgress>(ev, setLive).then((u) => offs.push(u));
+    }
+    return () => {
+      for (const off of offs) off();
+    };
   }, []);
 
   const visible = useMemo(() => CLEANUP_CATALOG.filter((c) => c.group === group), [group]);
@@ -92,6 +97,8 @@ export function CleanupPage() {
     setPhase("previewing");
     setError(null);
     setResult(null);
+    setLive({ done: 0, total: selected.length, current: null, bytes: 0, files: 0 });
+    setStartedAt(Date.now());
     try {
       const items = await backend.cleanupPreview(selected);
       setPreview(Object.fromEntries(items.map((i) => [i.id, i])));
@@ -99,6 +106,7 @@ export function CleanupPage() {
       setError(errorText(e));
     } finally {
       setPhase("idle");
+      setLive(null);
     }
   }, [selected, errorText]);
   const started = useRef(false);
@@ -111,7 +119,8 @@ export function CleanupPage() {
 
   const execute = async () => {
     setPhase("running");
-    setProgress({ done: 0, total: selected.length });
+    setLive({ done: 0, total: selected.length, current: null, bytes: 0, files: 0 });
+    setStartedAt(Date.now());
     setError(null);
     try {
       const tok = await backend.cleanupConfirm(selected);
@@ -124,7 +133,7 @@ export function CleanupPage() {
       setError(errorText(e));
     } finally {
       setPhase("idle");
-      setProgress(null);
+      setLive(null);
     }
   };
 
@@ -214,13 +223,22 @@ export function CleanupPage() {
               {t("cleanup.run")}
             </Button>
           </div>
-          {progress ? (
-            <p className="w-full text-xs text-muted-foreground">
-              {t("cleanup.running", { done: progress.done, total: progress.total })}
-            </p>
-          ) : null}
           {error ? <p className="w-full text-xs text-destructive">{error}</p> : null}
         </Card>
+
+        {live && busy && group !== "system" ? (
+          <LivePanel
+            live={live}
+            running={phase === "running"}
+            ids={selected}
+            since={startedAt}
+            expected={phase === "running" ? totalBytes : 0}
+            nameOf={(id) => t(cleanupName(id))}
+            onStop={() => void backend.cleanupCancel()}
+            opaque={(id) => preview[id]?.measurable === false}
+            noteOf={(id) => (id === "dism" ? "cleanup.live.component" : undefined)}
+          />
+        ) : null}
 
         {phase === "confirm" && group !== "system" ? (
           <Card className="animate-rise border-warning/40">

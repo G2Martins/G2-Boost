@@ -12,6 +12,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,10 @@ use crate::tasksched;
 
 const TOKEN_TTL: Duration = Duration::from_secs(120);
 const HISTORY_MAX: usize = 100;
+/// A long category reports at most this often while it walks (one event per file would flood the UI).
+const TICK: Duration = Duration::from_millis(150);
+/// How long a run waits for Windows' component cleanup task before leaving it in the background.
+const COMPONENT_WAIT: Duration = Duration::from_secs(30 * 60);
 
 /* ---------------- catalog ---------------- */
 
@@ -318,10 +323,18 @@ pub struct Tally {
     pub skipped: u64,
 }
 
+/// Per-file callback of a walk: sees the tally so far, returns `false` to stop (cancelled).
+type Tick<'a> = dyn FnMut(&Tally) -> bool + 'a;
+
 /// Sum files under `dir` (recursive), never crossing reparse points.
 pub(crate) fn measure_dir(dir: &Path, t: &mut Tally) {
+    measure_dir_with(dir, t, &mut |_| true);
+}
+
+/// [`measure_dir`] that calls `tick` after each file; `false` = it stopped early.
+fn measure_dir_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool {
     let Ok(rd) = fs::read_dir(dir) else {
-        return;
+        return true;
     };
     for e in rd.flatten() {
         let Ok(md) = e.metadata() else {
@@ -331,18 +344,29 @@ pub(crate) fn measure_dir(dir: &Path, t: &mut Tally) {
             continue;
         }
         if md.is_dir() {
-            measure_dir(&e.path(), t);
+            if !measure_dir_with(&e.path(), t, tick) {
+                return false;
+            }
         } else {
             t.bytes += md.len();
             t.files += 1;
+            if !tick(t) {
+                return false;
+            }
         }
     }
+    true
 }
 
 /// Delete files under `dir` and then the emptied subdirectories (bottom-up). `dir` itself stays.
 pub(crate) fn delete_dir_contents(dir: &Path, t: &mut Tally) {
+    delete_dir_contents_with(dir, t, &mut |_| true);
+}
+
+/// [`delete_dir_contents`] that calls `tick` after each file; `false` = it stopped early.
+fn delete_dir_contents_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool {
     let Ok(rd) = fs::read_dir(dir) else {
-        return;
+        return true;
     };
     for e in rd.flatten() {
         let Ok(md) = e.metadata() else {
@@ -354,8 +378,11 @@ pub(crate) fn delete_dir_contents(dir: &Path, t: &mut Tally) {
         }
         let p = e.path();
         if md.is_dir() {
-            delete_dir_contents(&p, t);
+            let go_on = delete_dir_contents_with(&p, t, tick);
             let _ = fs::remove_dir(&p); // only succeeds when empty
+            if !go_on {
+                return false;
+            }
         } else {
             let len = md.len();
             match fs::remove_file(&p) {
@@ -365,7 +392,39 @@ pub(crate) fn delete_dir_contents(dir: &Path, t: &mut Tally) {
                 }
                 Err(_) => t.skipped += 1,
             }
+            if !tick(t) {
+                return false;
+            }
         }
+    }
+    true
+}
+
+/* ---------------- live progress ---------------- */
+
+/// Live state of a preview or a run, sent to the UI while it works.
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
+pub struct Progress {
+    /// Categories finished.
+    pub done: usize,
+    pub total: usize,
+    /// Category in flight; `None` once everything finished (or stopped).
+    pub current: Option<&'static str>,
+    /// Measured (preview) or freed (run) so far, the category in flight included.
+    pub bytes: u64,
+    pub files: u64,
+}
+
+/// The per-file [`Tick`] of one category: reports `p` plus the category's tally at most every
+/// [`TICK`] and keeps going until `cancel` is set.
+fn ticker<'a>(p: &'a Progress, cancel: &'a AtomicBool, report: &'a mut dyn FnMut(&Progress)) -> impl FnMut(&Tally) -> bool + 'a {
+    let mut last = Instant::now();
+    move |t| {
+        if last.elapsed() >= TICK {
+            last = Instant::now();
+            report(&Progress { bytes: p.bytes + t.bytes, files: p.files + t.files, ..p.clone() });
+        }
+        !cancel.load(Ordering::Relaxed)
     }
 }
 
@@ -440,51 +499,76 @@ pub struct PreviewItem {
 }
 
 pub fn preview(ids: &[String]) -> Vec<PreviewItem> {
+    preview_live(ids, &AtomicBool::new(false), |_| {})
+}
+
+/// [`preview`] that reports as it measures and stops early when `cancel` is set (the
+/// categories not reached are left out).
+pub fn preview_live(ids: &[String], cancel: &AtomicBool, mut report: impl FnMut(&Progress)) -> Vec<PreviewItem> {
     let elevated = system::is_elevated();
     let running: HashSet<String> = system::running_processes();
-    ids.iter()
-        .filter_map(|id| find(id))
-        .map(|c| {
-            let mut item = PreviewItem {
-                id: c.id,
-                bytes: 0,
-                files: 0,
-                measurable: true,
-                missing: false,
-                needs_admin: c.admin && !elevated,
-                blocked_by: c.requires_closed.iter().filter(|p| running.contains(**p)).map(|p| p.to_string()).collect(),
-            };
-            match c.action {
-                Action::DirContents | Action::TopFiles(_) => {
-                    let roots: Vec<PathBuf> = paths(c.id).into_iter().filter(|p| matches!(checked_root(p), Ok(Some(_)))).collect();
-                    item.missing = roots.is_empty();
-                    let mut t = Tally::default();
-                    for r in &roots {
-                        match c.action {
-                            Action::DirContents => measure_dir(r, &mut t),
-                            Action::TopFiles(globs) => {
-                                for (_, len) in top_files(r, globs) {
-                                    t.bytes += len;
-                                    t.files += 1;
-                                }
+    let cats: Vec<&Category> = ids.iter().filter_map(|id| find(id)).collect();
+    let mut p = Progress { total: cats.len(), ..Default::default() };
+    let mut out = Vec::with_capacity(cats.len());
+    for c in cats {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        p.current = Some(c.id);
+        report(&p);
+        let mut item = PreviewItem {
+            id: c.id,
+            bytes: 0,
+            files: 0,
+            measurable: true,
+            missing: false,
+            needs_admin: c.admin && !elevated,
+            blocked_by: c.requires_closed.iter().filter(|p| running.contains(**p)).map(|p| p.to_string()).collect(),
+        };
+        match c.action {
+            Action::DirContents | Action::TopFiles(_) => {
+                let roots: Vec<PathBuf> = paths(c.id).into_iter().filter(|p| matches!(checked_root(p), Ok(Some(_)))).collect();
+                item.missing = roots.is_empty();
+                let mut t = Tally::default();
+                let mut tick = ticker(&p, cancel, &mut report);
+                for r in &roots {
+                    match c.action {
+                        Action::DirContents => {
+                            if !measure_dir_with(r, &mut t, &mut tick) {
+                                break;
                             }
-                            _ => unreachable!(),
                         }
+                        Action::TopFiles(globs) => {
+                            for (_, len) in top_files(r, globs) {
+                                t.bytes += len;
+                                t.files += 1;
+                            }
+                        }
+                        _ => unreachable!(),
                     }
-                    item.bytes = t.bytes;
-                    item.files = t.files;
                 }
-                Action::RecycleBin => {
-                    if let Some((b, n)) = recycle_bin_info() {
-                        item.bytes = b;
-                        item.files = n;
-                    }
-                }
-                Action::DnsFlush | Action::ComponentCleanup => item.measurable = false,
+                item.bytes = t.bytes;
+                item.files = t.files;
             }
-            item
-        })
-        .collect()
+            Action::RecycleBin => {
+                if let Some((b, n)) = recycle_bin_info() {
+                    item.bytes = b;
+                    item.files = n;
+                }
+            }
+            Action::DnsFlush | Action::ComponentCleanup => item.measurable = false,
+        }
+        if cancel.load(Ordering::Relaxed) {
+            break; // half-measured: leave it out rather than show a wrong size
+        }
+        p.bytes += item.bytes;
+        p.files += item.files;
+        p.done += 1;
+        out.push(item);
+    }
+    p.current = None;
+    report(&p);
+    out
 }
 
 /* ---------------- confirm token ---------------- */
@@ -561,31 +645,42 @@ pub enum CleanupError {
     UnknownCategory,
 }
 
-/// Run the categories in `ids` (already confirmed). `on_progress(done, total)` after each one.
-pub fn execute(ids: &[String], trigger: &str, mut on_progress: impl FnMut(usize, usize)) -> RunRecord {
+/// Run the categories in `ids` (already confirmed), reporting as it goes. `cancel` stops between
+/// files: the category in flight keeps what it freed and, like the ones not reached, ends `cancelled`.
+pub fn execute(ids: &[String], trigger: &str, cancel: &AtomicBool, mut report: impl FnMut(&Progress)) -> RunRecord {
     let t0 = Instant::now();
     let elevated = system::is_elevated();
+    let mut p = Progress { total: ids.len(), ..Default::default() };
     let mut items = Vec::new();
-    for (i, id) in ids.iter().enumerate() {
+    for id in ids {
         let Some(c) = find(id) else {
             items.push(ExecItem { id: id.clone(), error: Some("unknown_category".into()), ..Default::default() });
+            p.done += 1;
             continue;
         };
         let mut item = ExecItem { id: c.id.to_string(), ..Default::default() };
-        if c.admin && !elevated {
+        if cancel.load(Ordering::Relaxed) {
+            item.error = Some("cancelled".into());
+        } else if c.admin && !elevated {
             item.error = Some("needs_admin".into());
         } else {
-            run_one(c, &mut item);
+            p.current = Some(c.id);
+            report(&p);
+            run_one(c, &mut item, &mut ticker(&p, cancel, &mut report));
         }
+        p.bytes += item.bytes_freed;
+        p.files += item.files_deleted;
+        p.done += 1;
         items.push(item);
-        on_progress(i + 1, ids.len());
     }
+    p.current = None;
+    report(&p);
     let record = RunRecord { at: registry::now_unix(), trigger: trigger.to_string(), duration_ms: t0.elapsed().as_millis() as u64, items };
     record_run(&record);
     record
 }
 
-fn run_one(c: &Category, item: &mut ExecItem) {
+fn run_one(c: &Category, item: &mut ExecItem, tick: &mut Tick) {
     match c.action {
         Action::DirContents | Action::TopFiles(_) => {
             let mut t = Tally::default();
@@ -594,7 +689,12 @@ fn run_one(c: &Category, item: &mut ExecItem) {
                     continue;
                 };
                 match c.action {
-                    Action::DirContents => delete_dir_contents(&p, &mut t),
+                    Action::DirContents => {
+                        if !delete_dir_contents_with(&p, &mut t, tick) {
+                            item.error = Some("cancelled".into());
+                            break;
+                        }
+                    }
                     Action::TopFiles(globs) => {
                         for (f, len) in top_files(&p, globs) {
                             match fs::remove_file(&f) {
@@ -631,8 +731,13 @@ fn run_one(c: &Category, item: &mut ExecItem) {
             }
         }
         Action::ComponentCleanup => {
-            if let Err(e) = tasksched::run_task("\\Microsoft\\Windows\\Servicing", "StartComponentCleanup") {
-                item.error = Some(e.to_string());
+            // Waits for Windows' own task (it can take many minutes); Stop or the time cap leave
+            // it running in the background, said as such instead of a false "done".
+            let keep_waiting = || tick(&Tally::default());
+            match tasksched::run_task_wait("\\Microsoft\\Windows\\Servicing", "StartComponentCleanup", COMPONENT_WAIT, keep_waiting) {
+                Ok(true) => {}
+                Ok(false) => item.error = Some("background".into()),
+                Err(e) => item.error = Some(e.to_string()),
             }
         }
     }
@@ -937,9 +1042,42 @@ pub(crate) mod tests {
         }
         // SAFETY: shared data-dir override for tests (same value everywhere).
         unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
-        let rec = execute(&["temp_windows".into(), "nope".into()], "test", |_, _| {});
+        let mut seen = Vec::new();
+        let rec = execute(&["temp_windows".into(), "nope".into()], "test", &AtomicBool::new(false), |p| seen.push(p.clone()));
         assert_eq!(rec.items[0].error.as_deref(), Some("needs_admin"));
         assert_eq!(rec.items[1].error.as_deref(), Some("unknown_category"));
         assert!(history().iter().any(|r| r.trigger == "test"));
+        assert_eq!(seen.last(), Some(&Progress { done: 2, total: 2, ..Default::default() }), "ends with everything done, nothing current");
+    }
+
+    #[test]
+    fn stop_between_files_keeps_the_rest_and_the_ticker_reports_running_totals() {
+        let dir = tmp_tree("stop");
+        for i in 0..10 {
+            fs::write(dir.join(format!("f{i}.tmp")), [0u8; 100]).unwrap();
+        }
+        // Measuring stops after the 3rd file.
+        let mut t = Tally::default();
+        assert!(!measure_dir_with(&dir, &mut t, &mut |t| t.files < 3));
+        assert_eq!((t.files, t.bytes), (3, 300));
+        // Deleting stops after the 4th file: the other 6 stay.
+        let mut t = Tally::default();
+        assert!(!delete_dir_contents_with(&dir, &mut t, &mut |t| t.files < 4));
+        assert_eq!(t.files, 4);
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 6);
+        // The ticker adds the run's earlier totals and says stop once cancel is set.
+        let base = Progress { done: 1, total: 3, current: Some("temp_user"), bytes: 1000, files: 10 };
+        let cancel = AtomicBool::new(false);
+        let mut got = Vec::new();
+        let mut report = |p: &Progress| got.push(p.clone());
+        let mut tick = ticker(&base, &cancel, &mut report);
+        std::thread::sleep(TICK);
+        assert!(tick(&Tally { bytes: 50, files: 2, skipped: 0 }));
+        assert!(tick(&Tally { bytes: 60, files: 3, skipped: 0 }), "throttled: no second report yet");
+        cancel.store(true, Ordering::Relaxed);
+        assert!(!tick(&Tally::default()));
+        drop(tick);
+        assert_eq!(got, vec![Progress { bytes: 1050, files: 12, ..base }]);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

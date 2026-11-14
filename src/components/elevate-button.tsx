@@ -14,6 +14,7 @@ export function useErrorText() {
       if (msg === "cancelled") return t("boost.error.cancelled");
       if (msg === "blocked") return t("boost.error.blocked");
       if (msg === "bad_token") return t("cleanup.error.bad_token");
+      if (msg === "background") return t("cleanup.error.background");
       if (msg === "protected_item") return t("boost.startup.protected");
       if (msg === "protected_path") return t("disk.recycle.protected");
       if (msg === "scan_running") return t("disk.recycle.scan_running");

@@ -3,6 +3,7 @@
 //! (DISM component cleanup without `DISM.exe`), and the "start with Windows" logon task.
 
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{VARIANT_FALSE, VARIANT_TRUE};
 use windows::Win32::System::Com::{
@@ -136,17 +137,33 @@ pub fn set_task_enabled(folder_path: &str, name: &str, enabled: bool) -> Result<
     }
 }
 
-/// Start an existing task (e.g. Windows' StartComponentCleanup) and return immediately.
-pub fn run_task(folder_path: &str, name: &str) -> Result<(), TaskError> {
+/// Start an existing task (e.g. Windows' StartComponentCleanup) and wait while an instance of
+/// it runs, polling every 500 ms for at most `max`. `keep_waiting` returning `false` ends the
+/// wait early; the task itself keeps running. `Ok(true)` = it finished (with a success result),
+/// `Ok(false)` = still running when we stopped waiting.
+pub fn run_task_wait(folder_path: &str, name: &str, max: Duration, mut keep_waiting: impl FnMut() -> bool) -> Result<bool, TaskError> {
     let _com = Com::init()?;
     let svc = service()?;
     let f = folder(&svc, folder_path)?;
-    // SAFETY: valid folder; empty VARIANT = no parameters.
+    let t0 = Instant::now();
+    // SAFETY: valid folder/task; empty VARIANT = no parameters; read-only polling afterwards.
     unsafe {
         let task: IRegisteredTask = f.GetTask(&BSTR::from(name)).map_err(map)?;
+        // `Run` creates the instance before returning, so "no instance" below really means done.
         task.Run(&VARIANT::default()).map_err(map)?;
+        while t0.elapsed() < max {
+            if task.GetInstances(0).and_then(|c| c.Count()).map_err(map)? == 0 {
+                let code = task.LastTaskResult().map_err(map)?;
+                // A handler task reports an HRESULT: negative = failure (positive SCHED_S_* are notes).
+                return if code < 0 { Err(TaskError::Com(format!("task result 0x{:08X}", code as u32))) } else { Ok(true) };
+            }
+            if !keep_waiting() {
+                return Ok(false);
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
     }
-    Ok(())
+    Ok(false)
 }
 
 /// Register (or replace) a task in the root folder that runs `exe args` at the current user's

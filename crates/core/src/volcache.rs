@@ -33,7 +33,7 @@ use windows::Win32::UI::LegacyWindowsEnvironmentFeatures::{
 };
 use windows::core::{GUID, HRESULT, IUnknown, Interface, PCWSTR, PWSTR, implement, s};
 
-use crate::cleanup::{ExecItem, Risk, RunRecord};
+use crate::cleanup::{ExecItem, Progress, Risk, RunRecord};
 use crate::registry::{self, Root, Value, wide};
 use crate::{repair, system, tasksched};
 
@@ -295,15 +295,19 @@ fn system_volume() -> Vec<u16> {
     wide(&format!("{root}\\"))
 }
 
-/// Run `ids` (validated) on a fresh STA thread; `on_progress(done, total)` after each one.
-fn drive(ids: &[String], purge: bool, on_progress: &mut (dyn FnMut(usize, usize) + Send)) -> Vec<(&'static Handler, Result<Measured, String>)> {
+/// Run `ids` (validated) on a fresh STA thread, reporting the handler in flight (one handler can
+/// take minutes) and the bytes measured / freed so far.
+fn drive(ids: &[String], purge: bool, report: &mut (dyn FnMut(&Progress) + Send)) -> Vec<(&'static Handler, Result<Measured, String>)> {
     let list: Vec<&'static Handler> = ids.iter().filter_map(|i| find(i)).collect();
     std::thread::scope(|sc| {
         sc.spawn(|| {
             let com = tasksched::Com::init();
             let volume = system_volume();
+            let mut p = Progress { total: list.len(), ..Default::default() };
             let mut out = Vec::new();
-            for (i, h) in list.iter().enumerate() {
+            for h in &list {
+                p.current = Some(h.id);
+                report(&p);
                 let r = if com.is_err() {
                     Err("com".into())
                 } else if repair::cancelled() {
@@ -311,9 +315,14 @@ fn drive(ids: &[String], purge: bool, on_progress: &mut (dyn FnMut(usize, usize)
                 } else {
                     run_one(h, &volume, purge)
                 };
+                if let Ok(m) = &r {
+                    p.bytes += if purge { m.freed } else { m.used };
+                }
+                p.done += 1;
                 out.push((*h, r));
-                on_progress(i + 1, list.len());
             }
+            p.current = None;
+            report(&p);
             out
         })
         .join()
@@ -344,7 +353,7 @@ pub enum VcError {
 
 /// Measure (`GetSpaceUsed`) the selected handlers. Admin only: without elevation every item
 /// comes back `needs_admin` and no handler is loaded.
-pub fn preview(ids: &[String], mut on_progress: impl FnMut(usize, usize) + Send) -> Result<Vec<VcItem>, VcError> {
+pub fn preview(ids: &[String], mut on_progress: impl FnMut(&Progress) + Send) -> Result<Vec<VcItem>, VcError> {
     if !valid_selection(ids) {
         return Err(VcError::BadSelection);
     }
@@ -364,7 +373,7 @@ pub fn preview(ids: &[String], mut on_progress: impl FnMut(usize, usize) + Send)
 
 /// Purge the selected handlers (already confirmed with a token by the caller). Recorded in the
 /// cleanup history like any other run.
-pub fn execute(ids: &[String], trigger: &str, mut on_progress: impl FnMut(usize, usize) + Send) -> Result<RunRecord, VcError> {
+pub fn execute(ids: &[String], trigger: &str, mut on_progress: impl FnMut(&Progress) + Send) -> Result<RunRecord, VcError> {
     if !valid_selection(ids) {
         return Err(VcError::BadSelection);
     }
@@ -413,7 +422,7 @@ mod tests {
         assert!(!valid_selection(&ids(&["temp_user"])), "catalog ids are not handlers");
         assert!(!valid_selection(&ids(&["DownloadsFolder"])), "key names are not ids");
         assert!(!valid_selection(&ids(&["sys_chkdsk", "sys_chkdsk"])));
-        assert!(matches!(preview(&ids(&["../evil"]), |_, _| {}), Err(VcError::BadSelection)));
+        assert!(matches!(preview(&ids(&["../evil"]), |_| {}), Err(VcError::BadSelection)));
     }
 
     #[test]
@@ -474,9 +483,9 @@ mod tests {
         }
         // SAFETY: shared data-dir override for tests (same value everywhere).
         unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
-        let rec = execute(&["sys_setup_logs".into()], "test", |_, _| {}).unwrap();
+        let rec = execute(&["sys_setup_logs".into()], "test", |_| {}).unwrap();
         assert_eq!(rec.items[0].error.as_deref(), Some("needs_admin"));
-        let p = preview(&["sys_update_cleanup".into()], |_, _| {}).unwrap();
+        let p = preview(&["sys_update_cleanup".into()], |_| {}).unwrap();
         assert!(p[0].needs_admin && !p[0].available);
     }
 
@@ -487,7 +496,7 @@ mod tests {
     fn measure_live() {
         assert!(system::is_elevated(), "run elevated");
         let ids: Vec<String> = HANDLERS.iter().map(|h| h.id.to_string()).collect();
-        for i in preview(&ids, |d, t| eprintln!("{d}/{t}")).unwrap() {
+        for i in preview(&ids, |p| eprintln!("{}/{} {:?}", p.done, p.total, p.current)).unwrap() {
             println!("{:<28} bytes={:<14} available={} error={:?}", i.id, i.bytes, i.available, i.error);
             assert!(i.error.as_deref() != Some("untrusted_handler"), "{}", i.id);
         }

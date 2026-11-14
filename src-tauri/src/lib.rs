@@ -196,12 +196,28 @@ async fn blocking<T: Send + 'static, E: ToString>(f: impl FnOnce() -> Result<T, 
 
 const MAX_CATEGORIES: usize = 64;
 
+/// Stop for the cleanup page's preview and run (`cleanup_cancel`); each one clears it on start.
+/// Routines and MCP runs use their own flag, so Stop never reaches them.
+static CLEANUP_CANCEL: AtomicBool = AtomicBool::new(false);
+
 #[tauri::command]
-async fn cleanup_preview(ids: Vec<String>) -> Vec<PreviewItem> {
+async fn cleanup_preview(app: AppHandle, ids: Vec<String>) -> Vec<PreviewItem> {
     if ids.len() > MAX_CATEGORIES {
         return Vec::new();
     }
-    tauri::async_runtime::spawn_blocking(move || cleanup::preview(&ids)).await.unwrap_or_default()
+    CLEANUP_CANCEL.store(false, Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || {
+        cleanup::preview_live(&ids, &CLEANUP_CANCEL, |p| {
+            let _ = app.emit("cleanup:measure", p);
+        })
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+fn cleanup_cancel() {
+    CLEANUP_CANCEL.store(true, Ordering::SeqCst);
 }
 
 /// Issued only from the UI's confirmation dialog; single use, 2-minute TTL, bound to `ids`.
@@ -211,12 +227,6 @@ fn cleanup_confirm(tokens: State<'_, TokenStore>, ids: Vec<String>) -> Result<Co
         return Err("bad_selection".into());
     }
     Ok(tokens.issue(ids))
-}
-
-#[derive(serde::Serialize, Clone)]
-struct CleanupProgress {
-    done: usize,
-    total: usize,
 }
 
 #[tauri::command]
@@ -229,9 +239,10 @@ async fn cleanup_execute(
     if !tokens.consume(token, &ids) {
         return Err("bad_token".into());
     }
+    CLEANUP_CANCEL.store(false, Ordering::SeqCst);
     tauri::async_runtime::spawn_blocking(move || {
-        cleanup::execute(&ids, "manual", |done, total| {
-            let _ = app.emit("cleanup:progress", CleanupProgress { done, total });
+        cleanup::execute(&ids, "manual", &CLEANUP_CANCEL, |p| {
+            let _ = app.emit("cleanup:progress", p);
         })
     })
     .await
@@ -1277,13 +1288,19 @@ fn spawn_routines(app: AppHandle) {
                 let last = r.state.lock().unwrap().last_run;
                 if routines::due(&s.schedule, Clock::now(), last, r.ran_since_start.load(Ordering::SeqCst)) {
                     r.running.store(true, Ordering::SeqCst);
-                    let rec = cleanup::execute(&s.routine_categories, "routine", |_, _| {});
-                    r.ran_since_start.store(true, Ordering::SeqCst);
-                    let st = RoutineState { last_run: Some(rec.at) };
-                    routines::save_state(&st);
-                    *r.state.lock().unwrap() = st;
-                    r.running.store(false, Ordering::SeqCst);
-                    let _ = app.emit("routine:done", rec);
+                    // Own thread: a long run (GBs of caches, the component cleanup) must not hold
+                    // up Game Mode, priority rules and the exposure monitor on this 5 s loop.
+                    let (app, ids) = (app.clone(), s.routine_categories.clone());
+                    std::thread::spawn(move || {
+                        let r = app.state::<Routines>();
+                        let rec = cleanup::execute(&ids, "routine", &AtomicBool::new(false), |_| {});
+                        r.ran_since_start.store(true, Ordering::SeqCst);
+                        let st = RoutineState { last_run: Some(rec.at) };
+                        routines::save_state(&st);
+                        *r.state.lock().unwrap() = st;
+                        r.running.store(false, Ordering::SeqCst);
+                        let _ = app.emit("routine:done", rec);
+                    });
                 }
             }
             // Exposure monitor: first pass ~10 s after start (records the baseline), then every 5 min.
@@ -1931,8 +1948,8 @@ struct RepairProgress {
 #[tauri::command]
 async fn volcache_preview(app: AppHandle, ids: Vec<String>) -> Result<Vec<volcache::VcItem>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        volcache::preview(&ids, |done, total| {
-            let _ = app.emit("volcache:progress", CleanupProgress { done, total });
+        volcache::preview(&ids, |p| {
+            let _ = app.emit("volcache:progress", p);
         })
         .map_err(|e| e.to_string())
     })
@@ -1955,8 +1972,8 @@ async fn volcache_execute(app: AppHandle, tokens: State<'_, TokenStore>, token: 
         return Err("bad_token".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        volcache::execute(&ids, "manual", |done, total| {
-            let _ = app.emit("volcache:progress", CleanupProgress { done, total });
+        volcache::execute(&ids, "manual", |p| {
+            let _ = app.emit("volcache:progress", p);
         })
         .map_err(|e| e.to_string())
     })
@@ -2577,6 +2594,7 @@ pub fn run() {
             volcache_execute,
             repair_run,
             repair_cancel,
+            cleanup_cancel,
             repair_status,
             repair_history,
             bios_guide,

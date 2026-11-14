@@ -89,7 +89,7 @@ pub fn run_cleanup(ids: Vec<String>) -> Value {
     if !confirm((&format!("limpar {} ({} medidos agora)", ids.len(), gb(total)), &format!("clean {} categories ({} measured now)", ids.len(), gb(total))), &details) {
         return declined();
     }
-    json!({ "done": true, "run": cleanup::execute(&ids, "mcp", |_, _| {}) })
+    json!({ "done": true, "run": cleanup::execute(&ids, "mcp", &std::sync::atomic::AtomicBool::new(false), |_| {}) })
 }
 
 /* ---------------- tweaks, visual effects ---------------- */

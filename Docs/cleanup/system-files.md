@@ -1,6 +1,6 @@
 # Limpeza — Arquivos do sistema (handlers da Limpeza de Disco)
 
-**Última revisão:** 2026-10-22 · Código: `crates/core/src/volcache.rs` (+ `repair.rs`: vaga única e cancelamento) · Shell: `volcache_preview` / `volcache_confirm` / `volcache_execute`, `repair_cancel` · UI: aba **Arquivos do sistema** em `src/pages/cleanup.tsx` (`src/components/cleanup/system-files.tsx`); botão "Limpar com segurança" no WinSxS e no Windows.old dos essenciais grandes (`src/pages/disk.tsx`).
+**Última revisão:** 2026-11-14 (painel ao vivo com o handler atual) · 2026-10-22 · Código: `crates/core/src/volcache.rs` (+ `repair.rs`: vaga única e cancelamento) · Shell: `volcache_preview` / `volcache_confirm` / `volcache_execute`, `repair_cancel` · UI: aba **Arquivos do sistema** em `src/pages/cleanup.tsx` (`src/components/cleanup/system-files.tsx`); botão "Limpar com segurança" no WinSxS e no Windows.old dos essenciais grandes (`src/pages/disk.tsx`).
 
 ## O que é
 
@@ -8,11 +8,11 @@ Os mesmos módulos que a Limpeza de Disco do Windows usa (`IEmptyVolumeCache2` q
 
 ## Fluxo (igual ao catálogo)
 
-1. **Prévia** (`volcache_preview(ids)`): para cada id, carrega o handler, `InitializeEx(chave, "C:\", nome da chave)` (ou `Initialize` na v1) → `S_FALSE` = nada a limpar; senão `GetSpaceUsed` (bytes) → `Deactivate`. **Admin obrigatório**: sem elevação devolve `needs_admin` em todos os itens e não carrega nada. Evento `volcache:progress {done, total}` a cada handler (Limpeza de atualizações leva minutos).
+1. **Prévia** (`volcache_preview(ids)`): para cada id, carrega o handler, `InitializeEx(chave, "C:\", nome da chave)` (ou `Initialize` na v1) → `S_FALSE` = nada a limpar; senão `GetSpaceUsed` (bytes) → `Deactivate`. **Admin obrigatório**: sem elevação devolve `needs_admin` em todos os itens e não carrega nada. Evento `volcache:progress` (`cleanup::Progress`: `current` = handler em andamento, `bytes` medidos/liberados até agora) no início e no fim de cada handler (Limpeza de atualizações leva minutos); a UI usa o mesmo painel ao vivo da limpeza (relógio, handler atual, trilho em varredura).
 2. **Confirmação**: painel com total e, em vermelho, o que não tem volta (itens com aviso). `volcache_confirm(ids)` emite um `ConfirmToken` do **mesmo** `TokenStore` do catálogo (uso único, 2 min, amarrado aos ids). Os ids `sys_*` nunca coincidem com ids do catálogo (teste), então um token não serve para o outro fluxo.
 3. **Execução** (`volcache_execute(token, ids)`): token consumido antes de qualquer coisa; `GetSpaceUsed` + `Purge(bytes medidos)` + `Deactivate` por handler, numa thread STA própria. Bytes liberados = último `PurgeProgress` (ou o medido).
 4. **Histórico**: o mesmo `history.json` da limpeza (`cleanup::record_run`), gatilho `manual`.
-5. **Parar**: `repair_cancel` → o callback devolve `E_ABORT` no próximo progresso.
+5. **Parar** (botão no painel ao vivo): `repair_cancel` → o callback devolve `E_ABORT` no próximo progresso.
 
 Uma tarefa de manutenção por vez no app inteiro (`repair::exclusive`): a limpeza de arquivos do sistema e o DISM mexem no mesmo repositório de componentes. Ocupado = `busy`.
 

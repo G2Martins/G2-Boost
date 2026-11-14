@@ -1,5 +1,6 @@
-import { BrushCleaning, Eye, ShieldAlert, Square, Trash2, TriangleAlert } from "lucide-react";
+import { BrushCleaning, Eye, ShieldAlert, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { LivePanel } from "@/components/cleanup/live-panel";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { rise } from "@/components/shell/page-header";
 import { Badge, Button, Card, CardTitle, HelpHint, Switch } from "@/components/ui/primitives";
@@ -58,6 +59,7 @@ export function SystemFilesPanel({
   const [preview, setPreview] = useState<Record<string, VolCacheItem>>({});
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<CleanupProgress | null>(null);
+  const [startedAt, setStartedAt] = useState(0);
   const [result, setResult] = useState<RunRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +86,8 @@ export function SystemFilesPanel({
     setPhase("previewing");
     setError(null);
     setResult(null);
-    setProgress({ done: 0, total: selected.length });
+    setProgress({ done: 0, total: selected.length, current: null, bytes: 0, files: 0 });
+    setStartedAt(Date.now());
     try {
       const items = await backend.volcachePreview(selected);
       setPreview(Object.fromEntries(items.map((i) => [i.id, i])));
@@ -98,7 +101,8 @@ export function SystemFilesPanel({
 
   const execute = async () => {
     setPhase("running");
-    setProgress({ done: 0, total: selected.length });
+    setProgress({ done: 0, total: selected.length, current: null, bytes: 0, files: 0 });
+    setStartedAt(Date.now());
     setError(null);
     try {
       const tok = await backend.volcacheConfirm(selected);
@@ -146,12 +150,6 @@ export function SystemFilesPanel({
           </span>
         ) : null}
         <div className="ml-auto flex gap-2">
-          {busy ? (
-            <Button variant="ghost" onClick={() => void backend.repairCancel()}>
-              <Square className="size-4" />
-              {t("common.stop")}
-            </Button>
-          ) : null}
           <Button
             variant="outline"
             disabled={busy || !inTauri || !elevated || selected.length === 0}
@@ -169,17 +167,22 @@ export function SystemFilesPanel({
             {t("cleanup.run")}
           </Button>
         </div>
-        {progress ? (
-          <p className="w-full text-xs text-muted-foreground">
-            {t(phase === "running" ? "cleanup.running" : "volcache.measuring", {
-              done: progress.done,
-              total: progress.total,
-            })}
-            <span className="ml-2 text-muted-foreground/70">{t("volcache.slow")}</span>
-          </p>
-        ) : null}
         {error ? <p className="w-full text-xs text-destructive">{error}</p> : null}
       </Card>
+
+      {progress && busy ? (
+        <LivePanel
+          live={progress}
+          running={phase === "running"}
+          ids={selected}
+          since={startedAt}
+          expected={phase === "running" ? totalBytes : 0}
+          nameOf={(id) => t(name(id))}
+          // One servicing slot for the app: Stop is the shared repair cancel.
+          onStop={() => void backend.repairCancel()}
+          opaque={() => true}
+        />
+      ) : null}
 
       {phase === "confirm" ? (
         <Card className="animate-rise border-warning/40">

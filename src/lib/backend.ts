@@ -194,7 +194,16 @@ export type ExecItem = {
   error: string | null;
 };
 export type RunRecord = { at: number; trigger: string; duration_ms: number; items: ExecItem[] };
-export type CleanupProgress = { done: number; total: number };
+/** Live state of a cleanup preview (`cleanup:measure`) or run (`cleanup:progress`). */
+export type CleanupProgress = {
+  done: number;
+  total: number;
+  /** Category in flight; null once everything finished or stopped. */
+  current: string | null;
+  /** Measured (preview) or freed (run) so far, the category in flight included. */
+  bytes: number;
+  files: number;
+};
 
 export type Schedule =
   | { mode: "off" }
@@ -950,6 +959,8 @@ export const backend = {
   cleanupExecute: (token: number, ids: string[]) =>
     callOrThrow<RunRecord>("cleanup_execute", { token, ids }),
   cleanupHistory: () => call<RunRecord[]>("cleanup_history"),
+  /** Stop the page's preview or run between files (what was already freed stays freed). */
+  cleanupCancel: () => call<void>("cleanup_cancel"),
 
   settingsGet: () => call<Settings>("settings_get"),
   settingsSet: (settings: Settings) => callOrThrow<Settings>("settings_set", { settings }),
