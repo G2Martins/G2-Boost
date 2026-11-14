@@ -946,8 +946,9 @@ mod tests {
     #[test]
     fn schedule_sees_a_slow_reply_come_in_after_newer_ones() {
         static NO_CANCEL: AtomicBool = AtomicBool::new(false);
-        // Sent 40 ms apart, the first one answers after 600 ms: it comes in last, whatever the
-        // threads did on this busy machine.
+        // Sent 40 ms apart, the first one answers after 600 ms: it comes in after newer ones.
+        // Not "exactly last": under a loaded `bun run check` a later probe thread can start late
+        // too (arrival 4 of 6 seen on 2026-10-28), which says nothing about the scheduler.
         let (samples, _) = run_with(
             6,
             Duration::from_millis(40),
@@ -963,7 +964,7 @@ mod tests {
         );
         let m = summarize(&samples);
         assert!(samples[0].out_of_order && samples[0].late);
-        assert_eq!(samples[0].arrival, 5, "it came back last");
+        assert!(samples[0].arrival > samples[1].arrival, "it came back after a newer one");
         assert!(m.out_of_order >= 1);
         assert_eq!(m.late, 1);
     }
