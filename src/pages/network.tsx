@@ -2,6 +2,7 @@ import { Activity, Check, Gamepad2, Loader2, Play, Power, Route, Square, X } fro
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuliCard } from "@/components/luli-card";
 import { DevicesTab } from "@/components/network/devices-tab";
+import { DiagnosisTab } from "@/components/network/diagnosis-tab";
 import { RepairConnectionCard } from "@/components/network/repair-connection";
 import { NetUsageTab, WifiTab } from "@/components/network/usage-wifi";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
@@ -35,11 +36,18 @@ import { cn, formatBytes, formatMbps, formatMs } from "@/lib/utils";
 
 export function NetworkPage() {
   const { t } = useI18n();
-  const initial = ["monitor", "scanner", "games", "usage", "wifi", "devices", "tools"].includes(
-    boot.startTab ?? "",
-  )
+  const initial = [
+    "diagnosis",
+    "monitor",
+    "scanner",
+    "games",
+    "usage",
+    "wifi",
+    "devices",
+    "tools",
+  ].includes(boot.startTab ?? "")
     ? (boot.startTab as string)
-    : "monitor";
+    : "diagnosis";
   return (
     <PageHeader
       title={t("network.title")}
@@ -47,6 +55,7 @@ export function NetworkPage() {
       tabs={
         <Tabs defaultValue={initial}>
           <TabsList>
+            <TabsTrigger value="diagnosis">{t("network.tab.diagnosis")}</TabsTrigger>
             <TabsTrigger value="monitor">{t("network.tab.monitor")}</TabsTrigger>
             <TabsTrigger value="scanner">{t("network.tab.scanner")}</TabsTrigger>
             <TabsTrigger value="games">{t("network.tab.games")}</TabsTrigger>
@@ -55,6 +64,15 @@ export function NetworkPage() {
             <TabsTrigger value="devices">{t("network.tab.devices")}</TabsTrigger>
             <TabsTrigger value="tools">{t("network.tab.tools")}</TabsTrigger>
           </TabsList>
+          <TabsContent value="diagnosis">
+            <PageBody className="px-0 pb-0">
+              <LuliCard
+                findings={["nic_power_saving"]}
+                asks={[{ label: "luli.ask.network.slow", data: ["network.diagnosis"] }]}
+              />
+              <DiagnosisTab />
+            </PageBody>
+          </TabsContent>
           <TabsContent value="monitor">
             <PageBody className="px-0 pb-0">
               <LuliCard

@@ -1,6 +1,6 @@
 # Analisador de rede e DNS Optimizer
 
-**Última revisão:** 2026-10-23 (Reparar conexão) · 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), `netrepair.rs`, UI `src/components/network/devices-tab.tsx`, `src/components/network/repair-connection.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`, `net_dhcp_adapters`, `net_renew`, `net_flush_dns`, `net_open_reset`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
+**Última revisão:** 2026-11-14 (aba Diagnóstico: internet lenta em 7 passos; `nicpower.rs`; `dns::Adapter.kind/vpn`) · 2026-10-23 (Reparar conexão) · 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), `netrepair.rs`, UI `src/components/network/devices-tab.tsx`, `src/components/network/repair-connection.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`, `net_dhcp_adapters`, `net_renew`, `net_flush_dns`, `net_open_reset`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
 
 ## Monitor de conexão
 
@@ -10,6 +10,21 @@ ICMP por `IcmpSendEcho2` (iphlpapi): **sem admin e sem raw socket**. Alvos: Goog
 
 Cloudflare (`speed.cloudflare.com/__down` e `__up`, CORS liberado): download, upload, latência ociosa × sob carga (**bufferbloat**), ISP/cidade dos cabeçalhos `cf-meta-*`. Roda no próprio webview. Alternativa avaliada para o futuro: M-Lab NDT7 (aberto, servidores próprios); o speedtest da Ookla é proprietário e fica fora.
 
+## Diagnóstico: "minha internet está lenta" (aba Diagnóstico, primeira da página Rede; 2026-11-14)
+
+UI `src/components/network/diagnosis-tab.tsx`; shell `src-tauri/src/netdiag_cmds.rs`; core `nicpower.rs`, `dns.rs` (`kind`, `vpn`), `wmi::call`. Sete passos com checklist que vai marcando; os passos 1 a 5 só leem, nada muda antes da resposta do passo 6.
+
+1. **Velocidade**: o teste de velocidade da aba Velocidade (webview). Tabela contratado × medido × % do plano, ping, jitter, ping com a linha cheia (nota). O plano em Mbps fica no `localStorage` do webview (só exibição).
+2. **Este PC** (`netdiag_pc`): adaptador da rota principal (`kind` = `wifi`/`ethernet`/`other` pelo `IfType`, link em Mbps), DNS e provedor, VPNs ligadas (`IfType` túnel/PPP ou descrição de cliente VPN: "vpn", "tap-windows", "wireguard", "wintun"…), economia de energia da placa (`nicpower::for_adapter`), `dns_rank(4)` e duas leituras de `net_usage` com 3 s de intervalo (taxa por app só elevado; "o que está fazendo" vem da taxa e dos sockets).
+3. **Wi-Fi** (`wifi_report(true)`): sinal, canal, banda. No cabo o passo diz que não se aplica (e o 5 também).
+4. **Aparelhos** (`devices_scan`): nome, tipo, fabricante, IP. Roteador e este PC marcados; os demais com "É meu" (grava `devices_known`) / "Não reconheço".
+5. **Vizinhos**: redes, canal, sinal; quantas dividem o seu canal e o mais vazio (`best_channel`).
+6. **Correções** em três grupos com contagem: *Neste computador* (automáticas: economia da placa, DNS mais rápido por 5 ms ou mais; passo a passo: VPN, apps baixando ≥ 1 MB/s, 2,4 → 5 GHz, sinal < 50 %, link do cabo abaixo do plano), *No roteador* (canal, QoS/SQM com nota C ou pior, WPA2/WPA3, < 50 % do plano = reiniciar e chamar a operadora, trocar a senha) com botão **Abrir a página do roteador** (`router_open`: `http://<gateway>/` do adaptador principal, só IPv4 privado; a senha o usuário digita lá; se o roteador só muda pelo app da operadora, o texto manda fazer pelo app), *Aparelhos no Wi-Fi* (bloquear os não reconhecidos). Pergunta: **Sim, fazer todas / Deixe-me escolher / Agora não**. O app nunca pausa, fecha ou bloqueia nada.
+7. **Aplicar**: tabela "valores atuais, guardados para desfazer", depois `nic_power_off` e/ou `dns_apply` (cada um com o próprio backup no core), teste de novo e tabela antes × depois; botões Desfazer (`nic_power_restore`, `dns_restore`).
+
+### Economia de energia da placa (`nicpower.rs`)
+
+Lê a chave do driver em `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-…}\NNNN` cujo `NetCfgInstanceId` é o GUID do adaptador: `*EEE`, `AdvancedEEE`, `EnableGreenEthernet`, `PowerSavingMode`, `GigaLite` (`"1"` = ligado; só os que o driver tem). Desligar (admin): backup `backups/nicpower.json` na primeira vez (o original fica), grava `"0"`, `MSFT_NetAdapter.Restart()` via WMI (sem `netsh`/PowerShell; o GUID validado é o único texto que entra no WQL; o método usa o `__RELPATH` que o WMI devolveu) e espera o gateway voltar (até 20 s). Restaurar valida o arquivo (só essas palavras-chave sob a classe de rede, `\NNNN`) antes de gravar. Achado do conselheiro `nic_power_saving`. Na máquina do dono (Realtek 2.5GbE, 2026-11-14): três modos ligados; desligar levou o jitter de 0,3 a 0,9 ms para 0,0 a 0,4 ms (Cloudflare 2,9 → 2,3 ms).
 ## Ping para jogos
 
 Steam Datagram Relay (`ISteamApps/GetSDRConfig`, sem chave) via `tauri-plugin-http` (host na allowlist): POPs com IPs de relay de CS2, Dota 2 e Deadlock (`gru` = São Paulo), pingados por ICMP.

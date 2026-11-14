@@ -616,6 +616,18 @@ export type DnsAdapter = {
   /** The interface Windows routes internet traffic through. */
   primary: boolean;
   has_backup: boolean;
+  kind: "wifi" | "ethernet" | "other";
+  vpn: boolean;
+};
+/** Link power saving of an adapter (driver keywords that are on now). */
+export type NicPower = { guid: string; name: string; on: string[] };
+/** Rede › Diagnóstico: this PC's side of a slow connection. */
+export type NetDiagPc = {
+  adapter: Omit<DnsAdapter, "has_backup"> | null;
+  vpns: string[];
+  nic_power: NicPower | null;
+  nic_backup: boolean;
+  elevated: boolean;
 };
 export type DnsRankEntry = {
   id: string;
@@ -1010,6 +1022,12 @@ export const backend = {
   dnsRank: (samples = 6) => call<DnsRankEntry[]>("dns_rank", { samples }),
   dnsApply: (guid: string, provider: string) => callOrThrow<void>("dns_apply", { guid, provider }),
   dnsRestore: (guid: string) => callOrThrow<void>("dns_restore", { guid }),
+  netdiagPc: () => call<NetDiagPc>("netdiag_pc"),
+  /** Primary adapter's power saving off (admin; backup first; the link drops a few seconds). */
+  nicPowerOff: () => callOrThrow<NicPower>("nic_power_off"),
+  nicPowerRestore: () => callOrThrow<void>("nic_power_restore"),
+  /** Opens http://<gateway>/ (private IPv4 of the primary adapter); returns the gateway. */
+  routerOpen: () => callOrThrow<string>("router_open"),
   startupList: () => call<StartupItem[]>("startup_list"),
   startupSet: (location: StartupLocation, name: string, enabled: boolean) =>
     callOrThrow<StartupItem>("startup_set", { location, name, enabled }),

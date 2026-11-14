@@ -177,6 +177,26 @@ pub struct Adapter {
     /// `aa:bb:cc:dd:ee:ff`, when the adapter has one.
     pub mac: Option<String>,
     pub if_index: u32,
+    /// `wifi`, `ethernet` or `other` (from the interface type).
+    pub kind: &'static str,
+    /// A VPN or tunnel (interface type, or a VPN client's virtual adapter by its description).
+    pub vpn: bool,
+}
+
+/// Interface type → `wifi` / `ethernet` / `other` (`IF_TYPE_IEEE80211` = 71, `ETHERNET_CSMACD` = 6).
+pub(crate) fn adapter_kind(if_type: u32) -> &'static str {
+    match if_type {
+        71 => "wifi",
+        6 => "ethernet",
+        _ => "other",
+    }
+}
+
+/// Tunnel (131) and PPP (23) interfaces, or a VPN client's virtual Ethernet adapter, which only
+/// its description gives away ("Kaspersky VPN", "TAP-Windows", "WireGuard Tunnel", "Wintun").
+pub(crate) fn is_vpn(if_type: u32, description: &str) -> bool {
+    let d = description.to_ascii_lowercase();
+    matches!(if_type, 23 | 131) || ["vpn", "tap-windows", "wireguard", "wintun", "openvpn", "tailscale", "zerotier"].iter().any(|k| d.contains(k))
 }
 
 pub(crate) fn sockaddr_v4(sa: &SOCKET_ADDRESS) -> Option<Ipv4Addr> {
@@ -336,12 +356,15 @@ pub fn adapters() -> Vec<Adapter> {
                 a.PhysicalAddress[..6].iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":")
             });
             let primary = best.is_some_and(|b| b == a.Anonymous1.Anonymous.IfIndex);
+            let description = pwstr(a.Description);
             out.push(Adapter {
                 primary,
                 provider: provider_of(&dns),
                 guid: guid_str,
                 name: pwstr(a.FriendlyName),
-                description: pwstr(a.Description),
+                kind: adapter_kind(a.IfType),
+                vpn: is_vpn(a.IfType, &description),
+                description,
                 dns,
                 gateway,
                 static_dns,
@@ -461,6 +484,15 @@ pub fn has_backup(guid: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adapter_kind_and_vpn() {
+        assert_eq!((adapter_kind(71), adapter_kind(6), adapter_kind(131)), ("wifi", "ethernet", "other"));
+        assert!(is_vpn(6, "Kaspersky VPN"), "a VPN client's virtual Ethernet adapter");
+        assert!(is_vpn(53, "WireGuard Tunnel") && is_vpn(131, "") && is_vpn(23, ""));
+        assert!(!is_vpn(6, "Realtek Gaming 2.5GbE Family Controller"));
+        assert!(!is_vpn(71, "Intel(R) Wi-Fi 6 AX201 160MHz"));
+    }
 
     #[test]
     fn query_packet_and_reply_check() {

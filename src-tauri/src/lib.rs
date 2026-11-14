@@ -58,6 +58,9 @@ mod profiles_cmds;
 // r9:setup mod
 mod update_cmds;
 
+// Rede › Diagnóstico
+mod netdiag_cmds;
+
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
 const ROUTES: &[&str] = &[
@@ -2606,6 +2609,10 @@ pub fn run() {
             repair_run,
             repair_cancel,
             cleanup_cancel,
+            netdiag_cmds::netdiag_pc,
+            netdiag_cmds::nic_power_off,
+            netdiag_cmds::nic_power_restore,
+            netdiag_cmds::router_open,
             repair_status,
             repair_history,
             bios_guide,

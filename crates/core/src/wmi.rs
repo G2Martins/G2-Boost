@@ -142,6 +142,33 @@ pub fn query_timeout(namespace: &str, wql: &str, fields: &[&str], timeout: Durat
     }
 }
 
+/// Call the parameterless `method` of the instance at `relpath` (a `__RELPATH` WMI itself
+/// returned, never caller text) and give back its `ReturnValue` (0 = done).
+pub fn call(namespace: &str, relpath: &str, method: &str) -> Result<u32, String> {
+    let _com = Com::init().map_err(|e| e.to_string())?;
+    // SAFETY: standard WMI client sequence; COM objects are released on drop.
+    unsafe {
+        let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER).map_err(|e| e.message())?;
+        let empty = BSTR::new();
+        let services = locator
+            .ConnectServer(&BSTR::from(namespace), &empty, &empty, &empty, 0, &empty, None)
+            .map_err(|e| e.message())?;
+        CoSetProxyBlanket(&services, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, PCWSTR::null(), RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, None, EOAC_NONE)
+            .map_err(|e| e.message())?;
+        let mut out = None;
+        services
+            .ExecMethod(&BSTR::from(relpath), &BSTR::from(method), WBEM_GENERIC_FLAG_TYPE(0), None, None, Some(&mut out), None)
+            .map_err(|e| e.message())?;
+        let mut v = VARIANT::default();
+        let rv = match out {
+            Some(o) if o.Get(windows::core::w!("ReturnValue"), 0, &mut v, None, None).is_ok() => variant_value(&v).as_f64().unwrap_or(0.0) as u32,
+            _ => 0,
+        };
+        let _ = VariantClear(&mut v);
+        Ok(rv)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

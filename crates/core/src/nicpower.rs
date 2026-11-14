@@ -1,10 +1,43 @@
 //! Power saving of the network adapter in use: Energy Efficient Ethernet and the vendor "green"
 //! modes, read from the adapter's driver key (the same values its Advanced tab edits). They save
 //! a few watts on an idle link and can add latency spikes when traffic starts again.
+//!
+//! Turning them off (admin) backs up the values first, writes "0" and restarts the adapter
+//! through `MSFT_NetAdapter.Restart()` (WMI, no `netsh`/PowerShell) so the driver reads them.
+
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::registry::{self, Root, Value};
+use crate::registry::{self, Backup, BackupEntry, Root, Value};
+use crate::{system, wmi};
+
+/// Backup id: the values before the first change, kept until restored.
+const BACKUP: &str = "nicpower";
+const NETADAPTER_NS: &str = r"ROOT\StandardCimv2";
+/// How long `turn_off` waits for the link to come back after the restart.
+const RELINK: Duration = Duration::from_secs(20);
+
+#[derive(Debug, thiserror::Error)]
+pub enum NicError {
+    #[error("needs_admin")]
+    NeedsAdmin,
+    #[error("not_found")]
+    NotFound,
+    #[error("bad_backup")]
+    BadBackup,
+    #[error("{0}")]
+    Other(String),
+}
+
+impl From<registry::RegError> for NicError {
+    fn from(e: registry::RegError) -> Self {
+        match e {
+            registry::RegError::AccessDenied => NicError::NeedsAdmin,
+            e => NicError::Other(e.to_string()),
+        }
+    }
+}
 
 /// Network adapters' device class.
 const CLASS: &str = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}";
@@ -58,6 +91,94 @@ pub fn primary() -> Option<NicPower> {
     crate::dns::adapters().into_iter().find(|a| a.primary).and_then(|a| for_adapter(&a.guid))
 }
 
+pub fn has_backup() -> bool {
+    registry::load_backup(BACKUP).is_some()
+}
+
+/// `{8-4-4-4-12}` hex GUID: the only text that ever reaches the WQL below.
+fn valid_guid(g: &str) -> bool {
+    g.len() == 38 && g.starts_with('{') && g.ends_with('}') && g[1..37].bytes().enumerate().all(|(i, b)| if matches!(i, 8 | 13 | 18 | 23) { b == b'-' } else { b.is_ascii_hexdigit() })
+}
+
+/// Turn the link power saving of adapter `guid` off (admin): back up the current values (the
+/// first time only, so the backup is always the original), write "0", restart the adapter and
+/// wait for the link to come back (a few seconds offline).
+pub fn turn_off(guid: &str) -> Result<NicPower, NicError> {
+    if !valid_guid(guid) {
+        return Err(NicError::NotFound);
+    }
+    if !system::is_elevated() {
+        return Err(NicError::NeedsAdmin);
+    }
+    let path = driver_key(guid).ok_or(NicError::NotFound)?;
+    let mut present = Vec::new();
+    for k in KEYWORDS {
+        let v = registry::read(Root::Hklm, &path, k)?;
+        if v != Value::Absent {
+            present.push(BackupEntry { root: Root::Hklm, path: path.clone(), name: (*k).to_string(), value: v });
+        }
+    }
+    if !has_backup() {
+        registry::save_backup(&Backup { tweak: BACKUP.into(), taken_at: registry::now_unix(), entries: present.clone() }).map_err(|e| NicError::Other(e.to_string()))?;
+    }
+    for e in &present {
+        registry::write(Root::Hklm, &path, &e.name, &Value::Str("0".into()))?;
+    }
+    restart(guid)?;
+    for_adapter(guid).ok_or(NicError::NotFound)
+}
+
+/// Put the saved values back (admin), restart the adapter, drop the backup.
+pub fn restore() -> Result<(), NicError> {
+    if !system::is_elevated() {
+        return Err(NicError::NeedsAdmin);
+    }
+    let b = registry::load_backup(BACKUP).ok_or(NicError::NotFound)?;
+    // The file is user-writable: only our keywords under the network class may come back.
+    let ours = |e: &BackupEntry| {
+        e.root == Root::Hklm
+            && KEYWORDS.contains(&e.name.as_str())
+            && e.path.strip_prefix(CLASS).and_then(|s| s.strip_prefix('\\')).is_some_and(|k| k.len() == 4 && k.bytes().all(|b| b.is_ascii_digit()))
+    };
+    if !b.entries.iter().all(ours) {
+        return Err(NicError::BadBackup);
+    }
+    for e in &b.entries {
+        registry::write(e.root, &e.path, &e.name, &e.value)?;
+    }
+    let mut paths: Vec<&str> = b.entries.iter().map(|e| e.path.as_str()).collect();
+    paths.dedup();
+    for p in paths {
+        if let Ok(Value::Str(id)) = registry::read(Root::Hklm, p, "NetCfgInstanceId")
+            && valid_guid(&id)
+        {
+            restart(&id)?;
+        }
+    }
+    registry::delete_backup(BACKUP);
+    Ok(())
+}
+
+/// `MSFT_NetAdapter.Restart()` (disable + enable: how the driver picks up new Advanced values),
+/// then wait until the adapter has its gateway again.
+fn restart(guid: &str) -> Result<(), NicError> {
+    let rows = wmi::query(NETADAPTER_NS, &format!("SELECT * FROM MSFT_NetAdapter WHERE DeviceID = '{guid}'"), &["__RELPATH"]).map_err(NicError::Other)?;
+    let rel = rows.first().and_then(|r| r.get("__RELPATH")?.as_str().map(str::to_string)).ok_or(NicError::NotFound)?;
+    match wmi::call(NETADAPTER_NS, &rel, "Restart").map_err(NicError::Other)? {
+        0 => {}
+        rv => return Err(NicError::Other(format!("restart {rv}"))),
+    }
+    let t0 = Instant::now();
+    std::thread::sleep(Duration::from_secs(2)); // the old link is still listed for a moment
+    while t0.elapsed() < RELINK {
+        if crate::dns::adapters().iter().any(|a| a.guid.eq_ignore_ascii_case(guid) && a.gateway.is_some()) {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    Ok(()) // slow DHCP: the change is made, the link comes back on its own
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +202,14 @@ mod tests {
             eprintln!("{} on: {:?}", n.name, n.on);
         }
         assert!(for_adapter("{00000000-0000-0000-0000-000000000000}").is_none());
+    }
+
+    #[test]
+    fn only_a_plain_guid_reaches_wql() {
+        assert!(valid_guid("{AD698D0B-2095-47FA-B355-ECDAEC8D9156}"));
+        for bad in ["", "{AD698D0B-2095-47FA-B355-ECDAEC8D915}", "{AD698D0B-2095-47FA-B355-ECDAEC8D9156}' OR 1=1", "AD698D0B-2095-47FA-B355-ECDAEC8D9156ab", "{AD698D0B_2095-47FA-B355-ECDAEC8D9156}", "{ZZ698D0B-2095-47FA-B355-ECDAEC8D9156}"] {
+            assert!(!valid_guid(bad), "{bad}");
+        }
+        assert!(matches!(turn_off("x' OR '1'='1"), Err(NicError::NotFound)));
     }
 }
