@@ -99,6 +99,8 @@ pub struct Env {
     pub cpu_temp_c: Option<f64>,
     /// Remote access and exposure (cheap subset, `exposure::quick`).
     pub exposure: Option<crate::exposure::Report>,
+    /// Link power saving of the adapter carrying internet traffic.
+    pub nic_power: Option<crate::nicpower::NicPower>,
 }
 
 /// Gather everything the rules need for this machine (no admin, ~1 s).
@@ -117,6 +119,7 @@ pub fn env(p: &Profile, sample: Option<Sample>, winsat: Option<WinSat>) -> Env {
         firmware: Some(firmware::read(p)),
         cpu_temp_c,
         exposure: Some(crate::exposure::quick()),
+        nic_power: crate::nicpower::primary(),
     }
 }
 
@@ -255,8 +258,14 @@ pub fn analyze(p: &Profile, e: &Env) -> Report {
             f.push(finding("hdd_system", Severity::Critical, Kind::Upgrade, &[("model", d.model.clone())]));
         } else if d.bus == "sata" && d.ssd == Some(true) && p.disks.iter().any(|x| x.bus == "nvme" && x.ssd != Some(false)) {
             let nvme = p.disks.iter().find(|x| x.bus == "nvme").map(|x| x.model.clone()).unwrap_or_default();
-            f.push(finding("sata_system_with_nvme", Severity::Info, Kind::FreeFix, &[("sata", d.model.clone()), ("nvme", nvme)]));
+            // A small SATA SSD that is also short on room is where Windows stalls on write bursts
+            // (updates, shader and browser caches) while the fast drive sits idle: say it louder.
+            let tight = matches!((e.system_free_bytes, e.system_total_bytes), (Some(free), Some(total)) if total > 0 && free * 5 < total);
+            f.push(finding("sata_system_with_nvme", if tight { Severity::Warn } else { Severity::Info }, Kind::FreeFix, &[("sata", d.model.clone()), ("nvme", nvme)]));
         }
+    }
+    if let Some(n) = e.nic_power.as_ref().filter(|n| !n.on.is_empty()) {
+        f.push(finding("nic_power_saving", Severity::Info, Kind::FreeFix, &[("adapter", n.name.clone()), ("count", n.on.len().to_string())]));
     }
     if let (Some(free), Some(total)) = (e.system_free_bytes, e.system_total_bytes)
         && total > 0
@@ -428,6 +437,21 @@ mod tests {
         assert_eq!(r.gaming.target, Some("1080p"));
         // Sorted by severity: the 144 Hz warning before infos.
         assert_eq!(r.findings[0].severity, Severity::Warn);
+        let sev = |r: &Report, id: &str| r.findings.iter().find(|f| f.id == id).map(|f| f.severity);
+        assert_eq!(sev(&r, "sata_system_with_nvme"), Some(Severity::Warn), "17 % free on a small SATA: louder");
+        assert!(!got.contains(&"nic_power_saving"), "unknown adapter: nothing said");
+        let roomy = Env { system_free_bytes: Some(100 << 30), ..e.clone() };
+        assert_eq!(sev(&analyze(&machine(), &roomy), "sata_system_with_nvme"), Some(Severity::Info), "45 % free: still a tip");
+
+        // 2026-11-14 on the same PC: 31 GB free of 223 and the Realtek's green modes on.
+        let nic = crate::nicpower::NicPower { guid: "{x}".into(), name: "Realtek Gaming 2.5GbE".into(), on: vec!["EnableGreenEthernet", "PowerSavingMode", "GigaLite"] };
+        let e = Env { system_free_bytes: Some(31 << 30), nic_power: Some(nic.clone()), ..e };
+        let r = analyze(&machine(), &e);
+        assert_eq!(sev(&r, "sata_system_with_nvme"), Some(Severity::Warn), "14 % free on the SATA: louder");
+        let n = r.findings.iter().find(|f| f.id == "nic_power_saving").expect("green modes on");
+        assert_eq!(n.params.get("count").map(String::as_str), Some("3"));
+        let off = Env { nic_power: Some(crate::nicpower::NicPower { on: vec![], ..nic }), ..e };
+        assert!(!ids(&analyze(&machine(), &off)).contains(&"nic_power_saving"), "all off: nothing to say");
     }
 
     #[test]

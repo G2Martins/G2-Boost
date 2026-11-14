@@ -802,7 +802,10 @@ export const en = {
     "The biggest possible jump: an SSD (NVMe if the board has a slot). Boot, loading and hitching improve a lot.",
   "advisor.sata_system_with_nvme.title": "Windows on a SATA SSD, but there is an NVMe ({nvme})",
   "advisor.sata_system_with_nvme.body":
-    "Install games on the NVMe ({nvme}): faster loading and less texture-streaming stutter. Moving Windows needs a reinstall or a clone.",
+    "Install games on the NVMe ({nvme}): faster loading and less texture-streaming stutter. A small, nearly full SATA SSD stalls on write bursts (updates, caches): free up space or move heavy folders to the NVMe. Moving Windows needs a reinstall or a clone.",
+  "advisor.nic_power_saving.title": "Network adapter saving power ({count} modes on)",
+  "advisor.nic_power_saving.body":
+    "{adapter} has green Ethernet, EEE or a power-saving mode on: it saves a few watts and can add latency spikes when traffic starts again. Free: Network › Diagnosis turns them off with a backup, or Device Manager › network adapter › Advanced.",
   "advisor.system_disk_full.title": "System disk almost full ({free_gb} GB free, {pct}%)",
   "advisor.system_disk_full.body":
     "Below ~15% free, Windows and the shader cache suffer. Use Cleanup and the Disk analyzer.",

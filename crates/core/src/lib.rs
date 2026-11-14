@@ -29,6 +29,7 @@ pub mod monitor;
 pub mod network;
 pub mod netconns;
 pub mod netetw;
+pub mod nicpower;
 pub mod nvml;
 pub mod power;
 pub mod prio;

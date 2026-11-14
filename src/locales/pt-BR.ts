@@ -807,7 +807,10 @@ export const ptBR = {
     "O maior salto possível: um SSD (NVMe se a placa tiver slot). Boot, carregamentos e travadas melhoram muito.",
   "advisor.sata_system_with_nvme.title": "Windows no SSD SATA, mas há um NVMe ({nvme})",
   "advisor.sata_system_with_nvme.body":
-    "Instale os jogos no NVMe ({nvme}): carregamentos mais rápidos e menos engasgos de streaming de texturas. Mover o Windows exige reinstalar ou clonar.",
+    "Instale os jogos no NVMe ({nvme}): carregamentos mais rápidos e menos engasgos de streaming de texturas. SSD SATA pequeno e quase cheio trava em rajadas de escrita (atualizações, caches): libere espaço ou mova pastas pesadas para o NVMe. Mover o Windows exige reinstalar ou clonar.",
+  "advisor.nic_power_saving.title": "Placa de rede economizando energia ({count} modos ligados)",
+  "advisor.nic_power_saving.body":
+    "{adapter} está com Ethernet verde, EEE ou modo de economia ligado: poupa poucos watts e pode criar picos de latência quando o tráfego volta. Grátis: Rede › Diagnóstico desliga com backup, ou Gerenciador de Dispositivos › placa de rede › Avançado.",
   "advisor.system_disk_full.title": "Disco do sistema quase cheio ({free_gb} GB livres, {pct}%)",
   "advisor.system_disk_full.body":
     "Abaixo de ~15% livre o Windows e o cache de shaders sofrem. Use a Limpeza e o Analisador de disco.",

@@ -321,11 +321,22 @@ fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
                 if st.monitor_subs.load(Ordering::SeqCst) == 0 {
                     break;
                 }
+                // The Painel is the start page: closed to the tray or minimized it stays mounted.
+                // Its `GPU Engine(*)` PDH query walks every process × engine, the cost of an open
+                // Task Manager, so nobody watching = no sampling (games run without it).
+                if !main_on_screen(&app) {
+                    continue;
+                }
                 let _ = app.emit("monitor:tick", m.sample());
             }
         }
         st.monitor_running.store(false, Ordering::SeqCst);
     });
+}
+
+/// The main window is on screen: not hidden to the tray, not minimized.
+fn main_on_screen(app: &AppHandle) -> bool {
+    app.get_webview_window("main").is_none_or(|w| w.is_visible().unwrap_or(true) && !w.is_minimized().unwrap_or(false))
 }
 
 #[tauri::command]
