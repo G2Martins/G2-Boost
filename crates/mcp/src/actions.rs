@@ -212,13 +212,18 @@ pub fn create_restore_point() -> Value {
 
 /* ---------------- processes ---------------- */
 
-pub fn processes() -> Value {
+/// The 60 heaviest processes, or every one named `name`: a big process with a small working set
+/// (rust-analyzer: 2.7 GB committed, little resident) never made the top 60 and could not be ended.
+pub fn processes(name: Option<&str>) -> Value {
     let mut s = procs::Sampler::default();
     let _ = s.sample();
     std::thread::sleep(Duration::from_millis(1000));
     let mut list = s.sample();
     list.sort_by(|a, b| b.cpu_pct.total_cmp(&a.cpu_pct).then(b.ram_bytes.cmp(&a.ram_bytes)));
-    list.truncate(60);
+    match name.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(n) => list.retain(|p| p.name.eq_ignore_ascii_case(n)),
+        None => list.truncate(60),
+    }
     json!(list)
 }
 

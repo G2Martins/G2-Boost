@@ -260,6 +260,25 @@ pub fn connect(client: Client, exe: &Path) -> Result<Vec<Target>, ConnectError> 
     Ok(targets(exe))
 }
 
+/// Repoint our entry in `path` at `exe` when it names an exe that no longer exists (the app was
+/// reinstalled to another folder, e.g. `C:\Program Files` → `G:\G2 Boost`): the connection the
+/// user made keeps working. An entry naming another exe that still exists (a second install) is
+/// left alone. `true` = rewritten (backed up first, like any connect).
+pub fn repair_file(path: &Path, client: Client, exe: &Path) -> bool {
+    let stale = match read_object(path) {
+        Ok(Some(root)) => matches!(servers(&root), Ok(Some(s)) if s.get(NAME).is_some_and(|e| {
+            !same_exe(e, exe) && e.get("command").and_then(Value::as_str).is_some_and(|c| !Path::new(c).exists())
+        })),
+        _ => false,
+    };
+    stale && connect_file(path, client, exe, false).is_ok()
+}
+
+/// [`repair_file`] over every config found; how many were repointed.
+pub fn repair_stale(exe: &Path) -> usize {
+    [Client::Desktop, Client::Code].into_iter().flat_map(|c| paths(c).into_iter().map(move |p| (c, p))).filter(|(c, p)| repair_file(p, *c, exe)).count()
+}
+
 pub fn disconnect(client: Client, exe: &Path) -> Result<Vec<Target>, ConnectError> {
     for p in paths(client) {
         disconnect_file(&p)?;
@@ -278,6 +297,32 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn a_moved_install_is_repointed_but_a_second_live_one_is_not() {
+        let d = sandbox("repair");
+        let f = d.join(".claude.json");
+        let exe = d.join("G2 Boost.exe");
+        std::fs::write(&exe, b"").unwrap();
+        // 2026-11-14: the entry still named C:\Program Files after a reinstall on G:.
+        let gone = d.join("old").join("G2 Boost.exe");
+        std::fs::write(&f, json!({ "a": 1, "mcpServers": { "g2boost": { "type": "stdio", "command": gone.to_string_lossy(), "args": ["--mcp"], "env": {} } } }).to_string()).unwrap();
+        assert!(repair_file(&f, Client::Code, &exe));
+        assert_eq!(status_file(&f, &exe), (true, true));
+        assert!(serde_json::from_str::<Value>(&std::fs::read_to_string(&f).unwrap()).unwrap()["a"] == 1, "the rest kept");
+        assert!(!repair_file(&f, Client::Code, &exe), "already here: nothing to do");
+        // Another exe that exists = a second install the user may want: untouched.
+        let other = d.join("other.exe");
+        std::fs::write(&other, b"").unwrap();
+        connect_file(&f, Client::Code, &other, false).unwrap();
+        assert!(!repair_file(&f, Client::Code, &exe));
+        assert_eq!(status_file(&f, &exe), (true, false));
+        // No entry: never added by a repair.
+        let empty = d.join("empty.json");
+        std::fs::write(&empty, "{}").unwrap();
+        assert!(!repair_file(&empty, Client::Code, &exe));
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

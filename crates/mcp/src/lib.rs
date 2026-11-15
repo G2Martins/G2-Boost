@@ -185,6 +185,14 @@ struct ProcArgs {
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
+struct ProcListArgs {
+    /// Only processes with this executable name (e.g. "rust-analyzer.exe", case-insensitive); all of
+    /// them, not only the 60 heaviest.
+    name: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
 struct AppArgs {
     /// App id from get_installed_apps.
     app_id: String,
@@ -687,10 +695,10 @@ Native confirmation first.")]
         blocking(actions::create_restore_point).await
     }
 
-    #[tool(description = "Every running process (pid, created, name, path, RAM, CPU % over 1 s, system and \
-protected flags), heaviest first. Use pid + created with end_process.")]
-    async fn get_processes(&self) -> Result<String, String> {
-        blocking(actions::processes).await
+    #[tool(description = "Running processes (pid, created, name, path, RAM, CPU % over 1 s, system and \
+protected flags), heaviest first: the 60 heaviest, or every process with `name`. Use pid + created with end_process.")]
+    async fn get_processes(&self, Parameters(a): Parameters<ProcListArgs>) -> Result<String, String> {
+        blocking(move || actions::processes(a.name.as_deref())).await
     }
 
     #[tool(description = "End one process (system, critical, service and security processes are refused). \

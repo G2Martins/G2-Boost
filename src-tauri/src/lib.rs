@@ -2435,6 +2435,13 @@ pub fn run() {
                 let _ = qos::clear_all_ours(); // orphaned QoS policies (non-elevated: a reboot clears them)
             }
             watch_uninstalls(app.handle().clone());
+            // Reinstalled to another folder: the Claude apps the user connected keep finding us.
+            // Only the installed exe (`G2 Boost.exe`) does it; a dev build must never repoint them.
+            if let Ok(exe) = this_exe()
+                && exe.file_name().is_some_and(|n| n.eq_ignore_ascii_case("G2 Boost.exe"))
+            {
+                std::thread::spawn(move || claude_connect::repair_stale(&exe));
+            }
             // Tray: left click opens, menu has Open / Quit. Labels follow the default locale (pt-BR).
             let open = MenuItem::with_id(app, "open", "Abrir", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;

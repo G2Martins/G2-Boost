@@ -13,7 +13,7 @@ use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
@@ -31,6 +31,9 @@ const TOKEN_TTL: Duration = Duration::from_secs(120);
 const HISTORY_MAX: usize = 100;
 /// A long category reports at most this often while it walks (one event per file would flood the UI).
 const TICK: Duration = Duration::from_millis(150);
+/// Temp files younger than this stay: programs that are open right now use them (an installer
+/// mid-way, an editor's scratch files). Common practice for temp cleaners.
+const FRESH: Duration = Duration::from_secs(24 * 3600);
 /// How long a run waits for Windows' component cleanup task before leaving it in the background.
 const COMPONENT_WAIT: Duration = Duration::from_secs(30 * 60);
 
@@ -328,11 +331,28 @@ type Tick<'a> = dyn FnMut(&Tally) -> bool + 'a;
 
 /// Sum files under `dir` (recursive), never crossing reparse points.
 pub(crate) fn measure_dir(dir: &Path, t: &mut Tally) {
-    measure_dir_with(dir, t, &mut |_| true);
+    measure_dir_with(dir, t, None, &mut |_| true);
+}
+
+/// Categories whose recent files are left alone ([`FRESH`]): the temp folders.
+fn keeps_fresh(id: &str) -> bool {
+    matches!(id, "temp_user" | "temp_windows")
+}
+
+/// Files created or changed after this are kept (`None` = no age limit).
+fn cutoff(id: &str) -> Option<SystemTime> {
+    keeps_fresh(id).then(|| SystemTime::now() - FRESH)
+}
+
+/// Newer than `keep_after`? (the later of created and modified: a file copied in keeps an old
+/// modified time but was created just now)
+fn too_fresh(md: &fs::Metadata, keep_after: Option<SystemTime>) -> bool {
+    let Some(k) = keep_after else { return false };
+    [md.created().ok(), md.modified().ok()].into_iter().flatten().any(|t| t > k)
 }
 
 /// [`measure_dir`] that calls `tick` after each file; `false` = it stopped early.
-fn measure_dir_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool {
+fn measure_dir_with(dir: &Path, t: &mut Tally, keep_after: Option<SystemTime>, tick: &mut Tick) -> bool {
     let Ok(rd) = fs::read_dir(dir) else {
         return true;
     };
@@ -344,10 +364,10 @@ fn measure_dir_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool {
             continue;
         }
         if md.is_dir() {
-            if !measure_dir_with(&e.path(), t, tick) {
+            if !measure_dir_with(&e.path(), t, keep_after, tick) {
                 return false;
             }
-        } else {
+        } else if !too_fresh(&md, keep_after) {
             t.bytes += md.len();
             t.files += 1;
             if !tick(t) {
@@ -360,11 +380,11 @@ fn measure_dir_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool {
 
 /// Delete files under `dir` and then the emptied subdirectories (bottom-up). `dir` itself stays.
 pub(crate) fn delete_dir_contents(dir: &Path, t: &mut Tally) {
-    delete_dir_contents_with(dir, t, &mut |_| true);
+    delete_dir_contents_with(dir, t, None, &mut |_| true);
 }
 
 /// [`delete_dir_contents`] that calls `tick` after each file; `false` = it stopped early.
-fn delete_dir_contents_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool {
+fn delete_dir_contents_with(dir: &Path, t: &mut Tally, keep_after: Option<SystemTime>, tick: &mut Tick) -> bool {
     let Ok(rd) = fs::read_dir(dir) else {
         return true;
     };
@@ -378,12 +398,12 @@ fn delete_dir_contents_with(dir: &Path, t: &mut Tally, tick: &mut Tick) -> bool 
         }
         let p = e.path();
         if md.is_dir() {
-            let go_on = delete_dir_contents_with(&p, t, tick);
+            let go_on = delete_dir_contents_with(&p, t, keep_after, tick);
             let _ = fs::remove_dir(&p); // only succeeds when empty
             if !go_on {
                 return false;
             }
-        } else {
+        } else if !too_fresh(&md, keep_after) {
             let len = md.len();
             match fs::remove_file(&p) {
                 Ok(()) => {
@@ -534,7 +554,7 @@ pub fn preview_live(ids: &[String], cancel: &AtomicBool, mut report: impl FnMut(
                 for r in &roots {
                     match c.action {
                         Action::DirContents => {
-                            if !measure_dir_with(r, &mut t, &mut tick) {
+                            if !measure_dir_with(r, &mut t, cutoff(c.id), &mut tick) {
                                 break;
                             }
                         }
@@ -690,7 +710,7 @@ fn run_one(c: &Category, item: &mut ExecItem, tick: &mut Tick) {
                 };
                 match c.action {
                     Action::DirContents => {
-                        if !delete_dir_contents_with(&p, &mut t, tick) {
+                        if !delete_dir_contents_with(&p, &mut t, cutoff(c.id), tick) {
                             item.error = Some("cancelled".into());
                             break;
                         }
@@ -1051,6 +1071,31 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn temp_cleanup_keeps_what_open_programs_just_wrote() {
+        use std::os::windows::fs::FileTimesExt;
+        let dir = tmp_tree("fresh");
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        let old = SystemTime::now() - Duration::from_secs(2 * 86_400);
+        for name in ["old.tmp", "sub/old.tmp"] {
+            let p = dir.join(name);
+            fs::write(&p, [0u8; 10]).unwrap();
+            let f = fs::File::options().write(true).open(&p).unwrap();
+            f.set_times(fs::FileTimes::new().set_modified(old).set_created(old)).unwrap();
+        }
+        fs::write(dir.join("fresh.tmp"), [0u8; 7]).unwrap(); // 2026-11-14: a running tool's file, gone mid-use
+        let keep_after = Some(SystemTime::now() - FRESH);
+        let mut t = Tally::default();
+        assert!(measure_dir_with(&dir, &mut t, keep_after, &mut |_| true));
+        assert_eq!((t.files, t.bytes), (2, 20), "the preview counts only what will go");
+        let mut t = Tally::default();
+        assert!(delete_dir_contents_with(&dir, &mut t, keep_after, &mut |_| true));
+        assert_eq!(t.files, 2);
+        assert!(dir.join("fresh.tmp").exists() && !dir.join("old.tmp").exists() && !dir.join("sub").exists());
+        assert!(cutoff("temp_user").is_some() && cutoff("temp_windows").is_some() && cutoff("edge_cache").is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn stop_between_files_keeps_the_rest_and_the_ticker_reports_running_totals() {
         let dir = tmp_tree("stop");
         for i in 0..10 {
@@ -1058,11 +1103,11 @@ pub(crate) mod tests {
         }
         // Measuring stops after the 3rd file.
         let mut t = Tally::default();
-        assert!(!measure_dir_with(&dir, &mut t, &mut |t| t.files < 3));
+        assert!(!measure_dir_with(&dir, &mut t, None, &mut |t| t.files < 3));
         assert_eq!((t.files, t.bytes), (3, 300));
         // Deleting stops after the 4th file: the other 6 stay.
         let mut t = Tally::default();
-        assert!(!delete_dir_contents_with(&dir, &mut t, &mut |t| t.files < 4));
+        assert!(!delete_dir_contents_with(&dir, &mut t, None, &mut |t| t.files < 4));
         assert_eq!(t.files, 4);
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 6);
         // The ticker adds the run's earlier totals and says stop once cancel is set.

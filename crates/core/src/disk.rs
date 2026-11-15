@@ -616,9 +616,13 @@ pub fn validate_recycle(paths: &[String]) -> Result<Vec<PathBuf>, RecycleError> 
 /// Send paths already checked by [`validate_recycle`] (and confirmed by the user) to the Recycle Bin.
 pub fn recycle_validated(paths: &[PathBuf], trigger: &str) -> RecycleOutcome {
     let t0 = Instant::now();
+    // Measured before (a folder's size is gone with it); only what actually left is counted.
+    let sizes: Vec<u64> = paths.iter().map(|p| size_of_path(p)).collect();
     let (_rc, _aborted) = shell_recycle(paths);
-    let gone = paths.iter().filter(|p| fs::symlink_metadata(p).is_err()).count() as u32;
-    let out = RecycleOutcome { recycled: gone, bytes: 0, failed: paths.len() as u32 - gone };
+    let left: Vec<bool> = paths.iter().map(|p| fs::symlink_metadata(p).is_err()).collect();
+    let gone = left.iter().filter(|g| **g).count() as u32;
+    let bytes = sizes.iter().zip(&left).filter(|(_, g)| **g).map(|(s, _)| s).sum();
+    let out = RecycleOutcome { recycled: gone, bytes, failed: paths.len() as u32 - gone };
     if gone > 0 {
         crate::cleanup::record_run(&crate::cleanup::RunRecord {
             at: crate::registry::now_unix(),
@@ -626,7 +630,7 @@ pub fn recycle_validated(paths: &[PathBuf], trigger: &str) -> RecycleOutcome {
             duration_ms: t0.elapsed().as_millis() as u64,
             items: vec![crate::cleanup::ExecItem {
                 id: "disk_recycle".into(),
-                bytes_freed: 0,
+                bytes_freed: bytes,
                 files_deleted: u64::from(gone),
                 skipped: u64::from(out.failed),
                 error: None,
@@ -634,6 +638,19 @@ pub fn recycle_validated(paths: &[PathBuf], trigger: &str) -> RecycleOutcome {
         });
     }
     out
+}
+
+/// A file's size, or a folder's total (reparse points not followed, like every walk here).
+fn size_of_path(p: &Path) -> u64 {
+    match fs::symlink_metadata(p) {
+        Ok(m) if m.is_dir() && !crate::safety::is_reparse(&m) => {
+            let mut t = crate::cleanup::Tally::default();
+            crate::cleanup::measure_dir(p, &mut t);
+            t.bytes
+        }
+        Ok(m) if m.is_file() => m.len(),
+        _ => 0,
+    }
 }
 
 /// One shell operation sending `paths` (validated by the caller) to the Recycle Bin. Windows asks

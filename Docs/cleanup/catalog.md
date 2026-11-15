@@ -1,6 +1,6 @@
 # Limpeza — catálogo, prévia, execução, histórico
 
-**Última revisão:** 2026-11-14 (progresso ao vivo, Parar, componentes do Windows esperados) · 2026-10-22 (aba Arquivos do sistema) · Código: `crates/core/src/cleanup.rs`, `tasksched.rs`, `safety.rs` · UI: `src/pages/cleanup.tsx` · Origem: [legacy-bat-scripts.md](../references/legacy-bat-scripts.md).
+**Última revisão:** 2026-11-15 (temporários com menos de 24 h ficam) · 2026-11-14 (progresso ao vivo, Parar, componentes do Windows esperados) · 2026-10-22 (aba Arquivos do sistema) · Código: `crates/core/src/cleanup.rs`, `tasksched.rs`, `safety.rs` · UI: `src/pages/cleanup.tsx` · Origem: [legacy-bat-scripts.md](../references/legacy-bat-scripts.md).
 
 ## Fluxo
 
@@ -10,6 +10,7 @@
    - **Parar** (`cleanup_cancel`): flag checada entre arquivos, na prévia e na execução da página. A categoria em andamento fica com o que já apagou e termina `cancelled`, como as que não começaram; a prévia parada omite o que não terminou de medir. Rotinas e MCP usam flag própria (o Parar da página não as alcança).
    - **Componentes do Windows** (`dism`): `tasksched::run_task_wait` dispara `StartComponentCleanup` e espera enquanto a tarefa tem instância (até 30 min, batimento a cada 500 ms). `LastTaskResult` negativo = erro. Parar ou o limite = `background` (`segue em segundo plano no Windows`), nunca um "pronto" falso.
    - **UI**: `src/components/cleanup/live-panel.tsx` (também na aba Arquivos do sistema): posição N de M, relógio que anda a cada segundo, bytes ao vivo, trilho por bytes (varredura no item sem medida), item atual e há quanto tempo, aviso de item grande após 20 s, fila de categorias com estado, Parar.
+   - **Temporários recentes ficam** (`temp_user`, `temp_windows`, 2026-11-15): arquivo criado ou modificado nas últimas 24 h não é medido nem apagado. Antes a limpeza apagava o que programas abertos tinham acabado de gravar (caso real: os arquivos de trabalho de uma sessão do Claude Code em `%TEMP%`).
    - **Rotina agendada** roda a limpeza em thread própria: não segura o laço de 5 s (Modo Jogo, prioridade, monitor de exposição).
 4. **Histórico** (`cleanup_history`): `%LOCALAPPDATA%\G2 Boost\history.json`, últimas 100 execuções: data, gatilho (`manual` / `routine` / `game`), duração, por categoria bytes/arquivos/pulados/erro. Sem caminhos, sem PII.
 
@@ -19,8 +20,8 @@ Categorias com `admin` retornam `needs_admin` sem elevação; a UI mostra "Eleva
 
 | id | Grupo | Risco | Admin | Caminhos | Ação | Fechar antes |
 |---|---|---|---|---|---|---|
-| `temp_windows` | diária | baixo | sim | `%SystemRoot%\Temp` | conteúdo | — |
-| `temp_user` | diária | baixo | não | `%TEMP%`, `%TMP%` | conteúdo | — |
+| `temp_windows` | diária | baixo | sim | `%SystemRoot%\Temp` | conteúdo, só arquivos com mais de 24 h (criação e modificação) | — |
+| `temp_user` | diária | baixo | não | `%TEMP%`, `%TMP%` | conteúdo, só arquivos com mais de 24 h (criação e modificação) | — |
 | `wer` | diária | baixo | sim | `%LOCALAPPDATA%\Microsoft\Windows\WER\{ReportArchive,ReportQueue,Temp}`, `%PROGRAMDATA%\Microsoft\Windows\WER\{…}` | conteúdo | — |
 | `shaders` | diária | médio | não | NVIDIA `DXCache`, `GLCache`, `NV_Cache` (Local e ProgramData); AMD `DxCache`, `DXCache`, `GLCache`, `VkCache`; `D3DSCache`; Intel `ShaderCache` | conteúdo | jogos (1º load recompila) |
 | `thumbs` | diária | baixo | não | `%LOCALAPPDATA%\Microsoft\Windows\Explorer` + `%LOCALAPPDATA%` | só `thumbcache_*.db`, `iconcache_*.db`, `IconCache.db` | Explorer (em uso = pulado) |
