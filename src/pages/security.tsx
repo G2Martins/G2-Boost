@@ -16,6 +16,7 @@ import { AntivirusTab } from "@/components/security/antivirus-tab";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { ExeIcon } from "@/components/ui/exe-icon";
 import {
+  ActionNote,
   Badge,
   Button,
   Card,
@@ -182,10 +183,12 @@ export function SecurityPage() {
                   <Shield className="size-3.5 shrink-0" />
                   {t("security.disclaimer")}
                 </p>
-                {note ? (
-                  <p className={cn("text-xs", note.ok ? "text-success" : "text-destructive")}>
+                {working ? (
+                  <ActionNote state="working">{t("activity.working")}</ActionNote>
+                ) : note ? (
+                  <ActionNote key={note.text} state={note.ok ? "ok" : "err"}>
                     {note.text}
-                  </p>
+                  </ActionNote>
                 ) : null}
 
                 {!inTauri ? (

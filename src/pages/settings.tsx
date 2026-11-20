@@ -1,4 +1,12 @@
-import { CalendarClock, Gamepad2, Globe, Power, ShieldAlert, ShieldCheck } from "lucide-react";
+import {
+  BellRing,
+  CalendarClock,
+  Gamepad2,
+  Globe,
+  Power,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
@@ -218,6 +226,24 @@ export function SettingsPage() {
               {t("settings.always_admin")}
             </CardTitle>
             <p className="text-xs text-muted-foreground">{t("settings.always_admin.body")}</p>
+          </Card>
+          {/* r11:activity: Windows notification when a job ends with the window hidden. */}
+          <Card className="animate-rise" style={rise(6)}>
+            <CardTitle
+              help={t("settings.notify.hint")}
+              right={
+                <Switch
+                  checked={!!settings?.notify_native}
+                  disabled={!settings}
+                  onCheckedChange={(v) => save({ notify_native: v })}
+                  aria-label={t("settings.notify")}
+                />
+              }
+            >
+              <BellRing className="size-4" />
+              {t("settings.notify")}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">{t("settings.notify.body")}</p>
           </Card>
         </div>
 

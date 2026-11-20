@@ -1,6 +1,6 @@
 # Design system — grafite quente, um accent, motion curto
 
-**Última revisão:** 2026-10-25 (rodada 9: sidebar agrupada, marcas que deslizam, Meter, toast, pôster, botão tátil, tela antes do UAC) · 2026-10-22 (mark G²) · 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
+**Última revisão:** 2026-11-20 (rodada 11: sino, pílula de job, check que se desenha, anel de progresso, ponto de atividade, linha do tempo) · 2026-10-25 (rodada 9: sidebar agrupada, marcas que deslizam, Meter, toast, pôster, botão tátil, tela antes do UAC) · 2026-10-22 (mark G²) · 2026-10-18 (fase 3A: "tirar a cara de IA") · **Fonte de tokens:** `src/index.css` (`:root` HSL + `@theme inline` do Tailwind 4) · **Referência de convenção:** `Valerium-Portal/apps/dashboard/src/styles/app.css` (route-enter, home-tile, pulse-panel) — mesmo mecanismo: HSL em CSS custom properties, consumo via classes Tailwind, zero hex em componente.
 
 Direção: app de diagnóstico, não "gaming dashboard" genérico. Neutros quentes (grafite, texto cor de papel), **um** accent ("brasa", herdado da marca), status com parcimônia. Cards são **poços** — mais escuros que a página, com um filete de luz de 1px no topo: no hover eles clareiam (vêm à tona), nunca "flutuam". Aplicar com a skill `frontend-design`.
 
@@ -70,9 +70,27 @@ Tokens: `--motion-fast` 200 ms · `--motion-base` 350 ms · `--motion-slow` 550 
 
 Tudo o que se move continua dentro de `prefers-reduced-motion: no-preference`; em `reduce`, nada desliza, cresce ou respira.
 
+### 4.2 Rodada 11 (2026-11-20): atividade e feedback
+
+Seção `r11:activity` no fim do `index.css`; peças em `components/shell/activity.tsx` e no fim de `primitives.tsx`. Doc: [activity.md](./activity.md).
+
+| Peça | Como |
+|---|---|
+| Sino | Botão na topbar; contador = chip accent de 15 px com anel da cor da topbar, re-montado pela contagem (`.bell-count`, `count-pop` 350 ms); o sino balança uma vez quando chega linha nova (`.bell-ring`, 700 ms, re-montado pelo id). Popover nativo (`[popover]`, `.bell-pop`): fecha com clique fora e Esc, entra 200 ms (6 px + escala 0,98). |
+| Linha do sino | Poço do ícone do módulo (rota → ícone da sidebar), frase, "há 5 minutos"; barrinha de 2 px no tom da linha (`.line-row::before`), não lida = fundo 3,5% mais claro + ponto accent. |
+| `ProgressRing` | Anel de 36 de viewBox, arco = `--v` (0..1) com `stroke-dasharray` (transição 350 ms); sem total = arco de 22% girando (`ring-turn` 1,1 s linear). Cor = `--tone` do pai. |
+| `DoneMark` | Círculo a 35% + check (ou X) com `pathLength=1` que se desenha em 420 ms (`draw`). Fim de job, `ActionNote`. |
+| `ActionNote` | Resultado inline de um clique: anel girando enquanto roda, `DoneMark` no fim; `role="status"`. Re-chavear pelo texto para desenhar de novo. |
+| Pílula de job | Cápsula `surface` 94% + blur 8 px, borda forte, brilho do tom por baixo (`.job-pill`); entra 350 ms (14 px + escala 0,96), sai 200 ms nos últimos 220 ms dos 2,4 s de "Concluído". Centro inferior da coluna de conteúdo, acima do conteúdo (z 40), abaixo dos toasts. |
+| Ponto de atividade | 6 px accent com halo que pulsa (`.nav-busy`, 1,6 s) no item da sidebar do módulo com job rodando; no trilho recolhido, canto inferior direito. |
+| Linha do tempo | `.run-rail` (fio de 1 px que esmaece para baixo) + `.run-node` (poço redondo de 35 px com o ícone e um ponto de 9 px no tom do resultado); dias com eyebrow ("Hoje", "Ontem", data). |
+| Spinners | Em `reduce`, `.animate-spin` para (regra global): o ícone fica, o botão desabilitado continua dizendo "ocupado". |
+
+Em `reduce`: sino não balança, contador não pula, pílula entra e sai sem deslizar, anel não gira (arco fixo), check aparece pronto, ponto não pulsa (o e2e confere `animationName: none` e opacidade 1).
+
 ## 5. Estrutura — onde a UI vive
 - `src/components/ui/primitives.tsx` — Button, Card/CardTitle, HelpHint, Tabs, Switch, StatusPill, Badge (tons), Skeleton, LoadingScope, MetricRow, Modal, EmptyState, `selectClass`; `count-up.tsx` — `useCountUp`/`CountUp`/`reducedMotion`; `gauge.tsx`, `live-line.tsx`, `kpi-card.tsx`. Reusar antes de criar.
-- `AppShell`: sidebar de ícones (ativo = fundo neutro + marcador accent à esquerda) + topbar fina com a marca e o chip de elevação real (`AppInfo.elevated`). Sem busca/sino de enfeite.
+- `AppShell`: sidebar de ícones (ativo = fundo neutro + marcador accent à esquerda) + topbar fina com a marca, o chip de elevação real (`AppInfo.elevated`) e o sino de atividade (rodada 11: só conta linhas reais do core, nunca enfeite).
 - `PageHeader`: banner `surface` com brilho do accent a 12% + abas sublinhadas (ativa = borda accent).
 
 ### 5.1 Marca: mark "G²" (2026-10-22)

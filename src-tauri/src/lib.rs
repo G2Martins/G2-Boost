@@ -65,6 +65,7 @@ mod netdiag_cmds;
 use g2boost_core::activity;
 
 // r11:activity mod
+mod activity_cmds;
 
 // r11:clean mod
 
@@ -1306,6 +1307,11 @@ fn on_game_started(app: &AppHandle, game: Game) {
         duration_ms: 0,
         items: vec![ExecItem { id: "ram_purge".into(), bytes_freed: freed, ..Default::default() }],
     });
+    // r11:activity: the RAM purge at game start lands in the bell too.
+    match &error {
+        None => notify(app, "game", "activity.game.ram", &[("game", &game.name), ("bytes", &freed.to_string())], activity::Tone::Ok, Some("games")),
+        Some(_) => notify(app, "game", "activity.game.ram_failed", &[("game", &game.name)], activity::Tone::Warn, Some("games")),
+    }
     let _ = app.emit("game:started", GameEvent { game, freed_bytes: freed, error });
 }
 
@@ -2214,6 +2220,8 @@ fn exposure_tick(app: &AppHandle) {
         if fresh.is_empty() {
             return;
         }
+        // r11:activity: new exposure seen in the background → a line in the bell.
+        notify(&app, "security", "activity.security.alerts", &[("count", &fresh.len().to_string())], activity::Tone::Warn, Some("security"));
         let mut alerts = st.alerts.lock().unwrap();
         alerts.extend(fresh);
         let skip = alerts.len().saturating_sub(50);
@@ -2289,6 +2297,7 @@ fn updates_apps_confirm(ids: Vec<String>) -> Result<ConfirmToken, String> {
 
 #[tauri::command]
 async fn updates_apps_run(app: AppHandle, token: u64, ids: Vec<String>) -> Result<updates::Batch, String> {
+    let bell = app.clone(); // r11:activity
     tauri::async_runtime::spawn_blocking(move || {
         updates::apps_run(token, &ids, |p| {
             let _ = app.emit("updates:apps", p);
@@ -2297,6 +2306,7 @@ async fn updates_apps_run(app: AppHandle, token: u64, ids: Vec<String>) -> Resul
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())
+    .inspect(|b| activity_cmds::updates_done(&bell, b))
 }
 
 /// Stop after the package being upgraded now.
@@ -2327,6 +2337,7 @@ fn updates_wu_confirm(ids: Vec<String>) -> Result<ConfirmToken, String> {
 
 #[tauri::command]
 async fn updates_wu_install(app: AppHandle, token: u64, ids: Vec<String>) -> Result<updates::Batch, String> {
+    let bell = app.clone(); // r11:activity
     tauri::async_runtime::spawn_blocking(move || {
         updates::wu_install(token, &ids, move |p| {
             let _ = app.emit("updates:wu", p);
@@ -2335,6 +2346,7 @@ async fn updates_wu_install(app: AppHandle, token: u64, ids: Vec<String>) -> Res
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())
+    .inspect(|b| activity_cmds::updates_done(&bell, b))
 }
 
 /// Windows' update history and whether a restart is pending.
@@ -2789,6 +2801,7 @@ pub fn run() {
             activity_clear,
 
             // r11:activity
+            activity_cmds::activity_os_notify,
 
             // r11:clean
 

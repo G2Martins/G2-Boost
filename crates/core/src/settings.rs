@@ -90,6 +90,9 @@ pub struct Settings {
     pub update_auto_check: bool,
 
     // r11:activity field
+    /// Windows notification when a job ends or a background check changes while the window is in
+    /// the tray or minimized (a taskbar flash where Windows does not take the toast).
+    pub notify_native: bool,
 
     // r11:clean field
 
@@ -147,6 +150,7 @@ impl Default for Settings {
             update_auto_check: true,
 
             // r11:activity default
+            notify_native: true,
 
             // r11:clean default
 

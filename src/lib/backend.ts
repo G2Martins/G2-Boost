@@ -257,6 +257,8 @@ export type Settings = {
   update_auto_check: boolean;
 
   // r11:activity settings
+  /** Windows notification when a job ends with the window in the tray or minimized. */
+  notify_native: boolean;
 
   // r11:clean settings
 
@@ -923,7 +925,9 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
 async function callOrThrow<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!inTauri) throw new Error("app-only");
   try {
-    return await invoke<T>(cmd, args);
+    const p = invoke<T>(cmd, args);
+    watching?.(cmd, p); // r11:activity: the jobs store sees long commands start and settle
+    return await p;
   } catch (e) {
     throw new Error(typeof e === "string" ? e : e instanceof Error ? e.message : String(e));
   }
@@ -1268,6 +1272,14 @@ export const backend = {
   activityClear: () => call<void>("activity_clear"),
 
   // r11:activity
+  /** Native notification (toast, or a taskbar flash) when the window is hidden or minimized;
+   *  the core decides, and answers what it did. Text is rendered here, cleaned there. */
+  activityOsNotify: (title: string, body: string, route: string | null) =>
+    call<"off" | "visible" | "toast" | "flash" | "missed">("activity_os_notify", {
+      title,
+      body,
+      route,
+    }),
 
   // r11:clean
 
@@ -1831,6 +1843,11 @@ export type ActivityEntry = {
 };
 
 // ── r11:activity types ──
+/** One observer of user-initiated commands (`callOrThrow`): the jobs store, set once at boot. */
+let watching: ((cmd: string, settled: Promise<unknown>) => void) | null = null;
+export function watchCalls(f: (cmd: string, settled: Promise<unknown>) => void) {
+  watching = f;
+}
 
 // ── r11:clean types ──
 
