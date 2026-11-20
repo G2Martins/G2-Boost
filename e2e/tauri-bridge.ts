@@ -5,7 +5,13 @@ import { expect, type Page } from "@playwright/test";
  * the webview provides it: `invoke` answers from a table, `listen` records the handler and the
  * spec "emits" events by calling it. That exercises the real pages with real-looking data.
  */
-export type Bridge = { route: string; tab?: string; checkup?: unknown };
+export type Bridge = {
+  route: string;
+  tab?: string;
+  checkup?: unknown;
+  /** Fixed answers by command name (anything else answers null). */
+  answers?: Record<string, unknown>;
+};
 
 export async function fakeTauri(page: Page, bridge: Bridge) {
   await page.addInitScript((b: Bridge) => {
@@ -55,6 +61,7 @@ export async function fakeTauri(page: Page, bridge: Bridge) {
             exe: "G2 Boost.exe",
           };
         }
+        if (b.answers && cmd in b.answers) return b.answers[cmd];
         if (cmd === "checkup_run") return b.checkup ?? null;
         if (cmd === "hw_export_csv")
           return "C:\\Users\\tester\\Documents\\G2 Boost - sensores - 2026-10-25 14-03-22.csv";

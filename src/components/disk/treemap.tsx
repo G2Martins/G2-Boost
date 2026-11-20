@@ -40,12 +40,15 @@ export function Treemap({
   onOpen,
   locale,
   pending,
+  marks,
 }: {
   root: NodeView;
   onOpen: (node: NodeView) => void;
   locale: string;
   /** Names of top-level folders still being read (live map while scanning). */
   pending?: Set<string>;
+  /** Folder (`ids.join("/")`) → a note: what the cleanup does there. Dotted on the map, said on hover. */
+  marks?: Map<string, string>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -100,6 +103,7 @@ export function Treemap({
       text: token("--foreground"),
       muted: token("--muted-foreground"),
       primary: token("--primary"),
+      success: token("--success"),
       cls: Object.fromEntries(
         ["video", "audio", "image", "archive", "code", "binary", "document", "other"].map((c) => [
           c,
@@ -125,6 +129,12 @@ export function Treemap({
       ctx.strokeStyle = reading ? colors.primary : colors.border;
       ctx.lineWidth = 1;
       ctx.strokeRect(r.x0 + 0.5, r.y0 + 0.5, w - 1, hgt - 1);
+      if (r.depth === 1 && w > 14 && hgt > 14 && marks?.has(r.node.ids.join("/"))) {
+        ctx.fillStyle = colors.success;
+        ctx.beginPath();
+        ctx.arc(r.x1 - 7, r.y0 + 7, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
       if (w > 48 && hgt > 14) {
         const label = r.node.name;
         ctx.fillStyle = isDir ? colors.text : "rgba(255,255,255,0.92)";
@@ -144,7 +154,19 @@ export function Treemap({
         ctx.restore();
       }
     }
-  }, [rects, size, locale, pending]);
+  }, [rects, size, locale, pending, marks]);
+
+  // The depth-1 folder a rect belongs to carries the note (grandchildren inherit it on hover).
+  const markOf = (r: Rect) => {
+    if (!marks) return undefined;
+    const top =
+      r.depth === 1
+        ? r
+        : rects.find(
+            (q) => q.depth === 1 && r.x0 >= q.x0 && r.x1 <= q.x1 && r.y0 >= q.y0 && r.y1 <= q.y1,
+          );
+    return top ? marks.get(top.node.ids.join("/")) : undefined;
+  };
 
   const hit = (x: number, y: number): Rect | null => {
     // deepest rect containing the point wins
@@ -196,6 +218,7 @@ export function Treemap({
             {((100 * hover.r.node.size) / Math.max(1, root.size)).toFixed(1)}%
             {hover.r.node.is_dir ? ` · ${hover.r.node.files.toLocaleString(locale)} files` : ""}
           </div>
+          {markOf(hover.r) ? <div className="mt-1 text-success">{markOf(hover.r)}</div> : null}
         </div>
       ) : null}
     </div>
