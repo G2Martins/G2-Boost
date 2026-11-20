@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.10.0 (2026-11-20): central de atividade, limpeza inteligente, prontidão para anti-cheat e Conexões da Luli
+
+### Novo
+- **Atividade:** sino no topo com as notificações do app (rotina de limpeza, revisão semanal, atualizações em lote, jogo detectado, monitor de segurança, mudanças depois de reiniciar) e página **Atividade** com Notificações e Execuções (tudo o que o G2 Boost rodou neste PC, por módulo). Uma tarefa longa continua visível numa pílula de progresso quando você troca de página, e um ponto pulsa no item do menu. Com a janela escondida, o aviso aparece como notificação do Windows (desliga em Configurações).
+- **Limpeza inteligente:** um botão Analisar mede tudo (categorias, arquivos do sistema, Lixeira, arquivos grandes e antigos, pastas sem dono, sobras de apps, duplicados) e separa em **Seguro**, **Revisar** e **Sistema**. Durante a limpeza a barra do disco do sistema ganha espaço livre ao vivo; no fim aparecem o antes e depois e o próximo passo. As abas antigas viraram o **Modo detalhado**. Categorias novas: instaladores de driver deixados na raiz do disco e cache de mídia de editores de vídeo; relatórios de travamento do kernel entram em Despejos.
+- **Disco e limpeza juntos:** o mapa marca pastas que a Limpeza já cuida (com "Limpar só isso") e pastas sem dono; os Maiores e os Essenciais mostram o mesmo selo.
+- **Pronto para jogar com anti-cheat:** em Jogos e no Meu PC, cada jogo que exige firmware (Valorant e LoL, CS2 com FACEIT, Battlefield 6, Call of Duty) mostra o que falta: TPM 2.0, Secure Boot, modo UEFI e disco GPT, VBS, integridade de memória, IOMMU, versão do Windows e lista de bloqueio de drivers, com o caminho na BIOS da sua placa e o botão Reiniciar na BIOS. Depois de reiniciar, o app confere sozinho e avisa no sino quando algo mudou. A BIOS não pode ser alterada pelo Windows: o app guia e confere.
+- **Conexões:** página nova para a Luli. Botão **Testar** para cada provedor de IA (lista os modelos sem gastar créditos e diz se a chave funciona, está sem cota ou é inválida), seletor de modelo, **Skills** no formato SKILL.md (colar, escolher .md ou .zip, arrastar; entram desligadas, só o texto é lido, nada roda) e o mapa só leitura dos servidores MCP que os apps de IA deste PC iniciam, com selo para quem baixa pacote da internet a cada início. Conectar o G2 Boost também ao Cursor e ao VS Code.
+- **Memória RAM:** composição ao vivo (em uso, modificada, em espera, livre), antes e depois da limpeza, conselho de quando limpar ajuda, e quem usa a RAM com o ícone real de cada app, com atalho para encerrar ou tirar da inicialização.
+- **Ícones reais** na Inicialização, nas sobras de apps (agrupadas por app, com selecionar tudo e desfazer), nas pastas sem dono e nos órfãos. Sugestão de apps pouco usados e grandes em Apps › Instalados.
+- **Rede › Diagnóstico:** "minha internet está lenta" em 7 passos, com correções em 3 grupos, backup e antes/depois; economia de energia da placa de rede.
+- **Claude / MCP:** ferramentas novas de leitura: atividade recente, plano de limpeza, prontidão para anti-cheat, servidores MCP do PC e memória.
+
+### Mudou
+- **Ajustes revisados:** "apps em segundo plano" desligados entra no Debloat › Recomendado; latência de rede e prioridade de jogos agora dizem honestamente quando ajudam e saem da pontuação. Desligar a integridade de memória avisa quando um jogo instalado precisa dela.
+- **Limpeza de temporários** deixa de fora arquivos com menos de 24 horas (programas abertos usam esses arquivos).
+- O Painel não mede o PC com a janela escondida ou minimizada.
+- O modelo padrão da NVIDIA passa a ser `moonshotai/kimi-k3.1-pro` (o anterior saiu da lista pública).
+
+### Corrigido
+- Parar a limpeza não cancela mais um reparo da Manutenção rodando ao mesmo tempo.
+- A limpeza de componentes do Windows só aparece como concluída quando a tarefa rodou de verdade (antes, na bateria, podia dizer "feito" sem ter rodado).
+- Desfazer a economia de energia da placa de rede volta os valores de todas as placas alteradas, não só da primeira.
+- Ícones nunca são lidos através de pastas vinculadas que levem a um compartilhamento de rede.
+- Reinstalar o G2 Boost em outra pasta repara sozinho a conexão com o Claude.
+
 ## 0.9.3 (2026-10-28): Conectar ao Claude volta a funcionar e a Luli explica o limite de uso
 
 - **Conectar ao Claude:** o Claude Desktop da Microsoft Store passou a guardar a configuração em `%LOCALAPPDATA%\Claude-Data`. O G2 Boost continuava gravando na pasta antiga, mostrava "Conectado" e o Claude não carregava o G2 Boost. Agora ele grava na pasta nova e ignora a antiga quando o Claude saiu dela. Quem já tinha conectado: clique em Conectar de novo e reabra o Claude Desktop pela bandeja.
