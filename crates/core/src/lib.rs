@@ -103,6 +103,7 @@ pub mod selfupdate;
 pub mod activity;
 
 // r11:activity
+pub mod winnotify;
 
 // r11:clean
 

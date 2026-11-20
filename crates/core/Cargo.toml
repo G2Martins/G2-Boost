@@ -103,6 +103,8 @@ features = [
   # r9:setup
 
   # r11:activity
+  "UI_Notifications",
+  "Data_Xml_Dom",
 
   # r11:clean
 

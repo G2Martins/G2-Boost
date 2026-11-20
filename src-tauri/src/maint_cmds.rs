@@ -11,12 +11,14 @@ use crate::blocking;
 #[tauri::command]
 pub async fn maint_plan_run(app: AppHandle, plan: repair::Plan, label: String) -> Result<repair::PlanOutcome, String> {
     let label: String = label.chars().filter(|c| !c.is_control()).take(120).collect();
+    let bell = app.clone(); // r11:activity
     blocking(move || {
         repair::run_plan(plan, &label, &|p| {
             let _ = app.emit("maintenance:plan-progress", p);
         })
     })
     .await
+    .inspect(|o| crate::activity_cmds::plan_done(&bell, o))
 }
 
 #[tauri::command]
