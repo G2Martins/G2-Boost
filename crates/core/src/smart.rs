@@ -434,13 +434,7 @@ fn try_record(now: u64, drives: &[DriveHealth]) -> Result<(), SmartError> {
             v.drain(..v.len() - MAX_SAMPLES);
         }
     }
-    let p = history_path();
-    if let Some(dir) = p.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = p.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_vec(&h)?)?;
-    std::fs::rename(&tmp, &p)?;
+    crate::registry::write_atomic(&history_path(), &serde_json::to_vec(&h)?)?;
     Ok(())
 }
 

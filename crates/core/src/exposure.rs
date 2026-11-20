@@ -1696,14 +1696,8 @@ pub fn monitor_tick() -> Vec<Alert> {
     while base.len() > BASELINE_CAP {
         base.pop_first();
     }
-    if let Some(dir) = file.parent() {
-        let _ = std::fs::create_dir_all(dir);
-        let tmp = file.with_extension("json.tmp");
-        let list: Vec<&String> = base.iter().collect();
-        if std::fs::write(&tmp, serde_json::to_string(&list).unwrap_or_default()).is_ok() {
-            let _ = std::fs::rename(&tmp, &file);
-        }
-    }
+    let list: Vec<&String> = base.iter().collect();
+    let _ = crate::registry::write_atomic(&file, serde_json::to_string(&list).unwrap_or_default().as_bytes());
     fresh
 }
 

@@ -4,26 +4,27 @@ import type { AppEntry, Leftover, StartupItem } from "@/lib/backend";
 const DAY = 86_400;
 const MB = 1024 ** 2;
 
+const STALE_DAYS = 90;
+const BIG_BYTES = 500 * MB;
+
 /**
- * Installed apps not opened for `days` and at least `bytes` big, biggest first. Only apps with a
+ * Installed apps not opened for 90 days and at least 500 MB, biggest first. Only apps with a
  * real last-use date count: without launch data there is nothing honest to suggest.
  */
 export function staleBigApps(
   apps: AppEntry[],
   usage: Record<string, number | null>,
   nowSec: number,
-  days = 90,
-  bytes = 500 * MB,
 ): AppEntry[] {
   return apps
     .filter((a) => {
       const used = usage[a.id];
       return (
         !a.protected &&
-        (a.size_bytes ?? 0) >= bytes &&
+        (a.size_bytes ?? 0) >= BIG_BYTES &&
         typeof used === "number" &&
         used > 0 &&
-        nowSec - used >= days * DAY
+        nowSec - used >= STALE_DAYS * DAY
       );
     })
     .sort((a, b) => (b.size_bytes ?? 0) - (a.size_bytes ?? 0));

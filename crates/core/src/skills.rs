@@ -65,12 +65,8 @@ pub enum SkillError {
     Io(String),
 }
 
-/// Words the format reserves, plus Windows device names (never a file name here, refused anyway).
+/// Words the format reserves. (A skill name is never a file name: all skills live in one JSON.)
 const RESERVED_WORDS: &[&str] = &["anthropic", "claude"];
-const DEVICE_NAMES: &[&str] = &[
-    "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2",
-    "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
-];
 
 pub fn valid_name(name: &str) -> Result<(), SkillError> {
     let ok = (1..=MAX_NAME).contains(&name.len())
@@ -80,7 +76,7 @@ pub fn valid_name(name: &str) -> Result<(), SkillError> {
     if !ok {
         return Err(SkillError::InvalidName);
     }
-    if RESERVED_WORDS.iter().any(|w| name.contains(w)) || DEVICE_NAMES.contains(&name) {
+    if RESERVED_WORDS.iter().any(|w| name.contains(w)) {
         return Err(SkillError::ReservedName);
     }
     Ok(())
@@ -227,12 +223,7 @@ pub fn list() -> Vec<Skill> {
 }
 
 fn save(all: &[Skill]) -> Result<(), SkillError> {
-    let path = file();
-    let io = |e: std::io::Error| SkillError::Io(e.to_string());
-    std::fs::create_dir_all(path.parent().unwrap_or(&path)).map_err(io)?;
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_vec_pretty(all).unwrap_or_default()).map_err(io)?;
-    std::fs::rename(&tmp, &path).map_err(io)
+    crate::registry::write_atomic(&file(), &serde_json::to_vec_pretty(all).unwrap_or_default()).map_err(|e| SkillError::Io(e.to_string()))
 }
 
 /// Add one SKILL.md (off until the user turns it on).
@@ -326,11 +317,10 @@ mod tests {
         for bad in ["", "Upper", "has space", "../etc", "a/b", "a\\b", "-lead", "trail-", "dot.name", "ünï", &"a".repeat(65)] {
             assert_eq!(valid_name(bad), Err(SkillError::InvalidName), "{bad:?}");
         }
-        for reserved in ["claude-helper", "my-anthropic", "con", "nul", "lpt1"] {
+        for reserved in ["claude-helper", "my-anthropic"] {
             assert_eq!(valid_name(reserved), Err(SkillError::ReservedName), "{reserved:?}");
         }
         assert!(valid_name(&"a".repeat(64)).is_ok());
-        assert!(valid_name("console").is_ok(), "only the exact device name");
         // Body limit is bytes (16 KB), description limit is characters (1024).
         assert!(parse(&md("big", "d", &"x".repeat(MAX_BODY))).is_ok());
         assert_eq!(parse(&md("big", "d", &"x".repeat(MAX_BODY + 1))), Err(SkillError::TooLarge));

@@ -104,10 +104,7 @@ fn read<T: for<'de> Deserialize<'de> + Default>(name: &str) -> T {
 }
 
 fn write<T: Serialize>(name: &str, v: &T) -> Result<(), LuliError> {
-    std::fs::create_dir_all(dir())?;
-    let tmp = dir().join(format!("{name}.tmp"));
-    std::fs::write(&tmp, serde_json::to_vec(v).unwrap_or_default())?;
-    std::fs::rename(tmp, dir().join(name))?;
+    crate::registry::write_atomic(&dir().join(name), &serde_json::to_vec(v).unwrap_or_default())?;
     Ok(())
 }
 

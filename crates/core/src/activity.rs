@@ -88,14 +88,7 @@ fn load() -> Vec<Entry> {
 }
 
 fn save(all: &[Entry]) {
-    let path = file();
-    if let Some(dir) = path.parent() {
-        let _ = fs::create_dir_all(dir);
-    }
-    let tmp = path.with_extension("json.tmp");
-    if fs::write(&tmp, serde_json::to_string(all).unwrap_or_default()).is_ok() {
-        let _ = fs::rename(&tmp, &path);
-    }
+    let _ = registry::write_atomic(&file(), serde_json::to_string(all).unwrap_or_default().as_bytes());
 }
 
 /// Oldest first.

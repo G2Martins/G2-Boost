@@ -171,18 +171,18 @@ pub(crate) async fn smart_execute(app: AppHandle, tokens: State<'_, TokenStore>,
             records.push(rec);
         }
         if !sys.is_empty() {
-            if SMART_CANCEL.load(Ordering::SeqCst) {
-                let items = sys.iter().map(|id| cleanup::ExecItem { id: id.clone(), error: Some("cancelled".into()), ..Default::default() }).collect();
-                records.push(RunRecord { at: g2boost_core::registry::now_unix(), trigger: "manual".into(), duration_ms: 0, items });
+            let run = if SMART_CANCEL.load(Ordering::SeqCst) {
+                Err("cancelled".to_string())
             } else {
-                match on_handlers(|| volcache::execute(&sys, "manual", |p| emit(&smartclean::joined(&base, p, total)))) {
-                    Ok(rec) => records.push(rec),
-                    Err(e) => {
-                        let items = sys.iter().map(|id| cleanup::ExecItem { id: id.clone(), error: Some(e.to_string()), ..Default::default() }).collect();
-                        records.push(RunRecord { at: g2boost_core::registry::now_unix(), trigger: "manual".into(), duration_ms: 0, items });
-                    }
-                }
-            }
+                on_handlers(|| volcache::execute(&sys, "manual", |p| emit(&smartclean::joined(&base, p, total)))).map_err(|e| e.to_string())
+            };
+            // Not run (stopped first, or the handlers were busy): every handler id carries why.
+            records.push(run.unwrap_or_else(|err| RunRecord {
+                at: g2boost_core::registry::now_unix(),
+                trigger: "manual".into(),
+                duration_ms: 0,
+                items: sys.iter().map(|id| cleanup::ExecItem { id: id.clone(), error: Some(err.clone()), ..Default::default() }).collect(),
+            }));
         }
         let freed: u64 = records.iter().flat_map(|r| &r.items).map(|i| i.bytes_freed).sum();
         emit(&Progress { done: total, total, current: None, bytes: freed, files: base.files });

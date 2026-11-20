@@ -97,7 +97,7 @@ pub fn has_backup() -> bool {
 
 /// `{8-4-4-4-12}` hex GUID: the only text that ever reaches the WQL below.
 fn valid_guid(g: &str) -> bool {
-    g.len() == 38 && g.starts_with('{') && g.ends_with('}') && g[1..37].bytes().enumerate().all(|(i, b)| if matches!(i, 8 | 13 | 18 | 23) { b == b'-' } else { b.is_ascii_hexdigit() })
+    g.strip_prefix('{').and_then(|g| g.strip_suffix('}')).is_some_and(crate::updates::valid_guid)
 }
 
 /// Turn the link power saving of adapter `guid` off (admin): back up the current values (each

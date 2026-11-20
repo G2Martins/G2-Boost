@@ -477,6 +477,18 @@ pub fn unix_to_filetime(secs: u64) -> u64 {
     (secs + 11_644_473_600) * 10_000_000
 }
 
+/// Write `bytes` to `path` through `<path>.tmp` + rename (a crash never leaves half a file),
+/// creating the folder first. `rename` replaces the target on Windows.
+pub fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, path)
+}
+
 pub fn now_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

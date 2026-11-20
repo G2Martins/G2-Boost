@@ -453,14 +453,7 @@ fn load_snapshot() -> Option<Snapshot> {
 }
 
 fn save_snapshot(s: &Snapshot) {
-    let path = snapshot_file();
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let tmp = path.with_extension("json.tmp");
-    if std::fs::write(&tmp, serde_json::to_string(s).unwrap_or_default()).is_ok() {
-        let _ = std::fs::rename(&tmp, &path);
-    }
+    let _ = registry::write_atomic(&snapshot_file(), serde_json::to_string(s).unwrap_or_default().as_bytes());
 }
 
 /// A 2.0 TPM whose enabled/activated state was not readable (`Win32_Tpm` answers elevated only)
