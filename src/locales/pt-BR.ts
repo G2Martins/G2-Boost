@@ -253,6 +253,8 @@ export const ptBR = {
     "Cria um ponto de restauração do Windows (SRSetRestorePoint) antes de aplicar Padrão / Alto desempenho ou Boost agora. Exige administrador; o Windows limita a 1 por 24 h.",
   "settings.restore_before_preset.body": "Rede de segurança extra além do backup por ajuste.",
   "nav.ai": "Luli",
+  "nav.connections": "Conexões",
+  "nav.activity": "Atividade",
   "nav.games": "Jogos",
   "games.title": "Jogos",
   "games.subtitle":
@@ -4144,4 +4146,21 @@ export const ptBR = {
   "cleanup.found.title": "Lixo encontrado por categoria",
   "cleanup.found.total": "{total} no total · {selected} selecionados",
   "cleanup.found.empty": "Meça antes de limpar: a Prévia mostra quanto cada categoria ocupa.",
+
+  // ── r11:base · central de atividade, rotas novas (rodada 11, base) ──
+  "activity.title": "Atividade",
+  "activity.subtitle": "Notificações e tudo o que o G2 Boost executou neste PC",
+  "connections.title": "Conexões",
+  "connections.subtitle": "Provedores de IA, skills da Luli, Claude e os servidores MCP deste PC",
+  "activity.routine.cleanup": "Rotina de limpeza terminou: {bytes} liberados",
+
+  // ── r11:activity · central de notificações e execuções, motion (agente A1) ──
+
+  // ── r11:clean · limpeza inteligente, disco e sinergia (agente A2) ──
+
+  // ── r11:anticheat · prontidão para anti-cheat, BIOS, revisão dos ajustes (agente A3) ──
+
+  // ── r11:luli · conexões, skills, mapa de MCP (agente A4) ──
+
+  // ── r11:ram · memória RAM, ícones reais, sobras (agente A5) ──
 } as const;

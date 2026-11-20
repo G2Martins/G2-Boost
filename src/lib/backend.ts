@@ -255,6 +255,16 @@ export type Settings = {
 
   // r9:setup settings
   update_auto_check: boolean;
+
+  // r11:activity settings
+
+  // r11:clean settings
+
+  // r11:anticheat settings
+
+  // r11:luli settings
+
+  // r11:ram settings
 };
 
 export type PriorityClass = "idle" | "below_normal" | "normal" | "above_normal" | "high";
@@ -1243,6 +1253,23 @@ export const backend = {
   updateCheck: () => callOrThrow<UpdateInfo>("update_check"),
   /** Installed copies: download, verify SHA-256, start the installer; the app then quits. */
   updateInstall: () => callOrThrow<void>("update_install"),
+
+  // r11:base
+  /** Notification lines (oldest first); the live ones arrive on the `activity:new` event. */
+  activityList: () => call<ActivityEntry[]>("activity_list"),
+  /** Mark ids as read; an empty list marks everything. */
+  activityRead: (ids: number[]) => call<void>("activity_read", { ids }),
+  activityClear: () => call<void>("activity_clear"),
+
+  // r11:activity
+
+  // r11:clean
+
+  // r11:anticheat
+
+  // r11:luli
+
+  // r11:ram
 };
 
 export type VolumeOp = "scan" | "spot_fix" | "analyze" | "retrim" | "defrag";
@@ -1780,3 +1807,27 @@ export type UpdateInfo = {
   kind: "installed" | "portable" | "dev";
   installer_size: number | null;
 };
+
+// ── r11:base types ──
+export type ActivityTone = "info" | "ok" | "warn" | "err";
+/** One notification line: text is the i18n `key` rendered with `args` (no paths or PII). */
+export type ActivityEntry = {
+  id: number;
+  at: number;
+  kind: string;
+  key: string;
+  args: Record<string, string>;
+  tone: ActivityTone;
+  route: string | null;
+  read: boolean;
+};
+
+// ── r11:activity types ──
+
+// ── r11:clean types ──
+
+// ── r11:anticheat types ──
+
+// ── r11:luli types ──
+
+// ── r11:ram types ──

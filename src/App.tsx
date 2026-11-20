@@ -10,10 +10,12 @@ import { boot } from "@/lib/boot";
 import { I18nProvider, useI18n } from "@/lib/i18n";
 import { LuliProvider } from "@/lib/luli";
 import { emitDrop, navigate, onNavigate, openOrphans } from "@/lib/nav";
+import { ActivityPage } from "@/pages/activity";
 import { AiPage } from "@/pages/ai";
 import { AppsPage } from "@/pages/apps";
 import { BoostPage } from "@/pages/boost";
 import { CleanupPage } from "@/pages/cleanup";
+import { ConnectionsPage } from "@/pages/connections";
 import { ConsolePage } from "@/pages/console";
 import { DashboardPage } from "@/pages/dashboard";
 import { DebloatPage } from "@/pages/debloat";
@@ -44,6 +46,8 @@ const PAGES: Record<Route, () => React.JSX.Element> = {
   boost: BoostPage,
   console: ConsolePage,
   ai: AiPage,
+  connections: ConnectionsPage,
+  activity: ActivityPage,
   settings: SettingsPage,
   maintenance: MaintenancePage,
   gpu: GpuPage,

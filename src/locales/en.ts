@@ -255,6 +255,8 @@ export const en = {
     "Creates a Windows restore point (SRSetRestorePoint) before applying Default / High performance or Boost now. Needs administrator; Windows limits it to 1 per 24 h.",
   "settings.restore_before_preset.body": "Extra safety net on top of the per-tweak backup.",
   "nav.ai": "Luli",
+  "nav.connections": "Connections",
+  "nav.activity": "Activity",
   "nav.games": "Games",
   "games.title": "Games",
   "games.subtitle":
@@ -4121,4 +4123,21 @@ export const en = {
   "cleanup.found.title": "Junk found by category",
   "cleanup.found.total": "{total} in total · {selected} selected",
   "cleanup.found.empty": "Measure before cleaning: the Preview shows how much each category takes.",
+
+  // ── r11:base ──
+  "activity.title": "Activity",
+  "activity.subtitle": "Notifications and everything G2 Boost ran on this PC",
+  "connections.title": "Connections",
+  "connections.subtitle": "AI providers, Luli skills, Claude and the MCP servers on this PC",
+  "activity.routine.cleanup": "Cleanup routine finished: {bytes} freed",
+
+  // ── r11:activity ──
+
+  // ── r11:clean ──
+
+  // ── r11:anticheat ──
+
+  // ── r11:luli ──
+
+  // ── r11:ram ──
 } as const satisfies Record<keyof typeof ptBR, string>;

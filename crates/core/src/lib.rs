@@ -99,6 +99,19 @@ pub mod profiles;
 // r9:setup
 pub mod selfupdate;
 
+// r11:base
+pub mod activity;
+
+// r11:activity
+
+// r11:clean
+
+// r11:anticheat
+
+// r11:luli
+
+// r11:ram
+
 
 /// Crate version, surfaced in the UI "about" footer.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

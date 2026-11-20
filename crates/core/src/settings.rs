@@ -89,6 +89,15 @@ pub struct Settings {
     /// Ask GitHub for a newer G2 Boost at launch (one request; the user installs with a click).
     pub update_auto_check: bool,
 
+    // r11:activity field
+
+    // r11:clean field
+
+    // r11:anticheat field
+
+    // r11:luli field
+
+    // r11:ram field
 }
 
 impl Default for Settings {
@@ -137,6 +146,15 @@ impl Default for Settings {
             // r9:setup default
             update_auto_check: true,
 
+            // r11:activity default
+
+            // r11:clean default
+
+            // r11:anticheat default
+
+            // r11:luli default
+
+            // r11:ram default
         }
     }
 }
@@ -224,6 +242,15 @@ pub fn sanitize(mut s: Settings) -> Settings {
 
     // r9:setup sanitize
 
+    // r11:activity sanitize
+
+    // r11:clean sanitize
+
+    // r11:anticheat sanitize
+
+    // r11:luli sanitize
+
+    // r11:ram sanitize
     s
 }
 

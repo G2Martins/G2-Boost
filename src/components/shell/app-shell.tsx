@@ -1,8 +1,10 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import {
   Activity,
+  Bell,
   Bot,
   BrushCleaning,
+  Cable,
   Cpu,
   Flag,
   Gamepad2,
@@ -56,6 +58,8 @@ export type Route =
   | "packetloss"
   | "console"
   | "ai"
+  | "connections"
+  | "activity"
   | "settings";
 
 type NavItem = { route: Route; icon: LucideIcon; label: I18nKey };
@@ -101,6 +105,8 @@ export const NAV: { group: I18nKey; items: NavItem[] }[] = [
     group: "nav.group.system",
     items: [
       { route: "ai", icon: Bot, label: "nav.ai" },
+      { route: "connections", icon: Cable, label: "nav.connections" },
+      { route: "activity", icon: Bell, label: "nav.activity" },
       { route: "settings", icon: Settings, label: "nav.settings" },
     ],
   },

@@ -61,12 +61,48 @@ mod update_cmds;
 // Rede › Diagnóstico
 mod netdiag_cmds;
 
+// r11:base: activity center (the bell). Every block raises its lines through `notify`.
+use g2boost_core::activity;
+
+// r11:activity mod
+
+// r11:clean mod
+
+// r11:anticheat mod
+
+// r11:luli mod
+
+// r11:ram mod
+
+/// Record a notification line and tell the UI (bell, toasts). Text is an i18n key + small args:
+/// never a path or user name. A refused line (bad id) is dropped silently.
+pub(crate) fn notify(app: &AppHandle, kind: &str, key: &str, args: &[(&str, &str)], tone: activity::Tone, route: Option<&str>) {
+    if let Some(e) = activity::push(kind, key, args, tone, route) {
+        let _ = app.emit("activity:new", e);
+    }
+}
+
+#[tauri::command]
+fn activity_list() -> Vec<activity::Entry> {
+    activity::list()
+}
+
+#[tauri::command]
+fn activity_read(ids: Vec<u64>) {
+    activity::mark_read(&ids[..ids.len().min(activity::MAX)]);
+}
+
+#[tauri::command]
+fn activity_clear() {
+    activity::clear();
+}
+
 
 /// Routes the UI knows. Anything else coming from `--route` / `G2BOOST_START_ROUTE` is dropped.
 const ROUTES: &[&str] = &[
     "dashboard", "mypc", "hwmonitor", "maintenance", "security", "setup", "debloat", "boost", "peripherals", "profiles",
     "gpu", "games", "apps", "cleanup", "disk", "network", "overlay", "mousetest", "monitortest", "packetloss", "console",
-    "ai", "settings",
+    "ai", "connections", "activity", "settings",
 ];
 
 /// `--route <name>` on the command line (set when we relaunch ourselves elevated) wins over
@@ -1313,6 +1349,9 @@ fn spawn_routines(app: AppHandle) {
                         routines::save_state(&st);
                         *r.state.lock().unwrap() = st;
                         r.running.store(false, Ordering::SeqCst);
+                        // r11:base: a background run lands in the bell, not only in the cleanup history.
+                        let freed: u64 = rec.items.iter().map(|i| i.bytes_freed).sum();
+                        notify(&app, "routine", "activity.routine.cleanup", &[("bytes", &freed.to_string())], activity::Tone::Ok, Some("cleanup"));
                         let _ = app.emit("routine:done", rec);
                     });
                 }
@@ -2471,6 +2510,17 @@ pub fn run() {
                 let _ = w.hide();
             }
             spawn_routines(app.handle().clone());
+
+            // r11:activity setup
+
+            // r11:clean setup
+
+            // r11:anticheat setup
+
+            // r11:luli setup
+
+            // r11:ram setup
+
             // r9:overlay: overlay state + its global hotkey (when on); also stops an FPS session a crash left.
             overlay_cmds::init(app.handle());
             Ok(())
@@ -2730,6 +2780,21 @@ pub fn run() {
             // r9:setup
             update_cmds::update_check,
             update_cmds::update_install,
+
+            // r11:base
+            activity_list,
+            activity_read,
+            activity_clear,
+
+            // r11:activity
+
+            // r11:clean
+
+            // r11:anticheat
+
+            // r11:luli
+
+            // r11:ram
 
         ])
         .build(tauri::generate_context!())

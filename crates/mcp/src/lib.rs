@@ -890,6 +890,27 @@ run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")
         })
         .await
     }
+
+    // r11:base
+    #[tool(description = "Recent activity, read-only: the last 50 notification lines G2 Boost raised (newest last), each with time (unix seconds), module (kind), an i18n key describing what happened (e.g. a cleanup that finished, a check that changed after a reboot), small arguments (sizes, counts, game names), tone (info/ok/warn/err) and read state. Use it to see what the app changed recently before diagnosing a regression.")]
+    async fn get_activity(&self) -> Result<String, String> {
+        blocking(|| {
+            let all = g2boost_core::activity::list();
+            let start = all.len().saturating_sub(50);
+            json!({ "entries": &all[start..] })
+        })
+        .await
+    }
+
+    // r11:activity
+
+    // r11:clean
+
+    // r11:anticheat
+
+    // r11:luli
+
+    // r11:ram
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
