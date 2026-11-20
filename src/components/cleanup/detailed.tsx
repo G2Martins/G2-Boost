@@ -179,8 +179,14 @@ export function DetailedMode({
     setStartedAt(Date.now());
     setError(null);
     try {
-      const tok = await backend.smartConfirm(selected);
-      setResult(await backend.smartExecute(tok.token, selected));
+      // Not elevated: the Windows handlers would only come back "needs admin"; they stay out.
+      const ids = elevated ? selected : selected.filter((id) => !id.startsWith("sys_"));
+      if (ids.length === 0) {
+        setError(t("volcache.needs_admin"));
+        return;
+      }
+      const tok = await backend.smartConfirm(ids);
+      setResult(await backend.smartExecute(tok.token, ids));
       setPreview({});
       const h = await backend.cleanupHistory();
       if (h) onHistory(h);

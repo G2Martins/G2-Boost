@@ -898,7 +898,7 @@ function useMarks(view: NodeView | null, hits: OwnerHit[]): Map<string, string> 
   return useMemo(() => {
     const m = new Map<string, string>();
     if (!view) return m;
-    for (const h of hits) {
+    for (const h of ofView(view, hits)) {
       if (h.ids.length !== view.ids.length + 1) continue;
       const parts: string[] = [];
       if (h.inside.length) parts.push(t("clean.badge.inside", { names: names(h.inside, name) }));
@@ -909,6 +909,11 @@ function useMarks(view: NodeView | null, hits: OwnerHit[]): Map<string, string> 
     }
     return m;
   }, [view, hits, t, name]);
+}
+
+/** Hits of the folder on screen (an answer for the previous folder may still be in state). */
+function ofView(view: NodeView, hits: OwnerHit[]): OwnerHit[] {
+  return hits.filter((h) => view.ids.every((v, i) => h.ids[i] === v));
 }
 
 /** Up to three names, then "+N". */
@@ -932,8 +937,9 @@ function CleanStrip({
 }) {
   const { t } = useI18n();
   const name = useItemName();
-  const here = hits.find((h) => h.ids.length === view.ids.length);
-  const kids = hits.filter((h) => h.ids.length === view.ids.length + 1);
+  const mine = ofView(view, hits);
+  const here = mine.find((h) => h.ids.length === view.ids.length);
+  const kids = mine.filter((h) => h.ids.length === view.ids.length + 1);
   const below = [
     ...new Set([...(here?.contains ?? []), ...kids.flatMap((k) => [...k.inside, ...k.contains])]),
   ];
