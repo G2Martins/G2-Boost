@@ -100,9 +100,9 @@ fn valid_guid(g: &str) -> bool {
     g.len() == 38 && g.starts_with('{') && g.ends_with('}') && g[1..37].bytes().enumerate().all(|(i, b)| if matches!(i, 8 | 13 | 18 | 23) { b == b'-' } else { b.is_ascii_hexdigit() })
 }
 
-/// Turn the link power saving of adapter `guid` off (admin): back up the current values (the
-/// first time only, so the backup is always the original), write "0", restart the adapter and
-/// wait for the link to come back (a few seconds offline).
+/// Turn the link power saving of adapter `guid` off (admin): back up the current values (each
+/// value only the first time it is seen, so the backup always holds the originals, for every
+/// adapter turned off), write "0", restart the adapter and wait for the link to come back.
 pub fn turn_off(guid: &str) -> Result<NicPower, NicError> {
     if !valid_guid(guid) {
         return Err(NicError::NotFound);
@@ -118,8 +118,15 @@ pub fn turn_off(guid: &str) -> Result<NicPower, NicError> {
             present.push(BackupEntry { root: Root::Hklm, path: path.clone(), name: (*k).to_string(), value: v });
         }
     }
-    if !has_backup() {
-        registry::save_backup(&Backup { tweak: BACKUP.into(), taken_at: registry::now_unix(), entries: present.clone() }).map_err(|e| NicError::Other(e.to_string()))?;
+    let mut backup = registry::load_backup(BACKUP).unwrap_or(Backup { tweak: BACKUP.into(), taken_at: registry::now_unix(), entries: Vec::new() });
+    let before = backup.entries.len();
+    for e in &present {
+        if !backup.entries.iter().any(|b| b.path.eq_ignore_ascii_case(&e.path) && b.name == e.name) {
+            backup.entries.push(e.clone());
+        }
+    }
+    if backup.entries.len() != before {
+        registry::save_backup(&backup).map_err(|e| NicError::Other(e.to_string()))?;
     }
     for e in &present {
         registry::write(Root::Hklm, &path, &e.name, &Value::Str("0".into()))?;
@@ -147,6 +154,7 @@ pub fn restore() -> Result<(), NicError> {
         registry::write(e.root, &e.path, &e.name, &e.value)?;
     }
     let mut paths: Vec<&str> = b.entries.iter().map(|e| e.path.as_str()).collect();
+    paths.sort_unstable();
     paths.dedup();
     for p in paths {
         if let Ok(Value::Str(id)) = registry::read(Root::Hklm, p, "NetCfgInstanceId")

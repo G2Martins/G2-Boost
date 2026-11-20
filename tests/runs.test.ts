@@ -52,8 +52,9 @@ test("one timeline, newest first, each run pointing at its page", () => {
     profiles,
     volumes: null,
   });
-  // newest first by when each ended (SFC ran a minute: it ended after the update batch)
-  expect(runs.map((r) => r.at)).toEqual([500, 400, 250, 300, 200, 130, 50, 40]);
+  // newest first by when each ended (SFC ran a minute: it ended after the update batch);
+  // cleanup records are stamped at their end by the core, so `at` steps back to the start
+  expect(runs.map((r) => r.at)).toEqual([499, 400, 250, 300, 199, 130, 49, 39]);
 
   const [routine, undo, sfc, wu, leftovers, profile, system, unknown] = runs;
   expect(routine?.route).toBe("cleanup");
@@ -92,8 +93,8 @@ test("bell lines: sizes formatted, unknown keys generic, text stays text", () =>
     "Rotina de limpeza terminou: 1,5 MB liberados",
   );
   expect(lineText(t, "pt-BR", line("not.a.key", {}))).toBe("Algo aconteceu em routine");
-  expect(lineText(t, "pt-BR", line("activity.game.ram", { game: "<b>x</b>", bytes: "nope" }))).toBe(
-    "<b>x</b> abriu: nope de memória liberados",
+  expect(lineText(t, "pt-BR", line("activity.ram.game", { game: "<b>x</b>", bytes: "nope" }))).toBe(
+    "RAM limpa ao abrir <b>x</b>: nope viraram memória livre",
   );
 });
 

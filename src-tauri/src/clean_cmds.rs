@@ -15,13 +15,31 @@ use g2boost_core::system::DriveInfo;
 use g2boost_core::{activity, apps, disk, repair, volcache};
 use tauri::{AppHandle, Emitter, State};
 
-use crate::{AppsState, CLEANUP_CANCEL, DiskState, DupState, Routines, notify};
+use crate::{AppsState, DiskState, DupState, Routines, notify};
 
 /// A manual run this long ends with a line in the bell (the user may have left the page).
 const LONG_RUN_MS: u64 = 15_000;
 
 // ponytail: app-wide singletons, no `.manage()`; one analysis at a time is all the page needs.
 static ANALYZING: AtomicBool = AtomicBool::new(false);
+/// Stop for this page only: the Painel's own preview keeps `CLEANUP_CANCEL`, so one never cuts the other.
+static SMART_CANCEL: AtomicBool = AtomicBool::new(false);
+/// A preview or run is on Windows' cleanup handlers (holding the servicing lock): only then does
+/// Stop also signal `repair::cancel`, which would otherwise end a Maintenance job running meanwhile.
+static ON_HANDLERS: AtomicBool = AtomicBool::new(false);
+
+/// Run the handlers leg with `ON_HANDLERS` raised (lowered even if it panics).
+fn on_handlers<T>(f: impl FnOnce() -> T) -> T {
+    struct Lower;
+    impl Drop for Lower {
+        fn drop(&mut self) {
+            ON_HANDLERS.store(false, Ordering::SeqCst);
+        }
+    }
+    ON_HANDLERS.store(true, Ordering::SeqCst);
+    let _g = Lower;
+    f()
+}
 /// Unowned folders from the last analysis, lowercased: the disk map's "no owner" badge.
 static UNOWNED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
@@ -40,13 +58,13 @@ pub(crate) async fn smart_analyze(app: AppHandle, apps_st: State<'_, AppsState>,
         .unwrap()
         .as_ref()
         .map(|g| (g.len() as u64, g.iter().map(|x| x.wasted).sum::<u64>()));
-    CLEANUP_CANCEL.store(false, Ordering::SeqCst);
+    SMART_CANCEL.store(false, Ordering::SeqCst);
     let res = tauri::async_runtime::spawn_blocking(move || {
         if installed.is_empty() {
             installed = apps::list(&protected);
         }
         let inp = smartclean::Inputs { installed: Some(installed), dupes };
-        smartclean::analyze(&inp, &CLEANUP_CANCEL, |e| {
+        smartclean::analyze(&inp, &SMART_CANCEL, |e| {
             let _ = app.emit("smart:source", e);
         })
     })
@@ -60,8 +78,10 @@ pub(crate) async fn smart_analyze(app: AppHandle, apps_st: State<'_, AppsState>,
 /// Stop the analysis, a preview or a run between files (what was freed stays freed).
 #[tauri::command]
 pub(crate) fn smart_cancel() {
-    CLEANUP_CANCEL.store(true, Ordering::SeqCst);
-    repair::cancel();
+    SMART_CANCEL.store(true, Ordering::SeqCst);
+    if ON_HANDLERS.load(Ordering::SeqCst) {
+        repair::cancel();
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -74,7 +94,7 @@ pub(crate) struct SmartPreview {
 #[tauri::command]
 pub(crate) async fn smart_preview(app: AppHandle, ids: Vec<String>) -> Result<SmartPreview, String> {
     let (cat, sys) = smartclean::split_ids(&ids).ok_or("bad_selection")?;
-    CLEANUP_CANCEL.store(false, Ordering::SeqCst);
+    SMART_CANCEL.store(false, Ordering::SeqCst);
     let total = ids.len();
     tauri::async_runtime::spawn_blocking(move || {
         let emit = |p: &Progress| {
@@ -83,13 +103,13 @@ pub(crate) async fn smart_preview(app: AppHandle, ids: Vec<String>) -> Result<Sm
         let catalog = if cat.is_empty() {
             Vec::new()
         } else {
-            cleanup::preview_live(&cat, &CLEANUP_CANCEL, |p| emit(&smartclean::joined(&Progress::default(), p, total)))
+            cleanup::preview_live(&cat, &SMART_CANCEL, |p| emit(&smartclean::joined(&Progress::default(), p, total)))
         };
         let base = leg_end(cat.len(), catalog.iter().map(|i| (i.bytes, i.files)));
-        let system = if sys.is_empty() || CLEANUP_CANCEL.load(Ordering::SeqCst) {
+        let system = if sys.is_empty() || SMART_CANCEL.load(Ordering::SeqCst) {
             Vec::new()
         } else {
-            match volcache::preview(&sys, |p| emit(&smartclean::joined(&base, p, total))) {
+            match on_handlers(|| volcache::preview(&sys, |p| emit(&smartclean::joined(&base, p, total)))) {
                 Ok(v) => v,
                 Err(e) => sys.iter().filter_map(|i| volcache::find(i)).map(|h| busy_item(h.id, &e)).collect(),
             }
@@ -135,7 +155,7 @@ pub(crate) async fn smart_execute(app: AppHandle, tokens: State<'_, TokenStore>,
     if !tokens.consume(token, &ids) {
         return Err("bad_token".into());
     }
-    CLEANUP_CANCEL.store(false, Ordering::SeqCst);
+    SMART_CANCEL.store(false, Ordering::SeqCst);
     let total = ids.len();
     tauri::async_runtime::spawn_blocking(move || {
         let t0 = Instant::now();
@@ -146,16 +166,16 @@ pub(crate) async fn smart_execute(app: AppHandle, tokens: State<'_, TokenStore>,
         let mut records = Vec::new();
         let mut base = Progress::default();
         if !cat.is_empty() {
-            let rec = cleanup::execute(&cat, "manual", &CLEANUP_CANCEL, |p| emit(&smartclean::joined(&Progress::default(), p, total)));
+            let rec = cleanup::execute(&cat, "manual", &SMART_CANCEL, |p| emit(&smartclean::joined(&Progress::default(), p, total)));
             base = leg_end(cat.len(), rec.items.iter().map(|i| (i.bytes_freed, i.files_deleted)));
             records.push(rec);
         }
         if !sys.is_empty() {
-            if CLEANUP_CANCEL.load(Ordering::SeqCst) {
+            if SMART_CANCEL.load(Ordering::SeqCst) {
                 let items = sys.iter().map(|id| cleanup::ExecItem { id: id.clone(), error: Some("cancelled".into()), ..Default::default() }).collect();
                 records.push(RunRecord { at: g2boost_core::registry::now_unix(), trigger: "manual".into(), duration_ms: 0, items });
             } else {
-                match volcache::execute(&sys, "manual", |p| emit(&smartclean::joined(&base, p, total))) {
+                match on_handlers(|| volcache::execute(&sys, "manual", |p| emit(&smartclean::joined(&base, p, total)))) {
                     Ok(rec) => records.push(rec),
                     Err(e) => {
                         let items = sys.iter().map(|id| cleanup::ExecItem { id: id.clone(), error: Some(e.to_string()), ..Default::default() }).collect();

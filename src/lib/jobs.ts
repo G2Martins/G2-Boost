@@ -70,6 +70,9 @@ const KINDS: Record<JobKind, { route: Route; tab?: string; label: I18nKey }> = {
 const CALLS: Record<string, [JobKind, I18nKey]> = {
   cleanup_preview: ["cleanup", "jobs.cleanup.measure"],
   cleanup_execute: ["cleanup", "jobs.cleanup.run"],
+  smart_analyze: ["cleanup", "jobs.cleanup.measure"],
+  smart_preview: ["cleanup", "jobs.cleanup.measure"],
+  smart_execute: ["cleanup", "jobs.cleanup.run"],
   volcache_preview: ["volcache", "jobs.volcache.measure"],
   volcache_execute: ["volcache", "jobs.volcache.run"],
   repair_run: ["repair", "jobs.repair"],
@@ -247,6 +250,8 @@ export function startJobs() {
   };
   void backend.on<CleanupProgress>("cleanup:measure", cleanup("cleanup"));
   void backend.on<CleanupProgress>("cleanup:progress", cleanup("cleanup"));
+  void backend.on<CleanupProgress>("smart:measure", cleanup("cleanup"));
+  void backend.on<CleanupProgress>("smart:progress", cleanup("cleanup"));
   void backend.on<CleanupProgress>("volcache:progress", cleanup("volcache"));
   void backend.on<ScanProgressEvent>("disk:progress", (p) =>
     progress("disk", p.expected > 0 ? frac(p.bytes, p.expected) : null, p.bytes),

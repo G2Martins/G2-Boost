@@ -89,7 +89,8 @@ function cleanupRun(r: RunRecord, i: number): Run {
     : (TRIGGER_ROUTE[trigger] ?? ["cleanup"]);
   return {
     id: `cleanup:${r.at}:${i}`,
-    at: r.at,
+    // The core stamps a cleanup when it ends; every other history stamps the start.
+    at: r.at - Math.floor((r.duration_ms ?? 0) / 1000),
     route,
     tab,
     title: [

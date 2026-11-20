@@ -257,7 +257,7 @@ export function ActivityEffects({ route }: { route: Route }) {
       const text = lineText(t, locale, e);
       const label = routeLabel(e.route);
       // A game just started: the person is playing, the bell is enough.
-      if (e.kind !== "game" && !recently(e.route))
+      if (e.key !== "activity.ram.game" && !recently(e.route))
         void native(label ? t(label) : t("app.name"), text, e.route);
       if (e.route === here.current) return;
       if (attachNote(e.route, text)) return;

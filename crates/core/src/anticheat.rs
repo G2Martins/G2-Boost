@@ -463,9 +463,26 @@ fn save_snapshot(s: &Snapshot) {
     }
 }
 
+/// A 2.0 TPM whose enabled/activated state was not readable (`Win32_Tpm` answers elevated only)
+/// is a blind spot for the re-check: shown as ok on screen, but compared as unknown so that
+/// switching between an elevated and a normal start never looks like a change.
+pub(crate) fn blind_tpm(f: &Facts, r: &mut Readiness) {
+    if f.tpm.as_deref() != Some("2.0") || f.tpm_ready.is_some() {
+        return;
+    }
+    for c in r.checks.iter_mut().filter(|c| c.id == Tpm2) {
+        c.state = State::Unknown;
+    }
+    for t in r.titles.iter_mut().filter(|t| t.required.contains(&Tpm2)) {
+        t.ready = None;
+    }
+}
+
 /// Compare with the last start and remember this one. The first run only records a baseline.
 pub fn recheck(p: &Profile) -> Vec<Change> {
-    let r = readiness(p, &firmware::read(p));
+    let f = facts(p, &firmware::read(p));
+    let mut r = evaluate(&f, &installed(), firmware::vendor_of(p.board.as_deref(), p.laptop), firmware::is_amd(p));
+    blind_tpm(&f, &mut r);
     let old = load_snapshot();
     let (changes, next) = diff(old.as_ref().unwrap_or(&Snapshot::default()), &r);
     save_snapshot(&next);
@@ -654,6 +671,16 @@ mod tests {
         // A BIOS update reset the TPM.
         let (changes, _) = diff(&next, &evaluate(&Facts { tpm: None, ..ready_pc() }, &all, Vendor::Msi, false));
         assert!(changes.contains(&Change::Check { id: Tpm2, on: false }));
+
+        // TPM readiness seen elevated (not activated), then a normal start (unreadable): no flip.
+        let elevated = Facts { tpm_ready: Some(false), ..ready_pc() };
+        let (_, snap) = diff(&next, &evaluate(&elevated, &all, Vendor::Msi, false));
+        let normal = Facts { tpm_ready: None, ..ready_pc() };
+        let mut r = evaluate(&normal, &all, Vendor::Msi, false);
+        blind_tpm(&normal, &mut r);
+        let (changes, kept) = diff(&snap, &r);
+        assert!(changes.is_empty(), "elevation alone is not a change: {changes:?}");
+        assert_eq!(kept.checks.get(&Tpm2), Some(&State::Missing));
 
         // An unreadable value keeps the last known one (no fake "changed").
         let unknown = evaluate(&Facts { vbs: None, hvci: None, ..ready_pc() }, &all, Vendor::Msi, false);

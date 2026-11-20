@@ -146,14 +146,27 @@ fn reparse(md: &std::fs::Metadata) -> bool {
     md.file_attributes() & 0x400 != 0
 }
 
-/// A local `.exe` that is a plain file (a symlink or other reparse point is refused: it could
-/// lead anywhere, a share included).
+/// No junction or symlink anywhere on the way to `path` (checked from the drive root down, so
+/// each lookup only walks folders already known to be plain): a link in the middle could lead to
+/// a share and send the user's credentials there.
+fn plain_all_the_way(path: &Path) -> bool {
+    let mut parts: Vec<&Path> = path.ancestors().collect();
+    parts.pop(); // the bare root ("C:\") is not a reparse point
+    parts.iter().rev().all(|p| std::fs::symlink_metadata(p).is_ok_and(|md| !reparse(&md)))
+}
+
+/// A local `.exe` that is a plain file, reached through plain folders (a symlink or other
+/// reparse point anywhere is refused: it could lead anywhere, a share included).
 pub fn local_exe(path: &str) -> Option<PathBuf> {
     if !local_drive_path(path) || !path.to_ascii_lowercase().ends_with(".exe") {
         return None;
     }
-    let md = std::fs::symlink_metadata(path).ok()?;
-    (md.is_file() && !reparse(&md)).then(|| PathBuf::from(path))
+    let p = Path::new(path);
+    // The way first: a lookup of the full path would already walk through a linked folder.
+    if !plain_all_the_way(p) {
+        return None;
+    }
+    std::fs::symlink_metadata(p).ok()?.is_file().then(|| p.to_path_buf())
 }
 
 /// Helpers whose icon says nothing about the app (uninstallers, updaters, crash reporters).
@@ -166,8 +179,11 @@ fn main_exe(name: &str) -> bool {
 /// The biggest program inside `dir`, three levels down at most and a few thousand entries, never
 /// through a junction or symlink: the icon of a leftover or orphan folder.
 pub fn largest_exe(dir: &Path) -> Option<PathBuf> {
+    if !local_drive_path(&dir.to_string_lossy()) || !plain_all_the_way(dir) {
+        return None;
+    }
     let md = std::fs::symlink_metadata(dir).ok()?;
-    if !md.is_dir() || reparse(&md) || !local_drive_path(&dir.to_string_lossy()) {
+    if !md.is_dir() {
         return None;
     }
     let mut best: Option<(u64, PathBuf)> = None;
@@ -299,6 +315,9 @@ mod tests {
         let sym = std::os::windows::fs::symlink_file(outside.join("huge.exe"), app.join("sym.exe")).is_ok();
         assert_eq!(largest_exe(&app), Some(app.join(r"bin\x64\game.exe")));
         assert_eq!(largest_exe(&app.join("linked")), None, "the junction itself is never walked");
+        // A junction in the middle of the way (could point at a share) is refused too.
+        assert!(local_exe(&outside.join("huge.exe").to_string_lossy()).is_some(), "the plain path is fine");
+        assert!(local_exe(&app.join(r"linked\huge.exe").to_string_lossy()).is_none(), "no icon through a linked folder");
         if sym {
             assert!(local_exe(&app.join("sym.exe").to_string_lossy()).is_none(), "a symlinked exe is refused");
         }

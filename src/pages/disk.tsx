@@ -666,12 +666,17 @@ function FilesTab({
   const picks = Object.values(picked);
   // Files inside a cleanup category's folder: the badge says the cleanup already takes them.
   useEffect(() => {
+    // Badges match rows by position: never keep the previous list's answer, never a late one.
+    setOwners([]);
     const paths = (res?.files ?? []).map((f) => f.path);
-    if (paths.length === 0) {
-      setOwners([]);
-      return;
-    }
-    backend.cleanOwnerPaths(paths).then((o) => setOwners(o ?? []));
+    if (paths.length === 0) return;
+    let alive = true;
+    backend.cleanOwnerPaths(paths).then((o) => {
+      if (alive) setOwners(o ?? []);
+    });
+    return () => {
+      alive = false;
+    };
   }, [res]);
   const keyOf = (f: BigFile) => f.ids.join("/");
   const toggle = (f: BigFile) =>

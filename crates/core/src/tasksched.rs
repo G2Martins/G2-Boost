@@ -12,7 +12,7 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::TaskScheduler::{
     IExecAction, ILogonTrigger, IRegisteredTask, ITaskFolder, ITaskService, TASK_ACTION_EXEC,
     TASK_CREATE_OR_UPDATE, TASK_INSTANCES_IGNORE_NEW, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST,
-    TASK_RUNLEVEL_LUA, TASK_TRIGGER_LOGON, TaskScheduler,
+    TASK_RUN_IGNORE_CONSTRAINTS, TASK_RUNLEVEL_LUA, TASK_TRIGGER_LOGON, TaskScheduler,
 };
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::{BSTR, HRESULT, Interface};
@@ -141,6 +141,10 @@ pub fn set_task_enabled(folder_path: &str, name: &str, enabled: bool) -> Result<
 /// it runs, polling every 500 ms for at most `max`. `keep_waiting` returning `false` ends the
 /// wait early; the task itself keeps running. `Ok(true)` = it finished (with a success result),
 /// `Ok(false)` = still running when we stopped waiting.
+///
+/// Started with "ignore constraints" (a task set to wait for AC power or idle would otherwise not
+/// start at all), and "finished" needs proof that this run happened: an instance was seen, or the
+/// task's last run time moved. Without it, `LastTaskResult` is last month's code.
 pub fn run_task_wait(folder_path: &str, name: &str, max: Duration, mut keep_waiting: impl FnMut() -> bool) -> Result<bool, TaskError> {
     let _com = Com::init()?;
     let svc = service()?;
@@ -149,10 +153,18 @@ pub fn run_task_wait(folder_path: &str, name: &str, max: Duration, mut keep_wait
     // SAFETY: valid folder/task; empty VARIANT = no parameters; read-only polling afterwards.
     unsafe {
         let task: IRegisteredTask = f.GetTask(&BSTR::from(name)).map_err(map)?;
-        // `Run` creates the instance before returning, so "no instance" below really means done.
-        task.Run(&VARIANT::default()).map_err(map)?;
+        let last_before = task.LastRunTime().unwrap_or(0.0);
+        task.RunEx(&VARIANT::default(), TASK_RUN_IGNORE_CONSTRAINTS.0, 0, &BSTR::new()).map_err(map)?;
+        let mut seen = false;
         while t0.elapsed() < max {
-            if task.GetInstances(0).and_then(|c| c.Count()).map_err(map)? == 0 {
+            if task.GetInstances(0).and_then(|c| c.Count()).map_err(map)? > 0 {
+                seen = true;
+            } else if !seen && task.LastRunTime().unwrap_or(last_before) == last_before {
+                // Not listed yet and no new run recorded: give it a moment, then say it never started.
+                if t0.elapsed() > Duration::from_secs(15) {
+                    return Err(TaskError::Com("task did not start".into()));
+                }
+            } else {
                 let code = task.LastTaskResult().map_err(map)?;
                 // A handler task reports an HRESULT: negative = failure (positive SCHED_S_* are notes).
                 return if code < 0 { Err(TaskError::Com(format!("task result 0x{:08X}", code as u32))) } else { Ok(true) };
