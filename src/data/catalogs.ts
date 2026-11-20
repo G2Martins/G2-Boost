@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   BriefcaseBusiness,
   BugOff,
+  CirclePause,
   CircleUserRound,
   Cpu,
   EarOff,
@@ -538,6 +539,15 @@ export const TWEAKS: Tweak[] = [
   { id: "alt_shift_off", icon: Languages, category: "gaming", presets: [] },
   { id: "narrator_shortcut_off", icon: EarOff, category: "gaming", presets: [] },
   { id: "accessibility_shortcuts_off", icon: Accessibility, category: "gaming", presets: [] },
+  // Round 11: Store apps without background tasks (custom and Debloat only, never a preset).
+  {
+    id: "background_apps_off",
+    icon: CirclePause,
+    category: "performance",
+    admin: true,
+    level: "recommended",
+    presets: [],
+  },
 ];
 /** "Remover a IA do Windows": one click on the Debloat page (the profiles page reuses it). */
 export const AI_SET = [

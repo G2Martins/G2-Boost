@@ -101,6 +101,8 @@ pub struct Env {
     pub exposure: Option<crate::exposure::Report>,
     /// Link power saving of the adapter carrying internet traffic.
     pub nic_power: Option<crate::nicpower::NicPower>,
+    /// Firmware/Windows requirements of the installed games' anti-cheats.
+    pub anticheat: Option<crate::anticheat::Readiness>,
 }
 
 /// Gather everything the rules need for this machine (no admin, ~1 s).
@@ -109,14 +111,16 @@ pub fn env(p: &Profile, sample: Option<Sample>, winsat: Option<WinSat>) -> Env {
     let sys = system::list_drives().into_iter().find(|d| d.letter.eq_ignore_ascii_case(&drive));
     let gpu_driver = p.gpus.first().and_then(|g| g.driver.clone());
     let cpu_temp_c = sample.as_ref().and_then(|s| s.cpu_temp_c).or_else(|| sensors::read().and_then(|x| x.cpu_temp_c));
+    let fw = firmware::read(p);
     Env {
         system_free_bytes: sys.as_ref().map(|d| d.free_bytes),
         system_total_bytes: sys.as_ref().map(|d| d.total_bytes),
-        hvci_running: hvci_running(),
+        hvci_running: fw.hvci_running, // same Win32_DeviceGuard read as `hvci_running()`
         sample,
         winsat,
         gpu_driver_age_days: gpu_driver.as_deref().and_then(driver_age_days),
-        firmware: Some(firmware::read(p)),
+        anticheat: Some(crate::anticheat::readiness(p, &fw)),
+        firmware: Some(fw),
         cpu_temp_c,
         exposure: Some(crate::exposure::quick()),
         nic_power: crate::nicpower::primary(),
@@ -315,8 +319,30 @@ pub fn analyze(p: &Profile, e: &Env) -> Report {
     if p.tpm.as_deref() != Some("2.0") {
         f.push(finding("tpm_missing", Severity::Warn, Kind::Security, &[]));
     }
-    if e.hvci_running == Some(true) {
-        f.push(finding("hvci_on", Severity::Info, Kind::Security, &[]));
+    // An installed game whose anti-cheat uses memory integrity: never suggest turning it off.
+    let ac = e.anticheat.as_ref();
+    match (e.hvci_running, ac.and_then(|r| r.vbs_games.first())) {
+        (Some(true), Some(game)) => f.push(finding("hvci_needed", Severity::Info, Kind::Security, &[("game", game.clone())])),
+        (Some(true), None) => f.push(finding("hvci_on", Severity::Info, Kind::Security, &[])),
+        _ => {}
+    }
+    if let Some(r) = ac {
+        use crate::anticheat::{Check, State};
+        let missing = |c: Check| r.checks.iter().any(|x| x.id == c && x.state == State::Missing);
+        for t in r.titles.iter().filter(|t| t.ready == Some(false)) {
+            if let Some(game) = &t.installed {
+                f.push(finding("anticheat_blocked", Severity::Warn, Kind::Security, &[("game", game.clone()), ("count", t.missing.len().to_string())]));
+            }
+        }
+        let wants_iommu = r.titles.iter().find(|t| t.installed.is_some() && t.recommended.iter().chain(t.on_demand).any(|c| *c == Check::Iommu));
+        if missing(Check::Iommu)
+            && let Some(game) = wants_iommu.and_then(|t| t.installed.clone())
+        {
+            f.push(finding("iommu_off", Severity::Info, Kind::FreeFix, &[("game", game)]));
+        }
+        if missing(Check::Blocklist) {
+            f.push(finding("vuln_driver_blocklist_off", Severity::Warn, Kind::Security, &[]));
+        }
     }
 
     if let Some(t) = e.cpu_temp_c {
@@ -482,6 +508,49 @@ mod tests {
             assert!(got.contains(&id), "{id} missing in {got:?}");
         }
         assert_eq!(analyze(&p, &e).findings[0].severity, Severity::Critical);
+    }
+
+    #[test]
+    fn anticheat_findings() {
+        use crate::anticheat::{Facts, evaluate};
+        use crate::firmware::Vendor;
+        // The owner's PC: memory integrity on, VT-d off, Valorant installed.
+        let fw = Facts {
+            tpm: Some("2.0".into()),
+            secure_boot: Some(true),
+            boot_mode: Some("uefi"),
+            system_gpt: Some(true),
+            vbs: Some(true),
+            hvci: Some(true),
+            iommu: Some(false),
+            virtualization: true,
+            build: 26_200,
+            blocklist_reg: Some(1),
+            ..Default::default()
+        };
+        let with = |f: &Facts, games: &[&'static str]| {
+            let found: Vec<_> = games.iter().map(|g| (*g, g.to_uppercase())).collect();
+            Env { hvci_running: f.hvci, anticheat: Some(evaluate(f, &found, Vendor::Msi, false)), ..Default::default() }
+        };
+        let r = analyze(&machine(), &with(&fw, &["valorant"]));
+        let got = ids(&r);
+        assert!(got.contains(&"hvci_needed") && !got.contains(&"hvci_on"), "never suggest turning it off: {got:?}");
+        assert!(got.contains(&"iommu_off"));
+        assert!(!got.contains(&"anticheat_blocked") && !got.contains(&"vuln_driver_blocklist_off"));
+        let hv = r.findings.iter().find(|f| f.id == "hvci_needed").unwrap();
+        assert_eq!(hv.params.get("game").map(String::as_str), Some("VALORANT"));
+
+        // Only Battlefield 6 (no VBS use): the usual memory integrity tip, no IOMMU talk.
+        let got = ids(&analyze(&machine(), &with(&fw, &["bf6"])));
+        assert!(got.contains(&"hvci_on") && !got.contains(&"hvci_needed") && !got.contains(&"iommu_off"), "{got:?}");
+
+        // Secure Boot off + blocklist off without memory integrity.
+        let bad = Facts { secure_boot: Some(false), hvci: Some(false), blocklist_reg: Some(0), ..fw };
+        let r = analyze(&machine(), &with(&bad, &["valorant", "cod"]));
+        let blocked: Vec<_> = r.findings.iter().filter(|f| f.id == "anticheat_blocked").collect();
+        assert_eq!(blocked.len(), 2);
+        assert_eq!(blocked[0].params.get("count").map(String::as_str), Some("1"));
+        assert!(ids(&r).contains(&"vuln_driver_blocklist_off"));
     }
 
     #[test]

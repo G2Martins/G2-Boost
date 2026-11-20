@@ -1,8 +1,9 @@
 //! BIOS / firmware settings that Windows *can* tell us without a driver: boot mode (UEFI vs
-//! legacy CSM), Secure Boot, TPM, virtualization enabled in firmware, Resizable BAR (from the
-//! GPU's BAR1 size), memory running at its rated (XMP/EXPO) speed, BIOS age, Fast Startup and
-//! hibernation. Settings with no OS-visible trace (C-states, power limits, fan curves) are not
-//! readable from Windows and are reported as such.
+//! legacy CSM), Secure Boot, TPM, virtualization enabled in firmware, IOMMU (DMA protection),
+//! VBS / memory integrity running, the system disk's partition style (GPT/MBR), Resizable BAR
+//! (from the GPU's BAR1 size), memory running at its rated (XMP/EXPO) speed, BIOS age, Fast
+//! Startup and hibernation. Settings with no OS-visible trace (C-states, power limits, fan
+//! curves) are not readable from Windows and are reported as such.
 
 use serde::Serialize;
 use windows::Win32::System::SystemInformation::{FIRMWARE_TYPE, FirmwareTypeBios, FirmwareTypeUefi, GetFirmwareType};
@@ -34,6 +35,62 @@ pub struct Firmware {
     pub bios_age_days: Option<u32>,
     pub fast_startup: Option<bool>,
     pub hibernation: Option<bool>,
+    /// Virtualization-based security running (`Win32_DeviceGuard`).
+    pub vbs_running: Option<bool>,
+    /// Memory integrity (HVCI) running.
+    pub hvci_running: Option<bool>,
+    /// DMA protection available = an IOMMU (Intel VT-d / AMD-Vi) switched on in the firmware.
+    pub iommu: Option<bool>,
+    /// The system disk is GPT (Secure Boot needs UEFI, which boots Windows from GPT only).
+    pub system_gpt: Option<bool>,
+}
+
+/// What `Win32_DeviceGuard` says (Microsoft Learn, "Enable memory integrity"): `VirtualizationBasedSecurityStatus`
+/// 2 = running; `SecurityServicesRunning` has 2 = memory integrity; `AvailableSecurityProperties`
+/// has 3 = DMA protection. Readable without admin.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DeviceGuard {
+    pub vbs: Option<bool>,
+    pub hvci: Option<bool>,
+    pub dma: Option<bool>,
+}
+
+pub(crate) fn device_guard_from(row: &crate::wmi::Row) -> DeviceGuard {
+    use crate::wmi::WmiValue;
+    let list = |k: &str, v: i64| match row.get(k) {
+        Some(WmiValue::IntList(l)) => Some(l.contains(&v)),
+        _ => None,
+    };
+    DeviceGuard {
+        vbs: row.get("VirtualizationBasedSecurityStatus").and_then(WmiValue::as_f64).map(|s| s as i64 == 2),
+        hvci: list("SecurityServicesRunning", 2),
+        dma: list("AvailableSecurityProperties", 3),
+    }
+}
+
+pub fn device_guard() -> DeviceGuard {
+    const FIELDS: [&str; 3] = ["VirtualizationBasedSecurityStatus", "SecurityServicesRunning", "AvailableSecurityProperties"];
+    crate::wmi::query(r"ROOT\Microsoft\Windows\DeviceGuard", "SELECT VirtualizationBasedSecurityStatus, SecurityServicesRunning, AvailableSecurityProperties FROM Win32_DeviceGuard", &FIELDS)
+        .ok()
+        .and_then(|rows| rows.first().map(device_guard_from))
+        .unwrap_or_default()
+}
+
+/// Partition style of the disk holding the Windows volume (`IOCTL_DISK_GET_PARTITION_INFO_EX`
+/// on `\\.\C:`, no admin): `PartitionStyle` is the first DWORD, 0 = MBR, 1 = GPT.
+fn system_gpt() -> Option<bool> {
+    use windows::Win32::System::Ioctl::IOCTL_DISK_GET_PARTITION_INFO_EX;
+    let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+    let dev = crate::hardware::open_device(&format!(r"\\.\{drive}"))?;
+    let mut out = [0u8; 256];
+    if crate::hardware::ioctl(&dev, IOCTL_DISK_GET_PARTITION_INFO_EX, None, &mut out)? < 4 {
+        return None;
+    }
+    match u32::from_le_bytes([out[0], out[1], out[2], out[3]]) {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None, // RAW
+    }
 }
 
 fn dword(path: &str, name: &str) -> Option<u32> {
@@ -88,6 +145,7 @@ pub fn read(p: &Profile) -> Firmware {
         .filter_map(|m| m.rated_mts.map(|r| m.configured_mts >= r))
         .collect();
     let hypervisor_present = hypervisor_bit();
+    let dg = device_guard();
     Firmware {
         boot_mode: boot_mode(),
         secure_boot: p.secure_boot,
@@ -106,6 +164,10 @@ pub fn read(p: &Profile) -> Firmware {
         bios_age_days: p.bios.as_ref().and_then(|b| bios_age_days(&b.date)),
         fast_startup: dword(r"SYSTEM\CurrentControlSet\Control\Session Manager\Power", "HiberbootEnabled").map(|v| v == 1),
         hibernation: dword(r"SYSTEM\CurrentControlSet\Control\Power", "HibernateEnabled").map(|v| v == 1),
+        vbs_running: dg.vbs,
+        hvci_running: dg.hvci,
+        iommu: dg.dma,
+        system_gpt: system_gpt(),
     }
 }
 
@@ -187,11 +249,16 @@ const PATHS: &[(&str, Vendor, &str, &str)] = &[
     ("virtualization", Vendor::Gigabyte, "Tweaker › Advanced CPU Settings › Intel Virtualization Technology: Enabled", "Tweaker › Advanced CPU Settings › SVM Mode: Enabled"),
     ("virtualization", Vendor::Asrock, "Advanced › CPU Configuration › Intel Virtualization Technology: Enabled", "Advanced › CPU Configuration › SVM Mode: Enabled"),
     ("virtualization", Vendor::Generic, "Advanced › CPU › Intel Virtualization Technology (VT-x): Enabled", "Advanced › CPU › SVM Mode (AMD-V): Enabled"),
+    ("iommu", Vendor::Asus, "Advanced › System Agent (SA) Configuration › VT-d: Enabled", "Advanced › AMD CBS › NBIO Common Options › IOMMU: Enabled"),
+    ("iommu", Vendor::Msi, "OC › CPU Features › Intel VT-D Tech: Enabled", "OC › CPU Features › IOMMU: Enabled"),
+    ("iommu", Vendor::Gigabyte, "Settings › Miscellaneous › VT-d: Enabled", "Settings › Miscellaneous › IOMMU: Enabled"),
+    ("iommu", Vendor::Asrock, "Advanced › Chipset Configuration › VT-d: Enabled", "Advanced › AMD CBS › NBIO Common Options › IOMMU: Enabled"),
+    ("iommu", Vendor::Generic, "Advanced / Chipset › Intel VT-d: Enabled", "Advanced / AMD CBS › IOMMU (AMD-Vi): Enabled"),
 ];
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct GuideItem {
-    /// `csm`, `xmp`, `rebar`, `secure_boot`, `tpm`, `bios_update`, `virtualization` (i18n `bios.item.*`).
+    /// `csm`, `xmp`, `rebar`, `secure_boot`, `tpm`, `bios_update`, `virtualization`, `iommu` (i18n `bios.item.*`).
     pub id: &'static str,
     /// Where it lives in this maker's setup (firmware labels, untranslated).
     pub path: &'static str,
@@ -218,12 +285,18 @@ fn rebar_capable(p: &Profile) -> bool {
     })
 }
 
-/// Pure: the checklist from the firmware findings, with this maker's menu paths.
-pub(crate) fn guide_for(fw: &Firmware, vendor: Vendor, amd: bool, rebar_capable: bool) -> Guide {
+/// Pure: a checklist of `(item id, optional)` in that order, with this maker's menu paths.
+pub(crate) fn guide_with(vendor: Vendor, amd: bool, uefi: bool, items: &[(&'static str, bool)]) -> Guide {
     let path = |id: &str| {
         let row = PATHS.iter().find(|r| r.0 == id && r.1 == vendor).or_else(|| PATHS.iter().find(|r| r.0 == id && r.1 == Vendor::Generic));
         row.map_or("", |r| if amd { r.3 } else { r.2 })
     };
+    let (_, enter_key, advanced_key) = KEYS.iter().find(|k| k.0 == vendor).copied().unwrap_or((Vendor::Generic, "Del / F2", None));
+    Guide { vendor, enter_key, advanced_key, uefi, items: items.iter().map(|&(id, optional)| GuideItem { id, path: path(id), optional }).collect() }
+}
+
+/// Pure: the checklist from the firmware findings, with this maker's menu paths.
+pub(crate) fn guide_for(fw: &Firmware, vendor: Vendor, amd: bool, rebar_capable: bool) -> Guide {
     let wants = [
         ("csm", fw.boot_mode == Some("legacy"), false),
         ("xmp", fw.memory_at_rated_speed == Some(false), false),
@@ -232,20 +305,19 @@ pub(crate) fn guide_for(fw: &Firmware, vendor: Vendor, amd: bool, rebar_capable:
         ("tpm", fw.tpm.is_none(), false),
         ("bios_update", fw.bios_age_days.is_some_and(|d| d > 3 * 365), false),
         ("virtualization", !fw.virtualization_enabled, true),
+        // Only some anti-cheats (and Windows' DMA protection) ask for it: optional, like VT-x.
+        ("iommu", fw.iommu == Some(false), true),
     ];
-    let (_, enter_key, advanced_key) = KEYS.iter().find(|k| k.0 == vendor).copied().unwrap_or((Vendor::Generic, "Del / F2", None));
-    Guide {
-        vendor,
-        enter_key,
-        advanced_key,
-        uefi: fw.boot_mode == Some("uefi"),
-        items: wants.iter().filter(|w| w.1).map(|&(id, _, optional)| GuideItem { id, path: path(id), optional }).collect(),
-    }
+    let items: Vec<_> = wants.iter().filter(|w| w.1).map(|&(id, _, optional)| (id, optional)).collect();
+    guide_with(vendor, amd, fw.boot_mode == Some("uefi"), &items)
+}
+
+pub(crate) fn is_amd(p: &Profile) -> bool {
+    p.cpu_detail.vendor.to_ascii_uppercase().contains("AMD")
 }
 
 pub fn guide(p: &Profile, fw: &Firmware) -> Guide {
-    let amd = p.cpu_detail.vendor.to_ascii_uppercase().contains("AMD");
-    guide_for(fw, vendor_of(p.board.as_deref(), p.laptop), amd, rebar_capable(p))
+    guide_for(fw, vendor_of(p.board.as_deref(), p.laptop), is_amd(p), rebar_capable(p))
 }
 
 /* ---------------- restart into the firmware setup ---------------- */
@@ -432,7 +504,7 @@ mod tests {
 
     #[test]
     fn every_item_has_a_path_for_every_vendor() {
-        let items = ["csm", "xmp", "rebar", "secure_boot", "tpm", "bios_update", "virtualization"];
+        let items = ["csm", "xmp", "rebar", "secure_boot", "tpm", "bios_update", "virtualization", "iommu"];
         for v in [Vendor::Asus, Vendor::Msi, Vendor::Gigabyte, Vendor::Asrock, Vendor::Generic] {
             assert!(KEYS.iter().any(|k| k.0 == v));
             for id in items {
@@ -453,11 +525,16 @@ mod tests {
             resizable_bar: Some(true),
             memory_at_rated_speed: Some(true),
             bios_age_days: Some(200),
+            iommu: Some(true),
             ..Default::default()
         };
         let g = guide_for(&healthy, Vendor::Msi, false, true);
         assert!(g.items.is_empty() && g.uefi);
         assert_eq!((g.enter_key, g.advanced_key), ("Del", Some("F7")));
+        let no_iommu = guide_for(&Firmware { iommu: Some(false), ..healthy.clone() }, Vendor::Asus, true, true);
+        assert_eq!(no_iommu.items.iter().map(|i| (i.id, i.optional)).collect::<Vec<_>>(), vec![("iommu", true)]);
+        assert!(no_iommu.items[0].path.contains("IOMMU"), "AMD path: {}", no_iommu.items[0].path);
+        assert!(guide_for(&Firmware { iommu: None, ..healthy.clone() }, Vendor::Asus, true, true).items.is_empty(), "unknown: nothing said");
 
         let owner = Firmware { resizable_bar: Some(false), bios_age_days: Some(1250), ..healthy.clone() };
         let g = guide_for(&owner, Vendor::Gigabyte, true, true);
@@ -482,6 +559,41 @@ mod tests {
         println!("{:?} board={:?} enter={} advanced={:?} uefi={}", g.vendor, p.board, g.enter_key, g.advanced_key, g.uefi);
         for i in &g.items {
             println!("  {} (optional={}): {}", i.id, i.optional, i.path);
+        }
+    }
+
+    #[test]
+    fn device_guard_values() {
+        use crate::wmi::{Row, WmiValue};
+        // The owner's PC (2026-11-20): VBS + memory integrity running, no DMA protection (VT-d off).
+        let row: Row = [
+            ("VirtualizationBasedSecurityStatus".to_string(), WmiValue::Int(2)),
+            ("SecurityServicesRunning".to_string(), WmiValue::IntList(vec![2])),
+            ("AvailableSecurityProperties".to_string(), WmiValue::IntList(vec![1, 2, 5, 6, 7, 8])),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(device_guard_from(&row), DeviceGuard { vbs: Some(true), hvci: Some(true), dma: Some(false) });
+        let off: Row = [
+            ("VirtualizationBasedSecurityStatus".to_string(), WmiValue::Int(1)),
+            ("SecurityServicesRunning".to_string(), WmiValue::IntList(vec![0])),
+            ("AvailableSecurityProperties".to_string(), WmiValue::IntList(vec![1, 2, 3])),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(device_guard_from(&off), DeviceGuard { vbs: Some(false), hvci: Some(false), dma: Some(true) });
+        // Hostile / missing values: unknown, never a guess.
+        let junk: Row = [("SecurityServicesRunning".to_string(), WmiValue::Str("2".into()))].into_iter().collect();
+        assert_eq!(device_guard_from(&junk), DeviceGuard::default());
+    }
+
+    #[test]
+    fn live_device_guard_and_partition_style() {
+        let dg = device_guard();
+        println!("device guard {dg:?} gpt={:?}", system_gpt());
+        assert!(dg.vbs.is_some(), "Win32_DeviceGuard answers without admin on Windows 10/11");
+        if boot_mode() == Some("uefi") {
+            assert_eq!(system_gpt(), Some(true), "UEFI boots Windows from GPT");
         }
     }
 

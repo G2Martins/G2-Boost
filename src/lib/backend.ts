@@ -684,6 +684,11 @@ export type Firmware = {
   bios_age_days: number | null;
   fast_startup: boolean | null;
   hibernation: boolean | null;
+  vbs_running: boolean | null;
+  hvci_running: boolean | null;
+  /** DMA protection available: Intel VT-d / AMD-Vi on in the firmware. */
+  iommu: boolean | null;
+  system_gpt: boolean | null;
 };
 export type PowerPlan = { guid: string; name: string; active: boolean; builtin: boolean };
 export type PowerPlans = { plans: PowerPlan[]; has_battery: boolean };
@@ -817,7 +822,8 @@ export type BiosItemId =
   | "secure_boot"
   | "tpm"
   | "bios_update"
-  | "virtualization";
+  | "virtualization"
+  | "iommu";
 /** `path`: the firmware's own menu labels (English, untranslated), joined with " › ". */
 export type BiosGuideItem = { id: BiosItemId; path: string; optional: boolean };
 export type BiosGuide = {
@@ -1266,6 +1272,8 @@ export const backend = {
   // r11:clean
 
   // r11:anticheat
+  /** Installed games' anti-cheat requirements vs this PC (read-only). */
+  anticheatReadiness: () => call<AnticheatReadiness>("anticheat_readiness"),
 
   // r11:luli
 
@@ -1827,6 +1835,47 @@ export type ActivityEntry = {
 // ── r11:clean types ──
 
 // ── r11:anticheat types ──
+export type AnticheatCheck =
+  | "uefi"
+  | "gpt"
+  | "secure_boot"
+  | "tpm2"
+  | "vbs"
+  | "hvci"
+  | "iommu"
+  | "win11"
+  | "win25h2"
+  | "blocklist";
+export type AnticheatState = "ok" | "missing" | "unknown";
+/** Windows step that fixes a check (i18n `anticheat.fix.*`). */
+export type AnticheatWindowsFix = "mbr2gpt" | "core_isolation" | "update" | "blocklist";
+export type AnticheatCheckState = {
+  id: AnticheatCheck;
+  state: AnticheatState;
+  bios: BiosItemId | null;
+  windows: AnticheatWindowsFix | null;
+};
+export type AnticheatTitleId = "valorant" | "lol" | "faceit" | "bf6" | "cod";
+export type AnticheatTitle = {
+  id: AnticheatTitleId;
+  anticheat: "vanguard" | "faceit" | "javelin" | "ricochet";
+  /** The name it is installed under; null = not on this PC. */
+  installed: string | null;
+  required: AnticheatCheck[];
+  recommended: AnticheatCheck[];
+  on_demand: AnticheatCheck[];
+  missing: AnticheatCheck[];
+  ready: boolean | null;
+  on_demand_ok: boolean | null;
+};
+export type AnticheatReadiness = {
+  checks: AnticheatCheckState[];
+  titles: AnticheatTitle[];
+  /** Installed games whose anti-cheat uses VBS / memory integrity / IOMMU. */
+  vbs_games: string[];
+  /** BIOS steps for what is missing, with this board maker's menu paths. */
+  guide: BiosGuide;
+};
 
 // ── r11:luli types ──
 

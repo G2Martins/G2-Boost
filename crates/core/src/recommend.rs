@@ -83,6 +83,11 @@ const PREFERENCE: &[&str] = &[
     "recall_feature_off", "paint_ai_off", "notepad_ai_off", "edge_ai_off", "delivery_p2p_off", "spotlight_off",
     "ntfs_last_access_off", "storage_sense_off", "network_throttling_off", "transparency_off", "classic_context_menu",
     "taskbar_left", "notifications_off", "error_reporting_off", "narrator_shortcut_off",
+    // Round 11 review: Nagle/delayed ACK only touch TCP (competitive shooters talk UDP), and the
+    // MMCSS "Games" task only lifts threads that register with it, which few games do: kept in
+    // the High preset, not counted as pending. Store apps in the background is a trade (their
+    // notifications and sync wait for the window), not a measured gain.
+    "network_latency", "mmcss", "background_apps_off",
 ];
 
 /// Printers that print to a file or app, not paper: they need the Spooler but no device.
@@ -264,6 +269,10 @@ mod tests {
         assert_eq!(by(&laptop, "core_parking_off").reason, Some("laptop"));
         assert_eq!(by(&laptop, "wifi_power_saving_off").reason, Some("laptop"));
         assert_eq!(by(&r, "core_parking_off").reason, Some("preference"));
+        for id in ["network_latency", "mmcss", "background_apps_off"] {
+            assert_eq!(by(&r, id).reason, Some("preference"), "{id}: limited gain, not pending in the score");
+        }
+        assert!(by(&r, "input_lag").recommended && by(&r, "svc_sysmain").recommended, "owner's preset decisions kept");
 
         assert!(is_x3d_dual_ccd("AMD Ryzen 9 7950X3D 16-Core Processor", 16));
         assert!(is_x3d_dual_ccd("AMD Ryzen 9 9900X3D 12-Core Processor", 12));

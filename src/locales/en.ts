@@ -247,9 +247,9 @@ export const en = {
   "boost.tweak.svc_geolocation.warn": "some app needs your location.",
   "boost.tweak.hvci_off": "Turn off Core Isolation (memory integrity)",
   "boost.tweak.hvci_off.desc":
-    "Turns off memory integrity. The only tweak here with an FPS gain measured in independent tests (about 5 % in some games), but it lowers protection against malicious drivers. Takes effect after a restart.",
+    "Turns off memory integrity. The only tweak here with an FPS gain measured in independent tests (about 5 % in some games), but it lowers protection against malicious drivers. Some anti-cheats use memory integrity (Vanguard's on-demand mode, FACEIT): G2 Boost warns first when one of those games is installed. Takes effect after a restart.",
   "boost.tweak.hvci_off.warn":
-    "you want Windows' protection against kernel malware (Microsoft's default recommendation).",
+    "you play with an anti-cheat that uses memory integrity, or want Windows' protection against kernel malware (Microsoft's default recommendation).",
   "settings.restore_before_preset": "Restore point before presets",
   "settings.restore_before_preset.hint":
     "Creates a Windows restore point (SRSetRestorePoint) before applying Default / High performance or Boost now. Needs administrator; Windows limits it to 1 per 24 h.",
@@ -1468,7 +1468,7 @@ export const en = {
   "boost.tweak.hags.warn": "the GPU is older than 2018 or the driver crashes.",
   "boost.tweak.mmcss": "Multimedia priority for games",
   "boost.tweak.mmcss.desc":
-    "Makes the Windows multimedia scheduler prioritize games (CPU, GPU and disk) and reserve less time for background work: 10 % instead of 20 %.",
+    "Makes the Windows multimedia scheduler prioritize games (CPU, GPU and disk) and reserve less time for background work: 10 % instead of 20 %. The gain is small: the priority only applies to programs that register with the multimedia scheduler, and few games do.",
   "boost.tweak.mmcss.warn": "you record or stream while playing and the encoder drops frames.",
   "boost.tweak.network_latency": "Network latency for games",
   "boost.tweak.network_latency.desc":
@@ -4136,6 +4136,120 @@ export const en = {
   // ── r11:clean ──
 
   // ── r11:anticheat ──
+  "anticheat.title": "Ready for anti-cheat games",
+  "anticheat.help":
+    "Some anti-cheats only start with TPM 2.0 and Secure Boot on in the BIOS. Windows cannot change that by itself: G2 Boost shows what is missing and the menu path for your board, restarts straight into the BIOS and checks again after the boot.",
+  "anticheat.app_only":
+    "The check runs in the installed app: a browser cannot read the BIOS or Windows.",
+  "anticheat.compact.title": "Anti-cheat requirements",
+  "anticheat.compact.hint": "Step by step per game in Games.",
+  "anticheat.lead.installed":
+    "Installed games with an anti-cheat that checks the BIOS and Windows: {count}.",
+  "anticheat.lead.none":
+    "None of these games is installed. See what each anti-cheat asks for and where this PC stands.",
+  "anticheat.ready": "Ready",
+  "anticheat.missing": "{count} missing",
+  "anticheat.unknown": "Cannot tell",
+  "anticheat.required": "Requires",
+  "anticheat.recommended": "Uses if present",
+  "anticheat.on_demand": "On-demand mode",
+  "anticheat.on_demand.ok": "possible on this PC",
+  "anticheat.on_demand.no": "not yet",
+  "anticheat.on_demand.hint":
+    "In on-demand mode the anti-cheat driver loads only while the game runs, not from boot.",
+  "anticheat.steps.title": "What to do, in this order",
+  "anticheat.steps.none": "Nothing to change: everything these anti-cheats ask for is on.",
+  "anticheat.steps.bios": "In the BIOS",
+  "anticheat.steps.windows": "In Windows",
+  "anticheat.note":
+    "Secure Boot, TPM and IOMMU only change in the BIOS: for safety Windows does not touch them. After the restart G2 Boost checks by itself and tells you what changed.",
+  "anticheat.recheck": "Check again",
+  "anticheat.state.ok": "on",
+  "anticheat.state.missing": "missing",
+  "anticheat.state.unknown": "cannot tell",
+  "anticheat.check.uefi": "UEFI without CSM",
+  "anticheat.check.gpt": "GPT disk",
+  "anticheat.check.secure_boot": "Secure Boot",
+  "anticheat.check.tpm2": "TPM 2.0",
+  "anticheat.check.vbs": "VBS",
+  "anticheat.check.hvci": "Memory integrity",
+  "anticheat.check.iommu": "IOMMU",
+  "anticheat.check.win11": "Windows 11",
+  "anticheat.check.win25h2": "Windows 11 25H2",
+  "anticheat.check.blocklist": "Vulnerable driver blocklist",
+  "anticheat.title.valorant": "Valorant",
+  "anticheat.title.lol": "League of Legends",
+  "anticheat.title.faceit": "FACEIT (CS2)",
+  "anticheat.title.bf6": "Battlefield 6",
+  "anticheat.title.cod": "Call of Duty: Black Ops 7 and Warzone",
+  "anticheat.ac.vanguard": "Riot Vanguard",
+  "anticheat.ac.faceit": "FACEIT Anti-Cheat",
+  "anticheat.ac.javelin": "EA Javelin",
+  "anticheat.ac.ricochet": "Ricochet",
+  "anticheat.fix.mbr2gpt":
+    "Convert the system disk from MBR to GPT with Windows' MBR2GPT tool before turning CSM off. Without it Windows will not start after the change. Back up first.",
+  "anticheat.fix.core_isolation":
+    "Windows Security › Device security › Core isolation: turn Memory integrity on and restart. If you turned it off in PC Boost, switch that tweak off there.",
+  "anticheat.fix.update": "Settings › Windows Update: install the latest Windows 11 version.",
+  "anticheat.fix.blocklist":
+    "Windows Security › Device security › Core isolation: turn on the Microsoft Vulnerable Driver Blocklist.",
+  "anticheat.hvci.title": "Turn memory integrity off?",
+  "anticheat.hvci.body":
+    "{games} uses memory integrity in its anti-cheat. Without it the game may ask you to turn it back on, refuse its on-demand mode or lose anti-cheat protections.",
+  "anticheat.hvci.trade":
+    "The gain is about 5 % FPS in some games. You can undo it on the same card, with a restart.",
+  "anticheat.hvci.keep": "Keep it on",
+  "anticheat.hvci.confirm": "Turn it off anyway",
+  "anticheat.notify.uefi.on": "The PC now boots in UEFI, without CSM",
+  "anticheat.notify.uefi.off":
+    "The PC went back to legacy (CSM) boot: Secure Boot cannot work that way",
+  "anticheat.notify.gpt.on": "The system disk is GPT now",
+  "anticheat.notify.gpt.off": "The system disk now shows as MBR",
+  "anticheat.notify.secure_boot.on": "Secure Boot on since the last boot",
+  "anticheat.notify.secure_boot.off":
+    "Secure Boot off since the last boot: anti-cheat games may not start",
+  "anticheat.notify.tpm2.on": "TPM 2.0 active since the last boot",
+  "anticheat.notify.tpm2.off":
+    "TPM 2.0 is gone: updating or resetting the BIOS often turns fTPM or PTT off",
+  "anticheat.notify.vbs.on": "Virtualization-based security (VBS) on",
+  "anticheat.notify.vbs.off": "Virtualization-based security (VBS) off",
+  "anticheat.notify.hvci.on": "Memory integrity on",
+  "anticheat.notify.hvci.off": "Memory integrity off",
+  "anticheat.notify.iommu.on": "IOMMU (VT-d / AMD-Vi) on in the BIOS",
+  "anticheat.notify.iommu.off": "IOMMU (VT-d / AMD-Vi) off in the BIOS",
+  "anticheat.notify.win11.on": "Windows 11 installed",
+  "anticheat.notify.win11.off": "This PC is no longer on Windows 11",
+  "anticheat.notify.win25h2.on":
+    "Windows updated to 25H2: Vanguard's on-demand mode becomes possible with the rest on",
+  "anticheat.notify.win25h2.off": "Windows went back to a version before 25H2",
+  "anticheat.notify.blocklist.on": "Vulnerable driver blocklist on",
+  "anticheat.notify.blocklist.off": "Vulnerable driver blocklist off",
+  "anticheat.notify.ready": "{game} ready: the anti-cheat requirements are on",
+  "anticheat.notify.blocked": "{game} may not start: an anti-cheat requirement is missing",
+  "bios.item.iommu": "Turn the IOMMU on (VT-d on Intel, AMD-Vi on AMD)",
+  "bios.item.iommu.desc":
+    "Protects memory from direct device access (DMA). Some anti-cheats use it: Vanguard's on-demand mode requires it, FACEIT lists it as a protection. It does not change FPS.",
+  "mypc.fw.iommu": "IOMMU (VT-d / AMD-Vi)",
+  "mypc.fw.disk_style": "System disk partition style",
+  "mypc.fw.gpt": "GPT",
+  "mypc.fw.mbr": "MBR",
+  "advisor.hvci_needed.title": "Memory integrity on: {game} uses it",
+  "advisor.hvci_needed.body":
+    "{game}'s anti-cheat uses memory integrity (VBS). Keep it on: turning it off gains about 5 % FPS in some games, but the game may ask you to turn it back on or lose its on-demand mode.",
+  "advisor.anticheat_blocked.title": "{game} may not start on this PC",
+  "advisor.anticheat_blocked.body":
+    "Anti-cheat requirements missing: {count} (such as Secure Boot or TPM 2.0). The steps for your board are in Games › Ready for anti-cheat games.",
+  "advisor.iommu_off.title": "IOMMU off in the BIOS",
+  "advisor.iommu_off.body":
+    "{game}'s anti-cheat uses the IOMMU (VT-d on Intel, AMD-Vi on AMD). Turn it on in the BIOS: the path for your board is in Games › Ready for anti-cheat games.",
+  "advisor.vuln_driver_blocklist_off.title": "Vulnerable driver blocklist off",
+  "advisor.vuln_driver_blocklist_off.body":
+    "Microsoft's list stops drivers with known flaws from loading, a common trick of malware and cheats. Turn it on in Windows Security › Device security › Core isolation.",
+  "boost.tweak.background_apps_off": "Store apps without background activity",
+  "boost.tweak.background_apps_off.desc":
+    "Microsoft Store apps stop running background tasks while closed. Regular programs, services and Game Pass downloads stay the same. Fewer idle processes in memory; the FPS gain is small.",
+  "boost.tweak.background_apps_off.warn":
+    "you rely on notifications or sync from Store apps (such as WhatsApp, Phone Link or Weather) with their window closed.",
 
   // ── r11:luli ──
 

@@ -107,6 +107,7 @@ pub mod activity;
 // r11:clean
 
 // r11:anticheat
+pub mod anticheat;
 
 // r11:luli
 

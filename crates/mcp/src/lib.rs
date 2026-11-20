@@ -367,7 +367,8 @@ when they were taken.")]
 
     #[tool(description = "BIOS/firmware settings visible from Windows: boot mode (UEFI/legacy), Secure Boot, TPM, \
 virtualization enabled in firmware, hypervisor running, Resizable BAR (NVIDIA BAR1 size), RAM at its rated \
-XMP/EXPO speed, BIOS vendor/version/date/age, Fast Startup, hibernation. C-states, power limits and fan curves \
+XMP/EXPO speed, BIOS vendor/version/date/age, Fast Startup, hibernation, VBS and memory integrity running, IOMMU \
+(DMA protection available), system disk GPT. C-states, power limits and fan curves \
 are not readable from Windows.")]
     async fn get_firmware(&self) -> Result<String, String> {
         blocking(|| firmware::read(&hardware::profile())).await
@@ -907,6 +908,14 @@ run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")
     // r11:clean
 
     // r11:anticheat
+    #[tool(description = "Anti-cheat readiness, read-only: for Valorant and League of Legends (Riot Vanguard), FACEIT (CS2), Battlefield 6 and Call of Duty Black Ops 7 / Warzone, which are installed here, which firmware and Windows requirements their anti-cheat needs (TPM 2.0, Secure Boot, UEFI without CSM, GPT system disk, Windows 11, and for Vanguard's on-demand mode Windows 11 25H2+, VBS, memory integrity and IOMMU), each check's state on this PC (ok / missing / unknown), what fixes it (a BIOS item with this board maker's menu path, or a Windows step), and the vulnerable driver blocklist state. Windows cannot change Secure Boot or the TPM: the user changes them in the BIOS; G2 Boost > Jogos restarts into the BIOS (admin, confirmation) and re-checks after the next boot.")]
+    async fn get_anticheat_readiness(&self) -> Result<String, String> {
+        blocking(|| {
+            let p = hardware::profile();
+            g2boost_core::anticheat::readiness(&p, &firmware::read(&p))
+        })
+        .await
+    }
 
     // r11:luli
 
