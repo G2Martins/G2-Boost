@@ -1,6 +1,6 @@
 # Analisador de disco
 
-**Última revisão:** 2026-10-22 (essenciais levam à limpeza de arquivos do sistema) · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
+**Última revisão:** 2026-11-20 (selos da Limpeza no mapa e nos maiores, Limpar só isso, chegada filtrada vinda da Limpeza, varredura longa na central de atividade) · 2026-10-22 (essenciais levam à limpeza de arquivos do sistema) · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
 
 ## Varredura
 
@@ -11,6 +11,8 @@
 ## Treemap
 
 Squarified (`d3-hierarchy`), canvas próprio, cor por classe de arquivo, duplo clique entra na pasta, breadcrumb. Na barra: **Mostrar na pasta** (pasta atual) e **Lixeira** (pasta atual, com confirmação).
+
+**Sinergia com a Limpeza (2026-11-20, [smart-clean.md](../cleanup/smart-clean.md)):** `clean_owners(ids)` diz, para a pasta na tela e as subpastas diretas, que categoria do catálogo é dona dela (ou está dentro dela) e quais a última análise da Limpeza achou sem dono (comparação léxica contra as raízes reais, depois de `SafePath`). Subpasta com selo ganha um ponto verde no canto e a frase no hover; abaixo do caminho, uma faixa oferece **Limpar só isso** / **Limpar estes** (prévia, confirmação e token da Limpeza) e **Revisar em Apps** para pastas sem dono. Os tamanhos do mapa só mudam na próxima varredura (a faixa avisa).
 
 ## Arquivos e filtros
 
@@ -23,7 +25,9 @@ Squarified (`d3-hierarchy`), canvas próprio, cor por classe de arquivo, duplo c
 | `>6m`, `<7d` (d, w, m = meses, y) | sem modificação há mais de / modificado nos últimos (data desconhecida nunca casa) |
 | qualquer palavra | nome contém |
 
-Botões de exemplo na UI; resultado com caixa de seleção, **mostrar na pasta** por linha e **Enviar N para a Lixeira**.
+Botões de exemplo na UI; resultado com caixa de seleção, **mostrar na pasta** por linha e **Enviar N para a Lixeira**. Arquivo dentro de uma pasta do catálogo ganha o selo "Limpeza: categoria" (`clean_owner_paths`).
+
+**Chegada vinda da Limpeza:** `openDisk({tab, query, scan})` (`src/components/disk/intent.ts`) abre a página numa aba, com o filtro já escrito (ex.: `>500mb >6m` em Maiores) e, sem varredura na memória, começa a do disco pedido. Varredura que levou 15 s ou mais vira linha na central de atividade (`activity.clean.scan_done`, rota `disk`).
 
 ## Lixeira (`disk::recycle`)
 
@@ -40,7 +44,7 @@ No shell, a árvore é retirada do estado durante a operação (os outros comand
 
 ## Essenciais grandes (`disk::essentials`)
 
-Itens conhecidos relativos à raiz varrida — `pagefile.sys`, `hiberfil.sys`, `swapfile.sys`, `Windows\WinSxS`, `Windows.old`, `$Recycle.Bin`, `System Volume Information`, `Windows\SoftwareDistribution\Download`, `Windows\Installer`, `ProgramData\Package Cache` — com tamanho (0 = sem permissão para medir) e explicação i18n do que é e do **jeito seguro** de reduzir (desligar hibernação nas Opções de energia, limpeza de componentes, Windows Update cache, desinstalar o programa dono…). Nada aqui apaga; são ponteiros. `WinSxS` e `Windows.old` têm o botão **Limpar com segurança**, que abre Limpeza → aba Arquivos do sistema (handlers do próprio Windows, [../cleanup/system-files.md](../cleanup/system-files.md)).
+Itens conhecidos relativos à raiz varrida — `pagefile.sys`, `hiberfil.sys`, `swapfile.sys`, `Windows\WinSxS`, `Windows.old`, `$Recycle.Bin`, `System Volume Information`, `Windows\SoftwareDistribution\Download`, `Windows\Installer`, `ProgramData\Package Cache` — com tamanho (0 = sem permissão para medir) e explicação i18n do que é e do **jeito seguro** de reduzir (desligar hibernação nas Opções de energia, limpeza de componentes, Windows Update cache, desinstalar o programa dono…). Nada aqui apaga; são ponteiros. Downloads do Windows Update e Lixeira têm **Limpar só isso** (categorias `wu_cache` e `recycle`). `WinSxS` e `Windows.old` têm o botão **Limpar com segurança**, que abre Limpeza → aba Arquivos do sistema (handlers do próprio Windows, [../cleanup/system-files.md](../cleanup/system-files.md)).
 
 ## Testes
 

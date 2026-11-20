@@ -1,6 +1,6 @@
 # Limpeza — Arquivos do sistema (handlers da Limpeza de Disco)
 
-**Última revisão:** 2026-11-14 (painel ao vivo com o handler atual) · 2026-10-22 · Código: `crates/core/src/volcache.rs` (+ `repair.rs`: vaga única e cancelamento) · Shell: `volcache_preview` / `volcache_confirm` / `volcache_execute`, `repair_cancel` · UI: aba **Arquivos do sistema** em `src/pages/cleanup.tsx` (`src/components/cleanup/system-files.tsx`); botão "Limpar com segurança" no WinSxS e no Windows.old dos essenciais grandes (`src/pages/disk.tsx`).
+**Última revisão:** 2026-11-14 (painel ao vivo com o handler atual) · 2026-10-22 · Código: `crates/core/src/volcache.rs` (+ `repair.rs`: vaga única e cancelamento) · Shell: `volcache_preview` / `volcache_confirm` / `volcache_execute`, `repair_cancel` · UI: aba **Arquivos do sistema** do Modo detalhado (`src/components/cleanup/detailed.tsx`, mesma seleção e comandos `smart_*` do catálogo desde 2026-11-20) e balde **Sistema** da Limpeza inteligente ([smart-clean.md](./smart-clean.md), só os handlers ligados por padrão); botão "Limpar com segurança" no WinSxS e no Windows.old dos essenciais grandes (`src/pages/disk.tsx`).
 
 ## O que é
 
