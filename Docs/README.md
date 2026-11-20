@@ -32,6 +32,7 @@ comportamento.
 | --- | --- |
 | [boost/dashboard.md](./boost/dashboard.md) | Painel (pontuação por hardware, pontos de restauração, limpeza, RAM), monitor em tempo real, Meu PC (CPU, memória, GPU, monitores, discos, WinSAT), **BIOS/firmware** visível pelo Windows, sensores externos, recomendação por hardware. |
 | [boost/tweaks.md](./boost/tweaks.md) | Catálogo de ajustes (registro, serviços, SPI, energia, DirectX), presets, efeitos visuais em 4 níveis, backup/revert, elevação, limpeza de RAM, **inicialização e processos**, o que foi avaliado e recusado. |
+| [boost/memory.md](./boost/memory.md) | Memória RAM: composição ao vivo (PDH), quando limpar o cache em espera ajuda, antes/depois da limpeza, quem usa a RAM com ícone real e as ações (gerenciador, encerrar, tirar da inicialização), `get_memory`. |
 | [boost/debloat.md](./boost/debloat.md) | Página Debloat: níveis Essencial/Recomendado/Avançado, "Remover a IA do Windows" (políticas + recurso Recall pela DismApi), apps pré-instalados por allowlist com token, o que nunca é tocado. |
 | [boost/profiles.md](./boost/profiles.md) | Perfis e restauração (perfis com nome, Sem IA, Padrão do Windows, exportar/importar, desfazer tudo, histórico) e Mouse e teclado (velocidade do ponteiro, repetição do teclado, atalhos que atrapalham no jogo). |
 | [boost/hardware-monitor.md](./boost/hardware-monitor.md) | Monitor de hardware (árvore de sensores por dispositivo, mín./máx., CSV) e a aba Check-up do Meu PC. |

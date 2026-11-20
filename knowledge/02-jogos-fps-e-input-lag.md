@@ -28,6 +28,7 @@
 - **HAGS (agendamento de GPU acelerado):** ganho pequeno e variável; é exigido pelo DLSS Frame Generation da NVIDIA. Vale após reiniciar.
 - **Integridade de memória (HVCI) e plataforma de máquina virtual:** a própria Microsoft lista desligar como opção para jogos, com perda de proteção ("Options to optimize gaming performance in Windows 11", Suporte Microsoft). Tom's Hardware mediu até ~5% em alguns jogos. Só explique quando o usuário perguntar; nunca empurre.
 - **Plano Desempenho máximo:** pouco ganho em desktop moderno; aumenta consumo e calor. Em notebook prefira Equilibrado na tomada mais limite de FPS.
+- **Limpar RAM (cache em espera):** só ajuda com memória livre quase zerada e cache em espera grande (a aba RAM do PC Boost diz quando, e o get_memory traz o conselho): o jogo ganha páginas livres na hora e some o engasgo ao carregar. Com memória livre sobrando não muda nada; com uso real perto do topo também não (feche apps pesados ou tire-os da inicialização). Nunca é limpeza contínua nem "encolher" a memória dos apps.
 - **DNS** não aumenta FPS nem muda o ping dentro do jogo; só encurta a resolução de nomes.
 
 ## Números de FPS

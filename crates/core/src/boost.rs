@@ -1770,7 +1770,14 @@ const MEMORY_PURGE_STANDBY_LIST: i32 = 4;
 pub struct PurgeResult {
     pub before_avail: u64,
     pub after_avail: u64,
+    /// Cache turned into free memory: the free list's gain (standby already counts as
+    /// "available", so the available figure barely moves on a purge).
     pub freed_bytes: u64,
+    /// Standby cache and free list around the purge (PDH; 0 when the counters are unavailable).
+    pub standby_before: u64,
+    pub standby_after: u64,
+    pub free_before: u64,
+    pub free_after: u64,
 }
 
 pub(crate) fn enable_privilege(name: &str) -> Result<(), BoostError> {
@@ -1807,6 +1814,7 @@ pub fn purge_standby_list() -> Result<PurgeResult, BoostError> {
     }
     enable_privilege("SeProfileSingleProcessPrivilege")?;
     let before = system::memory_status().map(|m| m.avail_bytes).unwrap_or(0);
+    let split_before = crate::memory::composition().unwrap_or_default();
     let mut cmd = MEMORY_PURGE_STANDBY_LIST;
     // SAFETY: SystemMemoryListInformation takes a 4-byte SYSTEM_MEMORY_LIST_COMMAND.
     let status = unsafe { NtSetSystemInformation(SYSTEM_MEMORY_LIST_INFORMATION, (&mut cmd as *mut i32).cast::<c_void>(), 4) };
@@ -1815,7 +1823,21 @@ pub fn purge_standby_list() -> Result<PurgeResult, BoostError> {
     }
     std::thread::sleep(std::time::Duration::from_millis(250));
     let after = system::memory_status().map(|m| m.avail_bytes).unwrap_or(before);
-    Ok(PurgeResult { before_avail: before, after_avail: after, freed_bytes: after.saturating_sub(before) })
+    let split_after = crate::memory::composition().unwrap_or_default();
+    Ok(purge_result(before, after, &split_before, &split_after))
+}
+
+/// Freed = what the free list gained (the avail delta when PDH gave nothing).
+fn purge_result(before: u64, after: u64, a: &crate::memory::Composition, b: &crate::memory::Composition) -> PurgeResult {
+    PurgeResult {
+        before_avail: before,
+        after_avail: after,
+        freed_bytes: b.free.saturating_sub(a.free).max(after.saturating_sub(before)),
+        standby_before: a.standby,
+        standby_after: b.standby,
+        free_before: a.free,
+        free_after: b.free,
+    }
 }
 
 /* ---------------- elevation ---------------- */
@@ -1980,6 +2002,19 @@ mod tests {
         assert!(matches!(apply("hags", true), Err(BoostError::NeedsAdmin)));
         assert!(matches!(purge_standby_list(), Err(BoostError::NeedsAdmin)));
         assert!(matches!(apply("nope", true), Err(BoostError::UnknownTweak)));
+    }
+
+    /// A purge turns standby into free: "available" barely moves, the free list is what grew.
+    #[test]
+    fn purge_reports_the_cache_that_became_free() {
+        use crate::memory::Composition;
+        let gb = 1u64 << 30;
+        let a = Composition { standby: 9 * gb, free: gb, ..Default::default() };
+        let b = Composition { standby: gb / 2, free: 9 * gb, ..Default::default() };
+        let r = purge_result(10 * gb, 10 * gb + 1, &a, &b);
+        assert_eq!((r.freed_bytes, r.standby_before, r.standby_after), (8 * gb, 9 * gb, gb / 2));
+        let none = Composition::default();
+        assert_eq!(purge_result(gb, 2 * gb, &none, &none).freed_bytes, gb, "no PDH: the avail delta");
     }
 
     /// The UI catalog (`src/data/catalogs.ts`) and both dictionaries follow this catalog: same ids,

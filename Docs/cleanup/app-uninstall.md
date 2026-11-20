@@ -1,6 +1,6 @@
 # Desinstalar apps (AppCleaner para Windows)
 
-**Última revisão:** 2026-10-23 (aba Atualizações) · 2026-10-18 · Código: `crates/core/src/apps.rs` (+ `registry::export_tree/delete_tree`, `disk::shell_recycle`, `boost::delete_orphan_service`, `cleanup::TokenStore`); shell `src-tauri/src/lib.rs` (`AppsState`, `apps_*`); UI `src/pages/apps.tsx` (rota **Desinstalar apps**), drop em `src/App.tsx` + `src/lib/nav.ts`. Conceito de origem (clean-room): [../references/appcleaner.md](../references/appcleaner.md).
+**Última revisão:** 2026-11-20 (rodada 11: ícones guardados e de pasta, sobras agrupadas por dono, desfazer no toast, sino, pouco usados e grandes) · 2026-10-23 (aba Atualizações) · 2026-10-18 · Código: `crates/core/src/apps.rs` (+ `registry::export_tree/delete_tree`, `disk::shell_recycle`, `boost::delete_orphan_service`, `cleanup::TokenStore`); shell `src-tauri/src/lib.rs` (`AppsState`, `apps_*`); UI `src/pages/apps.tsx` (rota **Desinstalar apps**), drop em `src/App.tsx` + `src/lib/nav.ts`. Conceito de origem (clean-room): [../references/appcleaner.md](../references/appcleaner.md).
 
 ## O que faz
 
@@ -54,6 +54,15 @@ O inverso das sobras de um app: parte das **pastas** e pergunta se alguém ainda
 - **Confiança:** alta quando só sobrou desinstalador, ou quando não há programa dentro (`.exe/.dll/.sys`) e é jogo da Steam sem manifest ou está parada há 1 ano ou mais. **Com programa dentro é baixa** (jogo instalado à mão não muda os arquivos ao ser jogado), nunca pré-marcada. LocalLow sempre conta como dado do usuário (saves de jogos).
 - **Medido na máquina do dono (2026-10-18, só leitura, `unowned_live`):** ~80 pastas; maiores: `NBA 2K25` órfão na biblioteca G: (3,9 GB), Android SDK (4,4 GB, baixa), Ubisoft, VALORANT, Postman (baixa), Norton, Brave, Docker, VirtualBox (alta). Primeiro passe mostrou `MSBuild`/`Microsoft.NET`/`VulkanRT` → entraram no deny.
 - **MCP:** `get_unowned_folders` (leitura) e `remove_unowned_folders(paths)` (refaz a varredura, só alta e não preciosa, janela nativa de confirmação).
+
+## Ícones, grupos e sinergia (2026-11-20, rodada 11)
+
+- **Ícone guardado antes da remoção:** a primeira vez que o ícone de um app instalado é extraído, `apps::icon` grava o PNG em `<dados>\app-icons\<id>.png` (id reduzido a nome de arquivo; arquivo editável pelo usuário, então só vale se começar com a assinatura PNG e tiver menos de 1 MB). Depois da desinstalação o ícone ao vivo falha e o guardado aparece nas sobras e na lista de órfãos; sem ele, o maior programa que sobrou na pasta de instalação. `forget` apaga o arquivo.
+- **Ícone de cada sobra:** pasta com programa ganha `Leftover.icon` = o maior `.exe` dentro (`icons::largest_exe`: até 3 níveis, 4 mil entradas, nunca atravessa junção/symlink, ignora desinstaladores, atualizadores e relatórios de falha; só em unidade local). Na varredura de todos os discos só pastas com programa são lidas de novo. A UI pede pelo `exe_icon`, que revalida no core (`icons::local_exe`); sem ícone, o ícone do tipo.
+- **Agrupado por dono:** as sobras de um app são um grupo com o ícone do app, o total e "selecionar tudo"; na varredura de pastas sem dono, as pastas são agrupadas pelo nome (`Foo` em Roaming, Local e ProgramData = um app provável), maior grupo primeiro (`groupLeftovers` em `src/lib/ram-apps.ts`). A confiança continua por item; "tudo" inclui dados do usuário, e o modal avisa quando há.
+- **Desfazer evidente:** depois de remover, um toast de 12 s traz "Desfazer" (mesmo `apps_undo`); o botão do cabeçalho continua. Remover ou desfazer faz a lista procurar de novo (evento `APPS_REMOVED`).
+- **Sino:** remoção de 256 MB ou mais vira `activity.apps.removed` (bytes + itens, sem caminho).
+- **Pouco usados e grandes** (aba Instalados): sem abrir há 90+ dias (UserAssist) e com 500 MB ou mais, maior primeiro, até 6 com ícone real e "Desinstalar" no fluxo normal (que oferece as sobras depois). App sem data de uso nunca é sugerido (`staleBigApps`).
 
 ## Guarda de caminho (`fs_allowed`)
 Toda sobra de arquivo, mostrada ou removida: não é reparse point (junção/symlink nunca é seguida nem removida) → `canonicalize` → `SafePath` (System32, WinSxS, outro usuário, UNC = fora) → fora do `%SystemRoot%` → nunca uma raiz (as bases, o perfil, `Documents`, `Downloads`, unidade, `Program Files`, `Users`, `ProgramData`) → dentro de uma base; ProgramData só abaixo dela. A pasta de instalação passa só se estiver abaixo de `Program Files*`, de `LocalAppData\Programs` ou, em outra unidade, a dois níveis ou mais (`D:\Jogos\X`). Snapshot e nomes de família da Store são revalidados (arquivo editável pelo usuário).

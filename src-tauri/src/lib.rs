@@ -73,6 +73,7 @@ use g2boost_core::activity;
 // r11:luli mod
 
 // r11:ram mod
+mod ram_cmds;
 
 /// Record a notification line and tell the UI (bell, toasts). Text is an i18n key + small args:
 /// never a path or user name. A refused line (bad id) is dropped silently.
@@ -542,22 +543,8 @@ async fn exe_icon(cache: State<'_, IconCache>, path: String) -> Result<Option<St
     if let Some(hit) = cache.0.lock().unwrap().get(&key) {
         return Ok(hit.clone());
     }
-    let p = PathBuf::from(&path);
-    let ok = path.len() <= 520
-        && !path.starts_with("\\\\")
-        && !path.starts_with("//")
-        && p.is_absolute()
-        && key.ends_with(".exe")
-        && std::fs::metadata(&p).is_ok_and(|m| m.is_file());
-    let icon = if ok {
-        tauri::async_runtime::spawn_blocking(move || {
-            g2boost_core::icons::png_from_resource(&p, 0).map(|png| g2boost_core::icons::data_url(&png))
-        })
-        .await
-        .map_err(|e| e.to_string())?
-    } else {
-        None
-    };
+    // r11:ram: local, plain-file `.exe` only (no share, mapped drive or link), Store logo fallback.
+    let icon = tauri::async_runtime::spawn_blocking(move || g2boost_core::icons::exe_data_url(&path)).await.map_err(|e| e.to_string())?;
     let mut c = cache.0.lock().unwrap();
     if c.len() > 1000 {
         c.clear();
@@ -1305,6 +1292,10 @@ fn on_game_started(app: &AppHandle, game: Game) {
         duration_ms: 0,
         items: vec![ExecItem { id: "ram_purge".into(), bytes_freed: freed, ..Default::default() }],
     });
+    // r11:ram: a background purge is announced (only when it ran; needs_admin would repeat every game).
+    if freed > 0 {
+        notify(app, "ram", "activity.ram.game", &[("game", &game.name), ("bytes", &freed.to_string())], activity::Tone::Ok, Some("boost"));
+    }
     let _ = app.emit("game:started", GameEvent { game, freed_bytes: freed, error });
 }
 
@@ -1818,7 +1809,7 @@ fn apps_confirm(state: State<'_, AppsState>, tokens: State<'_, TokenStore>, ids:
 }
 
 #[tauri::command]
-async fn apps_remove(state: State<'_, AppsState>, tokens: State<'_, TokenStore>, token: u64, ids: Vec<u32>) -> Result<apps::RemoveOutcome, String> {
+async fn apps_remove(handle: AppHandle, state: State<'_, AppsState>, tokens: State<'_, TokenStore>, token: u64, ids: Vec<u32>) -> Result<apps::RemoveOutcome, String> {
     let (app, items) = {
         let pending = state.pending.lock().unwrap();
         let p = pending.as_ref().ok_or("unknown_app")?;
@@ -1841,6 +1832,11 @@ async fn apps_remove(state: State<'_, AppsState>, tokens: State<'_, TokenStore>,
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
     *state.pending.lock().unwrap() = None;
+    // r11:ram: a big removal (Recycle Bin can take a while) lands in the bell too.
+    if out.bytes >= 256 << 20 {
+        let (bytes, count) = (out.bytes.to_string(), (out.recycled + out.registry + out.services).to_string());
+        notify(&handle, "apps", "activity.apps.removed", &[("bytes", &bytes), ("count", &count)], activity::Tone::Ok, Some("apps"));
+    }
     Ok(out)
 }
 
@@ -2795,6 +2791,8 @@ pub fn run() {
             // r11:luli
 
             // r11:ram
+            ram_cmds::ram_composition,
+            ram_cmds::ram_apps,
 
         ])
         .build(tauri::generate_context!())

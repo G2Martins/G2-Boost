@@ -111,6 +111,7 @@ pub mod activity;
 // r11:luli
 
 // r11:ram
+pub mod memory;
 
 
 /// Crate version, surfaced in the UI "about" footer.

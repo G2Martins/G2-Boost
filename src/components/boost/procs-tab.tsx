@@ -27,13 +27,14 @@ import { cn, formatBytes } from "@/lib/utils";
 const POLL_MS = 2000;
 const MAX_ROWS = 250;
 
-/** Task manager: live CPU/RAM per process, open file location, end (confirmed) — never protected ones. */
-export function ProcsTab({ elevated }: { elevated: boolean }) {
+/** Task manager: live CPU/RAM per process, open file location, end (confirmed) — never protected ones.
+ *  `query` pre-fills the filter (opened from the RAM list on one program). */
+export function ProcsTab({ elevated, query: initial = "" }: { elevated: boolean; query?: string }) {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
   const [list, setList] = useState<ProcInfo[] | null>(null);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"cpu" | "ram">("cpu");
+  const [query, setQuery] = useState(initial);
+  const [sort, setSort] = useState<"cpu" | "ram">(initial ? "ram" : "cpu");
   const [paused, setPaused] = useState(false);
   const [confirm, setConfirm] = useState<ProcInfo | null>(null);
   const [msg, setMsg] = useState<string | null>(null);

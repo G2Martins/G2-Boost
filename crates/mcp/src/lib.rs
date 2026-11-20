@@ -911,6 +911,15 @@ run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")
     // r11:luli
 
     // r11:ram
+    #[tool(description = "Memory right now, read-only: the split Task Manager shows (in use, modified, standby \
+cache, free, compressed when visible; bytes), commit charge, an advice code (helps = free memory nearly gone and a \
+big standby cache, so G2 Boost's standby purge gives games free pages at once; in_use = real use near the top, a \
+purge frees nothing that matters, close apps; fine = nothing to do), and the 12 apps holding the most private \
+memory, grouped by executable file name (process count, private and working set bytes, Windows component flag, \
+whether it starts with Windows). No paths.")]
+    async fn get_memory(&self) -> Result<String, String> {
+        blocking(|| g2boost_core::memory::report(12)).await
+    }
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]

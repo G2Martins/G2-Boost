@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use windows::Win32::Foundation::{CloseHandle, FILETIME, HANDLE};
-use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX};
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
     GetPriorityClass, GetProcessTimes, HIGH_PRIORITY_CLASS, IsProcessCritical, NORMAL_PRIORITY_CLASS, OpenProcess,
@@ -38,6 +38,8 @@ struct Snap {
     path: String,
     system: bool,
     ram: u64,
+    /// Private commit (`PrivateUsage`): memory only this process holds, resident or paged out.
+    private: u64,
     cpu_100ns: u64,
     /// Creation time (FILETIME): with the pid, the identity of this exact process.
     created: u64,
@@ -73,8 +75,10 @@ fn snapshot() -> HashMap<u32, Snap> {
                 continue;
             };
             let (path, cpu, created) = query(h);
-            let mut pmc = PROCESS_MEMORY_COUNTERS { cb: size_of::<PROCESS_MEMORY_COUNTERS>() as u32, ..Default::default() };
-            let ram = if K32GetProcessMemoryInfo(h, &mut pmc, pmc.cb).as_bool() { pmc.WorkingSetSize as u64 } else { 0 };
+            let mut pmc = PROCESS_MEMORY_COUNTERS_EX { cb: size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32, ..Default::default() };
+            // The EX struct starts with the plain one; `cb` tells the API which one it got.
+            let ok = K32GetProcessMemoryInfo(h, (&mut pmc as *mut PROCESS_MEMORY_COUNTERS_EX).cast::<PROCESS_MEMORY_COUNTERS>(), pmc.cb).as_bool();
+            let (ram, private) = if ok { (pmc.WorkingSetSize as u64, pmc.PrivateUsage as u64) } else { (0, 0) };
             let _ = CloseHandle(h);
             if path.is_empty() {
                 continue;
@@ -83,7 +87,7 @@ fn snapshot() -> HashMap<u32, Snap> {
             let name = lower.rsplit('\\').next().unwrap_or(&lower).to_string();
             let mut session = 0u32;
             let _ = ProcessIdToSessionId(pid, &mut session);
-            out.insert(pid, Snap { system: lower.starts_with(&win), name, path, ram, cpu_100ns: cpu, created, session });
+            out.insert(pid, Snap { system: lower.starts_with(&win), name, path, ram, private, cpu_100ns: cpu, created, session });
         }
     }
     out
@@ -131,7 +135,10 @@ pub struct ProcInfo {
     /// Executable file name, lowercase.
     pub name: String,
     pub path: String,
+    /// Working set (resident, shared pages included).
     pub ram_bytes: u64,
+    /// Private commit: what only this process holds (no double count across a family).
+    pub private_bytes: u64,
     /// Share of total CPU capacity since the previous sample (0–100).
     pub cpu_pct: f32,
     /// Creation time (FILETIME); the UI sends it back with the pid to act on this exact process.
@@ -143,7 +150,7 @@ pub struct ProcInfo {
     pub protected: Option<&'static str>,
 }
 
-fn u64_as_string<S: serde::Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
+pub(crate) fn u64_as_string<S: serde::Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&v.to_string())
 }
 
@@ -193,6 +200,7 @@ impl Sampler {
                     name: s.name.clone(),
                     path: s.path.clone(),
                     ram_bytes: s.ram,
+                    private_bytes: s.private,
                     cpu_pct: ((cpu * 10.0).round() / 10.0).min(100.0) as f32,
                     created: s.created,
                     system: s.system,

@@ -1758,7 +1758,7 @@ export const en = {
   "boost.ram.freed_none": "Nothing to free right now",
   "boost.ram.title": "RAM cleaner",
   "boost.ram.help":
-    "Frees the standby list and modified pages, which cuts stutter in games. It does not trim app working sets: that provably makes things worse.",
+    "Empties the standby cache: it becomes free memory at once. It helps when almost no memory is free; with memory to spare it changes nothing. It never shrinks the memory of open apps: that measurably hurts.",
   "boost.ram.used": "Used",
   "boost.ram.free": "Free",
   "boost.ram.total": "{total} total",
@@ -4140,4 +4140,52 @@ export const en = {
   // ── r11:luli ──
 
   // ── r11:ram ──
+  "ram.title": "Memory right now",
+  "ram.purge.admin": "Clearing the standby cache needs administrator mode.",
+  "ram.seg.in_use": "In use",
+  "ram.seg.in_use.hint": "Open programs and Windows itself.",
+  "ram.seg.modified": "Modified",
+  "ram.seg.modified.hint": "Changed by apps, waiting to be written to disk.",
+  "ram.seg.standby": "Standby cache",
+  "ram.seg.standby.hint": "Files read recently. Windows hands it over at once to whoever asks.",
+  "ram.seg.free": "Free",
+  "ram.seg.free.hint": "Empty, ready to use.",
+  "ram.compressed": "{size} compressed (part of In use)",
+  "ram.commit": "committed {used} of {limit}",
+  "ram.advice.helps":
+    "Little free memory and a big standby cache: clearing now hands the game free pages at once and may cut stutters while loading.",
+  "ram.advice.in_use":
+    "Memory is full of real use, not cache: clearing will not help. Close the heavy apps below or take them out of startup.",
+  "ram.advice.fine":
+    "There is plenty of free memory. The standby cache goes back to whoever needs it on its own, so clearing now changes nothing in game.",
+  "ram.purge.freed": "Became free memory",
+  "ram.purge.none": "The cache was already empty: nothing changed.",
+  "ram.purge.standby": "Standby cache: {before} → {after}",
+  "ram.purge.free": "Free: {before} → {after}",
+  "ram.apps.title": "Who uses the RAM",
+  "ram.apps.help":
+    "Processes grouped by program (24 browser processes become one row). Private memory belongs to that app alone; the working set also counts what it shares with others.",
+  "ram.apps.empty": "Nothing to show right now.",
+  "ram.apps.startup": "Starts with Windows",
+  "ram.apps.ws": "working set {size}",
+  "ram.apps.startup_admin": "All-users item: open G2 Boost as administrator.",
+  "ram.apps.startup_off": "Remove from startup",
+  "ram.apps.startup_off_done": "{name} no longer opens with Windows.",
+  "ram.apps.open": "Show in Task manager",
+  "ram.apps.open_named": "Show {name} in Task manager",
+  "ram.apps.ended": "{name}: {n} processes ended.",
+  "ram.apps.end_failed": "{n} had already closed or are protected.",
+  "ram.apps.end_body":
+    "{n} processes of this program will be closed. Anything unsaved in them is lost. Windows, security and service processes are never ended.",
+  "ram.startup.now": "uses {size} now",
+  "ram.heavy.title": "Who uses the most RAM now",
+  "apps.stale.title": "Rarely used and big",
+  "apps.stale.help":
+    "Apps you have not opened from Start or Explorer in over 90 days that take more than 500 MB. A hint, not proof: apps opened by other programs do not count. Without that record, nothing is suggested.",
+  "apps.stale.row": "{size} · opened {n} days ago",
+  "apps.undo.short": "Undo",
+  "apps.group.total": "{n} items · {size}",
+  "apps.group.select": "Select all of {name}",
+  "activity.apps.removed": "Leftovers removed: {count} items, {bytes} went to the Recycle Bin",
+  "activity.ram.game": "RAM cleared when {game} opened: {bytes} became free memory",
 } as const satisfies Record<keyof typeof ptBR, string>;
