@@ -909,6 +909,16 @@ run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")
     // r11:anticheat
 
     // r11:luli
+    #[tool(description = "MCP servers configured in the AI apps on this PC (Claude Desktop, Claude Code, VS Code, Cursor, \
+Windsurf, LM Studio), read-only. Per server: name, app, transport (stdio/http), the executable's file name or the URL host \
+only (never arguments, environment, headers or query: they can hold secrets), and flags: downloads (fetches a package from \
+the internet at every start, npx/uvx/dlx), missing (executable not found), g2boost (this server). Claude Code project \
+servers come as name and project count only. Use it to explain what each server is and to point out risky ones: an \
+unknown package fetched at every start is a supply-chain and persistence risk. G2 Boost never starts or edits these servers; \
+removing one is done in the app that owns it.")]
+    async fn get_mcp_servers(&self) -> Result<String, String> {
+        blocking(|| g2boost_core::mcpmap::for_ai(&g2boost_core::mcpmap::scan())).await
+    }
 
     // r11:ram
 }

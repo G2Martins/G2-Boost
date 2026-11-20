@@ -2,7 +2,9 @@
 //! click: Claude Desktop (standard install and the Microsoft Store/MSIX one, whose config lives
 //! in `%LOCALAPPDATA%\Claude-Data\claude_*` or, before the app moved it out of the package, under
 //! `%LOCALAPPDATA%\Packages\Claude_*`; Cowork runs inside Desktop) and Claude Code (user scope,
-//! top-level `mcpServers` in `~/.claude.json`).
+//! top-level `mcpServers` in `~/.claude.json`). Since round 11 also Cursor (`~/.cursor/mcp.json`,
+//! same shape as Desktop) and VS Code (`%APPDATA%\Code\User\mcp.json`, key `servers`); a VS Code
+//! file with comments is not strict JSON, so it is refused (the UI shows the snippet to paste).
 //!
 //! Those files belong to other apps and are hostile input: parsed strictly, never rewritten when
 //! they are not a JSON object we understand, never followed through a symlink, backed up to
@@ -23,7 +25,11 @@ const MAX_BYTES: u64 = 16 << 20;
 pub enum Client {
     Desktop,
     Code,
+    Cursor,
+    Vscode,
 }
+
+const ALL: [Client; 4] = [Client::Desktop, Client::Code, Client::Cursor, Client::Vscode];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Target {
@@ -58,7 +64,7 @@ fn desktop_paths() -> Vec<PathBuf> {
     desktop_paths_in(var("APPDATA"), var("LOCALAPPDATA"))
 }
 
-fn desktop_paths_in(appdata: Option<PathBuf>, local: Option<PathBuf>) -> Vec<PathBuf> {
+pub(crate) fn desktop_paths_in(appdata: Option<PathBuf>, local: Option<PathBuf>) -> Vec<PathBuf> {
     let mut out = Vec::new();
     if let Some(appdata) = appdata {
         let dir = appdata.join("Claude");
@@ -102,17 +108,31 @@ fn code_path() -> Option<PathBuf> {
     p.is_file().then_some(p)
 }
 
+/// `<dir>\<file>` when the app's folder exists (the file itself may be created on connect).
+fn in_dir(base: &str, dir: &str, file: &str) -> Option<PathBuf> {
+    let d = PathBuf::from(std::env::var_os(base)?).join(dir);
+    d.is_dir().then(|| d.join(file))
+}
+
 fn paths(client: Client) -> Vec<PathBuf> {
     match client {
         Client::Desktop => desktop_paths(),
         Client::Code => code_path().into_iter().collect(),
+        Client::Cursor => in_dir("USERPROFILE", ".cursor", "mcp.json").into_iter().collect(),
+        Client::Vscode => in_dir("APPDATA", r"Code\User", "mcp.json").into_iter().collect(),
     }
+}
+
+/// The object that holds the servers.
+fn key(client: Client) -> &'static str {
+    if client == Client::Vscode { "servers" } else { "mcpServers" }
 }
 
 fn entry(client: Client, exe: &Path) -> Value {
     let command = exe.to_string_lossy();
     match client {
-        Client::Desktop => json!({ "command": command, "args": ["--mcp"] }),
+        Client::Desktop | Client::Cursor => json!({ "command": command, "args": ["--mcp"] }),
+        Client::Vscode => json!({ "type": "stdio", "command": command, "args": ["--mcp"] }),
         // The shape `claude mcp add-json` writes.
         Client::Code => json!({ "type": "stdio", "command": command, "args": ["--mcp"], "env": {} }),
     }
@@ -139,8 +159,8 @@ fn read_object(path: &Path) -> Result<Option<Map<String, Value>>, ConnectError> 
     }
 }
 
-fn servers(root: &Map<String, Value>) -> Result<Option<&Map<String, Value>>, ConnectError> {
-    match root.get("mcpServers") {
+fn servers<'a>(root: &'a Map<String, Value>, key: &str) -> Result<Option<&'a Map<String, Value>>, ConnectError> {
+    match root.get(key) {
         None | Some(Value::Null) => Ok(None),
         Some(Value::Object(m)) => Ok(Some(m)),
         Some(_) => Err(ConnectError::Unparseable),
@@ -152,9 +172,9 @@ fn same_exe(v: &Value, exe: &Path) -> bool {
 }
 
 /// (connected, points_here) for one file.
-pub fn status_file(path: &Path, exe: &Path) -> (bool, bool) {
+pub fn status_file(path: &Path, client: Client, exe: &Path) -> (bool, bool) {
     match read_object(path) {
-        Ok(Some(root)) => match servers(&root) {
+        Ok(Some(root)) => match servers(&root, key(client)) {
             Ok(Some(s)) => s.get(NAME).map_or((false, false), |e| (true, same_exe(e, exe))),
             _ => (false, false),
         },
@@ -194,10 +214,10 @@ pub fn connect_file(path: &Path, client: Client, exe: &Path, create: bool) -> Re
         None => return Err(ConnectError::NotInstalled),
     };
     let want = entry(client, exe);
-    if servers(&root)?.and_then(|s| s.get(NAME)) == Some(&want) {
+    if servers(&root, key(client))?.and_then(|s| s.get(NAME)) == Some(&want) {
         return Ok(()); // already exactly this
     }
-    let servers = root.entry("mcpServers").or_insert_with(|| Value::Object(Map::new()));
+    let servers = root.entry(key(client)).or_insert_with(|| Value::Object(Map::new()));
     if servers.is_null() {
         *servers = Value::Object(Map::new());
     }
@@ -212,14 +232,14 @@ pub fn connect_file(path: &Path, client: Client, exe: &Path, create: bool) -> Re
 }
 
 /// Remove our entry from one file (nothing else). Missing file or entry = nothing to do.
-pub fn disconnect_file(path: &Path) -> Result<(), ConnectError> {
+pub fn disconnect_file(path: &Path, client: Client) -> Result<(), ConnectError> {
     let Some(mut root) = read_object(path)? else {
         return Ok(());
     };
-    if servers(&root)?.is_none_or(|s| !s.contains_key(NAME)) {
+    if servers(&root, key(client))?.is_none_or(|s| !s.contains_key(NAME)) {
         return Ok(());
     }
-    if let Some(Value::Object(s)) = root.get_mut("mcpServers") {
+    if let Some(Value::Object(s)) = root.get_mut(key(client)) {
         s.shift_remove(NAME);
     }
     backup(path)?;
@@ -228,8 +248,7 @@ pub fn disconnect_file(path: &Path) -> Result<(), ConnectError> {
 
 /// Every config of both clients found on this PC, with its state.
 pub fn targets(exe: &Path) -> Vec<Target> {
-    [Client::Desktop, Client::Code]
-        .into_iter()
+    ALL.into_iter()
         .flat_map(|c| {
             let found = paths(c);
             if found.is_empty() {
@@ -239,8 +258,8 @@ pub fn targets(exe: &Path) -> Vec<Target> {
             found
                 .into_iter()
                 .map(|p| {
-                    let (connected, points_here) = status_file(&p, exe);
-                    let exists = p.is_file() || c == Client::Desktop;
+                    let (connected, points_here) = status_file(&p, c, exe);
+                    let exists = p.is_file() || c != Client::Code;
                     Target { client: c, path: p.to_string_lossy().into_owned(), exists, connected, points_here }
                 })
                 .collect()
@@ -255,7 +274,7 @@ pub fn connect(client: Client, exe: &Path) -> Result<Vec<Target>, ConnectError> 
         return Err(ConnectError::NotInstalled);
     }
     for p in &found {
-        connect_file(p, client, exe, client == Client::Desktop)?;
+        connect_file(p, client, exe, client != Client::Code)?;
     }
     Ok(targets(exe))
 }
@@ -266,7 +285,7 @@ pub fn connect(client: Client, exe: &Path) -> Result<Vec<Target>, ConnectError> 
 /// left alone. `true` = rewritten (backed up first, like any connect).
 pub fn repair_file(path: &Path, client: Client, exe: &Path) -> bool {
     let stale = match read_object(path) {
-        Ok(Some(root)) => matches!(servers(&root), Ok(Some(s)) if s.get(NAME).is_some_and(|e| {
+        Ok(Some(root)) => matches!(servers(&root, key(client)), Ok(Some(s)) if s.get(NAME).is_some_and(|e| {
             !same_exe(e, exe) && e.get("command").and_then(Value::as_str).is_some_and(|c| !Path::new(c).exists())
         })),
         _ => false,
@@ -276,12 +295,12 @@ pub fn repair_file(path: &Path, client: Client, exe: &Path) -> bool {
 
 /// [`repair_file`] over every config found; how many were repointed.
 pub fn repair_stale(exe: &Path) -> usize {
-    [Client::Desktop, Client::Code].into_iter().flat_map(|c| paths(c).into_iter().map(move |p| (c, p))).filter(|(c, p)| repair_file(p, *c, exe)).count()
+    ALL.into_iter().flat_map(|c| paths(c).into_iter().map(move |p| (c, p))).filter(|(c, p)| repair_file(p, *c, exe)).count()
 }
 
 pub fn disconnect(client: Client, exe: &Path) -> Result<Vec<Target>, ConnectError> {
     for p in paths(client) {
-        disconnect_file(&p)?;
+        disconnect_file(&p, client)?;
     }
     Ok(targets(exe))
 }
@@ -309,7 +328,7 @@ mod tests {
         let gone = d.join("old").join("G2 Boost.exe");
         std::fs::write(&f, json!({ "a": 1, "mcpServers": { "g2boost": { "type": "stdio", "command": gone.to_string_lossy(), "args": ["--mcp"], "env": {} } } }).to_string()).unwrap();
         assert!(repair_file(&f, Client::Code, &exe));
-        assert_eq!(status_file(&f, &exe), (true, true));
+        assert_eq!(status_file(&f, Client::Code, &exe), (true, true));
         assert!(serde_json::from_str::<Value>(&std::fs::read_to_string(&f).unwrap()).unwrap()["a"] == 1, "the rest kept");
         assert!(!repair_file(&f, Client::Code, &exe), "already here: nothing to do");
         // Another exe that exists = a second install the user may want: untouched.
@@ -317,7 +336,7 @@ mod tests {
         std::fs::write(&other, b"").unwrap();
         connect_file(&f, Client::Code, &other, false).unwrap();
         assert!(!repair_file(&f, Client::Code, &exe));
-        assert_eq!(status_file(&f, &exe), (true, false));
+        assert_eq!(status_file(&f, Client::Code, &exe), (true, false));
         // No entry: never added by a repair.
         let empty = d.join("empty.json");
         std::fs::write(&empty, "{}").unwrap();
@@ -340,18 +359,45 @@ mod tests {
         assert_eq!(v["mcpServers"]["other"]["command"], "x");
         assert_eq!(v["mcpServers"][NAME]["type"], "stdio");
         assert_eq!(v["mcpServers"][NAME]["args"][0], "--mcp");
-        assert_eq!(status_file(&f, exe), (true, true));
-        assert_eq!(status_file(&f, Path::new(r"D:\old\G2 Boost.exe")), (true, false));
+        assert_eq!(status_file(&f, Client::Code, exe), (true, true));
+        assert_eq!(status_file(&f, Client::Code, Path::new(r"D:\old\G2 Boost.exe")), (true, false));
 
         let before = std::fs::read_to_string(&f).unwrap();
         connect_file(&f, Client::Code, exe, false).unwrap();
         assert_eq!(std::fs::read_to_string(&f).unwrap(), before, "second connect changes nothing");
 
-        disconnect_file(&f).unwrap();
+        disconnect_file(&f, Client::Code).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
         assert!(v["mcpServers"].get(NAME).is_none());
         assert_eq!(v["mcpServers"]["other"]["command"], "x");
         assert_eq!(v["alpha"]["nested"][1], 2);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn vscode_and_cursor_shapes() {
+        let d = sandbox("vscode");
+        let exe = Path::new(r"C:\G2\G2 Boost.exe");
+        let f = d.join("mcp.json");
+        std::fs::write(&f, r#"{"servers":{"gh":{"type":"http","url":"https://x"}},"inputs":[]}"#).unwrap();
+        connect_file(&f, Client::Vscode, exe, true).unwrap();
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        assert_eq!(v["servers"][NAME]["type"], "stdio");
+        assert_eq!(v["servers"]["gh"]["url"], "https://x");
+        assert!(v.get("mcpServers").is_none() && v["inputs"].is_array());
+        assert_eq!(status_file(&f, Client::Vscode, exe), (true, true));
+        assert_eq!(status_file(&f, Client::Cursor, exe), (false, false), "Cursor reads mcpServers");
+        disconnect_file(&f, Client::Vscode).unwrap();
+        assert!(serde_json::from_str::<Value>(&std::fs::read_to_string(&f).unwrap()).unwrap()["servers"].get(NAME).is_none());
+        // VS Code allows comments; a rewrite would drop them, so such a file is refused untouched.
+        let jsonc = "// mine\n{\"servers\":{}}";
+        std::fs::write(&f, jsonc).unwrap();
+        assert!(matches!(connect_file(&f, Client::Vscode, exe, true), Err(ConnectError::Unparseable)));
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), jsonc);
+        let c = d.join("cursor.json");
+        connect_file(&c, Client::Cursor, exe, true).unwrap();
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(&c).unwrap()).unwrap();
+        assert_eq!(v["mcpServers"][NAME]["args"][0], "--mcp");
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -364,7 +410,7 @@ mod tests {
             let f = d.join(format!("bad{i}.json"));
             std::fs::write(&f, bad).unwrap();
             assert!(matches!(connect_file(&f, Client::Desktop, exe, true), Err(ConnectError::Unparseable)));
-            assert!(matches!(disconnect_file(&f), Err(ConnectError::Unparseable) | Ok(())));
+            assert!(matches!(disconnect_file(&f, Client::Desktop), Err(ConnectError::Unparseable) | Ok(())));
             assert_eq!(std::fs::read_to_string(&f).unwrap(), *bad);
         }
         // Claude Code without its file: not installed. Desktop: the file is created.
@@ -378,7 +424,7 @@ mod tests {
         let bom = d.join("bom.json");
         std::fs::write(&bom, "\u{feff}{\"a\":1}").unwrap();
         connect_file(&bom, Client::Desktop, exe, true).unwrap();
-        assert_eq!(status_file(&bom, exe), (true, true));
+        assert_eq!(status_file(&bom, Client::Desktop, exe), (true, true));
         let _ = std::fs::remove_dir_all(&d);
     }
 

@@ -109,6 +109,8 @@ pub mod activity;
 // r11:anticheat
 
 // r11:luli
+pub mod mcpmap;
+pub mod skills;
 
 // r11:ram
 
