@@ -25,6 +25,7 @@ comportamento.
 | [design-system.md](./core/design-system.md) | Tokens HSL, tipografia, componentes base, gráficos e gauges. |
 | [next-steps.md](./core/next-steps.md) | Roadmap por fases, o que foi feito em cada sessão, backlog. |
 | [ai-advisor.md](./core/ai-advisor.md) | Conselheiro local (achados de hardware, BIOS e temperatura), context pack sem dados pessoais, assistente no app (Claude/ChatGPT/Gemini, chave no Cofre do Windows, busca só em fontes confiáveis) com playbook de segurança, ações validadas, MCP só leitura via `--mcp`. |
+| [connections.md](./core/connections.md) | Conexões (rodada 11): provedores de IA com teste de chave e seletor de modelo, skills da Luli (SKILL.md validado, zip lido no webview, bloco `<skills>` abaixo de SAFETY), mapa só leitura dos servidores MCP dos apps de IA do PC e conectar o G2 Boost a Cursor/VS Code. |
 
 ## Funcionalidades
 

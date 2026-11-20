@@ -6,9 +6,12 @@ import { backend, type ClaudeClient, type ClaudeTarget, inTauri } from "@/lib/ba
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const CLIENTS: ClaudeClient[] = ["desktop", "code"];
+const CLIENTS: ClaudeClient[] = ["desktop", "code", "cursor", "vscode"];
 
-/** One-click registration of `G2 Boost.exe --mcp` with Claude Desktop (Cowork) and Claude Code. */
+/**
+ * One-click registration of `G2 Boost.exe --mcp` with Claude Desktop (Cowork), Claude Code,
+ * Cursor and VS Code (Conexões › MCP). Each file is backed up first; only our entry changes.
+ */
 export function ClaudeConnectCard({ style }: { style?: CSSProperties }) {
   const { t } = useI18n();
   const errorText = useErrorText();
@@ -48,9 +51,13 @@ export function ClaudeConnectCard({ style }: { style?: CSSProperties }) {
         ok: false,
         text:
           m === "unreadable_config"
-            ? t("claude.error.unreadable")
+            ? ask.client === "vscode"
+              ? t("conn.connect.vscode_unreadable")
+              : t("claude.error.unreadable")
             : m === "not_installed"
-              ? t("claude.missing")
+              ? ask.client === "desktop" || ask.client === "code"
+                ? t("claude.missing")
+                : t("conn.connect.missing")
               : errorText(e),
       });
     } finally {
@@ -76,17 +83,22 @@ export function ClaudeConnectCard({ style }: { style?: CSSProperties }) {
     null,
     2,
   );
+  const vscode = JSON.stringify(
+    { servers: { g2boost: { type: "stdio", command: path, args: ["--mcp"] } } },
+    null,
+    2,
+  );
   const askPaths = ask ? (targets ?? []).filter((x) => x.client === ask.client && x.path) : [];
 
   return (
     <Card className="animate-rise" style={style}>
       <CardTitle help={t("claude.hint")}>
         <Plug className="size-4" />
-        {t("claude.title")}
+        {t("conn.connect.title")}
       </CardTitle>
-      <p className="text-xs text-muted-foreground">{t("claude.body")}</p>
+      <p className="text-xs text-muted-foreground">{t("conn.connect.body")}</p>
 
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-3 grid gap-2 lg:grid-cols-2">
         {CLIENTS.map((c) => {
           const rows = (targets ?? []).filter((x) => x.client === c);
           const installed = rows.some((x) => x.path);
@@ -154,7 +166,8 @@ export function ClaudeConnectCard({ style }: { style?: CSSProperties }) {
       {manual
         ? [
             { k: "cli", label: "Claude Code", text: cli },
-            { k: "json", label: "claude_desktop_config.json", text: json },
+            { k: "json", label: "claude_desktop_config.json · .cursor/mcp.json", text: json },
+            { k: "vscode", label: "VS Code · mcp.json", text: vscode },
           ].map((b) => (
             <div key={b.k} className="mt-2">
               <p className="flex items-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

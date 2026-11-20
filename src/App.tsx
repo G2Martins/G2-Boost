@@ -147,6 +147,11 @@ export default function App() {
       if (e.payload.type !== "drop") return;
       const path = e.payload.paths[0];
       if (!path) return;
+      // r11:luli: a SKILL.md or skill .zip goes to Conexões › Skills (the core holds the file).
+      if (/\.(md|zip)$/i.test(path)) {
+        setRoute("connections");
+        return;
+      }
       emitDrop(path);
       setRoute("apps");
     });

@@ -358,22 +358,15 @@ export const ptBR = {
   "ai.provider.gemini": "Gemini",
   "ai.provider.nvidia": "NVIDIA",
   "ai.key.placeholder.nvidia": "nvapi-…",
-  "ai.free.gemini":
-    "Tem camada grátis para testar: crie a chave no Google AI Studio, sem cartão. Na camada grátis o Google pode usar as perguntas para treino; o G2 Boost só manda dados sem nome nem número de série.",
-  "ai.free.nvidia":
-    "Catálogo grátis para testes (Kimi, DeepSeek, GLM e outros): crie a chave em build.nvidia.com. Sem pesquisa na web neste provedor.",
   "ai.web.unavailable": "Sem web neste provedor",
   "ai.model": "Modelo",
   "ai.key.stored": "Chave guardada no Cofre do Windows",
   "ai.key.none": "Nenhuma chave salva",
-  "ai.key.hint":
-    "A chave fica no Gerenciador de Credenciais do Windows (protegida pela sua conta), nunca em arquivo. Ela só é lida no momento de cada pergunta.",
   "ai.key.placeholder.anthropic": "sk-ant-…",
   "ai.key.placeholder.openai": "sk-…",
   "ai.key.placeholder.gemini": "AIza…",
   "ai.key.save": "Salvar",
   "ai.key.delete": "Remover chave",
-  "ai.key.saved": "Chave salva.",
   "ai.key.invalid": "Chave inválida (vazia, com espaços ou longa demais).",
   "ai.key.missing": "Salve a chave do provedor antes de perguntar.",
   "ai.context": "O que será enviado",
@@ -671,11 +664,8 @@ export const ptBR = {
   "console.hint.app_hang": "app travou",
   "console.hint.restore_points_lost": "pontos de restauração apagados",
   "console.hint.dcom_noise": "ruído comum, pode ignorar",
-  "claude.title": "Conectar ao Claude",
   "claude.hint":
     "Pelo Claude Desktop, Cowork ou Claude Code, o uso conta no limite do seu plano (Pro ou Max), sem cobrança por token. O chat aqui dentro do G2 Boost continua com chave de API: a Anthropic não permite que apps de terceiros usem o login do plano.",
-  "claude.body":
-    "Liga o G2 Boost ao Claude do seu computador. O Claude passa a ler este PC (hardware, erros do Windows, uso do disco, apps, energia e a base de conhecimento da Luli) e investiga junto com você. Só leitura: mudar algo continua sendo um clique seu aqui.",
   "claude.client.desktop": "Claude Desktop e Cowork",
   "claude.client.code": "Claude Code",
   "claude.state.on": "Conectado",
@@ -4161,6 +4151,159 @@ export const ptBR = {
   // ── r11:anticheat · prontidão para anti-cheat, BIOS, revisão dos ajustes (agente A3) ──
 
   // ── r11:luli · conexões, skills, mapa de MCP (agente A4) ──
+  "conn.tab.providers": "Provedores de IA",
+  "conn.tab.skills": "Skills",
+  "conn.tab.mcp": "MCP",
+  "conn.app_only": "Disponível no app instalado.",
+  "conn.ai.manage": "Conexões",
+  "conn.luli.ask.mcp": "Os servidores MCP deste PC são seguros? Algum merece atenção?",
+  "conn.luli.ask.connect": "Como uso o G2 Boost pelo Claude, pelo Cursor ou pelo VS Code?",
+  "conn.prov.intro":
+    "Cada provedor usa a sua própria chave, guardada no Cofre do Windows. Testar lista os modelos da conta, sem gastar créditos, e mostra se a chave funciona.",
+  "conn.prov.active": "Em uso pela Luli",
+  "conn.prov.use": "Usar com a Luli",
+  "conn.prov.state.none": "Sem chave",
+  "conn.prov.state.unchecked": "Chave salva, ainda não testada",
+  "conn.prov.state.testing": "Testando…",
+  "conn.prov.state.ok": "Funcionando",
+  "conn.prov.state.unverified": "Serviço respondeu",
+  "conn.prov.state.invalid": "Chave inválida",
+  "conn.prov.state.quota": "Sem cota agora",
+  "conn.prov.state.offline": "Sem conexão",
+  "conn.prov.state.error": "Erro do provedor (HTTP {status})",
+  "conn.prov.state.ok.hint": "O provedor aceitou a chave.",
+  "conn.prov.state.unverified.hint":
+    "A lista de modelos deste provedor é pública: a chave é conferida na primeira pergunta.",
+  "conn.prov.state.invalid.hint":
+    "O provedor recusou a chave. Confira se ela foi copiada inteira ou crie outra.",
+  "conn.prov.state.quota.hint":
+    "Limite de uso ou cota da conta atingido. Na camada grátis a cota volta sozinha; em plano pago, confira o saldo.",
+  "conn.prov.state.offline.hint":
+    "O provedor não respondeu: sem internet, serviço fora do ar ou bloqueio na rede.",
+  "conn.prov.state.error.hint": "Resposta inesperada do provedor. Tente de novo mais tarde.",
+  "conn.prov.checked": "verificado em {when}",
+  "conn.prov.web.yes": "Com pesquisa na web",
+  "conn.prov.web.no": "Sem pesquisa na web",
+  "conn.prov.test": "Testar",
+  "conn.prov.key_label": "Chave de API do {provider}",
+  "conn.prov.replace": "Trocar",
+  "conn.prov.get.anthropic":
+    "Cobrança por uso na conta da API (a assinatura Pro ou Max não dá chave). Crie a chave em",
+  "conn.prov.get.openai":
+    "Cobrança por uso na conta da API (a assinatura do app não dá chave). Crie a chave em",
+  "conn.prov.get.gemini":
+    "Tem camada grátis, sem cartão. Nela o Google pode usar as perguntas para treino; o G2 Boost só manda dados sem nome nem número de série. Crie a chave em",
+  "conn.prov.get.nvidia": "Catálogo grátis para testes, sem pesquisa na web. Crie a chave em",
+  "conn.prov.keys_page": "página de chaves",
+  "conn.prov.default": "padrão",
+  "conn.prov.custom": "Outro modelo…",
+  "conn.prov.list": "Lista",
+  "conn.prov.model_invalid": "Nome de modelo inválido: só letras, números e os sinais . _ / :",
+  "conn.prov.models_listed": "{count} modelos de conversa listados pelo provedor.",
+  "conn.prov.models_hint": "Teste a chave para escolher o modelo numa lista.",
+  "conn.skills.title": "Skills da Luli",
+  "conn.skills.hint":
+    "Skill é uma pasta com um arquivo SKILL.md: um cabeçalho com nome e descrição (quando usar) e as instruções em Markdown. É o formato aberto usado pelos assistentes de IA.",
+  "conn.skills.body":
+    "Ensine a Luli com instruções prontas: cole o texto de um SKILL.md ou escolha um arquivo .md ou o .zip da skill. Cada skill entra desligada; leia e ligue as que quiser. As ligadas vão em toda conversa da Luli e do Console, abaixo das regras de segurança.",
+  "conn.skills.drop": "Ou arraste um SKILL.md ou um .zip de skill para esta janela.",
+  "conn.skills.paste": "Colar SKILL.md",
+  "conn.skills.pick": "Escolher arquivo",
+  "conn.skills.added": "{count} adicionada(s), desligada(s) até você ler e ligar.",
+  "conn.skills.empty.title": "Nenhuma skill ainda",
+  "conn.skills.empty.body":
+    "Adicione uma skill para a Luli seguir as suas instruções num assunto: um jogo, um jeito de responder, um checklist seu.",
+  "conn.skills.budget": "{on} ligada(s) · {kb} KB de {max} KB por conversa",
+  "conn.skills.budget_label": "Espaço das skills na conversa",
+  "conn.skills.partial": "Nem todas as ligadas cabem inteiras: desligue as que não usa.",
+  "conn.skills.view": "Ver",
+  "conn.skills.remove": "Remover",
+  "conn.skills.toggle": "Ligar ou desligar {name}",
+  "conn.skills.safety":
+    "Só o SKILL.md é lido. Scripts e outros arquivos do pacote são ignorados e nunca executados. Uma skill nunca muda o PC: o que a Luli sugerir continua passando pela prévia e pela sua confirmação.",
+  "conn.skills.enable_title": "Ligar {name}?",
+  "conn.skills.enable": "Ligar",
+  "conn.skills.close": "Fechar",
+  "conn.skills.enable_warning":
+    "Esta skill é instrução de terceiro e vai em toda conversa da Luli. Leia antes de ligar. As regras de segurança do G2 Boost continuam acima dela, mas uma skill mal-intencionada pode tentar levar a conversa para outro lado.",
+  "conn.skills.remove_title": "Remover {name}?",
+  "conn.skills.remove_body": "A skill sai da Luli e deste PC.",
+  "conn.skills.paste_title": "Colar uma skill",
+  "conn.skills.paste_body":
+    "Cole o conteúdo inteiro do SKILL.md, começando pelo cabeçalho entre as duas linhas de três hífens.",
+  "conn.skills.paste_placeholder":
+    "---\nname: minha-skill\ndescription: O que faz e quando usar.\n---\n# Instruções",
+  "conn.skills.add": "Adicionar",
+  "conn.skills.err.no_frontmatter":
+    "Não achei o cabeçalho: o SKILL.md começa com uma linha de três hífens, depois name: e description:, e fecha com outra linha igual.",
+  "conn.skills.err.bad_frontmatter":
+    "O cabeçalho tem uma linha que não entendi (aspas sem fechar ou name: repetido).",
+  "conn.skills.err.missing_name": "Falta o name: no cabeçalho.",
+  "conn.skills.err.missing_description":
+    "Falta a description: no cabeçalho. Ela diz quando a Luli deve usar a skill.",
+  "conn.skills.err.invalid_name":
+    "Nome inválido: até 64 letras minúsculas, números e hífens (por exemplo notas-de-jogo).",
+  "conn.skills.err.reserved_name": "Esse nome é reservado. Escolha outro.",
+  "conn.skills.err.invalid_description":
+    "Descrição inválida: uma linha de texto, até 1024 caracteres, sem < ou >.",
+  "conn.skills.err.empty_body": "A skill não tem instruções depois do cabeçalho.",
+  "conn.skills.err.too_large":
+    "Grande demais: as instruções de uma skill vão até 16 KB (o .zip, até 25 MB).",
+  "conn.skills.err.control_chars":
+    "O texto tem caracteres de controle. Salve como texto simples (UTF-8) e tente de novo.",
+  "conn.skills.err.duplicate": "Já existe uma skill com esse nome. Remova a antiga antes.",
+  "conn.skills.err.too_many": "Limite de 30 skills. Remova alguma antes.",
+  "conn.skills.err.not_zip": "O arquivo não é um .zip válido.",
+  "conn.skills.err.unsupported":
+    "Este .zip usa um formato que o G2 Boost não abre (zip64 ou outra compressão).",
+  "conn.skills.err.encrypted": "Um .zip com senha não é aceito.",
+  "conn.skills.err.corrupt": "O .zip está corrompido.",
+  "conn.skills.err.no_skill": "Não achei um SKILL.md no topo do .zip (pasta/SKILL.md).",
+  "conn.mcp.title": "Servidores MCP neste PC",
+  "conn.mcp.hint":
+    "MCP é o jeito como apps de IA ligam ferramentas. Cada servidor é um programa que o app inicia sozinho, com o seu usuário.",
+  "conn.mcp.body":
+    "O que os apps de IA deste PC iniciam. Só leitura: o G2 Boost não liga, não desliga e não altera esses servidores. Aparecem só o nome, o programa e o endereço; argumentos, variáveis e cabeçalhos nunca são mostrados nem saem do PC, porque costumam guardar chaves.",
+  "conn.mcp.refresh": "Ler de novo",
+  "conn.mcp.empty.title": "Nenhum servidor MCP encontrado",
+  "conn.mcp.empty.body": "Nenhum app de IA conhecido tem servidores MCP configurados neste PC.",
+  "conn.mcp.summary": "{count} servidor(es) em {apps} app(s)",
+  "conn.mcp.summary_downloads": "{count} baixa(m) pacote da internet a cada início",
+  "conn.mcp.searched": "Sem servidores MCP configurados: {list}.",
+  "conn.mcp.none": "Configurado, sem servidores",
+  "conn.mcp.count": "{count} servidor(es)",
+  "conn.mcp.projects": "em {count} projeto(s)",
+  "conn.mcp.safety":
+    "Servidor MCP é um caminho comum para um programa indesejado continuar rodando: ele volta toda vez que o app abre. Desconfie dos que você não reconhece, principalmente os que baixam pacote da internet a cada início. Para remover, use as configurações do app dono do servidor.",
+  "conn.mcp.flag.g2boost": "G2 Boost",
+  "conn.mcp.flag.downloads": "Baixa da internet ao iniciar",
+  "conn.mcp.flag.downloads.hint":
+    "O app busca a versão mais nova do pacote a cada início: o que roda pode mudar sem você saber.",
+  "conn.mcp.flag.missing": "Programa não encontrado",
+  "conn.mcp.error.symlink": "Arquivo é um link, não li",
+  "conn.mcp.error.too_large": "Arquivo grande demais",
+  "conn.mcp.error.invalid_json": "Arquivo com erro",
+  "conn.mcp.error.unreadable": "Não consegui ler",
+  "conn.mcp.client.claude_desktop": "Claude Desktop",
+  "conn.mcp.client.claude_code": "Claude Code",
+  "conn.mcp.client.vscode": "VS Code",
+  "conn.mcp.client.cursor": "Cursor",
+  "conn.mcp.client.windsurf": "Windsurf",
+  "conn.mcp.client.lmstudio": "LM Studio",
+  "conn.connect.title": "Conectar o G2 Boost aos apps de IA",
+  "conn.connect.body":
+    "Registra o servidor MCP do G2 Boost nos apps de IA deste computador. Eles passam a ler este PC (hardware, erros do Windows, disco, apps, energia e a base de conhecimento da Luli). Mudar algo continua pedindo a sua confirmação numa janela do Windows.",
+  "conn.connect.vscode_unreadable":
+    "O mcp.json do VS Code tem comentários ou outro formato, então não mexi nele. Copie a configuração manual abaixo para o arquivo.",
+  "conn.connect.missing": "Não encontrei este app neste PC.",
+  "claude.client.cursor": "Cursor",
+  "claude.client.vscode": "VS Code",
+  "claude.done.cursor": "Pronto. Reinicie o Cursor e ative o g2boost nas configurações de MCP.",
+  "claude.done.vscode":
+    "Pronto. No VS Code, o g2boost aparece na lista de servidores MCP; inicie por lá.",
+  "claude.confirm.after.cursor": "Depois, reinicie o Cursor para ele ler o arquivo.",
+  "claude.confirm.after.vscode":
+    "O VS Code lê o arquivo sozinho; o servidor aparece na lista de MCP do modo agente.",
 
   // ── r11:ram · memória RAM, ícones reais, sobras (agente A5) ──
 } as const;

@@ -64,7 +64,7 @@ export type ConsoleReply = {
   error: ConsoleMsg | null;
 };
 
-export type ClaudeClient = "desktop" | "code";
+export type ClaudeClient = "desktop" | "code" | "cursor" | "vscode";
 export type ClaudeTarget = {
   client: ClaudeClient;
   path: string;
@@ -1268,6 +1268,16 @@ export const backend = {
   // r11:anticheat
 
   // r11:luli
+  /** Luli skills (validated SKILL.md files, kept in the data dir; new ones start off). */
+  skillsList: () => call<LuliSkill[]>("skills_list"),
+  skillsAdd: (text: string) => callOrThrow<LuliSkill[]>("skills_add", { text }),
+  skillsSet: (name: string, enabled: boolean) =>
+    callOrThrow<LuliSkill[]>("skills_set", { name, enabled }),
+  skillsRemove: (name: string) => callOrThrow<LuliSkill[]>("skills_remove", { name }),
+  /** Bytes of the .md/.zip just dropped on the window (once); the webview never names a path. */
+  skillsTakeDrop: () => callOrThrow<ArrayBuffer>("skills_take_drop"),
+  /** MCP servers the AI apps on this PC start (read-only; never args, env or headers). */
+  mcpMap: () => call<McpClientMap[]>("mcp_map"),
 
   // r11:ram
 };
@@ -1829,5 +1839,40 @@ export type ActivityEntry = {
 // ── r11:anticheat types ──
 
 // ── r11:luli types ──
+export type LuliSkill = {
+  name: string;
+  description: string;
+  body: string;
+  enabled: boolean;
+  added: number;
+};
+export type McpClient =
+  | "claude_desktop"
+  | "claude_code"
+  | "vscode"
+  | "cursor"
+  | "windsurf"
+  | "lmstudio";
+export type McpServer = {
+  name: string;
+  scope: "user" | "project";
+  transport: "stdio" | "http" | "unknown" | null;
+  /** Executable file name only (never a path). */
+  command: string | null;
+  /** URL host only (never path, query or user info). */
+  host: string | null;
+  downloads: boolean;
+  missing: boolean;
+  g2boost: boolean;
+  projects: number;
+};
+export type McpClientMap = {
+  client: McpClient;
+  config: boolean;
+  error: "symlink" | "too_large" | "invalid_json" | "unreadable" | null;
+  /** The app's exe, for its icon. */
+  exe: string | null;
+  servers: McpServer[];
+};
 
 // ── r11:ram types ──

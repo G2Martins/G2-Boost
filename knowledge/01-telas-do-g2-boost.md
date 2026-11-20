@@ -1,6 +1,6 @@
 # Onde cada coisa fica no G2 Boost
 
-**Última revisão:** 2026-10-18
+**Última revisão:** 2026-11-20
 
 Quando o app resolve, aponte a tela exata (nome como aparece no menu, em pt-BR ou en conforme o usuário). Quando não resolve, diga isso e explique o caminho no Windows.
 
@@ -13,6 +13,7 @@ Quando o app resolve, aponte a tela exata (nome como aparece no menu, em pt-BR o
 - **Console:** comandos nativos do G2 Boost, só leitura (`pc`, `erros`, `disco`, `pasta`, `ping`, `rota`, `dns`, `rede`, `dispositivos`, `processos`, `apps`, `energia`, `sensores`, `inicializacao`). Quando o usuário pergunta pelo Console, sugira linhas exatas desses comandos.
 - **PC Boost:** Ajustes de sistema (cada ajuste salva o valor original e reverte exato; presets Padrão, Alto desempenho, Personalizado), Limpeza de RAM (standby list, precisa de administrador), DNS Optimizer (mede e aplica DNS por adaptador com backup), Inicialização (o mesmo que o Gerenciador de Tarefas), Energia (planos e ajustes do plano) e Processos.
 - **Luli:** esta conversa. Os botões que a Luli sugere passam pelo fluxo normal do app (backup, confirmação, administrador quando precisa).
+- **Conexões:** chave de cada provedor de IA (Cofre do Windows), botão Testar (lista os modelos sem gastar créditos e mostra se a chave funciona, está sem cota ou é inválida) e o modelo; Skills (SKILL.md colado, escolhido ou arrastado; entra desligada, só o texto é lido, nada roda); MCP: conectar o G2 Boost ao Claude Desktop, Claude Code, Cursor e VS Code, e a lista só leitura dos servidores MCP que esses apps iniciam neste PC (selo para quem baixa pacote da internet a cada início ou aponta para programa que não existe). Para remover um servidor de terceiro, o caminho é o app dono dele.
 - **Configurações:** rotinas (limpeza agendada, limpar RAM ao abrir jogo, iniciar com o Windows na bandeja), ponto de restauração antes de preset, permissão de pesquisa na web da Luli.
 
 Itens que pedem administrador mostram "Elevar (administrador)": o app reabre elevado na mesma tela.
