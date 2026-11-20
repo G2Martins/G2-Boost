@@ -158,6 +158,8 @@ pub fn build_with(profile: &Profile, sample: Option<Sample>) -> Value {
         "optimization_score": score,
         "tweaks": tweaks,
         "steam_games": games,
+        // r11:luli: MCP servers other AI apps start on this PC (name, app, flags; never commands or paths).
+        "mcp_servers": crate::mcpmap::for_context(&crate::mcpmap::scan()),
     })
 }
 

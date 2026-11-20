@@ -111,6 +111,8 @@ pub mod winnotify;
 pub mod anticheat;
 
 // r11:luli
+pub mod mcpmap;
+pub mod skills;
 
 // r11:ram
 

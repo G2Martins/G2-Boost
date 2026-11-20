@@ -73,6 +73,7 @@ mod activity_cmds;
 mod anticheat_cmds;
 
 // r11:luli mod
+mod luli_cmds;
 
 // r11:ram mod
 
@@ -2532,6 +2533,7 @@ pub fn run() {
             anticheat_cmds::setup(app.handle());
 
             // r11:luli setup
+            luli_cmds::setup(app.handle());
 
             // r11:ram setup
 
@@ -2809,6 +2811,12 @@ pub fn run() {
             anticheat_cmds::anticheat_readiness,
 
             // r11:luli
+            luli_cmds::skills_list,
+            luli_cmds::skills_add,
+            luli_cmds::skills_set,
+            luli_cmds::skills_remove,
+            luli_cmds::skills_take_drop,
+            luli_cmds::mcp_map,
 
             // r11:ram
 

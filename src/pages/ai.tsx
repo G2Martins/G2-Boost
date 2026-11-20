@@ -1,28 +1,25 @@
 import {
   Bot,
   Brain,
+  Cable,
   ChevronDown,
   CircleCheck,
   Globe,
-  KeyRound,
   ListTodo,
-  Lock,
   RefreshCw,
   Send,
   ShieldCheck,
   SlidersHorizontal,
-  Trash2,
   Wrench,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ClaudeConnectCard } from "@/components/claude-connect";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliMark } from "@/components/luli-card";
 import { LuliInstructionsCard, LuliMemoryCard, LuliSidebar } from "@/components/luli-sidebar";
 import { LuliThinking, TypeText } from "@/components/luli-typing";
 import { ExternalLink } from "@/components/safe-markdown";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
-import { Badge, Button, Card, CardTitle, HelpHint } from "@/components/ui/primitives";
+import { Badge, Button, Card, CardTitle } from "@/components/ui/primitives";
 import { cleanupName, TWEAKS, tweakName } from "@/data/catalogs";
 import { type Answer, isTrustedSource, PROVIDERS } from "@/lib/ai";
 import { backend, inTauri, type StartupItem } from "@/lib/backend";
@@ -53,7 +50,6 @@ export function AiPage() {
     setWebHere,
     fetchContext,
   } = luli;
-  const [keyDraft, setKeyDraft] = useState("");
   const [showContext, setShowContext] = useState(false);
   // The settings column (provider, context, personalization, memory) can be folded away.
   const [panel, setPanel] = useState(() => {
@@ -333,10 +329,7 @@ export function AiPage() {
                     <button
                       key={p}
                       type="button"
-                      onClick={() => {
-                        setKeyDraft("");
-                        luli.switchProvider(p);
-                      }}
+                      onClick={() => luli.switchProvider(p)}
                       className={cn(
                         "rounded-md px-2 py-2 font-display text-[12px] font-semibold tracking-wide transition-colors",
                         provider === p
@@ -355,76 +348,30 @@ export function AiPage() {
                     </button>
                   ))}
                 </div>
-                {provider === "gemini" || provider === "nvidia" ? (
-                  <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                    {t(`ai.free.${provider}` as const)}{" "}
-                    <ExternalLink
-                      url={
-                        provider === "gemini"
-                          ? "https://aistudio.google.com/apikey"
-                          : "https://build.nvidia.com/"
-                      }
-                      label={provider === "gemini" ? "aistudio.google.com" : "build.nvidia.com"}
-                    />
-                  </p>
-                ) : null}
-                <label
-                  className="mt-4 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-                  htmlFor="ai-model"
-                >
-                  {t("ai.model")}
-                </label>
-                <input
-                  id="ai-model"
-                  value={models[provider]}
-                  onChange={(e) => luli.setModel(provider, e.target.value.trim())}
-                  spellCheck={false}
-                  maxLength={64}
-                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-xs outline-none focus:border-ring"
-                />
-                <div className="mt-4 rounded-md border border-border bg-background/60 p-3">
-                  <p className="flex items-center gap-2 text-xs">
-                    {keys[provider] ? (
-                      <Lock className="size-3.5 text-success" />
-                    ) : (
-                      <KeyRound className="size-3.5 text-muted-foreground" />
+                {/* r11:luli: keys, models and their checks live in Conexões. */}
+                <div className="mt-3 flex items-center gap-2 text-xs">
+                  <span
+                    className={cn(
+                      "size-1.5 shrink-0 rounded-full",
+                      keys[provider] ? "bg-success" : "bg-muted-foreground/40",
                     )}
-                    <span className={keys[provider] ? "text-success" : "text-muted-foreground"}>
-                      {keys[provider] ? t("ai.key.stored") : t("ai.key.none")}
-                    </span>
-                    <HelpHint text={t("ai.key.hint")} />
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="password"
-                      value={keyDraft}
-                      onChange={(e) => setKeyDraft(e.target.value)}
-                      placeholder={t(`ai.key.placeholder.${provider}` as const)}
-                      autoComplete="off"
-                      spellCheck={false}
-                      className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 font-mono text-xs outline-none focus:border-ring"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!keyDraft.trim() || !inTauri}
-                      onClick={async () => {
-                        if (await luli.saveKey(keyDraft)) setKeyDraft("");
-                      }}
-                    >
-                      {t("ai.key.save")}
-                    </Button>
-                  </div>
-                  {keys[provider] ? (
-                    <button
-                      type="button"
-                      onClick={luli.deleteKey}
-                      className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-3" />
-                      {t("ai.key.delete")}
-                    </button>
-                  ) : null}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {keys[provider] ? (
+                      <span className="font-mono text-[11px]">{models[provider]}</span>
+                    ) : (
+                      t("ai.key.none")
+                    )}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant={keys[provider] ? "ghost" : "primary"}
+                    onClick={() => navigate("connections")}
+                  >
+                    <Cable className="size-4" />
+                    {t("conn.ai.manage")}
+                  </Button>
                 </div>
                 {note ? <p className="mt-3 text-xs text-foreground/90">{note}</p> : null}
               </Card>
@@ -473,7 +420,6 @@ export function AiPage() {
 
               <LuliInstructionsCard />
               <LuliMemoryCard />
-              <ClaudeConnectCard />
             </div>
           ) : null}
         </div>

@@ -12,6 +12,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -19,7 +20,9 @@ import { useErrorText } from "@/components/elevate-button";
 import {
   type Answer,
   askStateless,
+  type CheckState,
   ClaudeChat,
+  checkState,
   DEFAULT_MODELS,
   isBusy,
   isQuota,
@@ -28,8 +31,10 @@ import {
   PROVIDER_WEB,
   PROVIDERS,
   type Provider,
+  type ProviderCheck,
   systemPrompt,
   type Turn,
+  testProvider,
 } from "@/lib/ai";
 import {
   type AdvisorReport,
@@ -37,6 +42,7 @@ import {
   inTauri,
   type LuliHistory,
   type LuliMemoryItem,
+  type LuliSkill,
 } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
 import { KNOWLEDGE } from "@/lib/knowledge";
@@ -53,6 +59,32 @@ export type LuliMessage = {
 };
 
 const LS_PROVIDER = "g2boost.ai.provider";
+/** Last key check per provider (state, time, listed models): a per-viewer convenience. */
+const LS_CHECKS = "g2boost.ai.checks";
+type Checks = Partial<Record<Provider, ProviderCheck>>;
+const STATES: CheckState[] = ["ok", "unverified", "invalid", "quota", "offline", "error"];
+function readChecks(): Checks {
+  try {
+    const raw = JSON.parse(readLs(LS_CHECKS) ?? "{}") as Record<string, ProviderCheck>;
+    const out: Checks = {};
+    for (const p of PROVIDERS) {
+      const c = raw[p];
+      // A test cut short by closing the app ("testing") is no state at all.
+      if (c && STATES.includes(c.state) && typeof c.at === "number")
+        out[p] = {
+          state: c.state,
+          at: c.at,
+          models: Array.isArray(c.models)
+            ? c.models.filter((m): m is string => typeof m === "string").slice(0, 200)
+            : [],
+          status: typeof c.status === "number" ? c.status : undefined,
+        };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 const lsModel = (p: Provider) => `g2boost.ai.model.${p}`;
 function readLs(k: string): string | null {
   try {
@@ -159,6 +191,9 @@ function useLuliState() {
   const [history, setHistory] = useState<LuliHistory>({ groups: [], conversations: [] });
   const [memory, setMemory] = useState<LuliMemoryItem[]>([]);
   const [instructions, setInstructions] = useState("");
+  /** Conexões › Skills (every one; only the enabled go into the prompt). */
+  const [skills, setSkills] = useState<LuliSkill[]>([]);
+  const [checks, setChecks] = useState<Checks>(readChecks);
   const [convId, setConvId] = useState<string | null>(null);
   const conv = useRef<{ id: string | null; group: string | null }>({ id: null, group: null });
   const reportBusy = useRef(false);
@@ -185,6 +220,7 @@ function useLuliState() {
       setInstructions(s.luli_instructions ?? "");
     });
     backend.luliMemory().then((m) => m && setMemory(m));
+    backend.skillsList().then((s) => s && setSkills(s));
     void refreshHistory();
   }, [refreshHistory]);
 
@@ -360,36 +396,67 @@ function useLuliState() {
 
   const setModel = useCallback(
     (p: Provider, v: string) => {
-      cancel();
-      claude.current = null; // the next Claude turn uses the new model
+      // Another provider's model (Conexões) leaves the conversation in progress alone.
+      if (p === provider) {
+        cancel();
+        claude.current = null; // the next Claude turn uses the new model
+      }
       setModels((m) => ({ ...m, [p]: v }));
       writeLs(lsModel(p), v);
     },
-    [cancel],
+    [cancel, provider],
   );
 
+  /** A check result (a test, or what a real question said about the key). */
+  const recordCheck = useCallback((p: Provider, c: ProviderCheck | null) => {
+    setChecks((prev) => {
+      const next = { ...prev };
+      if (c) next[p] = c;
+      else delete next[p];
+      if (c?.state !== "testing") writeLs(LS_CHECKS, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  /** List the provider's models with its key (no tokens spent); the models fill the selector. */
+  const testKey = useCallback(
+    async (p: Provider) => {
+      recordCheck(p, { state: "testing", at: Date.now(), models: checks[p]?.models ?? [] });
+      const c = await testProvider(p);
+      // A failed test keeps the models an earlier one listed.
+      recordCheck(p, c.models.length ? c : { ...c, models: checks[p]?.models ?? [] });
+      return c;
+    },
+    [checks, recordCheck],
+  );
+
+  /** Save a key in the Credential Manager; null = saved, else the error text. */
   const saveKey = useCallback(
-    async (value: string) => {
-      setNote(null);
+    async (p: Provider, value: string): Promise<string | null> => {
       try {
-        await backend.aiKeySet(provider, value);
-        setKeys((k) => ({ ...k, [provider]: true }));
-        setNote(t("ai.key.saved"));
-        return true;
+        await backend.aiKeySet(p, value);
+        setKeys((k) => ({ ...k, [p]: true }));
+        recordCheck(p, null); // a new key: the old check says nothing about it
+        return null;
       } catch (e) {
-        setNote(
-          e instanceof Error && e.message === "invalid_key" ? t("ai.key.invalid") : errorText(e),
-        );
-        return false;
+        return e instanceof Error && e.message === "invalid_key"
+          ? t("ai.key.invalid")
+          : errorText(e);
       }
     },
-    [provider, t, errorText],
+    [t, errorText, recordCheck],
   );
 
-  const deleteKey = useCallback(async () => {
-    await backend.aiKeyDelete(provider).catch(() => undefined);
-    setKeys((k) => ({ ...k, [provider]: false }));
-  }, [provider]);
+  const deleteKey = useCallback(
+    async (p: Provider) => {
+      await backend.aiKeyDelete(p).catch(() => undefined);
+      setKeys((k) => ({ ...k, [p]: false }));
+      recordCheck(p, null);
+    },
+    [recordCheck],
+  );
+
+  const enabledSkills = useMemo(() => skills.filter((s) => s.enabled), [skills]);
 
   const ask = useCallback(
     async (
@@ -421,6 +488,7 @@ function useLuliState() {
         noWeb,
         memory: memory.map((m) => m.text),
         instructions,
+        skills: enabledSkills,
       });
       const ctrl = new AbortController();
       inflight.current = ctrl;
@@ -450,12 +518,20 @@ function useLuliState() {
             ctrl.signal,
           );
         }
+        recordCheck(provider, {
+          state: "ok",
+          at: Date.now(),
+          models: checks[provider]?.models ?? [],
+        });
         if (!ctrl.signal.aborted) {
           const reply: LuliMessage = { role: "assistant", text: answer.text, answer };
           setMessages((m) => [...m, reply]);
           void persist([...prior.filter((m) => !m.error), userMsg, reply]);
         }
       } catch (e) {
+        const state = checkState(provider, e);
+        if (state && state !== "offline")
+          recordCheck(provider, { state, at: Date.now(), models: checks[provider]?.models ?? [] });
         if (!ctrl.signal.aborted) {
           const msg = e instanceof Error ? e.message : String(e);
           const text = isTimeout(e)
@@ -494,6 +570,9 @@ function useLuliState() {
       memory,
       instructions,
       persist,
+      enabledSkills,
+      checks,
+      recordCheck,
     ],
   );
 
@@ -524,6 +603,7 @@ function useLuliState() {
         console: opts.console,
         memory: memory.map((m) => m.text),
         instructions,
+        skills: enabledSkills,
       });
       const onText = opts.onText ?? (() => undefined);
       return provider === "anthropic"
@@ -538,7 +618,18 @@ function useLuliState() {
             opts.signal,
           );
     },
-    [keys, provider, context, fetchContext, webAlways, locale, models, memory, instructions],
+    [
+      keys,
+      provider,
+      context,
+      fetchContext,
+      webAlways,
+      locale,
+      models,
+      memory,
+      instructions,
+      enabledSkills,
+    ],
   );
 
   /** The last answer asked for the web: allow it (here or always) and ask the same question again. */
@@ -604,6 +695,10 @@ function useLuliState() {
     forget,
     instructions,
     saveInstructions,
+    skills,
+    setSkills,
+    checks,
+    testKey,
   };
 }
 
