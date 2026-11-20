@@ -32,6 +32,7 @@ Conferido em 2026-10-25 contra a documentação da Microsoft quando ela existe. 
 | `alt_shift_off` | HKCU `Keyboard Layout\Toggle`: `Language Hotkey` e `Hotkey` = "3" | "Keyboard Layout Toggle" (3 = sem atalho); `SPI_SETLANGTOGGLE` recarrega | oficial |
 | `narrator_shortcut_off` | HKCU `Software\Microsoft\Narrator\NoRoam\WinEnterLaunchEnabled` | Configurações › Acessibilidade › Narrador | observado |
 | `accessibility_shortcuts_off` | `SPI_GET/SETSTICKYKEYS`, `…FILTERKEYS`, `…TOGGLEKEYS`, bit `*_HOTKEYACTIVE` (0x4) | doc de `SystemParametersInfo` e das structs | oficial |
+| `background_apps_off` (rodada 11) | HKLM `Policies\Microsoft\Windows\AppPrivacy\LetAppsRunInBackground=2` (Force Deny; 0 = usuário decide, 1 = força permitir) | Policy CSP `Privacy/LetAppsRunInBackground` e ADMX "Let Windows apps run in the background" | oficial |
 | `wifi_power_saving_off`, `core_parking_off` | plano ativo: subgrupo `19cbb8fa-…`/`12bbebe6-…` (modo de economia do adaptador sem fio), `54533251-…`/`0cc5b647-…` (CPMINCORES) | "Processor power management options", `powercfg /q` | oficial |
 | `nvidia_telemetry_off` | tarefas `\NvTmMon_`, `\NvTmRep_`, `\NvTmRepOnLogon_`, `\NvTmRep_CrashReport1..4_` + `{B2FE1952-0186-46C3-BAEC-A80AA35AC5B8}` | instalações antigas do driver | observado; drivers atuais não criam (indisponível) |
 | `recall_feature_off` | recurso opcional `Recall` | `Disable-WindowsOptionalFeature -FeatureName Recall` documentado; feito pela DismApi (`DismDisableFeature`) | oficial |
