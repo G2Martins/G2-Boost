@@ -32,6 +32,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { ActivityBell, JobPill, useJobs } from "@/components/shell/activity";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -167,6 +168,9 @@ export function AppShell({
   };
   const group = NAV.find((g) => g.items.some((i) => i.route === route));
   const current = group?.items.find((i) => i.route === route);
+  // r11:activity: modules with a job running get a dot in the sidebar.
+  const jobs = useJobs();
+  const busy = new Set(jobs.filter((j) => j.state === "run").map((j) => j.route));
 
   // One pill glides to the active item (measured), instead of each item lighting up on its own.
   const navRef = useRef<HTMLElement>(null);
@@ -237,6 +241,7 @@ export function AppShell({
                   icon={item.icon}
                   label={t(item.label)}
                   badge={badges?.[item.route]}
+                  busy={busy.has(item.route)}
                   onClick={() => onNavigate(item.route)}
                 />
               ))}
@@ -270,7 +275,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <header className="flex h-11 shrink-0 items-center gap-4 border-b border-border bg-surface/80 px-5 backdrop-blur">
           {group && current ? (
             <span className="flex items-center gap-2 text-[12px]">
@@ -279,7 +284,9 @@ export function AppShell({
               <span className="font-semibold">{t(current.label)}</span>
             </span>
           ) : null}
-          {elevated === null ? null : (
+          {elevated === null ? (
+            <span className="ml-auto" />
+          ) : (
             <span
               title={elevated ? undefined : t("app.standard.hint")}
               className={cn(
@@ -297,8 +304,10 @@ export function AppShell({
               {elevated ? t("app.elevated") : t("app.standard")}
             </span>
           )}
+          <ActivityBell />
         </header>
         <main className="relative min-h-0 flex-1 overflow-y-auto">{children}</main>
+        <JobPill route={route} />
       </div>
     </div>
   );
@@ -310,6 +319,7 @@ function NavButton({
   icon: Icon,
   label,
   badge,
+  busy,
   onClick,
 }: {
   active: boolean;
@@ -317,6 +327,8 @@ function NavButton({
   icon: LucideIcon;
   label: string;
   badge?: number;
+  /** A job of this module is running (r11:activity). */
+  busy?: boolean;
   onClick: () => void;
 }) {
   const button = (
@@ -337,11 +349,17 @@ function NavButton({
         className={cn("shrink-0", collapsed ? "size-5" : "size-4.5", active && "text-primary")}
       />
       {collapsed ? null : <span className="truncate text-[13px] font-medium">{label}</span>}
+      {busy ? (
+        <span
+          aria-hidden
+          className={cn("nav-busy", collapsed ? "absolute right-2 bottom-2" : "ml-auto")}
+        />
+      ) : null}
       {badge ? (
         <span
           className={cn(
             "num flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-background",
-            collapsed ? "absolute top-1 right-1.5" : "ml-auto",
+            collapsed ? "absolute top-1 right-1.5" : busy ? "ml-2" : "ml-auto",
           )}
         >
           {badge > 9 ? "9+" : badge}

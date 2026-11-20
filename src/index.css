@@ -794,3 +794,246 @@
     stroke-dasharray: none;
   }
 }
+
+/* ── r11:activity · bell, job pill, busy dot, success check, run timeline ──────────────────
+ * Same contract as above: the rest state is the visible one, motion only under no-preference. */
+@layer components {
+  /* Bell popover: native [popover] (light dismiss + Esc + top layer), pinned under the header. */
+  .bell-pop {
+    position: fixed;
+    inset: 3rem 1rem auto auto;
+    width: min(380px, calc(100vw - 2rem));
+    max-height: min(520px, calc(100vh - 4rem));
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border-strong));
+    border-radius: calc(var(--radius) + 4px);
+    background: hsl(var(--surface));
+    color: hsl(var(--foreground));
+    box-shadow:
+      var(--shadow-card-hover),
+      0 24px 56px -18px hsl(0 0% 0% / 0.75);
+  }
+  .bell-pop:not(:popover-open) {
+    display: none;
+  }
+  .bell-pop:popover-open {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Unread count: a small ember chip on the bell. */
+  .bell-count {
+    position: absolute;
+    top: 2px;
+    right: 1px;
+    display: flex;
+    height: 15px;
+    min-width: 15px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0 4px;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 9px;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px hsl(var(--surface));
+  }
+  /* A notification row: a short status bar on the left, unread rows a shade lighter. */
+  .line-row {
+    position: relative;
+  }
+  .line-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.7rem;
+    bottom: 0.7rem;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: hsl(var(--tone) / 0.75);
+  }
+  .line-row[data-unread] {
+    background: hsl(var(--foreground) / 0.035);
+  }
+
+  /* Job pill: a readout floating over the content when the job's page is not on screen. */
+  .job-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    border: 1px solid hsl(var(--border-strong));
+    border-radius: 999px;
+    background: hsl(var(--surface) / 0.94);
+    backdrop-filter: blur(8px);
+    padding: 0.4rem 0.9rem 0.4rem 0.45rem;
+    box-shadow:
+      var(--shadow-card-hover),
+      0 0 0 1px hsl(var(--tone) / 0.12),
+      0 14px 36px -14px hsl(0 0% 0% / 0.8),
+      0 0 24px -10px hsl(var(--tone) / 0.55);
+    transition:
+      border-color var(--motion-fast) var(--ease-out-expo),
+      box-shadow var(--motion-base) var(--ease-out-expo);
+  }
+  .job-pill:hover {
+    border-color: hsl(var(--tone) / 0.55);
+  }
+  /* Progress ring: the arc is the share done (--v 0..1); unknown total = a short arc that turns. */
+  .job-ring {
+    flex-shrink: 0;
+    rotate: -90deg;
+  }
+  .job-ring .track {
+    stroke: hsl(var(--foreground) / 0.1);
+  }
+  .job-ring .arc {
+    stroke: hsl(var(--tone));
+    stroke-dasharray: calc(var(--v, 0.22) * 100) 100;
+    transition: stroke-dasharray var(--motion-base) var(--ease-out-expo);
+  }
+  /* Success / failure mark: a path with pathLength=1 that draws itself. */
+  .check-draw path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+  /* Sidebar: the module that is working shows a small ember dot. */
+  .nav-busy {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 6px hsl(var(--primary) / 0.7);
+  }
+  /* Run timeline: a hairline rail with a node per run, lit in the run's tone. */
+  .run-rail {
+    position: relative;
+  }
+  .run-rail::before {
+    content: "";
+    position: absolute;
+    /* list padding 8 px + row padding 4 px + half the 35 px node */
+    left: 29px;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    width: 1px;
+    background: linear-gradient(hsl(var(--border-strong)), hsl(var(--border)) 70%, transparent);
+  }
+  .run-node {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 35px;
+    height: 35px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid hsl(var(--border-strong));
+    background: hsl(var(--card));
+    color: hsl(var(--muted-foreground));
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.05);
+  }
+  .run-node::after {
+    content: "";
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: hsl(var(--tone));
+    box-shadow: 0 0 0 2px hsl(var(--background));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bell-pop:popover-open {
+    animation: bell-pop-in var(--motion-fast) var(--ease-out-expo);
+  }
+  /* New line: the bell swings once, the count pops (both re-keyed by the count). */
+  .bell-ring {
+    transform-origin: 50% 2px;
+    animation: bell-ring 700ms var(--ease-out-expo);
+  }
+  .bell-count {
+    animation: count-pop var(--motion-base) var(--ease-out-expo);
+  }
+  .job-pill[data-state="in"] {
+    animation: pill-in var(--motion-base) var(--ease-out-expo);
+  }
+  .job-pill[data-state="out"] {
+    animation: fade-out-down var(--motion-fast) ease-in forwards;
+  }
+  .job-ring[data-indeterminate] {
+    animation: ring-turn 1.1s linear infinite;
+  }
+  .check-draw path {
+    animation: draw 420ms var(--ease-out-expo) 60ms backwards;
+  }
+  .nav-busy {
+    animation: busy-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes bell-pop-in {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+    scale: 0.98;
+  }
+}
+@keyframes bell-ring {
+  0% {
+    rotate: 0deg;
+  }
+  20% {
+    rotate: 14deg;
+  }
+  40% {
+    rotate: -10deg;
+  }
+  60% {
+    rotate: 6deg;
+  }
+  80% {
+    rotate: -3deg;
+  }
+}
+@keyframes count-pop {
+  from {
+    scale: 0.4;
+    opacity: 0;
+  }
+  60% {
+    scale: 1.15;
+  }
+}
+@keyframes pill-in {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.96;
+  }
+}
+@keyframes ring-turn {
+  to {
+    rotate: 270deg;
+  }
+}
+@keyframes busy-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 5px hsl(var(--primary) / 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Spinners everywhere stop turning (the icon stays: the disabled button still says "busy"). */
+  .animate-spin {
+    animation: none;
+  }
+}

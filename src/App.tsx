@@ -1,6 +1,7 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { LucideProvider, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { ActivityEffects } from "@/components/shell/activity";
 import { AdminGate } from "@/components/shell/admin-gate";
 import { AppShell, type Route } from "@/components/shell/app-shell";
 import { Button, TooltipProvider } from "@/components/ui/primitives";
@@ -8,6 +9,7 @@ import { Toaster, toast } from "@/components/ui/toast";
 import { backend, inTauri } from "@/lib/backend";
 import { boot } from "@/lib/boot";
 import { I18nProvider, useI18n } from "@/lib/i18n";
+import { setHere, startJobs } from "@/lib/jobs";
 import { LuliProvider } from "@/lib/luli";
 import { emitDrop, navigate, onNavigate, openOrphans } from "@/lib/nav";
 import { ActivityPage } from "@/pages/activity";
@@ -120,6 +122,10 @@ export default function App() {
     document.addEventListener("pointermove", move, { passive: true });
     return () => document.removeEventListener("pointermove", move);
   }, []);
+  // r11:activity: jobs and the bell listen from boot, so leaving a page never loses its progress.
+  useEffect(startJobs, []);
+  // Layout effect: before the new page's own effects start any job.
+  useLayoutEffect(() => setHere(route), [route]);
   useEffect(() => {
     backend.appInfo().then((i) => {
       if (i) {
@@ -204,6 +210,7 @@ export default function App() {
             </AppShell>
             {askAdmin ? <AdminGate route={route} onSkip={() => setAskAdmin(false)} /> : null}
             <ToasterI18n />
+            <ActivityEffects route={route} />
           </LucideProvider>
         </TooltipProvider>
       </LuliProvider>

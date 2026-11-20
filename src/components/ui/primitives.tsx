@@ -420,3 +420,102 @@ export function EmptyState({
     </div>
   );
 }
+
+/* ---------- r11:activity · job ring + done mark ---------- */
+/** Small progress ring: `value` 0..1 fills the arc; null = unknown total (a short arc that turns,
+ *  still under reduced motion). Color = the parent's `tone-*`. */
+export function ProgressRing({
+  value,
+  size = 22,
+  className,
+}: {
+  value: number | null;
+  size?: number;
+  className?: string;
+}) {
+  const v = value === null ? undefined : Math.min(1, Math.max(0, value));
+  return (
+    <svg
+      viewBox="0 0 36 36"
+      width={size}
+      height={size}
+      aria-hidden
+      className={cn("job-ring", className)}
+      data-indeterminate={v === undefined ? "" : undefined}
+      style={{ "--v": v } as CSSProperties}
+    >
+      <circle className="track" cx="18" cy="18" r="15.9155" fill="none" strokeWidth="3.2" />
+      <circle
+        className="arc"
+        cx="18"
+        cy="18"
+        r="15.9155"
+        fill="none"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        pathLength={100}
+      />
+    </svg>
+  );
+}
+
+/** Check (or cross) that draws itself once when a job ends; static under reduced motion. */
+export function DoneMark({
+  ok,
+  size = 22,
+  className,
+}: {
+  ok: boolean;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn("check-draw shrink-0", className)}
+    >
+      <circle cx="12" cy="12" r="10.4" strokeWidth="1.5" opacity="0.35" />
+      <path
+        d={ok ? "M7.2 12.4l3.2 3.2 6.4-6.8" : "M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8"}
+        strokeWidth="2.2"
+        pathLength={1}
+      />
+    </svg>
+  );
+}
+
+/** Inline outcome of a click: a turning ring while it runs, then a check that draws (or a cross).
+ *  Re-key it by the text so the mark draws again for the next result. */
+export function ActionNote({
+  state,
+  children,
+}: {
+  state: "working" | "ok" | "err";
+  children: ReactNode;
+}) {
+  return (
+    <p
+      role="status"
+      className={cn(
+        "flex items-center gap-2 text-xs",
+        state === "working" && "tone-accent text-muted-foreground",
+        state === "ok" && "text-success",
+        state === "err" && "text-destructive",
+      )}
+    >
+      {state === "working" ? (
+        <ProgressRing value={null} size={15} />
+      ) : (
+        <DoneMark ok={state === "ok"} size={16} />
+      )}
+      {children}
+    </p>
+  );
+}
