@@ -27,7 +27,7 @@ export const DEFAULT_MODELS: Record<Provider, string> = {
   anthropic: "claude-opus-5-5",
   openai: "gpt-5",
   gemini: "gemini-3.8-flash",
-  nvidia: "moonshotai/kimi-k2.6",
+  nvidia: "moonshotai/kimi-k3.1-pro",
 };
 
 /** Providers whose API offers server-side web search (NVIDIA's catalog does not). */
