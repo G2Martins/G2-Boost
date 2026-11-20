@@ -14,6 +14,7 @@ import { BiosGuideCard } from "@/components/bios-guide";
 import { CheckupTab } from "@/components/checkup";
 import { DiskHealthCard } from "@/components/disk-health";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { AnticheatPanel } from "@/components/games/anticheat-panel";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
@@ -439,6 +440,18 @@ export function MyPc({ elevated }: { elevated: boolean }) {
                     : "—"
                 }
               />
+              <MetricRow
+                label={t("mypc.fw.iommu")}
+                value={fw?.iommu == null ? t("mypc.fw.unknown") : yn(fw.iommu)}
+                ok={fw?.iommu ? true : undefined}
+              />
+              <MetricRow
+                label={t("mypc.fw.disk_style")}
+                value={
+                  fw?.system_gpt == null ? "—" : fw.system_gpt ? t("mypc.fw.gpt") : t("mypc.fw.mbr")
+                }
+                ok={fw?.system_gpt ?? undefined}
+              />
               <MetricRow label={t("mypc.fw.fast_startup")} value={fw ? yn(fw.fast_startup) : "—"} />
               <MetricRow label={t("mypc.fw.hibernation")} value={fw ? yn(fw.hibernation) : "—"} />
             </div>
@@ -503,7 +516,8 @@ export function MyPc({ elevated }: { elevated: boolean }) {
           </div>
         </Card>
 
-        <BiosGuideCard elevated={elevated} index={7} />
+        <AnticheatPanel compact elevated={elevated} index={7} />
+        <BiosGuideCard elevated={elevated} index={8} />
       </div>
     </LoadingScope>
   );
@@ -543,6 +557,9 @@ export function MyPcPage() {
                   "legacy_boot",
                   "secure_boot_off",
                   "tpm_missing",
+                  "anticheat_blocked",
+                  "iommu_off",
+                  "vuln_driver_blocklist_off",
                   "hdd_system",
                 ]}
                 asks={[

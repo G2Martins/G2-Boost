@@ -7,10 +7,10 @@ import { type BiosGuide, type BiosItemId, backend, inTauri } from "@/lib/backend
 import { type I18nKey, useI18n } from "@/lib/i18n";
 
 /** Items whose change can go wrong in a known way carry a `.warn` line. */
-const WARN: BiosItemId[] = ["csm", "xmp", "secure_boot", "bios_update"];
+export const BIOS_WARN: BiosItemId[] = ["csm", "xmp", "secure_boot", "bios_update"];
 
 /** The firmware's menu trail, as it reads on screen: one chip per level. */
-function MenuPath({ path }: { path: string }) {
+export function MenuPath({ path }: { path: string }) {
   const parts = path.split(" › ");
   return (
     <p className="mt-2 flex flex-wrap items-center gap-1 rounded-md border border-border bg-background/70 px-2.5 py-2 font-mono text-[11px] leading-none text-foreground/85">
@@ -28,10 +28,7 @@ function MenuPath({ path }: { path: string }) {
 /** "O que mudar na BIOS": checklist from the firmware findings + restart into the setup. */
 export function BiosGuideCard({ elevated, index }: { elevated: boolean; index: number }) {
   const { t } = useI18n();
-  const errorText = useErrorText();
   const [guide, setGuide] = useState<BiosGuide | null>(null);
-  const [confirm, setConfirm] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,44 +41,19 @@ export function BiosGuideCard({ elevated, index }: { elevated: boolean; index: n
 
   if (!inTauri) return null; // nothing to tell without the core
 
-  const reboot = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await backend.biosReboot();
-      setMsg(t("bios.reboot.started"));
-    } catch (e) {
-      const m = e instanceof Error ? e.message : String(e);
-      setMsg(m === "unsupported" ? t("bios.reboot.unsupported") : errorText(e));
-    } finally {
-      setBusy(false);
-      setConfirm(false);
-    }
-  };
-
   return (
     <Card className="animate-rise xl:col-span-2" style={rise(index)}>
       <CardTitle
         help={t("bios.help")}
         right={
           guide ? (
-            guide.uefi ? (
-              elevated ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => setConfirm(true)}
-                >
-                  <Power className="size-4" />
-                  {t("bios.reboot")}
-                </Button>
-              ) : (
-                <ElevateButton route="dashboard" tab="mypc" />
-              )
-            ) : (
-              <span className="text-xs text-muted-foreground">{t("bios.reboot.legacy")}</span>
-            )
+            <BiosRebootButton
+              uefi={guide.uefi}
+              elevated={elevated}
+              route="dashboard"
+              tab="mypc"
+              onMessage={setMsg}
+            />
           ) : null
         }
       >
@@ -128,7 +100,7 @@ export function BiosGuideCard({ elevated, index }: { elevated: boolean; index: n
                       {t(`bios.item.${it.id}.desc` as I18nKey)}
                     </p>
                     <MenuPath path={it.path} />
-                    {WARN.includes(it.id) ? (
+                    {BIOS_WARN.includes(it.id) ? (
                       <p className="mt-2 flex gap-1.5 text-[11px] leading-relaxed text-warning">
                         <TriangleAlert className="mt-px size-3.5 shrink-0" />
                         {t(`bios.item.${it.id}.warn` as I18nKey)}
@@ -148,7 +120,54 @@ export function BiosGuideCard({ elevated, index }: { elevated: boolean; index: n
           <Skeleton className="h-20 w-full" />
         </div>
       )}
+    </Card>
+  );
+}
 
+/** "Reiniciar na BIOS": UEFI only, admin only, after a confirmation that says it restarts now. */
+export function BiosRebootButton({
+  uefi,
+  elevated,
+  route,
+  tab,
+  onMessage,
+}: {
+  uefi: boolean;
+  elevated: boolean;
+  /** Where the elevated copy reopens. */
+  route: string;
+  tab?: string;
+  onMessage: (m: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const errorText = useErrorText();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const reboot = async () => {
+    setBusy(true);
+    onMessage(null);
+    try {
+      await backend.biosReboot();
+      onMessage(t("bios.reboot.started"));
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      onMessage(m === "unsupported" ? t("bios.reboot.unsupported") : errorText(e));
+    } finally {
+      setBusy(false);
+      setConfirm(false);
+    }
+  };
+
+  if (!uefi)
+    return <span className="text-xs text-muted-foreground">{t("bios.reboot.legacy")}</span>;
+  if (!elevated) return <ElevateButton route={route} tab={tab} />;
+  return (
+    <>
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => setConfirm(true)}>
+        <Power className="size-4" />
+        {t("bios.reboot")}
+      </Button>
       <Modal
         open={confirm}
         onClose={() => !busy && setConfirm(false)}
@@ -169,6 +188,6 @@ export function BiosGuideCard({ elevated, index }: { elevated: boolean; index: n
         <p>{t("bios.reboot.body")}</p>
         <p className="mt-2 text-muted-foreground">{t("bios.reboot.back")}</p>
       </Modal>
-    </Card>
+    </>
   );
 }

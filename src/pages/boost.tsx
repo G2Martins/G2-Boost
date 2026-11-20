@@ -14,6 +14,7 @@ import {
 } from "@/components/boost/tweak-kit";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
+import { HvciOffWarning } from "@/components/games/anticheat-panel";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
@@ -81,7 +82,7 @@ export function BoostPage() {
       <TabsContent value="tweaks">
         <PageBody className="px-0 pb-0">
           <LuliCard
-            findings={["hvci_on", "cpu_hot", "gpu_hot", "refresh_below_max"]}
+            findings={["hvci_on", "hvci_needed", "cpu_hot", "gpu_hot", "refresh_below_max"]}
             asks={[{ label: "luli.ask.boost.worth" }, { label: "luli.ask.boost.hurt" }]}
           />
           <TweaksTab elevated={elevated} />
@@ -183,8 +184,12 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<TweakCategory | "all">("all");
+  // r11:anticheat: games whose anti-cheat uses memory integrity; turning it off asks first.
+  const [vbsGames, setVbsGames] = useState<string[]>([]);
+  const [hvciAsk, setHvciAsk] = useState<Step | null>(null);
 
   useEffect(() => {
+    backend.anticheatReadiness().then((r) => r && setVbsGames(r.vbs_games));
     backend
       .recommendations()
       .then((r) => r && setRecs(Object.fromEntries(r.items.map((x) => [x.id, x]))));
@@ -415,11 +420,24 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
               busy={busy === tw.id || run !== null}
               error={errors[tw.id]}
               rec={recs[tw.id]}
-              onToggle={(on, level) => void toggle({ tw, on, level })}
+              onToggle={(on, level) =>
+                tw.id === "hvci_off" && on && vbsGames.length > 0
+                  ? setHvciAsk({ tw, on, level })
+                  : void toggle({ tw, on, level })
+              }
             />
           ))}
         </div>
       )}
+      <HvciOffWarning
+        games={vbsGames}
+        open={hvciAsk !== null}
+        onCancel={() => setHvciAsk(null)}
+        onConfirm={() => {
+          if (hvciAsk) void toggle(hvciAsk);
+          setHvciAsk(null);
+        }}
+      />
     </>
   );
 }
