@@ -67,6 +67,7 @@ use g2boost_core::activity;
 // r11:activity mod
 
 // r11:clean mod
+mod clean_cmds;
 
 // r11:anticheat mod
 
@@ -1449,6 +1450,11 @@ fn disk_scan_start(app: AppHandle, state: State<'_, DiskState>, root: String) ->
             Ok((tree, summary)) => {
                 *st.tree.lock().unwrap() = Some(Arc::new(tree));
                 *st.summary.lock().unwrap() = Some(summary.clone());
+                // r11:clean: a long scan lands in the bell (the user may have left the page).
+                if !summary.cancelled && summary.elapsed_ms >= 15_000 {
+                    let (bytes, files) = (summary.bytes.to_string(), summary.files.to_string());
+                    notify(&app, "disk", "activity.clean.scan_done", &[("bytes", &bytes), ("count", &files)], activity::Tone::Ok, Some("disk"));
+                }
                 let _ = app.emit("disk:done", summary);
             }
             Err(e) => {
@@ -2789,6 +2795,14 @@ pub fn run() {
             // r11:activity
 
             // r11:clean
+            clean_cmds::smart_analyze,
+            clean_cmds::smart_cancel,
+            clean_cmds::smart_preview,
+            clean_cmds::smart_confirm,
+            clean_cmds::smart_execute,
+            clean_cmds::clean_owners,
+            clean_cmds::clean_owner_paths,
+            clean_cmds::clean_app_exes,
 
             // r11:anticheat
 

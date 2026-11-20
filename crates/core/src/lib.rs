@@ -105,6 +105,7 @@ pub mod activity;
 // r11:activity
 
 // r11:clean
+pub mod smartclean;
 
 // r11:anticheat
 

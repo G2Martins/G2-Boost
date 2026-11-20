@@ -905,6 +905,15 @@ run them, tell the user to open G2 Boost > Manutenção (admin, confirmation).")
     // r11:activity
 
     // r11:clean
+    #[tool(description = "Smart cleanup plan, read-only (what the Limpeza screen shows after Analisar): three buckets with sizes in bytes. safe = catalog categories cleaned in one click (low risk, on by default); system = admin categories and Windows' own cleanup handlers (needs_admin when G2 Boost is not elevated); review = items a person should look at: opt-in or risky categories (Recycle Bin, shader cache, developer caches), big files untouched for 6+ months in the user's folders (big_old), folders no installed app owns (unowned), leftovers of removed apps, duplicates. extras = big items cleaning never touches (hiberfil, pagefile, games library on the system drive, restore points) and drive = the system drive's free/total bytes. No file paths. Takes 10 to 40 s. Cleaning is done by the user in the app (Limpeza › Analisar › Limpar) or with run_cleanup for safe categories; review items go through their own screens.")]
+    async fn get_cleanup_plan(&self) -> Result<String, String> {
+        blocking(|| {
+            let installed = apps::list(&settings::load().protected_apps);
+            let inp = g2boost_core::smartclean::Inputs { installed: Some(installed), dupes: None };
+            g2boost_core::smartclean::analyze(&inp, &std::sync::atomic::AtomicBool::new(false), |_| {}).for_mcp()
+        })
+        .await
+    }
 
     // r11:anticheat
 
