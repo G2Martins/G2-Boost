@@ -775,7 +775,7 @@ fn is_laptop(chassis: Option<u8>) -> bool {
 
 /* ---------------- disks ---------------- */
 
-struct Device(HANDLE);
+pub(crate) struct Device(HANDLE);
 
 impl Drop for Device {
     fn drop(&mut self) {
@@ -787,7 +787,7 @@ impl Drop for Device {
 }
 
 /// Open a device path with no access rights: enough for the metadata IOCTLs below, no admin.
-fn open_device(path: &str) -> Option<Device> {
+pub(crate) fn open_device(path: &str) -> Option<Device> {
     let w = wide(path);
     // SAFETY: valid path; 0 desired access.
     unsafe { CreateFileW(PCWSTR(w.as_ptr()), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, None, OPEN_EXISTING, FILE_FLAGS_AND_ATTRIBUTES(0), None) }
@@ -795,7 +795,7 @@ fn open_device(path: &str) -> Option<Device> {
         .map(Device)
 }
 
-fn ioctl(dev: &Device, code: u32, input: Option<&[u8]>, out: &mut [u8]) -> Option<usize> {
+pub(crate) fn ioctl(dev: &Device, code: u32, input: Option<&[u8]>, out: &mut [u8]) -> Option<usize> {
     let mut ret = 0u32;
     // SAFETY: buffers are valid for the sizes passed; synchronous call.
     unsafe {

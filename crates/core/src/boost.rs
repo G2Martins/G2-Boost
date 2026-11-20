@@ -366,7 +366,8 @@ const ADVERTISING_ID_OFF: &[RegOp] = &[op(
     Desired::Dword(1),
 )];
 /// Core Isolation / Memory Integrity. The only lever with a measured FPS gain (~5 %, Tom's
-/// Hardware) and the only one that lowers security. Beta, custom preset only, reboot.
+/// Hardware) and the only one that lowers security. Beta, custom preset only, reboot. Some
+/// anti-cheats use it (Vanguard's on-demand mode, FACEIT): the UI warns, naming the game.
 const HVCI_OFF: &[RegOp] = &[op(
     HKLM,
     r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
@@ -509,6 +510,11 @@ const ALT_SHIFT_OFF: &[RegOp] = &[
     op(HKCU, LANG_TOGGLE, "Hotkey", Desired::Str("3"), Desired::Str("1")),
 ];
 const NARRATOR_SHORTCUT_OFF: &[RegOp] = &[policy(HKCU, r"Software\Microsoft\Narrator\NoRoam", "WinEnterLaunchEnabled", 0)];
+/// Round 11: Store (packaged UWP) apps stop running background tasks while closed. Policy CSP
+/// `Privacy/LetAppsRunInBackground`, 2 = Force Deny; honored on Home too (registry policy, no
+/// gpedit needed), not a UCPD-protected key. Desktop programs (Win32), services and Gaming
+/// Services (Game Pass installs) are not affected. Deleting the value gives the choice back.
+const BACKGROUND_APPS_OFF: &[RegOp] = &[policy(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground", 2)];
 const CLASSIC_MENU_KEY: &str = r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}";
 
 const SUB_WIFI: GUID = GUID::from_u128(0x19cbb8fa_5279_450e_9fac_8a3d5fedd0c1);
@@ -554,7 +560,7 @@ const fn tw(id: &'static str, admin: bool, beta: bool, category: Category, kind:
 
 /* ---- gates: where a tweak means something ---- */
 
-fn build() -> u32 {
+pub(crate) fn build() -> u32 {
     match registry::read(HKLM, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber") {
         Ok(Value::Str(b)) => b.parse().unwrap_or(0),
         _ => 0,
@@ -661,6 +667,8 @@ pub const TWEAKS: &[Tweak] = &[
     tw("alt_shift_off", false, false, Gaming, Kind::Registry(ALT_SHIFT_OFF)),
     tw("narrator_shortcut_off", false, false, Gaming, Kind::Registry(NARRATOR_SHORTCUT_OFF)),
     tw("accessibility_shortcuts_off", false, false, Gaming, Kind::AccessKeys),
+    // Round 11: fewer background processes.
+    tw("background_apps_off", true, false, Performance, Kind::Registry(BACKGROUND_APPS_OFF)),
 ];
 
 pub fn find(id: &str) -> Result<&'static Tweak, BoostError> {

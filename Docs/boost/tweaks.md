@@ -1,6 +1,14 @@
 # PC Boost — tweaks, efeitos visuais, serviços, RAM
 
-**Última revisão:** 2026-10-25 (rodada 9: modelo novo, 34 ajustes de debloat e do Windows, busca/filtros/"Ver o que muda", presets só gerenciam os próprios membros, revert endurecido) · 2026-10-22 (tarefas WinSAT/diagnóstico/feedback, Spooler) · 2026-10-18 · Código: `crates/core/src/boost.rs`, `winfeature.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, `src/components/boost/tweak-kit.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
+**Última revisão:** 2026-11-20 (rodada 11: revisão de especialista, `background_apps_off`, aviso do `hvci_off` com jogo de anti-cheat, `network_latency`/`mmcss` fora da pontuação) · 2026-10-25 (rodada 9: modelo novo, 34 ajustes de debloat e do Windows, busca/filtros/"Ver o que muda", presets só gerenciam os próprios membros, revert endurecido) · 2026-10-22 (tarefas WinSAT/diagnóstico/feedback, Spooler) · 2026-10-18 · Código: `crates/core/src/boost.rs`, `winfeature.rs`, `visualfx.rs`, `registry.rs`, `startup.rs`, `procs.rs` · UI: `src/pages/boost.tsx`, `src/components/boost/tweak-kit.tsx`, catálogo de apresentação em `src/data/catalogs.ts`.
+
+## Rodada 11 (2026-11-20): revisão de especialista
+
+- **Ganho limitado dito no texto e fora da pontuação** (`recommend.rs`, motivo `preference`; continuam no preset Alto desempenho): `network_latency` (Nagle/ACK atrasado só afetam TCP; shooters competitivos falam UDP) e `mmcss` (a tarefa "Games" do MMCSS só eleva threads que se registram nela, e poucos jogos fazem isso).
+- **`hvci_off` × anti-cheat (decisão do dono: só avisar):** com jogo instalado cujo anti-cheat usa VBS/HVCI/IOMMU (`anticheat::Readiness.vbs_games`: Valorant, League of Legends, FACEIT), ligar o ajuste abre um modal citando o jogo; "Manter ligada" é o botão principal, "Desligar mesmo assim" segue. Não bloqueia. Detalhe em [anticheat.md](anticheat.md).
+- **Novo `background_apps_off`** (Desempenho, admin, Debloat › Recomendado, fora dos presets e da pontuação): política `HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy\LetAppsRunInBackground=2` (Policy CSP `Privacy/LetAppsRunInBackground`, Force Deny). Apps da Store (UWP) param as tarefas de fundo com a janela fechada; programas Win32, serviços e o Gaming Services (downloads do Game Pass) não mudam. Vale no Home (política por registro). Não é chave protegida pelo UCPD; se um dia for, `boost::apply` desfaz e devolve `blocked`. Desligar apaga o valor (backup do mecanismo normal). Custo: notificações/sincronização de apps da Store esperam a janela abrir.
+- **Mantidos por decisão do dono:** `input_lag` (FSO off) no Padrão; SysMain e Windows Search desligados pelo preset.
+- **Avaliado e recusado:** `SvcHostSplitThresholdInKB` (junta serviços em menos `svchost.exe`: o número de processos cai, CPU/RAM não, e um serviço que trava derruba os vizinhos).
 
 > Planos de energia e Gerenciador de tarefas (abas Energia e Processos) → [power-processes.md](power-processes.md). Página Debloat (níveis, IA do Windows, apps pré-instalados) → [debloat.md](debloat.md).
 
@@ -91,7 +99,7 @@ A UI calcula o preset ativo comparando o estado real (tweaks "indisponíveis" s�
 | `compat_telemetry_off` | CompatTelRunner/CEIP off | tarefas `\Microsoft\Windows\Application Experience\{Microsoft Compatibility Appraiser, … Exp, ProgramDataUpdater}` e `\…\Customer Experience Improvement Program\{Consolidator, UsbCeip}` via `IRegisteredTask::SetEnabled` (ausentes são ignoradas) | sim | Padrão + Alto | Privacidade |
 | `svc_dps` | DPS Disabled | SCM | sim | Personalizado | Desempenho |
 | `svc_geolocation` | lfsvc Disabled | SCM | sim | Personalizado | Privacidade |
-| `hvci_off` (beta) | Isolamento de Núcleo off | HKLM `DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity\Enabled=0` (reboot) | sim | Personalizado | Desempenho |
+| `hvci_off` (beta) | Isolamento de Núcleo off; com jogo de anti-cheat que usa VBS instalado, a UI avisa antes (rodada 11) | HKLM `DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity\Enabled=0` (reboot) | sim | Personalizado | Desempenho |
 
 **Mudanças de preset pela evidência** ([../references/windows-services-research.md](../references/windows-services-research.md)): `svc_xbox` saiu do Alto desempenho (serviços já Manual/parados → ganho nulo, efeitos reais no Game Pass); `svc_sysmain` continua no Padrão por decisão do dono, mas `recommend()` o tira da lista em HD mecânico. Cada tweak tem `category` (Desempenho / Privacidade / Aparência / Rede) e, no card, o motivo de "não recomendado neste PC" ([dashboard.md](dashboard.md)).
 

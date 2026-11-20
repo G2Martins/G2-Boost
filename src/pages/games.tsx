@@ -1,6 +1,7 @@
 import { Gamepad2, Plus, RefreshCw, Search, Square, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { AnticheatPanel } from "@/components/games/anticheat-panel";
 import { GameTweaksDialog, optionsOf } from "@/components/games/game-tweaks";
 import { GamePoster } from "@/components/games/poster";
 import { RoutePanel } from "@/components/games/route-panel";
@@ -431,8 +432,11 @@ export function GamesPage() {
           </div>
         ) : null}
 
+        {/* ---------------- r11:anticheat: firmware and Windows checks per game ---------------- */}
+        <AnticheatPanel elevated={elevated} index={2} />
+
         {/* ---------------- what Game Mode does ---------------- */}
-        <Card className="animate-rise" style={rise(2)}>
+        <Card className="animate-rise" style={rise(3)}>
           <CardTitle help={t("games.options.help")}>{t("games.options.title")}</CardTitle>
           <ul className="divide-y divide-border">
             {OPTIONS.map((k) => (

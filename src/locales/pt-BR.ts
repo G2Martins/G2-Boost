@@ -245,9 +245,9 @@ export const ptBR = {
   "boost.tweak.svc_geolocation.warn": "algum app precisa da sua localização.",
   "boost.tweak.hvci_off": "Desligar Isolamento de Núcleo (integridade de memória)",
   "boost.tweak.hvci_off.desc":
-    "Desliga a integridade de memória. É o único ajuste desta lista com ganho de FPS medido em testes independentes (cerca de 5 % em alguns jogos), mas reduz a proteção contra drivers maliciosos. Vale depois de reiniciar.",
+    "Desliga a integridade de memória. É o único ajuste desta lista com ganho de FPS medido em testes independentes (cerca de 5 % em alguns jogos), mas reduz a proteção contra drivers maliciosos. Alguns anti-cheats usam a integridade de memória (o modo sob demanda do Vanguard, o FACEIT): o G2 Boost avisa antes se um desses jogos estiver instalado. Vale depois de reiniciar.",
   "boost.tweak.hvci_off.warn":
-    "você quer manter a proteção do Windows contra malware de kernel (recomendação padrão da Microsoft).",
+    "você joga com anti-cheat que usa a integridade de memória ou quer manter a proteção do Windows contra malware de kernel (recomendação padrão da Microsoft).",
   "settings.restore_before_preset": "Ponto de restauração antes de preset",
   "settings.restore_before_preset.hint":
     "Cria um ponto de restauração do Windows (SRSetRestorePoint) antes de aplicar Padrão / Alto desempenho ou Boost agora. Exige administrador; o Windows limita a 1 por 24 h.",
@@ -1473,7 +1473,7 @@ export const ptBR = {
   "boost.tweak.hags.warn": "a GPU é anterior a 2018 ou o driver apresenta travamentos.",
   "boost.tweak.mmcss": "Prioridade multimídia para jogos",
   "boost.tweak.mmcss.desc":
-    "Faz o agendador multimídia do Windows priorizar jogos (processador, placa de vídeo e disco) e reservar menos tempo para tarefas de fundo: 10 % em vez de 20 %.",
+    "Faz o agendador multimídia do Windows priorizar jogos (processador, placa de vídeo e disco) e reservar menos tempo para tarefas de fundo: 10 % em vez de 20 %. O ganho é pequeno: a prioridade só vale para programas que se registram no agendador multimídia, e poucos jogos fazem isso.",
   "boost.tweak.mmcss.warn": "você grava ou faz streaming enquanto joga e o encoder perde quadros.",
   "boost.tweak.network_latency": "Latência de rede para jogos",
   "boost.tweak.network_latency.desc":
@@ -4159,6 +4159,121 @@ export const ptBR = {
   // ── r11:clean · limpeza inteligente, disco e sinergia (agente A2) ──
 
   // ── r11:anticheat · prontidão para anti-cheat, BIOS, revisão dos ajustes (agente A3) ──
+  "anticheat.title": "Pronto para jogar com anti-cheat",
+  "anticheat.help":
+    "Alguns anti-cheats só abrem com TPM 2.0 e Secure Boot ligados na BIOS. O Windows não consegue mudar isso sozinho: o G2 Boost mostra o que falta, o caminho no menu da sua placa, reinicia direto na BIOS e confere de novo depois do boot.",
+  "anticheat.app_only":
+    "A conferência roda no app instalado: pelo navegador não dá para ler a BIOS nem o Windows.",
+  "anticheat.compact.title": "Requisitos de anti-cheat",
+  "anticheat.compact.hint": "Passo a passo por jogo em Jogos.",
+  "anticheat.lead.installed":
+    "Jogos instalados com anti-cheat que confere a BIOS e o Windows: {count}.",
+  "anticheat.lead.none":
+    "Nenhum destes jogos está instalado. Veja o que cada anti-cheat pede e como este PC está.",
+  "anticheat.ready": "Pronto",
+  "anticheat.missing": "Falta {count}",
+  "anticheat.unknown": "Não dá para saber",
+  "anticheat.required": "Exige",
+  "anticheat.recommended": "Usa se tiver",
+  "anticheat.on_demand": "Modo sob demanda",
+  "anticheat.on_demand.ok": "possível neste PC",
+  "anticheat.on_demand.no": "ainda não",
+  "anticheat.on_demand.hint":
+    "No modo sob demanda o driver do anti-cheat só carrega com o jogo aberto, não desde o boot.",
+  "anticheat.steps.title": "O que fazer, nesta ordem",
+  "anticheat.steps.none": "Nada a mudar: tudo o que esses anti-cheats pedem está ligado.",
+  "anticheat.steps.bios": "Na BIOS",
+  "anticheat.steps.windows": "No Windows",
+  "anticheat.note":
+    "Secure Boot, TPM e IOMMU só mudam na BIOS: por segurança o Windows não mexe neles. Depois de reiniciar, o G2 Boost confere sozinho e avisa o que mudou.",
+  "anticheat.recheck": "Conferir de novo",
+  "anticheat.state.ok": "ligado",
+  "anticheat.state.missing": "falta",
+  "anticheat.state.unknown": "não dá para saber",
+  "anticheat.check.uefi": "UEFI sem CSM",
+  "anticheat.check.gpt": "Disco GPT",
+  "anticheat.check.secure_boot": "Secure Boot",
+  "anticheat.check.tpm2": "TPM 2.0",
+  "anticheat.check.vbs": "VBS",
+  "anticheat.check.hvci": "Integridade de memória",
+  "anticheat.check.iommu": "IOMMU",
+  "anticheat.check.win11": "Windows 11",
+  "anticheat.check.win25h2": "Windows 11 25H2",
+  "anticheat.check.blocklist": "Bloqueio de drivers vulneráveis",
+  "anticheat.title.valorant": "Valorant",
+  "anticheat.title.lol": "League of Legends",
+  "anticheat.title.faceit": "FACEIT (CS2)",
+  "anticheat.title.bf6": "Battlefield 6",
+  "anticheat.title.cod": "Call of Duty: Black Ops 7 e Warzone",
+  "anticheat.ac.vanguard": "Riot Vanguard",
+  "anticheat.ac.faceit": "FACEIT Anti-Cheat",
+  "anticheat.ac.javelin": "EA Javelin",
+  "anticheat.ac.ricochet": "Ricochet",
+  "anticheat.fix.mbr2gpt":
+    "Converta o disco do sistema de MBR para GPT com a ferramenta MBR2GPT do Windows antes de desligar o CSM. Sem isso o Windows não inicia depois da mudança. Faça backup antes.",
+  "anticheat.fix.core_isolation":
+    "Segurança do Windows › Segurança do dispositivo › Isolamento de núcleo: ligue Integridade de memória e reinicie. Se desligou pelo PC Boost, desligue o ajuste lá.",
+  "anticheat.fix.update":
+    "Configurações › Windows Update: instale a versão mais nova do Windows 11.",
+  "anticheat.fix.blocklist":
+    "Segurança do Windows › Segurança do dispositivo › Isolamento de núcleo: ligue a Lista de bloqueio de drivers vulneráveis da Microsoft.",
+  "anticheat.hvci.title": "Desligar a integridade de memória?",
+  "anticheat.hvci.body":
+    "{games} usa a integridade de memória no anti-cheat. Sem ela o jogo pode pedir para ligar de novo, não abrir no modo sob demanda ou perder proteções do anti-cheat.",
+  "anticheat.hvci.trade":
+    "O ganho é de cerca de 5 % de FPS em alguns jogos. Dá para voltar atrás no mesmo cartão, com reinício.",
+  "anticheat.hvci.keep": "Manter ligada",
+  "anticheat.hvci.confirm": "Desligar mesmo assim",
+  "anticheat.notify.uefi.on": "O PC agora inicia em UEFI, sem CSM",
+  "anticheat.notify.uefi.off":
+    "O PC voltou a iniciar no modo legado (CSM): assim o Secure Boot não funciona",
+  "anticheat.notify.gpt.on": "O disco do sistema agora é GPT",
+  "anticheat.notify.gpt.off": "O disco do sistema agora aparece como MBR",
+  "anticheat.notify.secure_boot.on": "Secure Boot ligado desde o último boot",
+  "anticheat.notify.secure_boot.off":
+    "Secure Boot desligado desde o último boot: jogos com anti-cheat podem não abrir",
+  "anticheat.notify.tpm2.on": "TPM 2.0 ativo desde o último boot",
+  "anticheat.notify.tpm2.off":
+    "O TPM 2.0 sumiu: atualizar ou resetar a BIOS costuma desligar o fTPM ou o PTT",
+  "anticheat.notify.vbs.on": "Segurança baseada em virtualização (VBS) ligada",
+  "anticheat.notify.vbs.off": "Segurança baseada em virtualização (VBS) desligada",
+  "anticheat.notify.hvci.on": "Integridade de memória ligada",
+  "anticheat.notify.hvci.off": "Integridade de memória desligada",
+  "anticheat.notify.iommu.on": "IOMMU (VT-d / AMD-Vi) ligado na BIOS",
+  "anticheat.notify.iommu.off": "IOMMU (VT-d / AMD-Vi) desligado na BIOS",
+  "anticheat.notify.win11.on": "Windows 11 instalado",
+  "anticheat.notify.win11.off": "Este PC não está mais no Windows 11",
+  "anticheat.notify.win25h2.on":
+    "Windows atualizado para o 25H2: o modo sob demanda do Vanguard fica possível com o resto ligado",
+  "anticheat.notify.win25h2.off": "O Windows voltou para uma versão anterior ao 25H2",
+  "anticheat.notify.blocklist.on": "Bloqueio de drivers vulneráveis ligado",
+  "anticheat.notify.blocklist.off": "Bloqueio de drivers vulneráveis desligado",
+  "anticheat.notify.ready": "{game} pronto: os requisitos do anti-cheat estão ligados",
+  "anticheat.notify.blocked": "{game} pode não abrir: falta um requisito do anti-cheat",
+  "bios.item.iommu": "Ligar o IOMMU (VT-d na Intel, AMD-Vi na AMD)",
+  "bios.item.iommu.desc":
+    "Protege a memória contra acesso direto de dispositivos (DMA). Alguns anti-cheats usam: o modo sob demanda do Vanguard exige, o FACEIT lista como proteção. Não muda o FPS.",
+  "mypc.fw.iommu": "IOMMU (VT-d / AMD-Vi)",
+  "mypc.fw.disk_style": "Partição do disco do sistema",
+  "mypc.fw.gpt": "GPT",
+  "mypc.fw.mbr": "MBR",
+  "advisor.hvci_needed.title": "Integridade de memória ligada: {game} usa",
+  "advisor.hvci_needed.body":
+    "O anti-cheat de {game} usa a integridade de memória (VBS). Mantenha ligada: desligar ganha cerca de 5 % de FPS em alguns jogos, mas o jogo pode pedir para ligar de novo ou perder o modo sob demanda.",
+  "advisor.anticheat_blocked.title": "{game} pode não abrir neste PC",
+  "advisor.anticheat_blocked.body":
+    "Requisitos do anti-cheat faltando: {count} (como Secure Boot ou TPM 2.0). O passo a passo para a sua placa está em Jogos › Pronto para jogar com anti-cheat.",
+  "advisor.iommu_off.title": "IOMMU desligado na BIOS",
+  "advisor.iommu_off.body":
+    "O anti-cheat de {game} usa o IOMMU (VT-d na Intel, AMD-Vi na AMD). Ligue na BIOS: o caminho para a sua placa está em Jogos › Pronto para jogar com anti-cheat.",
+  "advisor.vuln_driver_blocklist_off.title": "Bloqueio de drivers vulneráveis desligado",
+  "advisor.vuln_driver_blocklist_off.body":
+    "A lista da Microsoft impede que drivers com falhas conhecidas carreguem, um truque comum de malware e de cheats. Ligue em Segurança do Windows › Segurança do dispositivo › Isolamento de núcleo.",
+  "boost.tweak.background_apps_off": "Apps da Loja sem rodar em segundo plano",
+  "boost.tweak.background_apps_off.desc":
+    "Os apps da Microsoft Store param de rodar tarefas de fundo enquanto estão fechados. Programas comuns, serviços e os downloads do Game Pass continuam iguais. São menos processos parados na memória; o ganho de FPS é pequeno.",
+  "boost.tweak.background_apps_off.warn":
+    "você depende de notificações ou sincronização de apps da Loja (como WhatsApp, Telefone ou Clima) com a janela fechada.",
 
   // ── r11:luli · conexões, skills, mapa de MCP (agente A4) ──
 

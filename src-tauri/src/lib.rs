@@ -69,6 +69,7 @@ use g2boost_core::activity;
 // r11:clean mod
 
 // r11:anticheat mod
+mod anticheat_cmds;
 
 // r11:luli mod
 
@@ -2516,6 +2517,7 @@ pub fn run() {
             // r11:clean setup
 
             // r11:anticheat setup
+            anticheat_cmds::setup(app.handle());
 
             // r11:luli setup
 
@@ -2791,6 +2793,7 @@ pub fn run() {
             // r11:clean
 
             // r11:anticheat
+            anticheat_cmds::anticheat_readiness,
 
             // r11:luli
 

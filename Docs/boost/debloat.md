@@ -1,6 +1,6 @@
 # Debloat: o que o Windows trouxe sem você pedir
 
-**Última revisão:** 2026-10-25 (rodada 9: página nova) · Código: `crates/core/src/boost.rs` (ajustes), `winfeature.rs` (recurso Recall pela DismApi), `debloat.rs` (apps pré-instalados), `recommend.rs`; shell `src-tauri/src/tweaks_cmds.rs`; UI `src/pages/debloat.tsx`, `src/components/boost/tweak-kit.tsx`, níveis em `src/data/catalogs.ts` · Fontes de cada chave: [../references/debloat-sources.md](../references/debloat-sources.md) · Mecânica de backup/revert: [tweaks.md](tweaks.md).
+**Última revisão:** 2026-11-20 (rodada 11: `background_apps_off` no Recomendado) · 2026-10-25 (rodada 9: página nova) · Código: `crates/core/src/boost.rs` (ajustes), `winfeature.rs` (recurso Recall pela DismApi), `debloat.rs` (apps pré-instalados), `recommend.rs`; shell `src-tauri/src/tweaks_cmds.rs`; UI `src/pages/debloat.tsx`, `src/components/boost/tweak-kit.tsx`, níveis em `src/data/catalogs.ts` · Fontes de cada chave: [../references/debloat-sources.md](../references/debloat-sources.md) · Mecânica de backup/revert: [tweaks.md](tweaks.md).
 
 Rota `debloat`. Uma linha diz o que é (telemetria, anúncios, IA e apps de brinde) e o resto é um livro-razão: tudo com prévia do que muda, backup antes e desfazer item a item. Nada aqui mexe em Windows Update, Defender, firewall, UAC ou Prefetch (teste `nothing_forbidden_in_the_catalog`).
 
@@ -21,7 +21,7 @@ Estado "Desconhecido (precisa de admin)" = `status: unavailable` + `detail: need
 | Nível | Itens |
 |---|---|
 | Essencial | `tips`, `widgets_off`, `search_highlights_off`, `silent_apps_off`, `advertising_id_off`, `edge_background_off`, `teams_chat_off`, `consumer_features_off`, `account_notifications_off` |
-| Recomendado | `compat_telemetry_off`, `feedback_tasks_off`, `widgets_policy_off`, `telemetry_min`, `diagtrack_manual`, `copilot_off`, `recall_off`, `click_to_do_off`, `paint_ai_off`, `notepad_ai_off`, `edge_ai_off`, `delivery_p2p_off`, `start_web_search_off`, `spotlight_off`, `office_telemetry_off`, `nvidia_telemetry_off` |
+| Recomendado | `compat_telemetry_off`, `feedback_tasks_off`, `widgets_policy_off`, `telemetry_min`, `diagtrack_manual`, `copilot_off`, `recall_off`, `click_to_do_off`, `paint_ai_off`, `notepad_ai_off`, `edge_ai_off`, `delivery_p2p_off`, `start_web_search_off`, `spotlight_off`, `office_telemetry_off`, `nvidia_telemetry_off`, `background_apps_off` (rodada 11, [tweaks.md](tweaks.md)) |
 | Avançado | `svc_telemetry`, `svc_geolocation`, `recall_feature_off`, `error_reporting_off` |
 
 O nível mora no catálogo da UI (`level`); a mecânica, no core. Os mesmos ids aparecem no PC Boost › Ajustes de sistema (com busca e filtros) e servem à página de Perfis (conjunto de IA, teclado).

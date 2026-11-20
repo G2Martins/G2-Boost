@@ -150,6 +150,8 @@ pub fn build_with(profile: &Profile, sample: Option<Sample>) -> Value {
             "unavailable: G2 Boost installs no kernel driver; it reads HWiNFO (shared memory) or LibreHardwareMonitor when the user runs one"
         },
         "firmware": env.firmware,
+        // r11:anticheat: requirement states + installed game names only.
+        "anticheat": env.anticheat.as_ref().map(crate::anticheat::for_ai),
         "startup_items": startup_items(),
         "top_processes": procs::top(Duration::from_millis(500), 12),
         "advisor": report,
@@ -167,7 +169,7 @@ mod tests {
     fn pack_has_no_computer_name_and_core_sections() {
         let v = build(None);
         let o = v.as_object().unwrap();
-        for k in ["profile", "advisor", "tweaks", "optimization_score", "steam_games", "winsat", "firmware", "startup_items", "top_processes"] {
+        for k in ["profile", "advisor", "tweaks", "optimization_score", "steam_games", "winsat", "firmware", "anticheat", "startup_items", "top_processes"] {
             assert!(o.contains_key(k), "{k}");
         }
         assert!(o["profile"].get("computer").is_none());
