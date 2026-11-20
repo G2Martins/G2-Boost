@@ -116,6 +116,7 @@ pub mod mcpmap;
 pub mod skills;
 
 // r11:ram
+pub mod memory;
 
 
 /// Crate version, surfaced in the UI "about" footer.

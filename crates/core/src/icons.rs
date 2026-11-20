@@ -125,6 +125,95 @@ pub fn store_logo(declared: &Path) -> Option<Vec<u8>> {
     (bytes.starts_with(b"\x89PNG") && bytes.len() < 4 << 20).then_some(bytes)
 }
 
+/* ---------------- icons by path (the path may come from the webview: hostile) ---------------- */
+
+/// `C:\…` on a local drive (never UNC, `\\?\`/`\\.\` device paths or a mapped network drive):
+/// reading an icon must never reach a share, which would send the user's credentials.
+fn local_drive_path(s: &str) -> bool {
+    use windows::Win32::Storage::FileSystem::GetDriveTypeW;
+    let b = s.as_bytes();
+    if s.len() > 520 || b.len() < 4 || !b[0].is_ascii_alphabetic() || b[1] != b':' || b[2] != b'\\' || s.contains('/') {
+        return false;
+    }
+    let root = wide(&s[..3]);
+    // SAFETY: NUL-terminated root path; 4 = DRIVE_REMOTE, 1 = DRIVE_NO_ROOT_DIR.
+    let kind = unsafe { GetDriveTypeW(PCWSTR(root.as_ptr())) };
+    kind != 4 && kind != 1
+}
+
+fn reparse(md: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    md.file_attributes() & 0x400 != 0
+}
+
+/// A local `.exe` that is a plain file (a symlink or other reparse point is refused: it could
+/// lead anywhere, a share included).
+pub fn local_exe(path: &str) -> Option<PathBuf> {
+    if !local_drive_path(path) || !path.to_ascii_lowercase().ends_with(".exe") {
+        return None;
+    }
+    let md = std::fs::symlink_metadata(path).ok()?;
+    (md.is_file() && !reparse(&md)).then(|| PathBuf::from(path))
+}
+
+/// Helpers whose icon says nothing about the app (uninstallers, updaters, crash reporters).
+fn main_exe(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    n.ends_with(".exe")
+        && !["unins", "uninst", "crash", "setup", "updater", "update.exe", "helper", "elevat"].iter().any(|k| n.contains(k))
+}
+
+/// The biggest program inside `dir`, three levels down at most and a few thousand entries, never
+/// through a junction or symlink: the icon of a leftover or orphan folder.
+pub fn largest_exe(dir: &Path) -> Option<PathBuf> {
+    let md = std::fs::symlink_metadata(dir).ok()?;
+    if !md.is_dir() || reparse(&md) || !local_drive_path(&dir.to_string_lossy()) {
+        return None;
+    }
+    let mut best: Option<(u64, PathBuf)> = None;
+    let (mut stack, mut seen) = (vec![(dir.to_path_buf(), 0u8)], 0usize);
+    while let Some((d, depth)) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            seen += 1;
+            if seen > 4000 {
+                return best.map(|b| b.1); // ponytail: a huge folder gets the best of what was seen
+            }
+            // DirEntry metadata on Windows is the link's own (never followed).
+            let Ok(md) = e.metadata() else {
+                continue;
+            };
+            if reparse(&md) {
+                continue;
+            }
+            if md.is_dir() {
+                if depth < 3 {
+                    stack.push((e.path(), depth + 1));
+                }
+            } else if main_exe(&e.file_name().to_string_lossy()) && best.as_ref().is_none_or(|b| md.len() > b.0) {
+                best = Some((md.len(), e.path()));
+            }
+        }
+    }
+    best.map(|b| b.1)
+}
+
+/// `…\WindowsApps\<package full name>\…` → the package full name.
+fn package_of(path: &str) -> Option<&str> {
+    let i = path.to_ascii_lowercase().find(r"\windowsapps\")? + r"\windowsapps\".len();
+    path[i..].split('\\').next().filter(|s| !s.is_empty())
+}
+
+/// A program's icon as a data URL: its own icon resource, or its Store package logo when the
+/// program lives in `WindowsApps` and has none. `None` for anything that is not a local exe.
+pub fn exe_data_url(path: &str) -> Option<String> {
+    let p = local_exe(path)?;
+    let png = png_from_resource(&p, 0).or_else(|| package_of(path).and_then(crate::apps::package_logo))?;
+    Some(data_url(&png))
+}
+
 /// `data:image/png;base64,…`
 pub fn data_url(png: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -165,5 +254,55 @@ mod tests {
         let big = png_sized(&PathBuf::from(win).join("explorer.exe"), 256).expect("big explorer icon");
         assert!(big.starts_with(b"\x89PNG\r\n\x1a\n") && big.len() > png.len(), "256 px is bigger than 32 px");
         assert!(png_sized(Path::new(r"C:\nope\x.exe"), 256).is_none());
+    }
+
+    #[test]
+    fn exe_paths_from_outside_are_local_files_only() {
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let explorer = format!(r"{win}\explorer.exe");
+        assert!(local_exe(&explorer).is_some());
+        assert!(exe_data_url(&explorer).is_some_and(|u| u.starts_with("data:image/png;base64,")));
+        for bad in [
+            r"\\server\share\app.exe",
+            r"\\?\C:\Windows\explorer.exe",
+            r"\\.\C:\Windows\explorer.exe",
+            "//server/share/app.exe",
+            "explorer.exe",
+            r"C:\Windows\win.ini",
+            r"C:/Windows/explorer.exe",
+            r"C:\nope\nope.exe",
+            &win,
+        ] {
+            assert!(local_exe(bad).is_none(), "{bad}");
+            assert!(exe_data_url(bad).is_none(), "{bad}");
+        }
+        assert_eq!(package_of(r"C:\Program Files\WindowsApps\Foo.Bar_1.0.0.0_x64__abc\app\x.exe"), Some("Foo.Bar_1.0.0.0_x64__abc"));
+        assert_eq!(package_of(r"C:\Program Files\App\x.exe"), None);
+    }
+
+    /// Sandbox folder: the biggest real program wins; uninstallers, junctions and symlinks never do.
+    #[test]
+    fn largest_exe_never_crosses_a_link() {
+        let root = std::env::temp_dir().join(format!("g2boost-icons-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (app, outside) = (root.join("App"), root.join("Outside"));
+        for d in [app.join(r"bin\x64"), app.join(r"a\b\c\d"), outside.clone()] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+        std::fs::write(app.join("small.exe"), [0u8; 10]).unwrap();
+        std::fs::write(app.join(r"bin\x64\game.exe"), [0u8; 200]).unwrap();
+        std::fs::write(app.join("unins000.exe"), [0u8; 5000]).unwrap();
+        std::fs::write(app.join(r"a\b\c\d\deep.exe"), [0u8; 9000]).unwrap(); // past the depth limit
+        std::fs::write(outside.join("huge.exe"), [0u8; 20000]).unwrap();
+        crate::cleanup::tests::make_junction(&app.join("linked"), &outside);
+        // A file symlink needs a privilege (or developer mode); checked when it can be made.
+        let sym = std::os::windows::fs::symlink_file(outside.join("huge.exe"), app.join("sym.exe")).is_ok();
+        assert_eq!(largest_exe(&app), Some(app.join(r"bin\x64\game.exe")));
+        assert_eq!(largest_exe(&app.join("linked")), None, "the junction itself is never walked");
+        if sym {
+            assert!(local_exe(&app.join("sym.exe").to_string_lossy()).is_none(), "a symlinked exe is refused");
+        }
+        assert!(largest_exe(Path::new(r"\\server\share")).is_none());
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

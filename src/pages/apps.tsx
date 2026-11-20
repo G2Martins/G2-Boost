@@ -15,12 +15,13 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { InstallTab } from "@/components/apps/install-tab";
 import { UpdatesTab } from "@/components/apps/updates-tab";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
+import { ExeIcon, IconTile, useIcon } from "@/components/ui/exe-icon";
 import {
   Badge,
   Button,
@@ -35,6 +36,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/primitives";
+import { toast } from "@/components/ui/toast";
 import {
   type AppEntry,
   backend,
@@ -48,6 +50,7 @@ import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { sizeText, usePageData } from "@/lib/luli";
 import { APPS_REMOVED, onDrop, onOpenOrphans, takeDrop, takeOpenOrphans } from "@/lib/nav";
+import { groupLeftovers, type LeftoverGroup, staleBigApps } from "@/lib/ram-apps";
 import { cn, formatBytes } from "@/lib/utils";
 
 const KIND_ICON = {
@@ -152,35 +155,24 @@ export function AppsPage() {
   );
 }
 
-/** The app's own icon (extracted natively, PNG); its initial on a tinted tile until it loads. */
-function AppIcon({ app, size = "size-8" }: { app: AppEntry; size?: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    backend.appsIcon(app.id).then((s) => alive && setSrc(s));
-    return () => {
-      alive = false;
-    };
-  }, [app.id]);
-  return src ? (
-    <img
-      src={src}
-      alt=""
-      aria-hidden
-      className={cn(size, "shrink-0 object-contain")}
-      draggable={false}
-    />
-  ) : (
-    <span
-      aria-hidden
-      className={cn(
-        size,
-        "flex shrink-0 items-center justify-center rounded-md bg-foreground/6 font-display text-[13px] font-semibold text-muted-foreground",
-      )}
-    >
-      {app.name.slice(0, 1).toUpperCase()}
-    </span>
+/** The app's own icon (extracted natively, PNG; kept by the core so it survives the uninstall),
+ *  else the biggest program left in its folder, else its initial on a tinted tile. */
+function AppIcon({
+  id,
+  name,
+  size = "size-8",
+  fallbackExe,
+}: {
+  id: string;
+  name: string;
+  size?: string;
+  fallbackExe?: string | null;
+}) {
+  const own = useIcon(`app:${id}`, () => backend.appsIcon(id));
+  const left = useIcon(!own && fallbackExe ? `exe:${fallbackExe.toLowerCase()}` : null, () =>
+    backend.exeIcon(fallbackExe ?? ""),
   );
+  return <IconTile src={own ?? left} name={name} className={cn(size, "rounded-md text-[13px]")} />;
 }
 
 function fmtDate(d: string | null, locale: string) {
@@ -284,6 +276,8 @@ function InstalledTab({
     return u ? Math.floor((Date.now() / 1000 - u) / 86_400) : null;
   };
   const app = apps?.find((a) => a.id === selected) ?? null;
+  // Not opened in 90+ days and 500 MB+: only with a real last-use date (no data, no suggestion).
+  const stale = useMemo(() => staleBigApps(apps ?? [], usage, Date.now() / 1000), [apps, usage]);
 
   const uninstall = async (a: AppEntry) => {
     setAsk(null);
@@ -368,6 +362,45 @@ function InstalledTab({
         {msg ? <p className="w-full text-xs text-foreground/90">{msg}</p> : null}
       </Card>
 
+      {stale.length > 0 ? (
+        <Card className="animate-rise" style={rise(1)}>
+          <CardTitle help={t("apps.stale.help")}>
+            {t("apps.stale.title")}
+            <Badge tone="neutral">{stale.length}</Badge>
+          </CardTitle>
+          <ul className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+            {stale.slice(0, 6).map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center gap-3 rounded-md border border-border px-3 py-2"
+              >
+                <AppIcon id={a.id} name={a.name} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{a.name}</span>
+                  <span className="num block text-[11px] text-muted-foreground">
+                    {t("apps.stale.row", {
+                      size: formatBytes(a.size_bytes ?? 0, locale),
+                      n: idleDays(a.id) ?? 0,
+                    })}
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={waiting !== null}
+                  onClick={() => {
+                    setSelected(a.id);
+                    setAsk(a);
+                  }}
+                >
+                  {t("apps.uninstall")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,420px)_1fr]">
         <Card className="animate-rise min-w-0 py-2" style={rise(1)}>
           {apps === null && inTauri
@@ -385,7 +418,7 @@ function InstalledTab({
                     a.id === selected ? "bg-foreground/7" : "hover:bg-foreground/4",
                   )}
                 >
-                  <AppIcon app={a} />
+                  <AppIcon id={a.id} name={a.name} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
                       <span className="truncate text-sm font-semibold">{a.name}</span>
@@ -417,7 +450,7 @@ function InstalledTab({
           {app ? (
             <Card className="animate-rise" style={rise(2)}>
               <div className="flex flex-wrap items-start gap-3">
-                <AppIcon app={app} size="size-12" />
+                <AppIcon id={app.id} name={app.name} size="size-12" />
                 <div className="min-w-0 flex-1">
                   <h3 className="font-display text-[17px] font-semibold tracking-wide">
                     {app.name}
@@ -557,13 +590,7 @@ function UndoButton() {
             n: rec.files.length + rec.keys.length,
           })}
           onClick={async () => {
-            try {
-              const o = await backend.appsUndo();
-              setMsg(t("apps.undo.done", { files: o.files, keys: o.keys, failed: o.failed }));
-            } catch (e) {
-              setMsg(errorText(e));
-            }
-            refresh();
+            setMsg(await undoLast(t, errorText));
           }}
         >
           <RotateCcw className="size-4" />
@@ -656,6 +683,7 @@ function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScan
                     selected?.id === o.app.id ? "bg-foreground/7" : "hover:bg-foreground/4",
                   )}
                 >
+                  <AppIcon id={o.app.id} name={o.app.name} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{o.app.name}</span>
                     <span className="block truncate text-[11px] text-muted-foreground">
@@ -731,7 +759,7 @@ function Companions({
       <ul className="space-y-2">
         {list.map((c) => (
           <li key={c.id} className="flex items-center gap-3">
-            <AppIcon app={c} />
+            <AppIcon id={c.id} name={c.name} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{c.name}</span>
               <span className="block truncate text-[11px] text-muted-foreground">
@@ -751,6 +779,18 @@ function Companions({
       </ul>
     </Card>
   );
+}
+
+/** Put the last removal back; every list listening to APPS_REMOVED looks again. */
+async function undoLast(t: ReturnType<typeof useI18n>["t"], errorText: (e: unknown) => string) {
+  try {
+    const o = await backend.appsUndo();
+    return t("apps.undo.done", { files: o.files, keys: o.keys, failed: o.failed });
+  } catch (e) {
+    return errorText(e);
+  } finally {
+    window.dispatchEvent(new Event(APPS_REMOVED));
+  }
 }
 
 function LeftoversPanel({
@@ -773,8 +813,16 @@ function LeftoversPanel({
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A removal or an undo anywhere: look again (what is left, or what came back).
+  const [again, setAgain] = useState(0);
+  useEffect(() => {
+    const bump = () => setAgain((n) => n + 1);
+    window.addEventListener(APPS_REMOVED, bump);
+    return () => window.removeEventListener(APPS_REMOVED, bump);
+  }, []);
+  const sweep = appId === SWEEP_ID;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `recheck` re-runs the search after an uninstall
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `recheck`/`again` re-run the search
   useEffect(() => {
     let alive = true;
     setItems(null);
@@ -787,15 +835,22 @@ function LeftoversPanel({
     return () => {
       alive = false;
     };
-  }, [appId, recheck]);
+  }, [appId, recheck, again]);
 
+  const groups = useMemo(
+    () => groupLeftovers(items ?? [], sweep, appName),
+    [items, sweep, appName],
+  );
   const chosen = (items ?? []).filter((x) => picked.has(x.id));
   const bytes = chosen.reduce((s, x) => s + x.bytes, 0);
-  const toggle = (id: number) =>
+  const total = (items ?? []).reduce((s, x) => s + x.bytes, 0);
+  const toggle = (ids: number[], on: boolean) =>
     setPicked((cur) => {
       const n = new Set(cur);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+      for (const id of ids) {
+        if (on) n.add(id);
+        else n.delete(id);
+      }
       return n;
     });
 
@@ -807,15 +862,24 @@ function LeftoversPanel({
       const ids = chosen.map((x) => x.id);
       const token = await backend.appsConfirm(ids);
       const out: LeftoverOutcome = await backend.appsRemove(token.token, ids);
-      setMsg(
+      const text =
         t("apps.removed", {
           files: out.recycled,
           size: formatBytes(out.bytes, locale),
           keys: out.registry + out.services,
         }) +
-          (out.failed ? ` ${t("apps.removed_failed", { n: out.failed })}` : "") +
-          (out.needs_admin ? ` ${t("apps.removed_admin", { n: out.needs_admin })}` : ""),
-      );
+        (out.failed ? ` ${t("apps.removed_failed", { n: out.failed })}` : "") +
+        (out.needs_admin ? ` ${t("apps.removed_admin", { n: out.needs_admin })}` : "");
+      setMsg(text);
+      // The way back stays one click away, even after this list is gone.
+      toast(text, {
+        tone: "success",
+        duration: 12_000,
+        action: {
+          label: t("apps.undo.short"),
+          run: () => void undoLast(t, errorText).then((m) => toast(m)),
+        },
+      });
       onRemoved();
       window.dispatchEvent(new Event(APPS_REMOVED));
     } catch (e) {
@@ -829,7 +893,11 @@ function LeftoversPanel({
     <Card className="animate-rise min-w-0" style={rise(3)}>
       <CardTitle help={t("apps.leftovers.help")}>
         {t("apps.leftovers.title")}
-        {items ? <Badge tone="neutral">{items.length}</Badge> : null}
+        {items ? (
+          <Badge tone="neutral">
+            {t("apps.group.total", { n: items.length, size: formatBytes(total, locale) })}
+          </Badge>
+        ) : null}
       </CardTitle>
       {installed ? (
         <p className="-mt-2 mb-3 text-xs text-muted-foreground">{t("apps.leftovers.preview")}</p>
@@ -840,43 +908,27 @@ function LeftoversPanel({
       {items && items.length === 0 ? (
         <p className="py-6 text-center text-xs text-muted-foreground">{t("apps.leftovers.none")}</p>
       ) : null}
-      <ul className="divide-y divide-border/70">
-        {(items ?? []).map((x) => {
-          const Icon = KIND_ICON[x.kind];
-          return (
-            <li key={x.id} className="flex items-start gap-3 py-2.5">
-              <input
-                type="checkbox"
-                checked={picked.has(x.id)}
-                onChange={() => toggle(x.id)}
-                aria-label={x.path}
-                className="mt-1 size-4 accent-primary"
-              />
-              <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-mono text-[12px]" title={x.path}>
-                  {x.path}
-                </p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Badge tone={CONF_TONE[x.confidence]}>
-                    {t(`apps.conf.${x.confidence}` as I18nKey)}
-                  </Badge>
-                  {t(`apps.reason.${x.reason}` as I18nKey)}
-                  {x.idle_days !== undefined ? (
-                    <span>{t("apps.idle", { n: x.idle_days })}</span>
-                  ) : null}
-                  {x.precious ? <Badge tone="warning">{t("apps.precious")}</Badge> : null}
-                  {x.needs_admin ? (
-                    <Badge tone="neutral">{t("common.admin_required")}</Badge>
-                  ) : null}
-                </p>
-              </div>
-              <span className="num shrink-0 text-xs text-muted-foreground">
-                {x.bytes ? formatBytes(x.bytes, locale) : ""}
-              </span>
-            </li>
-          );
-        })}
+      <ul className="space-y-3">
+        {groups.map((g) => (
+          <LeftoverGroupRow
+            key={g.key}
+            g={g}
+            picked={picked}
+            onToggle={toggle}
+            icon={
+              sweep ? (
+                <ExeIcon
+                  path={g.icon}
+                  name={g.name}
+                  className="size-7 rounded-md text-[12px]"
+                  fallback={<Folder className="size-4" />}
+                />
+              ) : (
+                <AppIcon id={appId} name={appName} size="size-7" fallbackExe={g.icon} />
+              )
+            }
+          />
+        ))}
       </ul>
       {items && items.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
@@ -925,5 +977,96 @@ function LeftoversPanel({
         </ul>
       </Modal>
     </Card>
+  );
+}
+
+/** One owner (the app, or a folder name in the sweep): icon, total, "all of it", then each item. */
+function LeftoverGroupRow({
+  g,
+  picked,
+  onToggle,
+  icon,
+}: {
+  g: LeftoverGroup;
+  picked: Set<number>;
+  onToggle: (ids: number[], on: boolean) => void;
+  icon: ReactNode;
+}) {
+  const { t, locale } = useI18n();
+  const ids = g.items.map((x) => x.id);
+  const all = ids.every((id) => picked.has(id));
+  const some = !all && ids.some((id) => picked.has(id));
+  return (
+    <li className="rounded-md border border-border/70">
+      <div className="flex items-center gap-3 border-b border-border/70 bg-foreground/3 px-3 py-2">
+        <input
+          type="checkbox"
+          checked={all}
+          ref={(el) => {
+            if (el) el.indeterminate = some;
+          }}
+          onChange={() => onToggle(ids, !all)}
+          aria-label={t("apps.group.select", { name: g.name })}
+          className="size-4 accent-primary"
+        />
+        {icon}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{g.name}</span>
+          <span className="num block text-[11px] text-muted-foreground">
+            {t("apps.group.total", { n: g.items.length, size: formatBytes(g.bytes, locale) })}
+          </span>
+        </span>
+      </div>
+      <ul className="divide-y divide-border/70 px-3">
+        {g.items.map((x) => {
+          const Icon = KIND_ICON[x.kind];
+          const kind = <Icon className="size-4 text-muted-foreground" />;
+          return (
+            <li key={x.id} className="flex items-start gap-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={picked.has(x.id)}
+                onChange={() => onToggle([x.id], !picked.has(x.id))}
+                aria-label={x.path}
+                className="mt-1 size-4 accent-primary"
+              />
+              <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
+                {x.icon ? (
+                  <ExeIcon
+                    path={x.icon}
+                    name={x.path}
+                    className="size-4 bg-transparent"
+                    fallback={kind}
+                  />
+                ) : (
+                  kind
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-mono text-[12px]" title={x.path}>
+                  {x.path}
+                </p>
+                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Badge tone={CONF_TONE[x.confidence]}>
+                    {t(`apps.conf.${x.confidence}` as I18nKey)}
+                  </Badge>
+                  {t(`apps.reason.${x.reason}` as I18nKey)}
+                  {x.idle_days !== undefined ? (
+                    <span>{t("apps.idle", { n: x.idle_days })}</span>
+                  ) : null}
+                  {x.precious ? <Badge tone="warning">{t("apps.precious")}</Badge> : null}
+                  {x.needs_admin ? (
+                    <Badge tone="neutral">{t("common.admin_required")}</Badge>
+                  ) : null}
+                </p>
+              </div>
+              <span className="num shrink-0 text-xs text-muted-foreground">
+                {x.bytes ? formatBytes(x.bytes, locale) : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </li>
   );
 }

@@ -56,6 +56,9 @@ pub struct StartupItem {
     pub needs_admin: bool,
     /// Security components (Windows Security tray): shown, never turned off by G2 Boost.
     pub protected: bool,
+    /// The program it starts (shortcut target resolved), when it exists: its icon, and the link
+    /// between this item and the process using RAM. `None` = unknown or gone.
+    pub exe: Option<String>,
 }
 
 /// Security software (Windows Security tray + common third-party antivirus), matched lowercase on
@@ -115,6 +118,7 @@ fn run_items(root: Root, path: &str, location: Location, out: &mut Vec<StartupIt
             enabled: state(location, &name),
             needs_admin: location.needs_admin(),
             protected: is_protected(&name, &command),
+            exe: program_of(&command).and_then(|p| existing(&p)),
             name,
             command,
             location,
@@ -144,15 +148,41 @@ fn folder_items(location: Location, out: &mut Vec<StartupItem>) {
             continue;
         }
         let command = e.path().to_string_lossy().into_owned();
+        let lower = name.to_ascii_lowercase();
+        let exe = if lower.ends_with(".lnk") {
+            crate::apps::lnk_target(&e.path()).and_then(|t| existing(&t.to_string_lossy()))
+        } else if lower.ends_with(".exe") {
+            existing(&command)
+        } else {
+            None
+        };
         out.push(StartupItem {
             enabled: state(location, &name),
             needs_admin: location.needs_admin(),
             protected: is_protected(&name, &command),
+            exe,
             command,
             name,
             location,
         });
     }
+}
+
+/// Program of a Run command line: quoted path, or up to the `.exe` that ends it; `%VARS%`
+/// expanded; a bare name (`rundll32.exe x`) is System32's. Pure text, nothing is run or opened.
+pub(crate) fn program_of(command: &str) -> Option<String> {
+    let expanded = crate::apps::expand_env(command.trim());
+    let (prog, _) = crate::apps::parse_command(&expanded)?;
+    if prog.contains('\\') {
+        return Some(prog);
+    }
+    Some(format!(r"{}\System32\{prog}", system::system_root()))
+}
+
+/// The long, real path of a program that exists (8.3 names and `..` resolved), a local file only.
+fn existing(path: &str) -> Option<String> {
+    let real = crate::disk::strip_verbatim(&std::fs::canonicalize(crate::icons::local_exe(path)?).ok()?);
+    Some(real.to_string_lossy().into_owned())
 }
 
 pub fn list() -> Vec<StartupItem> {
@@ -218,6 +248,21 @@ mod tests {
         assert!(is_protected("Avast", r"C:\Program Files\Avast Software\Avast\AvastUI.exe /nogui"));
         assert!(is_protected("x", r"C:\Program Files\AVG\Antivirus\AVGUI.exe"));
         assert!(!is_protected("Steam", r"C:\Program Files (x86)\Steam\steam.exe -silent"), "no false positive");
+    }
+
+    #[test]
+    fn program_of_a_command_line() {
+        let win = system::system_root();
+        assert_eq!(program_of(r#""C:\Program Files\Steam\steam.exe" -silent"#).as_deref(), Some(r"C:\Program Files\Steam\steam.exe"));
+        assert_eq!(program_of(r"C:\Program Files\App\app.exe --min").as_deref(), Some(r"C:\Program Files\App\app.exe"));
+        assert!(program_of(r"%SystemRoot%\system32\SecurityHealthSystray.exe").unwrap().eq_ignore_ascii_case(&format!(r"{win}\system32\SecurityHealthSystray.exe")));
+        assert_eq!(program_of("rundll32.exe x.dll,Run"), Some(format!(r"{win}\System32\rundll32.exe")));
+        assert_eq!(program_of("run.cmd now"), None, "not a program G2 Boost can name");
+        assert_eq!(program_of(""), None);
+        // Only a real local file becomes the item's program.
+        assert!(existing(&format!(r"{win}\explorer.exe")).is_some_and(|p| p.to_ascii_lowercase().ends_with(r"\explorer.exe")));
+        assert_eq!(existing(r"C:\nope\nope.exe"), None);
+        assert_eq!(existing(r"\\server\share\x.exe"), None);
     }
 
     /// Round-trips a throwaway HKCU Run entry through disable/enable and removes it.

@@ -1,8 +1,9 @@
-import { Eraser, Lock, RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { Lock, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { PowerTab } from "@/components/boost/power-tab";
 import { BootCard, PrivacyTab } from "@/components/boost/privacy-boot";
 import { ProcsTab } from "@/components/boost/procs-tab";
+import { RamApps, RamTab } from "@/components/boost/ram-tab";
 import {
   RestartBadge,
   type StateMap,
@@ -13,10 +14,10 @@ import {
   useTweakStates,
 } from "@/components/boost/tweak-kit";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
-import { GameExesEditor } from "@/components/game-exes";
 import { HvciOffWarning } from "@/components/games/anticheat-panel";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
+import { ExeIcon } from "@/components/ui/exe-icon";
 import {
   Badge,
   Button,
@@ -48,18 +49,13 @@ import {
   tweakWarn,
 } from "@/data/catalogs";
 import {
+  type AppMem,
   backend,
   type DnsAdapter,
   type DnsRankEntry,
   type FxLevel,
-  type GameEvent,
   inTauri,
-  type MemoryStatus,
-  type ProcGroup,
-  type PurgeResult,
   type Recommendation,
-  type RoutineStatus,
-  type Settings,
   type StartupItem,
   type TweakCategory,
   type TweakState,
@@ -71,14 +67,31 @@ import { cn, formatBytes } from "@/lib/utils";
 /** Case- and accent-insensitive search text. */
 const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
+const TABS = ["ram", "dns", "startup", "privacy", "power", "procs"];
+
 export function BoostPage() {
   const { t } = useI18n();
   const [elevated, setElevated] = useState(false);
+  const [tab, setTab] = useState(() =>
+    TABS.includes(boot.startTab ?? "") ? (boot.startTab as string) : "tweaks",
+  );
+  // "Ver no gerenciador" from the RAM list: the task manager opens filtered on that program.
+  const [procsQuery, setProcsQuery] = useState("");
+  const openProcs = useCallback((name: string) => {
+    setProcsQuery(name);
+    setTab("procs");
+  }, []);
   useEffect(() => {
     backend.appInfo().then((i) => i && setElevated(i.elevated));
   }, []);
   return (
-    <PageHeaderWithTabs>
+    <PageHeaderWithTabs
+      tab={tab}
+      onTab={(v) => {
+        setTab(v);
+        setProcsQuery("");
+      }}
+    >
       <TabsContent value="tweaks">
         <PageBody className="px-0 pb-0">
           <LuliCard
@@ -90,7 +103,7 @@ export function BoostPage() {
       </TabsContent>
       <TabsContent value="ram">
         <PageBody className="px-0 pb-0">
-          <RamTab elevated={elevated} />
+          <RamTab elevated={elevated} onOpenProcs={openProcs} />
         </PageBody>
       </TabsContent>
       <TabsContent value="dns">
@@ -101,7 +114,7 @@ export function BoostPage() {
       <TabsContent value="startup">
         <PageBody className="px-0 pb-0">
           <BootCard elevated={elevated} />
-          <StartupTab elevated={elevated} />
+          <StartupTab elevated={elevated} onOpenProcs={openProcs} />
         </PageBody>
       </TabsContent>
       <TabsContent value="privacy">
@@ -116,7 +129,7 @@ export function BoostPage() {
       </TabsContent>
       <TabsContent value="procs">
         <PageBody className="px-0 pb-0">
-          <ProcsTab elevated={elevated} />
+          <ProcsTab elevated={elevated} query={procsQuery} />
         </PageBody>
       </TabsContent>
       <span className="sr-only">{t("boost.title")}</span>
@@ -124,20 +137,22 @@ export function BoostPage() {
   );
 }
 
-function PageHeaderWithTabs({ children }: { children: React.ReactNode }) {
+function PageHeaderWithTabs({
+  tab,
+  onTab,
+  children,
+}: {
+  tab: string;
+  onTab: (v: string) => void;
+  children: React.ReactNode;
+}) {
   const { t } = useI18n();
   return (
     <PageHeader
       title={t("boost.title")}
       subtitle={t("boost.subtitle")}
       tabs={
-        <Tabs
-          defaultValue={
-            ["ram", "dns", "startup", "privacy", "power", "procs"].includes(boot.startTab ?? "")
-              ? (boot.startTab as string)
-              : "tweaks"
-          }
-        >
+        <Tabs value={tab} onValueChange={onTab}>
           <TabsList>
             <TabsTrigger value="tweaks">{t("boost.tab.tweaks")}</TabsTrigger>
             <TabsTrigger value="ram">{t("boost.tab.ram")}</TabsTrigger>
@@ -607,173 +622,6 @@ function TweakCard({
   );
 }
 
-function RamTab({ elevated }: { elevated: boolean }) {
-  const { t, locale } = useI18n();
-  const errorText = useErrorText();
-  const [mem, setMem] = useState<MemoryStatus | null>(null);
-  const [last, setLast] = useState<{ at: Date; result: PurgeResult } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [status, setStatus] = useState<RoutineStatus | null>(null);
-  const [lastGame, setLastGame] = useState<GameEvent | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const tick = () => {
-      backend.memoryStatus().then((m) => alive && m && setMem(m));
-      backend.routineStatus().then((s) => alive && s && setStatus(s));
-    };
-    tick();
-    backend.settingsGet().then((s) => alive && s && setSettings(s));
-    const id = setInterval(tick, 3000);
-    let off: (() => void) | null = null;
-    backend.on<GameEvent>("game:started", setLastGame).then((u) => {
-      off = u;
-    });
-    return () => {
-      alive = false;
-      clearInterval(id);
-      off?.();
-    };
-  }, []);
-
-  const save = async (patch: Partial<Settings>) => {
-    if (!settings) return;
-    setErr(null);
-    try {
-      setSettings(await backend.settingsSet({ ...settings, ...patch }));
-    } catch (e) {
-      setErr(errorText(e));
-    }
-  };
-
-  const clean = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      const result = await backend.ramPurge();
-      setLast({ at: new Date(), result });
-    } catch (e) {
-      setErr(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const used = mem ? mem.total_bytes - mem.avail_bytes : 0;
-  const pct = mem ? Math.round((used / mem.total_bytes) * 100) : 0;
-
-  return (
-    <>
-      <Card className="animate-rise">
-        <CardTitle
-          help={t("boost.ram.help")}
-          right={
-            <span className="flex items-center gap-2">
-              {!elevated ? <ElevateButton route="boost" tab="ram" /> : null}
-              <Button variant="primary" disabled={busy || !inTauri} onClick={clean}>
-                <Eraser className="size-4" />
-                {t("boost.ram.clean")}
-              </Button>
-            </span>
-          }
-        >
-          {t("boost.ram.title")}
-          <span className="ml-2 font-sans text-xs font-normal text-muted-foreground">
-            {last
-              ? `${t("boost.ram.last", { when: last.at.toLocaleTimeString(locale) })} · ${
-                  last.result.freed_bytes > 0
-                    ? t("boost.ram.freed", { freed: formatBytes(last.result.freed_bytes, locale) })
-                    : t("boost.ram.freed_none")
-                }`
-              : t("boost.ram.never")}
-          </span>
-        </CardTitle>
-        {err ? <p className="mb-3 text-xs text-destructive">{err}</p> : null}
-        <div className="h-5 w-full overflow-hidden rounded bg-border/60">
-          <div
-            className={cn(
-              "h-full rounded transition-all duration-700",
-              pct > 85 ? "bg-destructive" : "bg-chart-1",
-            )}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <div className="mt-3 flex items-center gap-6 text-xs">
-          <span className="flex items-center gap-2">
-            <span className="size-3 rounded-sm bg-chart-1" />
-            <b>{t("boost.ram.used")}</b>
-            <span className="num text-muted-foreground">
-              {mem ? formatBytes(used, locale) : "—"}
-            </span>
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="size-3 rounded-sm border border-border" />
-            <b>{t("boost.ram.free")}</b>
-            <span className="num text-muted-foreground">
-              {mem ? formatBytes(mem.avail_bytes, locale) : "—"}
-            </span>
-          </span>
-          <span className="num ml-auto text-muted-foreground">
-            {mem ? t("boost.ram.total", { total: formatBytes(mem.total_bytes, locale, 0) }) : "—"}
-          </span>
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="animate-rise" style={rise(1)}>
-          <CardTitle
-            help={t("settings.game.ram.hint")}
-            right={
-              <Switch
-                checked={!!settings?.game_ram_clean}
-                disabled={!settings}
-                onCheckedChange={(v) => save({ game_ram_clean: v })}
-                aria-label={t("settings.game.ram")}
-              />
-            }
-          >
-            {t("settings.game.ram")}
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            {status?.game
-              ? t("settings.game.current", { name: status.game.name })
-              : t("settings.game.none")}
-          </p>
-          {lastGame ? (
-            <p className="mt-2 text-xs">
-              {lastGame.error
-                ? errorText(new Error(lastGame.error))
-                : t("settings.game.last", {
-                    name: lastGame.game.name,
-                    freed: formatBytes(lastGame.freed_bytes, locale),
-                  })}
-            </p>
-          ) : null}
-          {!elevated ? (
-            <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-warning">
-              {t("settings.game.needs_admin")}
-              <ElevateButton route="boost" tab="ram" />
-            </p>
-          ) : null}
-          <p className="mt-4 rounded-md border border-chart-1/30 bg-chart-1/10 px-3 py-2.5 text-xs text-foreground/90">
-            {t("boost.ram.notice")}
-          </p>
-        </Card>
-        <Card className="animate-rise" style={rise(2)}>
-          <CardTitle help={t("settings.game.exes.hint")}>{t("settings.game.exes")}</CardTitle>
-          <GameExesEditor
-            exes={settings?.game_exes ?? []}
-            disabled={!settings}
-            onChange={(game_exes) => save({ game_exes })}
-          />
-        </Card>
-      </div>
-    </>
-  );
-}
-
 function DnsTab({ elevated }: { elevated: boolean }) {
   const { t } = useI18n();
   const errorText = useErrorText();
@@ -933,20 +781,27 @@ function DnsTab({ elevated }: { elevated: boolean }) {
   );
 }
 
-/** Startup apps (Task Manager semantics) + what is heavy right now. Nothing is killed. */
-function StartupTab({ elevated }: { elevated: boolean }) {
+/** Startup apps (Task Manager semantics) with their own icons, and who holds RAM right now: a
+ *  running startup item shows what it costs, a heavy app that starts with Windows can be turned off. */
+function StartupTab({
+  elevated,
+  onOpenProcs,
+}: {
+  elevated: boolean;
+  onOpenProcs: (name: string) => void;
+}) {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
   const [items, setItems] = useState<StartupItem[] | null>(null);
-  const [procs, setProcs] = useState<ProcGroup[] | null>(null);
+  const [apps, setApps] = useState<AppMem[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true);
-    const [i, p] = await Promise.all([backend.startupList(), backend.procsTop()]);
+    const [i, a] = await Promise.all([backend.startupList(), backend.ramApps()]);
     if (i) setItems(i);
-    if (p) setProcs(p);
+    if (a) setApps(a);
     setBusy(false);
   }, []);
   useEffect(() => {
@@ -966,7 +821,7 @@ function StartupTab({ elevated }: { elevated: boolean }) {
   };
 
   const enabled = items?.filter((i) => i.enabled).length ?? 0;
-  const ramMax = Math.max(1, ...(procs ?? []).map((p) => p.ram_bytes));
+  const ramByExe = new Map((apps ?? []).map((a) => [a.path.toLowerCase(), a]));
 
   return (
     <>
@@ -1008,6 +863,7 @@ function StartupTab({ elevated }: { elevated: boolean }) {
             {items === null && inTauri
               ? [0, 1, 2, 3, 4].map((k) => (
                   <li key={k} className="flex items-center gap-3 py-3">
+                    <Skeleton className="size-7" />
                     <div className="flex-1 space-y-1.5">
                       <Skeleton className="h-3.5 w-40" />
                       <Skeleton className="h-3 w-64" />
@@ -1018,16 +874,31 @@ function StartupTab({ elevated }: { elevated: boolean }) {
               : null}
             {(items ?? []).map((it) => {
               const locked = it.protected || (it.needs_admin && !elevated);
+              const running = it.exe ? ramByExe.get(it.exe.toLowerCase()) : undefined;
               return (
                 <li key={`${it.location}:${it.name}`} className="flex items-center gap-3 py-2.5">
+                  <ExeIcon
+                    path={it.exe}
+                    name={it.name}
+                    className={cn("size-7", !it.enabled && "opacity-50 grayscale")}
+                  />
                   <div className="min-w-0 flex-1">
-                    <p
-                      className={cn(
-                        "truncate text-sm font-medium",
-                        !it.enabled && "text-muted-foreground line-through decoration-border",
-                      )}
-                    >
-                      {it.name}
+                    <p className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "truncate text-sm font-medium",
+                          !it.enabled && "text-muted-foreground line-through decoration-border",
+                        )}
+                      >
+                        {it.name}
+                      </span>
+                      {running ? (
+                        <span className="num shrink-0 text-[11px] text-muted-foreground">
+                          {t("ram.startup.now", {
+                            size: formatBytes(running.private_bytes, locale),
+                          })}
+                        </span>
+                      ) : null}
                     </p>
                     <p className="truncate text-[11px] text-muted-foreground" title={it.command}>
                       {t(`boost.startup.loc.${it.location}`)} · {it.command}
@@ -1054,47 +925,18 @@ function StartupTab({ elevated }: { elevated: boolean }) {
         </Card>
 
         <Card className="animate-rise min-w-0 py-3" style={rise(2)}>
-          <CardTitle className="mb-2 flex items-center gap-2">
-            {t("boost.procs.title")}
-            <HelpHint text={t("boost.procs.help")} />
+          <CardTitle className="mb-2" help={t("ram.apps.help")}>
+            {t("ram.heavy.title")}
           </CardTitle>
-          <ul className="space-y-2">
-            {procs === null && inTauri
-              ? [0, 1, 2, 3, 4, 5].map((k) => (
-                  <li key={k} className="space-y-1.5 py-1">
-                    <Skeleton className="h-3.5 w-full" />
-                    <Skeleton className="h-1 w-2/3" />
-                  </li>
-                ))
-              : null}
-            {(procs ?? []).map((p) => (
-              <li key={p.name} className="text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-medium">{p.name}</span>
-                  {p.count > 1 ? (
-                    <span className="num text-[11px] text-muted-foreground">×{p.count}</span>
-                  ) : null}
-                  {p.system ? <Badge tone="neutral">{t("boost.procs.system")}</Badge> : null}
-                  <span className="num ml-auto text-xs text-muted-foreground">
-                    {p.cpu_pct.toFixed(1)}%
-                  </span>
-                  <span className="num w-20 text-right text-xs font-semibold">
-                    {formatBytes(p.ram_bytes, locale)}
-                  </span>
-                </div>
-                <div className="mt-1 h-1 overflow-hidden rounded-full bg-card-hover">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      p.system ? "bg-muted-foreground/40" : "bg-chart-1",
-                    )}
-                    style={{ width: `${(p.ram_bytes / ramMax) * 100}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[11px] text-muted-foreground">{t("boost.procs.note")}</p>
+          <RamApps
+            apps={apps}
+            startup={items}
+            elevated={elevated}
+            limit={8}
+            onStartupOff={(it) => void toggle(it, false)}
+            onOpenProcs={onOpenProcs}
+            onEnded={load}
+          />
         </Card>
       </div>
     </>

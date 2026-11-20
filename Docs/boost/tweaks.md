@@ -161,7 +161,7 @@ Teste ao vivo (`cursor_shadow_roundtrip`, `#[ignore]`): flip + restore passou em
 
 ## Limpeza de RAM
 
-`purge_standby_list()`: habilita `SeProfileSingleProcessPrivilege` no token (só existe elevado) e chama `NtSetSystemInformation(80, MemoryPurgeStandbyList=4)`. Devolve `avail` antes/depois e bytes liberados. **Não** faz `EmptyWorkingSets` (piora, script v2.0). Rotina automática (ao abrir jogo / agendada) = fase Rotinas.
+`purge_standby_list()`: habilita `SeProfileSingleProcessPrivilege` no token (só existe elevado) e chama `NtSetSystemInformation(80, MemoryPurgeStandbyList=4)`. **Não** faz `EmptyWorkingSets` (piora, script v2.0). Desde 2026-11-20 o liberado é o ganho da lista livre (não o delta de "disponível") e a aba RAM mostra composição, conselho e quem usa a memória: [memory.md](memory.md).
 
 ## Testes
 

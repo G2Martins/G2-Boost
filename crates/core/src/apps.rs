@@ -367,17 +367,64 @@ fn file_uri_path(uri: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// The app's icon as a PNG data URL (Store logo, or the `DisplayIcon` resource, or its exe).
+/// The app's icon as a PNG data URL: Store logo, `DisplayIcon` resource or its exe while it is
+/// installed (kept on disk the first time), then the kept copy once it is gone, then the biggest
+/// program left in its install folder.
 pub fn icon(app: &App) -> Option<String> {
-    let src = app.icon_source.as_deref()?;
-    let png = if app.hive == Hive::Store {
-        crate::icons::store_logo(Path::new(src))
-    } else {
-        crate::icons::parse_source(src)
-            .and_then(|(p, i)| crate::icons::png_from_resource(&p, i))
-            .or_else(|| app.exe.as_deref().and_then(|e| crate::icons::png_from_resource(Path::new(e), 0)))
-    }?;
+    let png = match live_icon(app) {
+        Some(png) => {
+            keep_icon(&app.id, &png);
+            png
+        }
+        None => kept_icon(&app.id).or_else(|| {
+            let dir = app.install_location.as_deref()?;
+            crate::icons::png_from_resource(&crate::icons::largest_exe(Path::new(dir))?, 0)
+        })?,
+    };
     Some(crate::icons::data_url(&png))
+}
+
+fn live_icon(app: &App) -> Option<Vec<u8>> {
+    let src = app.icon_source.as_deref()?;
+    if app.hive == Hive::Store {
+        return crate::icons::store_logo(Path::new(src));
+    }
+    crate::icons::parse_source(src)
+        .and_then(|(p, i)| crate::icons::png_from_resource(&p, i))
+        .or_else(|| app.exe.as_deref().and_then(|e| crate::icons::png_from_resource(Path::new(e), 0)))
+}
+
+/// `<data dir>\app-icons\<id>.png`; the id (from a user-writable snapshot) is reduced to a
+/// plain file name.
+fn icon_file(id: &str) -> PathBuf {
+    let name: String = id.chars().map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-') { c } else { '_' }).take(150).collect();
+    registry::data_dir().join("app-icons").join(format!("{name}.png"))
+}
+
+/// Keep the icon of an installed app so its leftovers still show it after the uninstall.
+fn keep_icon(id: &str, png: &[u8]) {
+    let f = icon_file(id);
+    if !f.exists() && png.len() < 1 << 20 {
+        let _ = f.parent().map(fs::create_dir_all);
+        let _ = fs::write(f, png);
+    }
+}
+
+fn kept_icon(id: &str) -> Option<Vec<u8>> {
+    let png = fs::read(icon_file(id)).ok()?;
+    (png.starts_with(b"\x89PNG") && png.len() < 1 << 20).then_some(png)
+}
+
+/// Logo of the current user's Store package `full` (its full name, as in `WindowsApps\<full>`).
+pub(crate) fn package_logo(full: &str) -> Option<Vec<u8>> {
+    if !valid_family(full) {
+        return None;
+    }
+    use windows::core::HSTRING;
+    // Empty SID = the current user (the all-users lookup needs admin).
+    let pkg = package_manager()?.FindPackageByUserSecurityIdPackageFullName(&HSTRING::new(), &HSTRING::from(full)).ok()?;
+    let uri = pkg.Logo().ok()?.AbsoluteUri().ok()?;
+    crate::icons::store_logo(Path::new(&file_uri_path(&uri.to_string())?))
 }
 
 /// The installed package with this full name, if any.
@@ -444,6 +491,7 @@ pub fn forget(id: &str) {
     };
     snap.apps.retain(|a| a.id != id);
     let _ = fs::write(snapshot_file(), serde_json::to_string(&snap).unwrap_or_default());
+    let _ = fs::remove_file(icon_file(id));
 }
 
 /* ---------------- name matching ---------------- */
@@ -659,6 +707,9 @@ pub struct Leftover {
     /// Days since anything inside changed (folder-first sweep only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idle_days: Option<u32>,
+    /// Biggest program inside a folder leftover (its icon is the app's); found without crossing links.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     /// Found where apps install (Program Files, another drive): re-checked the same way on removal.
     #[serde(skip)]
     install_dir: bool,
@@ -902,7 +953,7 @@ impl Found {
         }
         let id = self.0.len() as u32;
         let precious = matches!(&target, Target::Fs(p) if is_precious(p));
-        self.0.push(Leftover { id, kind, path, bytes, confidence, reason, needs_admin, precious, idle_days: None, install_dir: false, target });
+        self.0.push(Leftover { id, kind, path, bytes, confidence, reason, needs_admin, precious, idle_days: None, icon: None, install_dir: false, target });
         true
     }
 
@@ -914,6 +965,9 @@ impl Found {
                 && let Some(l) = self.0.last_mut()
             {
                 l.install_dir = install_dir;
+                if kind == LeftoverKind::Folder {
+                    l.icon = crate::icons::largest_exe(&real).map(|p| p.to_string_lossy().into_owned());
+                }
             }
         }
     }
@@ -1222,6 +1276,9 @@ fn unowned_in(owners: &Owners, ctx: &Ctx, roots: &SweepRoots, now: u64) -> Vec<L
             l.install_dir = install_dir;
             l.idle_days = Some(days.min(u64::from(u32::MAX)) as u32);
             l.precious |= locallow; // LocalLow is where games keep saves
+            if program {
+                l.icon = crate::icons::largest_exe(&real).map(|p| p.to_string_lossy().into_owned());
+            }
         }
     };
     let skip = |name: &str| {
@@ -1849,7 +1906,11 @@ mod tests {
         let by = |suffix: &str| found.iter().find(|l| l.path.to_ascii_lowercase().ends_with(&suffix.to_ascii_lowercase()));
         let drv = by(r"Program Files\Acme Widget Display Driver").expect("companion with only its uninstaller");
         assert_eq!((drv.confidence, drv.reason), (Confidence::High, Reason::Companion));
-        assert_eq!(by(r"Program Files\Acme Widget Pro Tools").expect("companion with files").confidence, Confidence::Medium);
+        let tools = by(r"Program Files\Acme Widget Pro Tools").expect("companion with files");
+        assert_eq!(tools.confidence, Confidence::Medium);
+        // The folder's icon is its program; an uninstaller alone says nothing about the app.
+        assert!(tools.icon.as_deref().is_some_and(|i| i.ends_with("tools.exe")), "{:?}", tools.icon);
+        assert_eq!(drv.icon, None);
         assert!(by(r"Program Files\Acme Widget Bridge").is_none(), "still installed: not a leftover");
         assert!(by(r"Program Files\Other App").is_none());
         assert!(found.iter().all(|l| !l.path.to_ascii_lowercase().ends_with(r"\program files")), "never the root");
@@ -1859,6 +1920,30 @@ mod tests {
         assert!(Matcher::new(&app("Parsec", "Parsec Cloud, Inc.", None, None)).companion("Parsec Virtual Display Driver"));
         assert!(!Matcher::new(&app("Parsec", "", None, None)).companion("Parsec 2"));
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The icon of an installed app is kept, so its leftovers still show it once the app is gone;
+    /// the id (from a user-writable snapshot) never escapes the icons folder.
+    #[test]
+    fn kept_icons_survive_the_uninstall() {
+        // SAFETY: same value every data-dir test sets.
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
+        let f = icon_file(r"m64:..\..\evil/x:y");
+        assert_eq!(f.parent(), Some(registry::data_dir().join("app-icons").as_path()));
+        assert_eq!(f.file_name().unwrap().to_string_lossy(), "m64_.._.._evil_x_y.png");
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let mut a = app("Icon Test App", "", Some(&format!(r"{win}\explorer.exe")), None);
+        a.id = "u:g2boost-icon-test".into();
+        a.icon_source = a.exe.clone();
+        let _ = fs::remove_file(icon_file(&a.id));
+        assert!(icon(&a).is_some(), "live icon");
+        assert!(kept_icon(&a.id).is_some(), "kept on first sight");
+        a.icon_source = Some(r"C:\gone\gone.exe".into());
+        a.exe = None;
+        assert!(icon(&a).is_some_and(|u| u.starts_with("data:image/png;base64,")), "kept copy after the uninstall");
+        fs::write(icon_file(&a.id), b"not a png").unwrap();
+        assert_eq!(icon(&a), None, "a tampered file is not an icon");
+        let _ = fs::remove_file(icon_file(&a.id));
     }
 
     #[test]

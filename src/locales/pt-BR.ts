@@ -1755,7 +1755,7 @@ export const ptBR = {
   "boost.ram.freed_none": "Nada a liberar agora",
   "boost.ram.title": "Limpeza de RAM",
   "boost.ram.help":
-    "Libera a lista de espera (standby) e páginas modificadas, o que corta engasgos em jogos. Não encolhe o working set dos apps: isso comprovadamente piora.",
+    "Esvazia o cache em espera (standby): vira memória livre na hora. Ajuda quando quase não há memória livre; com memória sobrando não muda nada. Nunca encolhe a memória dos apps abertos: isso comprovadamente piora.",
   "boost.ram.used": "Usado",
   "boost.ram.free": "Livre",
   "boost.ram.total": "{total} total",
@@ -4214,8 +4214,6 @@ export const ptBR = {
   "activity.result.failed": "Falhou",
   "activity.result.steps": "{ok} de {total} ajustes",
   // lines the core raises (bell)
-  "activity.game.ram": "{game} abriu: {bytes} de memória liberados",
-  "activity.game.ram_failed": "{game} abriu, mas não deu para liberar a memória",
   "activity.security.alerts": "Monitor de segurança: novidades para revisar ({count})",
   "activity.updates.apps.ok": "Apps atualizados: {count}",
   "activity.updates.apps.partial": "Apps atualizados: {count}, com falha: {failed}",
@@ -4647,4 +4645,52 @@ export const ptBR = {
     "O VS Code lê o arquivo sozinho; o servidor aparece na lista de MCP do modo agente.",
 
   // ── r11:ram · memória RAM, ícones reais, sobras (agente A5) ──
+  "ram.title": "Memória agora",
+  "ram.purge.admin": "Limpar o cache em espera precisa do modo administrador.",
+  "ram.seg.in_use": "Em uso",
+  "ram.seg.in_use.hint": "Programas abertos e o próprio Windows.",
+  "ram.seg.modified": "Modificada",
+  "ram.seg.modified.hint": "Alterada pelos apps, esperando ir para o disco.",
+  "ram.seg.standby": "Cache em espera",
+  "ram.seg.standby.hint": "Arquivos lidos há pouco. O Windows entrega na hora a quem pedir.",
+  "ram.seg.free": "Livre",
+  "ram.seg.free.hint": "Sem nada dentro, pronta para uso.",
+  "ram.compressed": "{size} comprimida (dentro de Em uso)",
+  "ram.commit": "confirmada {used} de {limit}",
+  "ram.advice.helps":
+    "Pouca memória livre e muito cache em espera: limpar agora entrega páginas livres na hora para o jogo e pode cortar engasgos ao carregar.",
+  "ram.advice.in_use":
+    "A memória está cheia de uso real, não de cache: limpar não resolve. Feche os apps pesados abaixo ou tire-os da inicialização.",
+  "ram.advice.fine":
+    "Há memória livre de sobra. O cache em espera volta para quem precisar sozinho, então limpar agora não muda nada no jogo.",
+  "ram.purge.freed": "Viraram memória livre",
+  "ram.purge.none": "O cache já estava vazio: nada mudou.",
+  "ram.purge.standby": "Cache em espera: {before} → {after}",
+  "ram.purge.free": "Livre: {before} → {after}",
+  "ram.apps.title": "Quem usa a RAM",
+  "ram.apps.help":
+    "Processos agrupados pelo programa (24 processos do navegador viram uma linha). Memória privada é só daquele app; o conjunto de trabalho conta também o que ele divide com outros.",
+  "ram.apps.empty": "Nada para mostrar agora.",
+  "ram.apps.startup": "Inicia com o Windows",
+  "ram.apps.ws": "conjunto {size}",
+  "ram.apps.startup_admin": "Item de todos os usuários: abra o G2 Boost como administrador.",
+  "ram.apps.startup_off": "Tirar da inicialização",
+  "ram.apps.startup_off_done": "{name} não abre mais com o Windows.",
+  "ram.apps.open": "Ver no Gerenciador de tarefas",
+  "ram.apps.open_named": "Ver {name} no Gerenciador de tarefas",
+  "ram.apps.ended": "{name}: {n} processos encerrados.",
+  "ram.apps.end_failed": "{n} já tinham fechado ou são protegidos.",
+  "ram.apps.end_body":
+    "{n} processos deste programa serão fechados. O que não foi salvo neles se perde. Processos do Windows, de segurança e serviços nunca são encerrados.",
+  "ram.startup.now": "usa {size} agora",
+  "ram.heavy.title": "Quem usa mais RAM agora",
+  "apps.stale.title": "Pouco usados e grandes",
+  "apps.stale.help":
+    "Apps que você não abre há mais de 90 dias pelo Iniciar ou pelo Explorador e que ocupam mais de 500 MB. É uma pista, não prova: apps abertos por outros programas não contam. Sem esse registro, nada é sugerido.",
+  "apps.stale.row": "{size} · aberto há {n} dias",
+  "apps.undo.short": "Desfazer",
+  "apps.group.total": "{n} itens · {size}",
+  "apps.group.select": "Selecionar tudo de {name}",
+  "activity.apps.removed": "Sobras removidas: {count} itens, {bytes} foram para a Lixeira",
+  "activity.ram.game": "RAM limpa ao abrir {game}: {bytes} viraram memória livre",
 } as const;

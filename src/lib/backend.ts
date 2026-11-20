@@ -174,7 +174,16 @@ export type TweakState = {
   detail: string | null;
   services: ServiceState[];
 };
-export type PurgeResult = { before_avail: number; after_avail: number; freed_bytes: number };
+export type PurgeResult = {
+  before_avail: number;
+  after_avail: number;
+  /** What the free list gained: the standby cache that became free memory. */
+  freed_bytes: number;
+  standby_before: number;
+  standby_after: number;
+  free_before: number;
+  free_after: number;
+};
 
 export type PreviewItem = {
   id: string;
@@ -663,6 +672,8 @@ export type StartupItem = {
   enabled: boolean;
   needs_admin: boolean;
   protected: boolean;
+  /** The program it starts, when it exists (its icon; the link to the RAM list). */
+  exe: string | null;
 };
 export type ProcGroup = {
   name: string;
@@ -721,6 +732,8 @@ export type ProcInfo = {
   name: string;
   path: string;
   ram_bytes: number;
+  /** Private commit: what only this process holds. */
+  private_bytes: number;
   cpu_pct: number;
   /** Creation time as a decimal string (sent back with the pid to act on this exact process). */
   created: string;
@@ -767,6 +780,8 @@ export type Leftover = {
   idle_days?: number;
   /** Saves, profiles, vaults: never preselected, extra warning. */
   precious: boolean;
+  /** Biggest program inside a folder leftover (its icon). */
+  icon?: string;
 };
 export type UndoRecord = { at: number; app: string; files: string[]; keys: string[] };
 export type UndoOutcome = { files: number; keys: number; failed: number };
@@ -1316,6 +1331,10 @@ export const backend = {
   mcpMap: () => call<McpClientMap[]>("mcp_map"),
 
   // r11:ram
+  /** In use / modified / standby / free (+ compressed) right now and the purge advice. */
+  ramComposition: () => call<MemComposition>("ram_composition"),
+  /** Apps holding the most private memory, grouped by executable. */
+  ramApps: () => call<AppMem[]>("ram_apps"),
 };
 
 export type VolumeOp = "scan" | "spot_fix" | "analyze" | "retrim" | "defrag";
@@ -2003,3 +2022,26 @@ export type McpClientMap = {
 };
 
 // ── r11:ram types ──
+export type MemAdvice = "helps" | "in_use" | "fine";
+export type MemComposition = {
+  total: number;
+  in_use: number;
+  modified: number;
+  standby: number;
+  free: number;
+  compressed: number | null;
+  committed: number;
+  commit_limit: number;
+  advice: MemAdvice;
+};
+export type AppMem = {
+  name: string;
+  path: string;
+  count: number;
+  private_bytes: number;
+  ws_bytes: number;
+  system: boolean;
+  protected: ProcInfo["protected"];
+  /** The processes that may be ended (pid + creation time as a string). */
+  procs: { pid: number; created: string }[];
+};
