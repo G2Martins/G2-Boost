@@ -1,75 +1,44 @@
-import { BrushCleaning, Eye, History, ShieldAlert, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LivePanel } from "@/components/cleanup/live-panel";
-import { SystemFilesPanel } from "@/components/cleanup/system-files";
-import { ElevateButton, useErrorText } from "@/components/elevate-button";
+import { History, ScanSearch, SlidersHorizontal } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { DETAIL_TABS, DetailedMode, type DetailTab } from "@/components/cleanup/detailed";
+import { SmartView } from "@/components/cleanup/smart-view";
 import { LuliCard } from "@/components/luli-card";
-import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
+import { PageBody, PageHeader } from "@/components/shell/page-header";
 import {
   Badge,
-  Button,
   Card,
   CardTitle,
   EmptyState,
-  HelpHint,
-  Meter,
-  Switch,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/primitives";
-import {
-  CLEANUP_CATALOG,
-  type CleanupGroup,
-  cleanupHint,
-  cleanupName,
-  type Risk,
-} from "@/data/catalogs";
-import {
-  backend,
-  type CleanupProgress,
-  type DriveInfo,
-  inTauri,
-  type PreviewItem,
-  type RunRecord,
-} from "@/lib/backend";
+import { backend, type RunRecord } from "@/lib/backend";
 import { boot } from "@/lib/boot";
-import { type I18nKey, useI18n } from "@/lib/i18n";
-import { sizeText, usePageData } from "@/lib/luli";
+import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
-const RISK_KEY: Record<Risk, I18nKey> = {
-  low: "cleanup.risk.low",
-  medium: "cleanup.risk.medium",
-  high: "cleanup.risk.high",
-};
-const RISK_TONE = { low: "success", medium: "warning", high: "danger" } as const satisfies Record<
-  Risk,
-  string
->;
+type Mode = "smart" | "detailed";
 
-type Phase = "idle" | "previewing" | "confirm" | "running";
-
+/**
+ * Limpeza: the smart view (Analyze → three buckets → Clean) by default; the switches per
+ * category stay one click away in the detailed mode. `startTab` picks a detailed tab (`system`
+ * from the disk page's essentials) or `analyze` (back from Elevate: analyze right away).
+ */
 export function CleanupPage() {
   const { t, locale } = useI18n();
-  const errorText = useErrorText();
-  const [on, setOn] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(CLEANUP_CATALOG.map((c) => [c.id, c.defaultOn])),
-  );
-  // "system" = Windows' own cleanup handlers; opened directly from the disk's big-items list.
-  const [group, setGroup] = useState<CleanupGroup | "system">(() => {
-    if (boot.startTab !== "system") return "daily";
+  const [arrival] = useState(() => {
+    const tab = boot.startTab;
     boot.startTab = undefined;
-    return "system";
+    return tab;
   });
-  const [preview, setPreview] = useState<Record<string, PreviewItem>>({});
-  const [phase, setPhase] = useState<Phase>("idle");
-  // What the core is doing right now (preview or run) and since when: the live panel.
-  const [live, setLive] = useState<CleanupProgress | null>(null);
-  const [startedAt, setStartedAt] = useState(0);
-  const [result, setResult] = useState<RunRecord | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>(() =>
+    DETAIL_TABS.includes(arrival as DetailTab) ? "detailed" : "smart",
+  );
+  const [tab, setTab] = useState<DetailTab>(() =>
+    DETAIL_TABS.includes(arrival as DetailTab) ? (arrival as DetailTab) : "daily",
+  );
   const [history, setHistory] = useState<RunRecord[]>([]);
   const [elevated, setElevated] = useState(false);
 
@@ -77,101 +46,43 @@ export function CleanupPage() {
     backend.appInfo().then((i) => i && setElevated(i.elevated));
     backend.cleanupHistory().then((h) => h && setHistory(h));
   }, []);
-  useEffect(() => {
-    const offs: (() => void)[] = [];
-    for (const ev of ["cleanup:measure", "cleanup:progress"]) {
-      backend.on<CleanupProgress>(ev, setLive).then((u) => offs.push(u));
-    }
-    return () => {
-      for (const off of offs) off();
-    };
-  }, []);
 
-  const visible = useMemo(() => CLEANUP_CATALOG.filter((c) => c.group === group), [group]);
-  const selected = useMemo(() => CLEANUP_CATALOG.filter((c) => on[c.id]).map((c) => c.id), [on]);
-  const previewed = selected.every((id) => preview[id]);
-  const totalBytes = selected.reduce((s, id) => s + (preview[id]?.bytes ?? 0), 0);
-  const needsAdmin = selected.some((id) => preview[id]?.needs_admin);
-
-  const runPreview = useCallback(async () => {
-    setPhase("previewing");
-    setError(null);
-    setResult(null);
-    setLive({ done: 0, total: selected.length, current: null, bytes: 0, files: 0 });
-    setStartedAt(Date.now());
-    try {
-      const items = await backend.cleanupPreview(selected);
-      setPreview(Object.fromEntries(items.map((i) => [i.id, i])));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setPhase("idle");
-      setLive(null);
-    }
-  }, [selected, errorText]);
-  const started = useRef(false);
-  useEffect(() => {
-    if (boot.autorun && inTauri && !started.current) {
-      started.current = true;
-      void runPreview();
-    }
-  }, [runPreview]);
-
-  const execute = async () => {
-    setPhase("running");
-    setLive({ done: 0, total: selected.length, current: null, bytes: 0, files: 0 });
-    setStartedAt(Date.now());
-    setError(null);
-    try {
-      const tok = await backend.cleanupConfirm(selected);
-      const rec = await backend.cleanupExecute(tok.token, selected);
-      setResult(rec);
-      setPreview({});
-      const h = await backend.cleanupHistory();
-      if (h) setHistory(h);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setPhase("idle");
-      setLive(null);
-    }
+  const detailed = (next?: string) => {
+    if (next && DETAIL_TABS.includes(next as DetailTab)) setTab(next as DetailTab);
+    setMode("detailed");
   };
-
-  const busy = phase === "previewing" || phase === "running";
-
-  const luliData = useMemo(() => {
-    const rows = Object.values(preview)
-      .filter((p) => p.measurable && !p.missing && p.bytes > 0)
-      .sort((a, b) => b.bytes - a.bytes);
-    if (rows.length === 0) return null;
-    return [
-      "Cleanup preview measured now (category id: size):",
-      ...rows.map(
-        (p) =>
-          `- ${p.id}: ${sizeText(p.bytes)}, ${p.files} files${p.needs_admin ? ", needs admin" : ""}${p.blocked_by.length ? `, in use by ${p.blocked_by.join(", ")}` : ""}`,
-      ),
-    ].join("\n");
-  }, [preview]);
-  usePageData("cleanup", luliData);
 
   return (
     <>
       <PageHeader
         title={t("cleanup.title")}
-        subtitle={t("cleanup.subtitle")}
+        subtitle={t(mode === "smart" ? "clean.subtitle" : "cleanup.subtitle")}
+        actions={
+          <fieldset className="flex gap-1.5" aria-label={t("clean.mode.label")}>
+            <ModeChip pressed={mode === "smart"} onClick={() => setMode("smart")}>
+              <ScanSearch className="size-3.5" />
+              {t("clean.mode.smart")}
+            </ModeChip>
+            <ModeChip pressed={mode === "detailed"} onClick={() => setMode("detailed")}>
+              <SlidersHorizontal className="size-3.5" />
+              {t("clean.mode.detailed")}
+            </ModeChip>
+          </fieldset>
+        }
         tabs={
-          <Tabs value={group} onValueChange={(v) => setGroup(v as CleanupGroup | "system")}>
-            <TabsList>
-              <TabsTrigger value="daily">{t("cleanup.tab.daily")}</TabsTrigger>
-              <TabsTrigger value="monthly">{t("cleanup.tab.monthly")}</TabsTrigger>
-              <TabsTrigger value="advanced">{t("cleanup.tab.advanced")}</TabsTrigger>
-              <TabsTrigger value="system">{t("volcache.tab")}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="daily" />
-            <TabsContent value="monthly" />
-            <TabsContent value="advanced" />
-            <TabsContent value="system" />
-          </Tabs>
+          mode === "detailed" ? (
+            <Tabs value={tab} onValueChange={(v) => setTab(v as DetailTab)}>
+              <TabsList>
+                <TabsTrigger value="daily">{t("cleanup.tab.daily")}</TabsTrigger>
+                <TabsTrigger value="monthly">{t("cleanup.tab.monthly")}</TabsTrigger>
+                <TabsTrigger value="advanced">{t("cleanup.tab.advanced")}</TabsTrigger>
+                <TabsTrigger value="system">{t("volcache.tab")}</TabsTrigger>
+              </TabsList>
+              {DETAIL_TABS.map((d) => (
+                <TabsContent key={d} value={d} />
+              ))}
+            </Tabs>
+          ) : undefined
         }
       />
       <PageBody>
@@ -182,216 +93,23 @@ export function CleanupPage() {
             { label: "luli.ask.cleanup.often" },
           ]}
         />
-        {group === "system" ? (
-          <SystemFilesPanel elevated={elevated} onHistory={setHistory} />
-        ) : null}
-        {group === "system" ? null : <DiskSummary preview={preview} selected={selected} />}
-        <Card
-          className={cn(
-            "animate-rise flex flex-wrap items-center gap-4 py-4",
-            group === "system" && "hidden",
-          )}
-        >
-          <span className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-wide">
-            {t("cleanup.selected_total", {
-              count: selected.length,
-              size: previewed && selected.length > 0 ? formatBytes(totalBytes, locale) : "—",
-            })}
-            <HelpHint text={t("cleanup.help")} />
-          </span>
-          {needsAdmin && !elevated ? (
-            <span className="flex items-center gap-2 text-xs text-warning">
-              <ElevateButton route="cleanup" />
-              <HelpHint text={t("cleanup.elevate_hint")} />
-            </span>
-          ) : null}
-          <div className="ml-auto flex gap-2">
-            <Button
-              variant="outline"
-              disabled={busy || !inTauri || selected.length === 0}
-              onClick={runPreview}
-            >
-              <Eye className="size-4" />
-              {phase === "previewing" ? t("cleanup.preview.running") : t("cleanup.preview")}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={busy || !previewed || selected.length === 0}
-              onClick={() => setPhase("confirm")}
-            >
-              <BrushCleaning className="size-4" />
-              {t("cleanup.run")}
-            </Button>
-          </div>
-          {error ? <p className="w-full text-xs text-destructive">{error}</p> : null}
-        </Card>
-
-        {live && busy && group !== "system" ? (
-          <LivePanel
-            live={live}
-            running={phase === "running"}
-            ids={selected}
-            since={startedAt}
-            expected={phase === "running" ? totalBytes : 0}
-            nameOf={(id) => t(cleanupName(id))}
-            onStop={() => void backend.cleanupCancel()}
-            opaque={(id) => preview[id]?.measurable === false}
-            noteOf={(id) => (id === "dism" ? "cleanup.live.component" : undefined)}
+        {mode === "smart" ? (
+          <SmartView
+            elevated={elevated}
+            autostart={arrival === "analyze"}
+            onHistory={setHistory}
+            onDetailed={detailed}
           />
-        ) : null}
+        ) : (
+          <DetailedMode
+            tab={tab}
+            elevated={elevated}
+            autorun={!!boot.autorun}
+            onHistory={setHistory}
+          />
+        )}
 
-        {phase === "confirm" && group !== "system" ? (
-          <Card className="animate-rise border-warning/40">
-            <CardTitle>
-              <Trash2 className="size-4 text-warning" />
-              {t("cleanup.confirm.title")}
-            </CardTitle>
-            <p className="text-sm text-foreground/90">
-              {t("cleanup.confirm.body", {
-                size: formatBytes(totalBytes, locale),
-                count: selected.length,
-              })}
-            </p>
-            <ul className="mt-3 grid grid-cols-1 gap-1 text-xs md:grid-cols-2">
-              {selected.map((id) => {
-                const p = preview[id];
-                const c = CLEANUP_CATALOG.find((x) => x.id === id);
-                return (
-                  <li key={id} className="flex items-center gap-2">
-                    <span className={cn(c?.risk === "high" && "text-destructive")}>
-                      {t(cleanupName(id))}
-                    </span>
-                    <span className="num ml-auto text-muted-foreground">
-                      {p?.measurable
-                        ? formatBytes(p.bytes, locale)
-                        : t("cleanup.preview.not_measurable")}
-                    </span>
-                    {p?.needs_admin && !elevated ? (
-                      <Badge tone="warning">{t("cleanup.needs_admin")}</Badge>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setPhase("idle")}>
-                {t("common.cancel")}
-              </Button>
-              <Button variant="primary" onClick={execute}>
-                <Trash2 className="size-4" />
-                {t("cleanup.confirm.go")}
-              </Button>
-            </div>
-          </Card>
-        ) : null}
-
-        {result && group !== "system" ? (
-          <Card className="animate-rise">
-            <CardTitle>
-              {t("cleanup.result.title")}
-              <span className="ml-2 font-sans text-xs font-normal text-success">
-                {t("cleanup.result.freed", {
-                  size: formatBytes(
-                    result.items.reduce((s, i) => s + i.bytes_freed, 0),
-                    locale,
-                  ),
-                })}
-              </span>
-            </CardTitle>
-            <ul className="grid grid-cols-1 gap-1 text-xs md:grid-cols-2">
-              {result.items.map((i) => (
-                <li key={i.id} className="flex items-center gap-2">
-                  <span>{t(cleanupName(i.id))}</span>
-                  <span className="num ml-auto text-muted-foreground">
-                    {i.error
-                      ? t("cleanup.result.error", { error: errorText(new Error(i.error)) })
-                      : `${formatBytes(i.bytes_freed, locale)}${
-                          i.skipped > 0
-                            ? ` · ${t("cleanup.result.skipped", { count: i.skipped })}`
-                            : ""
-                        }`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ) : null}
-
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          {visible.map((c, i) => {
-            const p = preview[c.id];
-            return (
-              <Card
-                key={c.id}
-                className="panel-hover animate-rise flex items-start gap-4"
-                style={rise(i)}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-[14px] font-semibold tracking-wide">
-                      {t(cleanupName(c.id))}
-                    </h3>
-                    <Badge tone={RISK_TONE[c.risk]}>{t(RISK_KEY[c.risk])}</Badge>
-                    {c.admin ? (
-                      <Badge
-                        tone={p?.needs_admin ? "warning" : "neutral"}
-                        title={t("common.admin_required")}
-                      >
-                        <ShieldAlert className="mr-1 inline size-3" />
-                        {t("common.admin_required")}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    {t(cleanupHint(c.id))}
-                  </p>
-                  {c.requiresClosed ? (
-                    <p className="mt-1.5 text-[11px] text-warning/90">
-                      {t("cleanup.requires_closed", { apps: c.requiresClosed.join(", ") })}
-                    </p>
-                  ) : null}
-                  {p ? (
-                    <p className="num mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {p.missing ? (
-                        <span className="text-muted-foreground">
-                          {t("cleanup.preview.missing")}
-                        </span>
-                      ) : p.measurable ? (
-                        <>
-                          <span className="font-semibold">{formatBytes(p.bytes, locale)}</span>
-                          <span className="text-muted-foreground">
-                            {t("cleanup.preview.files", { files: p.files })}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {t("cleanup.preview.not_measurable")}
-                        </span>
-                      )}
-                      {p.blocked_by.length > 0 ? (
-                        <span className="text-warning">
-                          {t("cleanup.preview.blocked", { apps: p.blocked_by.join(", ") })}
-                        </span>
-                      ) : null}
-                    </p>
-                  ) : null}
-                </div>
-                <Switch
-                  checked={!!on[c.id]}
-                  disabled={busy}
-                  onCheckedChange={(v) => setOn((s) => ({ ...s, [c.id]: v }))}
-                  aria-label={t(cleanupName(c.id))}
-                  className={cn(
-                    c.risk === "high" &&
-                      "data-[state=checked]:border-destructive data-[state=checked]:bg-destructive/90",
-                  )}
-                />
-              </Card>
-            );
-          })}
-        </div>
-
-        <Card className="animate-rise" style={rise(visible.length)}>
+        <Card className="animate-rise">
           <CardTitle>
             <History className="size-4" />
             {t("cleanup.history")}
@@ -400,7 +118,7 @@ export function CleanupPage() {
             <EmptyState
               icon={<History className="size-5" />}
               title={t("cleanup.history.empty")}
-              body={t("cleanup.help")}
+              body={t("clean.history.empty")}
             />
           ) : (
             <ul className="divide-y divide-border text-xs">
@@ -408,7 +126,10 @@ export function CleanupPage() {
                 .reverse()
                 .slice(0, 10)
                 .map((r) => (
-                  <li key={r.at} className="flex items-center gap-3 py-2">
+                  <li
+                    key={`${r.at}-${r.trigger}-${r.items[0]?.id ?? ""}`}
+                    className="flex items-center gap-3 py-2"
+                  >
                     <span className="num text-muted-foreground">
                       {new Date(r.at * 1000).toLocaleString(locale)}
                     </span>
@@ -434,112 +155,30 @@ export function CleanupPage() {
   );
 }
 
-/** System drive ring + what the last preview found per category (largest first). */
-function DiskSummary({
-  preview,
-  selected,
+/** Segmented toggle (aria-pressed), like the other pages' filters. */
+function ModeChip({
+  pressed,
+  onClick,
+  children,
 }: {
-  preview: Record<string, PreviewItem>;
-  selected: string[];
+  pressed: boolean;
+  onClick: () => void;
+  children: ReactNode;
 }) {
-  const { t, locale } = useI18n();
-  const [drive, setDrive] = useState<DriveInfo | null>(null);
-  const [drawn, setDrawn] = useState(false);
-  useEffect(() => {
-    backend.listDrives().then((d) => {
-      if (d) setDrive(d.find((x) => x.letter.toUpperCase().startsWith("C")) ?? d[0] ?? null);
-    });
-    // The ring draws from empty on the first frame (the transition lives in .gauge-anim).
-    const id = requestAnimationFrame(() => setDrawn(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-  const rows = Object.values(preview)
-    .filter((p) => p.measurable && !p.missing && p.bytes > 0)
-    .sort((a, b) => b.bytes - a.bytes);
-  const found = rows.reduce((s, p) => s + p.bytes, 0);
-  const picked = rows.filter((p) => selected.includes(p.id)).reduce((s, p) => s + p.bytes, 0);
-  const used = drive ? drive.total_bytes - drive.free_bytes : 0;
-  const pct = drive && drive.total_bytes > 0 ? (100 * used) / drive.total_bytes : 0;
   return (
-    <Card className="animate-rise grid gap-6 md:grid-cols-[200px_1fr]">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="relative size-32">
-          <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden>
-            <circle
-              cx="60"
-              cy="60"
-              r="50"
-              fill="none"
-              strokeWidth="9"
-              className="stroke-foreground/8"
-            />
-            <circle
-              cx="60"
-              cy="60"
-              r="50"
-              fill="none"
-              strokeWidth="9"
-              strokeLinecap="round"
-              pathLength={100}
-              strokeDasharray={`${drawn ? pct : 0} 100`}
-              className={cn("gauge-anim", pct > 90 ? "stroke-destructive" : "stroke-primary")}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="num text-lg font-semibold">
-              {drive ? formatBytes(drive.free_bytes, locale) : "—"}
-            </span>
-            <span className="text-[11px] text-muted-foreground">{t("cleanup.disk.free")}</span>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {drive
-            ? t("cleanup.disk.used", {
-                drive: drive.letter,
-                used: formatBytes(used, locale),
-                total: formatBytes(drive.total_bytes, locale),
-              })
-            : t("cleanup.disk.title")}
-        </p>
-      </div>
-      <div className="min-w-0">
-        <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-display text-[15px] font-semibold tracking-wide">
-            {t("cleanup.found.title")}
-          </h3>
-          {rows.length ? (
-            <span className="num text-xs text-muted-foreground">
-              {t("cleanup.found.total", {
-                total: formatBytes(found, locale),
-                selected: formatBytes(picked, locale),
-              })}
-            </span>
-          ) : null}
-        </header>
-        {rows.length ? (
-          <ul className="grid gap-2.5">
-            {rows.slice(0, 8).map((p) => (
-              <li
-                key={p.id}
-                className="grid grid-cols-[minmax(0,13rem)_1fr_auto] items-center gap-3 text-xs"
-              >
-                <span className="truncate">{t(cleanupName(p.id))}</span>
-                <Meter
-                  value={p.bytes / (rows[0]?.bytes || 1)}
-                  tone={selected.includes(p.id) ? "accent" : "neutral"}
-                  label={t(cleanupName(p.id))}
-                />
-                <span className="num w-20 text-right text-muted-foreground">
-                  {formatBytes(p.bytes, locale)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-muted-foreground">{t("cleanup.found.empty")}</p>
-        )}
-      </div>
-    </Card>
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={cn(
+        "press flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors",
+        pressed
+          ? "border-border-strong bg-foreground/8 text-foreground"
+          : "border-border text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

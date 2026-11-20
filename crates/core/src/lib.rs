@@ -106,6 +106,7 @@ pub mod activity;
 pub mod winnotify;
 
 // r11:clean
+pub mod smartclean;
 
 // r11:anticheat
 pub mod anticheat;

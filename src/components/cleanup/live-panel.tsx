@@ -134,7 +134,9 @@ export function LivePanel({
               key={id}
               className={cn(
                 "flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition-colors duration-300",
-                state === "done" && "border-success/30 text-success",
+                // Done items are struck through as they finish: the queue empties visibly.
+                state === "done" &&
+                  "border-success/30 text-success line-through decoration-success/50",
                 state === "active" && "border-primary/60 bg-primary/10 text-foreground",
                 state === "pending" && "border-border text-muted-foreground/70",
               )}

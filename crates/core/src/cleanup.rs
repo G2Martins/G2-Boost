@@ -78,6 +78,14 @@ pub struct Category {
     action: Action,
 }
 
+impl Category {
+    /// Empties whole folders (its roots can be named on the disk map); false for top-file globs,
+    /// the Recycle Bin, the DNS flush and the component task.
+    pub(crate) fn clears_folders(&self) -> bool {
+        matches!(self.action, Action::DirContents)
+    }
+}
+
 const fn cat(
     id: &'static str,
     group: Group,
@@ -119,6 +127,18 @@ pub const CATALOG: &[Category] = &[
     cat("teams_cache", Group::Monthly, Risk::Low, false, &["teams.exe"], true, Action::DirContents),
     cat("slack_cache", Group::Monthly, Risk::Low, false, &["slack.exe"], true, Action::DirContents),
     cat("vscode_cache", Group::Monthly, Risk::Low, false, &["code.exe"], true, Action::DirContents),
+    // Round 11 review: driver installers extracted at the drive root, and Adobe's media cache
+    // (both rebuilt or re-downloaded when needed; Docs/cleanup/catalog.md).
+    cat("driver_installers", Group::Monthly, Risk::Low, false, &[], true, Action::DirContents),
+    cat(
+        "adobe_media_cache",
+        Group::Monthly,
+        Risk::Low,
+        false,
+        &["adobe premiere pro.exe", "afterfx.exe", "adobe media encoder.exe", "audition.exe"],
+        true,
+        Action::DirContents,
+    ),
     // Developer caches: re-downloaded on the next install/restore, so medium risk and opt-in.
     cat("dev_npm", Group::Advanced, Risk::Medium, false, &[], false, Action::DirContents),
     cat("dev_pip", Group::Advanced, Risk::Medium, false, &[], false, Action::DirContents),
@@ -139,6 +159,17 @@ pub(crate) fn env_dir(var: &str) -> Option<PathBuf> {
 
 fn under(base: Option<PathBuf>, rel: &str) -> Option<PathBuf> {
     base.map(|b| b.join(rel))
+}
+
+/// `C:\` of the system drive (`%SystemDrive%` is `C:`, not an absolute path by itself).
+fn drive_root() -> Option<PathBuf> {
+    let d = std::env::var("SystemDrive").ok()?;
+    (d.len() == 2 && d.ends_with(':')).then(|| PathBuf::from(format!("{d}\\")))
+}
+
+/// Folders AMD's and NVIDIA's driver installers unpack into and leave behind.
+fn driver_installer_dirs(root: Option<PathBuf>) -> Vec<PathBuf> {
+    ["AMD", "NVIDIA"].iter().filter_map(|n| under(root.clone(), n)).collect()
 }
 
 /// Real (non-reparse) child directories of `base` whose name passes `keep`. Profile folders that
@@ -257,6 +288,12 @@ pub fn paths(id: &str) -> Vec<PathBuf> {
             under(roaming(), r"Code\Code Cache"),
             under(roaming(), r"Code\GPUCache"),
         ],
+        "driver_installers" => return driver_installer_dirs(drive_root()),
+        "adobe_media_cache" => vec![
+            under(roaming(), r"Adobe\Common\Media Cache Files"),
+            under(roaming(), r"Adobe\Common\Media Cache"),
+            under(roaming(), r"Adobe\Common\Peak Files"),
+        ],
         "dev_npm" => vec![under(local(), "npm-cache")],
         "dev_pip" => vec![under(local(), r"pip\cache")],
         "dev_nuget" => vec![under(local(), r"NuGet\v3-cache")],
@@ -284,7 +321,7 @@ pub fn paths(id: &str) -> Vec<PathBuf> {
             under(win(), r"Logs\WindowsUpdate"),
             under(win(), r"Logs\DISM"),
         ],
-        "dumps" => vec![under(local(), "CrashDumps"), under(win(), "Minidump")],
+        "dumps" => vec![under(local(), "CrashDumps"), under(win(), "Minidump"), under(win(), "LiveKernelReports")],
         _ => Vec::new(),
     };
     list.into_iter().flatten().collect()
@@ -336,7 +373,7 @@ pub(crate) fn measure_dir(dir: &Path, t: &mut Tally) {
 
 /// Categories whose recent files are left alone ([`FRESH`]): the temp folders.
 fn keeps_fresh(id: &str) -> bool {
-    matches!(id, "temp_user" | "temp_windows")
+    matches!(id, "temp_user" | "temp_windows" | "driver_installers")
 }
 
 /// Files created or changed after this are kept (`None` = no age limit).
@@ -1092,6 +1129,45 @@ pub(crate) mod tests {
         assert_eq!(t.files, 2);
         assert!(dir.join("fresh.tmp").exists() && !dir.join("old.tmp").exists() && !dir.join("sub").exists());
         assert!(cutoff("temp_user").is_some() && cutoff("temp_windows").is_some() && cutoff("edge_cache").is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Round 11 categories: the driver installer folders sit at the drive root (class Other), keep
+    /// what an install in progress just unpacked, and a junction root or inside is never followed.
+    #[test]
+    fn driver_installer_folders_keep_fresh_files_and_refuse_junctions() {
+        use std::os::windows::fs::FileTimesExt;
+        let dir = tmp_tree("drivers");
+        let victim = dir.join("victim");
+        fs::create_dir_all(&victim).unwrap();
+        fs::write(victim.join("keep.bin"), b"x").unwrap();
+        let roots = driver_installer_dirs(Some(dir.clone()));
+        assert_eq!(roots, vec![dir.join("AMD"), dir.join("NVIDIA")]);
+        fs::create_dir_all(dir.join(r"AMD\Chipset\Bin")).unwrap();
+        let old = SystemTime::now() - Duration::from_secs(30 * 86_400);
+        for f in [r"AMD\Chipset\Bin\setup.exe", r"AMD\Chipset\readme.txt"] {
+            fs::write(dir.join(f), [0u8; 100]).unwrap();
+            fs::File::options().write(true).open(dir.join(f)).unwrap().set_times(fs::FileTimes::new().set_modified(old).set_created(old)).unwrap();
+        }
+        fs::write(dir.join(r"AMD\unpacking.tmp"), [0u8; 5]).unwrap(); // installer running right now
+        make_junction(&dir.join(r"AMD\trap"), &victim);
+        make_junction(&dir.join("NVIDIA"), &victim); // the root itself is a link: skipped
+        assert!(matches!(checked_root(&dir.join("AMD")), Ok(Some(_))));
+        assert!(matches!(checked_root(&dir.join("NVIDIA")), Ok(None)), "junction root is not cleaned");
+        let mut t = Tally::default();
+        assert!(delete_dir_contents_with(&dir.join("AMD"), &mut t, cutoff("driver_installers"), &mut |_| true));
+        assert_eq!(t.files, 2);
+        assert!(dir.join(r"AMD\unpacking.tmp").exists() && !dir.join(r"AMD\Chipset").exists());
+        assert!(victim.join("keep.bin").exists());
+        // Every new path classifies outside the critical areas (the drive root is "other").
+        for id in ["driver_installers", "adobe_media_cache", "dumps"] {
+            assert!(find(id).is_some());
+            for p in paths(id) {
+                assert!(checked_root(&p).is_ok(), "{id}: {}", p.display());
+            }
+        }
+        assert!(paths("dumps").iter().any(|p| p.ends_with("LiveKernelReports")));
+        fs::remove_dir(dir.join("NVIDIA")).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 

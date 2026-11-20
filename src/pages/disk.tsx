@@ -12,12 +12,16 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { QuickClean } from "@/components/cleanup/quick-clean";
+import { useItemName } from "@/components/cleanup/smart-view";
 import { DupesTab } from "@/components/disk/dupes-tab";
+import { openUnowned, takeDiskIntent } from "@/components/disk/intent";
 import { FILE_CLASSES, Treemap } from "@/components/disk/treemap";
 import { useErrorText } from "@/components/elevate-button";
 import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
+  Badge,
   Button,
   Card,
   CardTitle,
@@ -35,6 +39,7 @@ import {
   type Essential,
   inTauri,
   type NodeView,
+  type OwnerHit,
   type RecycleOutcome,
   type ScanProgressEvent,
   type ScanSummary,
@@ -64,6 +69,9 @@ export function DiskPage() {
   const errorText = useErrorText();
   const scanning = progress !== null;
   const started = useRef(false);
+  // Sent here by the cleanup page ("see what else takes the space"): tab, filter, scan.
+  const [intent] = useState(takeDiskIntent);
+  const [owners, setOwners] = useState<OwnerHit[]>([]);
 
   // While scanning: the root's direct children growing, as a one-level treemap.
   const live = useMemo(() => {
@@ -140,17 +148,29 @@ export function DiskPage() {
         void startScan(boot.scanPath ?? d?.[0]?.letter ?? "C:");
       }
     });
-    // a previous scan may still be in memory (page re-mount)
+    // a previous scan may still be in memory (page re-mount); none and asked for one: start it
     backend.diskSummary().then((s) => {
       if (s) {
         setSummary(s);
         void loadRoot();
+      } else if (intent.scan && inTauri && !started.current) {
+        started.current = true;
+        setSelected(intent.scan);
+        void startScan(intent.scan);
       }
     });
     return () => {
       for (const p of offs) p.then((off) => off());
     };
-  }, [loadRoot, startScan]);
+  }, [loadRoot, startScan, intent]);
+
+  // What the cleanup does in the folder on screen and its sub-folders (badges, strip below).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` re-asks after a recycle
+  useEffect(() => {
+    if (!view) return;
+    backend.cleanOwners(view.ids).then((h) => setOwners(h ?? []));
+  }, [view, version]);
+  const marks = useMarks(view, owners);
 
   const open = async (node: NodeView) => {
     const v = await backend.diskTree(node.ids, 2, 80);
@@ -178,9 +198,11 @@ export function DiskPage() {
   };
 
   const current = drives.find((d) => d.letter === selected);
-  const initialTab = ["treemap", "largest", "dupes", "essentials"].includes(boot.startTab ?? "")
-    ? (boot.startTab as string)
-    : "treemap";
+  const initialTab =
+    intent.tab ??
+    (["treemap", "largest", "dupes", "essentials"].includes(boot.startTab ?? "")
+      ? (boot.startTab as string)
+      : "treemap");
 
   const luliData = useMemo(() => {
     if (!summary || !view || summary.cancelled) return null;
@@ -349,7 +371,14 @@ export function DiskPage() {
                         }}
                       />
                     ) : null}
-                    <Treemap root={view} onOpen={open} locale={locale} />
+                    <CleanStrip
+                      view={view}
+                      hits={owners}
+                      onCleaned={(freed) =>
+                        setFolderMsg(t("clean.badge.cleaned", { size: formatBytes(freed, locale) }))
+                      }
+                    />
+                    <Treemap root={view} onOpen={open} locale={locale} marks={marks} />
                     <p className="mt-2 text-[11px] text-muted-foreground">{t("disk.hint.open")}</p>
                   </>
                 ) : live ? (
@@ -384,6 +413,7 @@ export function DiskPage() {
           <TabsContent value="largest">
             <PageBody className="px-0 pb-0">
               <FilesTab
+                initialQuery={intent.query}
                 hasScan={summary !== null}
                 version={version}
                 onRecycled={refreshAfterRecycle}
@@ -601,17 +631,21 @@ const FILTER_EXAMPLES = [">1gb", "*.mp4 *.mkv", "*.iso *.zip", ">6m >500mb", "*.
 
 /** Largest files, narrowed by a filter; pick rows → Recycle Bin. */
 function FilesTab({
+  initialQuery,
   hasScan,
   version,
   onRecycled,
 }: {
+  initialQuery?: string;
   hasScan: boolean;
   version: number;
   onRecycled: (o: RecycleOutcome) => Promise<void>;
 }) {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
-  const [query, setQuery] = useState("");
+  const name = useItemName();
+  const [query, setQuery] = useState(initialQuery ?? "");
+  const [owners, setOwners] = useState<(string | null)[]>([]);
   const [res, setRes] = useState<DiskSearch | null>(null);
   const [picked, setPicked] = useState<Record<string, BigFile>>({});
   const [confirm, setConfirm] = useState(false);
@@ -630,6 +664,15 @@ function FilesTab({
   // An empty query is the plain "largest files" list (one walk, no separate top-files call).
   const files = res?.files ?? [];
   const picks = Object.values(picked);
+  // Files inside a cleanup category's folder: the badge says the cleanup already takes them.
+  useEffect(() => {
+    const paths = (res?.files ?? []).map((f) => f.path);
+    if (paths.length === 0) {
+      setOwners([]);
+      return;
+    }
+    backend.cleanOwnerPaths(paths).then((o) => setOwners(o ?? []));
+  }, [res]);
   const keyOf = (f: BigFile) => f.ids.join("/");
   const toggle = (f: BigFile) =>
     setPicked((cur) => {
@@ -726,7 +769,7 @@ function FilesTab({
             </tr>
           </thead>
           <tbody>
-            {files.map((f) => (
+            {files.map((f, i) => (
               <tr
                 key={keyOf(f)}
                 className={cn(
@@ -743,8 +786,15 @@ function FilesTab({
                     className="accent-primary"
                   />
                 </td>
-                <td className="num max-w-160 truncate py-1.5" title={f.path}>
-                  {f.path}
+                <td className="num max-w-160 py-1.5" title={f.path}>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate">{f.path}</span>
+                    {owners[i] ? (
+                      <Badge tone="success" className="shrink-0 normal-case tracking-normal">
+                        {t("clean.badge.file", { name: name(owners[i] ?? "") })}
+                      </Badge>
+                    ) : null}
+                  </span>
                 </td>
                 <td className="num py-1.5 text-right font-semibold">
                   {formatBytes(f.size, locale)}
@@ -774,6 +824,8 @@ function FilesTab({
 
 /** Big items Windows' own cleanup handlers shrink (cleanup page, "System files" tab). */
 const SYSTEM_FILES_FOR = ["winsxs", "windows_old"];
+/** Essentials a catalog category empties: cleaned right here (preview + confirmation). */
+const CATEGORY_FOR: Record<string, string> = { wu_download: "wu_cache", recycle_bin: "recycle" };
 
 /** Big system items with what they are and the safe way to shrink each. */
 function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number }) {
@@ -812,6 +864,11 @@ function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t(`disk.ess.${e.id}.body` as I18nKey)}
                 </p>
+                {CATEGORY_FOR[e.id] ? (
+                  <div className="mt-2">
+                    <QuickClean ids={[CATEGORY_FOR[e.id] ?? ""]} route="disk" />
+                  </div>
+                ) : null}
                 {SYSTEM_FILES_FOR.includes(e.id) ? (
                   <Button
                     size="sm"
@@ -831,5 +888,99 @@ function EssentialsTab({ hasScan, version }: { hasScan: boolean; version: number
         </ul>
       )}
     </Card>
+  );
+}
+
+/** Sub-folder → what the cleanup does there, for the treemap's dots and hover. */
+function useMarks(view: NodeView | null, hits: OwnerHit[]): Map<string, string> {
+  const { t } = useI18n();
+  const name = useItemName();
+  return useMemo(() => {
+    const m = new Map<string, string>();
+    if (!view) return m;
+    for (const h of ofView(view, hits)) {
+      if (h.ids.length !== view.ids.length + 1) continue;
+      const parts: string[] = [];
+      if (h.inside.length) parts.push(t("clean.badge.inside", { names: names(h.inside, name) }));
+      else if (h.contains.length)
+        parts.push(t("clean.badge.contains", { names: names(h.contains, name) }));
+      if (h.unowned) parts.push(t("clean.badge.unowned"));
+      if (parts.length) m.set(h.ids.join("/"), parts.join(" · "));
+    }
+    return m;
+  }, [view, hits, t, name]);
+}
+
+/** Hits of the folder on screen (an answer for the previous folder may still be in state). */
+function ofView(view: NodeView, hits: OwnerHit[]): OwnerHit[] {
+  return hits.filter((h) => view.ids.every((v, i) => h.ids[i] === v));
+}
+
+/** Up to three names, then "+N". */
+function names(ids: string[], name: (id: string) => string): string {
+  const shown = ids.slice(0, 3).map(name).join(", ");
+  return ids.length > 3 ? `${shown} +${ids.length - 3}` : shown;
+}
+
+/**
+ * Under the breadcrumb: the cleanup's part in this folder. Inside a category's folder = "clean
+ * only this"; categories below = clean those; folders nobody owns = review them in Apps.
+ */
+function CleanStrip({
+  view,
+  hits,
+  onCleaned,
+}: {
+  view: NodeView;
+  hits: OwnerHit[];
+  onCleaned: (freed: number) => void;
+}) {
+  const { t } = useI18n();
+  const name = useItemName();
+  const mine = ofView(view, hits);
+  const here = mine.find((h) => h.ids.length === view.ids.length);
+  const kids = mine.filter((h) => h.ids.length === view.ids.length + 1);
+  const below = [
+    ...new Set([...(here?.contains ?? []), ...kids.flatMap((k) => [...k.inside, ...k.contains])]),
+  ];
+  const ownerless = kids.filter((k) => k.unowned).length;
+  const inside = (here?.inside.length ?? 0) > 0;
+  const cats = inside ? (here?.inside ?? []) : below;
+  if (cats.length === 0 && ownerless === 0 && !here?.unowned) return null;
+  return (
+    <div className="mb-3 flex flex-col gap-2 rounded-md border border-success/25 bg-success/5 px-3 py-2 text-xs">
+      {cats.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <BrushCleaning className="size-3.5 text-success" />
+          <span>
+            {inside
+              ? t("clean.strip.inside", { names: names(cats, name) })
+              : t("clean.strip.below", { names: names(cats, name) })}
+          </span>
+          <span className="ml-auto">
+            <QuickClean
+              key={cats.join(",")}
+              ids={cats}
+              route="disk"
+              label={inside ? t("clean.quick.go") : t("clean.strip.clean_these")}
+              onDone={onCleaned}
+            />
+          </span>
+        </div>
+      ) : null}
+      {here?.unowned || ownerless > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <FileWarning className="size-3.5 text-warning" />
+          <span>
+            {here?.unowned
+              ? t("clean.strip.unowned_here")
+              : t("clean.strip.unowned_below", { count: ownerless })}
+          </span>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={openUnowned}>
+            {t("clean.review.in_apps")}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }

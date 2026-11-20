@@ -1282,6 +1282,22 @@ export const backend = {
     }),
 
   // r11:clean
+  /** Measure every source (live `smart:source`): the Safe / Review / System buckets. */
+  smartAnalyze: () => callOrThrow<CleanPlan>("smart_analyze"),
+  /** Stop the analysis, a preview or a run between files. */
+  smartCancel: () => call<void>("smart_cancel"),
+  /** Catalog categories and Windows handlers measured as one queue (`smart:measure`). */
+  smartPreview: (ids: string[]) => callOrThrow<SmartPreview>("smart_preview", { ids }),
+  smartConfirm: (ids: string[]) => callOrThrow<ConfirmToken>("smart_confirm", { ids }),
+  /** Catalog then handlers, one `smart:progress` queue; both land in the history. */
+  smartExecute: (token: number, ids: string[]) =>
+    callOrThrow<SmartRun>("smart_execute", { token, ids }),
+  /** Cleanup badges for the folder on screen in the disk map and its sub-folders. */
+  cleanOwners: (ids: number[]) => call<OwnerHit[]>("clean_owners", { ids }),
+  /** The category whose folder holds each path (null = none). */
+  cleanOwnerPaths: (paths: string[]) => call<(string | null)[]>("clean_owner_paths", { paths }),
+  /** Category id → its app's exe (real icon), only apps installed here. */
+  cleanAppExes: () => call<Record<string, string>>("clean_app_exes"),
 
   // r11:anticheat
   /** Installed games' anti-cheat requirements vs this PC (read-only). */
@@ -1860,6 +1876,51 @@ export function watchCalls(f: (cmd: string, settled: Promise<unknown>) => void) 
 }
 
 // ── r11:clean types ──
+export type CleanSource = "catalog" | "system" | "big_old" | "unowned" | "leftovers" | "dupes";
+export type SourceEvent = {
+  source: CleanSource;
+  state: "running" | "done" | "skipped";
+  /** Found so far (running) or in total (done). */
+  bytes: number;
+  count: number;
+  current: string | null;
+};
+export type ReviewItem =
+  | { kind: "category"; id: string; bytes: number; needs_admin: boolean }
+  | { kind: "big_old"; count: number; bytes: number }
+  | { kind: "unowned"; count: number; bytes: number; high: number }
+  | { kind: "leftovers"; apps: number; bytes: number }
+  | { kind: "dupes"; groups: number; bytes: number };
+export type CleanExtra = {
+  id: "hiberfil" | "pagefile" | "swapfile" | "games" | "restore_points";
+  bytes: number;
+  count: number;
+};
+export type CleanPlan = {
+  at: number;
+  elevated: boolean;
+  drive: DriveInfo | null;
+  /** System drive under 15 % or 20 GB free. */
+  tight: boolean;
+  safe: string[];
+  safe_bytes: number;
+  system: string[];
+  system_bytes: number;
+  review: ReviewItem[];
+  review_bytes: number;
+  catalog: PreviewItem[];
+  handlers: VolCacheItem[];
+  big_old: { path: string; size: number; mtime: number }[];
+  extras: CleanExtra[];
+};
+export type SmartPreview = { catalog: PreviewItem[]; system: VolCacheItem[] };
+export type SmartRun = {
+  records: RunRecord[];
+  before: DriveInfo | null;
+  after: DriveInfo | null;
+  tight: boolean;
+};
+export type OwnerHit = { ids: number[]; inside: string[]; contains: string[]; unowned: boolean };
 
 // ── r11:anticheat types ──
 export type AnticheatCheck =

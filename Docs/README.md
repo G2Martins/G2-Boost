@@ -39,6 +39,7 @@ comportamento.
 | [boost/overlay.md](./boost/overlay.md) | Overlay de jogo: FPS, tempo de quadro e 1% low por ETW (sem injeção), janela por cima e clicável através, atalho global, limites. |
 | [core/tools.md](./core/tools.md) | Ferramentas: teste do mouse (polling e cliques), teste de monitor (pixels, níveis, movimento), perda de pacotes (atrasados, fora de ordem, CSV, rota). |
 | [boost/routines.md](./boost/routines.md) | Iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja, configurações validadas. |
+| [cleanup/smart-clean.md](./cleanup/smart-clean.md) | Limpeza inteligente: análise de todas as fontes, baldes Seguro / Revisar / Sistema, progresso do disco ganhando espaço, selos da Limpeza no Analisador de disco, MCP `get_cleanup_plan`. |
 | [cleanup/catalog.md](./cleanup/catalog.md) | Catálogo de limpeza com caminhos reais, prévia, token de confirmação, execução segura contra junções, histórico. |
 | [cleanup/system-files.md](./cleanup/system-files.md) | Arquivos do sistema pelos handlers da Limpeza de Disco do Windows (WinSxS, Windows.old, drivers antigos, logs), allowlist e defesa contra handler plantado. |
 | [core/maintenance.md](./core/maintenance.md) | Manutenção: DISM pela DismApi (verificar/reparar imagem), SFC e MRT pela exceção da §1.3, parsers do CBS.log/mrt.log, revisão semanal e reparo completo numa vaga só, consertos rápidos (Windows Update, impressora, áudio), passos de verificação elevada. |

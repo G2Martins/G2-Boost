@@ -1,6 +1,13 @@
 # Disco e limpeza
 
-**Última revisão:** 2026-10-18
+**Última revisão:** 2026-11-20
+
+## A tela Limpeza
+
+- Abre em **Analisar**: mede caches e temporários, arquivos do sistema (com admin), arquivos grandes e antigos nas pastas do usuário, pastas sem dono, sobras de apps removidos e duplicados (se o Analisador de disco já procurou). Nada é apagado na análise.
+- Três baldes: **Seguro** (um clique), **Sistema** (entra no clique com o app como administrador) e **Revisar** (Lixeira, shaders, caches de desenvolvimento, arquivos grandes, pastas sem dono: cada um com o próprio botão e confirmação).
+- Depois de limpar: espaço livre antes e depois; se o disco continua apertado, "Ver o que mais ocupa" abre o Analisador já filtrado. Modo detalhado = as abas antigas, categoria por categoria.
+- No Analisador de disco, pasta que a Limpeza cuida tem ponto verde e "Limpar só isso".
 
 ## Seguro para liberar
 
