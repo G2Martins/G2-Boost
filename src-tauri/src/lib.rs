@@ -1965,13 +1965,15 @@ fn watch_uninstalls(app: AppHandle) {
 #[tauri::command]
 fn apps_protect(state: State<'_, AppsState>, r: State<'_, Routines>, id: String, protect: bool) -> Result<Settings, String> {
     let name = state.apps.lock().unwrap().iter().find(|a| a.id == id).map(|a| a.name.clone()).ok_or("unknown_app")?;
-    let mut s = r.settings.lock().unwrap().clone();
+    // Lock held through the save: a concurrent writer can't interleave and undo this change.
+    let mut live = r.settings.lock().unwrap();
+    let mut s = live.clone();
     s.protected_apps.retain(|n| !n.eq_ignore_ascii_case(&name));
     if protect {
         s.protected_apps.push(name);
     }
     let saved = settings::save(&s).map_err(|e| e.to_string())?;
-    *r.settings.lock().unwrap() = saved.clone();
+    *live = saved.clone();
     Ok(saved)
 }
 
@@ -2307,11 +2309,12 @@ async fn updates_apps(r: State<'_, Routines>) -> Result<Vec<updates::AppUpdate>,
 /// Leave a package out of "update all" (or put it back); saved in settings.
 #[tauri::command]
 fn updates_exclude(r: State<'_, Routines>, id: String, exclude: bool) -> Result<Vec<String>, String> {
-    let mut s = r.settings.lock().unwrap().clone();
+    let mut live = r.settings.lock().unwrap(); // held through the save (see `settings_set`)
+    let mut s = live.clone();
     s.update_excluded = updates::exclude(&s.update_excluded, &id, exclude).map_err(|e| e.to_string())?;
     let saved = settings::save(&s).map_err(|e| e.to_string())?;
     let list = saved.update_excluded.clone();
-    *r.settings.lock().unwrap() = saved;
+    *live = saved;
     Ok(list)
 }
 
