@@ -267,19 +267,48 @@ fn file() -> PathBuf {
 }
 
 pub fn load() -> Settings {
-    std::fs::read_to_string(file())
-        .ok()
-        .and_then(|t| serde_json::from_str::<Settings>(&t).ok())
-        .map(sanitize)
-        .unwrap_or_default()
+    load_from(&file())
+}
+
+/// A file that does not parse as a whole (one value out of range is enough) is copied to
+/// `settings.json.bad` before the next save replaces it, and every field that still parses is kept:
+/// only the broken ones fall back to their defaults (games, profiles and rules survive).
+fn load_from(path: &std::path::Path) -> Settings {
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                let _ = std::fs::copy(path, bad_copy(path)); // locked or unreadable: keep what we can
+            }
+            return Settings::default();
+        }
+    };
+    if let Ok(s) = serde_json::from_slice::<Settings>(&bytes) {
+        return sanitize(s);
+    }
+    let _ = std::fs::write(bad_copy(path), &bytes);
+    let Ok(serde_json::Value::Object(fields)) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return Settings::default();
+    };
+    // ponytail: one parse per field (~25), only on a broken file.
+    let mut good = serde_json::Map::new();
+    for (k, v) in fields {
+        let mut trial = good.clone();
+        trial.insert(k.clone(), v.clone());
+        if serde_json::from_value::<Settings>(serde_json::Value::Object(trial)).is_ok() {
+            good.insert(k, v);
+        }
+    }
+    sanitize(serde_json::from_value(serde_json::Value::Object(good)).unwrap_or_default())
+}
+
+fn bad_copy(path: &std::path::Path) -> PathBuf {
+    path.with_extension("json.bad")
 }
 
 pub fn save(s: &Settings) -> std::io::Result<Settings> {
     let s = sanitize(s.clone());
-    if let Some(dir) = file().parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(file(), serde_json::to_string_pretty(&s).expect("serializable"))?;
+    registry::write_atomic(&file(), serde_json::to_string_pretty(&s).expect("serializable").as_bytes())?;
     Ok(s)
 }
 
@@ -335,6 +364,28 @@ mod tests {
         assert_eq!(s.luli_instructions, "seja direta", "trimmed, control characters removed");
         assert_eq!(s.game_mode_games, vec!["steam:730".to_string()], "deduplicated, control chars and bad ids dropped");
         assert_eq!(s.game_tweaks.keys().collect::<Vec<_>>(), vec!["steam:730"], "empty entries and bad ids dropped");
+    }
+
+    #[test]
+    fn a_broken_field_falls_back_alone_and_the_file_is_kept_aside() {
+        let dir = std::env::temp_dir().join(format!("g2boost-settings-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        // `hour: 300` does not fit a u8: before, the whole file became the defaults.
+        let text = r#"{"close_to_tray":false,"schedule":{"mode":"daily","hour":300},"game_mode_games":["steam:730"],"game_exes":["cs2.exe"]}"#;
+        std::fs::write(&path, text).unwrap();
+        let s = load_from(&path);
+        assert!(!s.close_to_tray);
+        assert_eq!(s.game_mode_games, vec!["steam:730".to_string()], "games survive");
+        assert_eq!(s.game_exes, vec!["cs2.exe".to_string()]);
+        assert_eq!(s.schedule, Schedule::Off, "only the broken field is the default");
+        assert_eq!(std::fs::read_to_string(dir.join("settings.json.bad")).unwrap(), text, "original kept");
+        std::fs::write(&path, b"\xff not json").unwrap();
+        assert_eq!(load_from(&path), Settings::default());
+        assert_eq!(std::fs::read(dir.join("settings.json.bad")).unwrap(), b"\xff not json");
+        assert_eq!(load_from(&dir.join("missing.json")), Settings::default());
+        assert!(!dir.join("missing.json.bad").exists(), "first run: nothing to keep");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

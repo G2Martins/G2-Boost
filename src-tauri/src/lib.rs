@@ -1238,18 +1238,19 @@ fn luli_forget(id: String) -> Result<Vec<luli::MemoryItem>, String> {
 fn settings_set(r: State<'_, Routines>, settings: Settings) -> Result<Settings, String> {
     // Per-game options mirror the GPU preference in the registry: only `game_tweaks_set` changes
     // them (a page holding an older copy must not undo them). Picked exes: only `pick_exe` & co.
-    // Profiles and the overlay: only their own commands.
-    let live = r.settings.lock().unwrap().clone();
+    // Profiles and the overlay: only their own commands. Held locked through the save, so one of
+    // those commands cannot land in between and be undone by this older copy.
+    let mut live = r.settings.lock().unwrap();
     let settings = Settings {
-        game_tweaks: live.game_tweaks,
-        game_paths: live.game_paths,
-        game_exe_override: live.game_exe_override,
-        profiles: live.profiles,
-        overlay: live.overlay,
+        game_tweaks: live.game_tweaks.clone(),
+        game_paths: live.game_paths.clone(),
+        game_exe_override: live.game_exe_override.clone(),
+        profiles: live.profiles.clone(),
+        overlay: live.overlay.clone(),
         ..settings
     };
     let saved = settings::save(&settings).map_err(|e| e.to_string())?;
-    *r.settings.lock().unwrap() = saved.clone();
+    *live = saved.clone();
     Ok(saved)
 }
 

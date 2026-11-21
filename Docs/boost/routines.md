@@ -1,10 +1,10 @@
 # Rotinas — iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja
 
-**Última revisão:** 2026-10-23 (sempre abrir como administrador) · 2026-10-15 · Código: `crates/core/src/settings.rs`, `routines.rs`, `tasksched.rs`; shell `src-tauri/src/lib.rs` (`Routines`, `spawn_routines`, bandeja) · UI: `src/pages/settings.tsx`, aba RAM em `src/pages/boost.tsx`, `src/components/game-exes.tsx`.
+**Última revisão:** 2026-11-21 (agenda diária/semanal recupera o horário perdido com o PC desligado; `settings.json` com campo quebrado mantém o resto e guarda `settings.json.bad`; gravação atômica) · 2026-10-23 (sempre abrir como administrador) · 2026-10-15 · Código: `crates/core/src/settings.rs`, `routines.rs`, `tasksched.rs`; shell `src-tauri/src/lib.rs` (`Routines`, `spawn_routines`, bandeja) · UI: `src/pages/settings.tsx`, aba RAM em `src/pages/boost.tsx`, `src/components/game-exes.tsx`.
 
 ## Configurações (`settings.json`)
 
-`%LOCALAPPDATA%\G2 Boost\settings.json`, validado no load **e** antes de salvar (`settings::sanitize`): categorias desconhecidas caem fora, exes viram `nome.exe` minúsculo sem caminho (máx. 50), horas 1–168, hora 0–23, dia 0–6.
+`%LOCALAPPDATA%\G2 Boost\settings.json`, validado no load **e** antes de salvar (`settings::sanitize`): categorias desconhecidas caem fora, exes viram `nome.exe` minúsculo sem caminho (máx. 50), horas 1–168, hora 0–23, dia 0–6. Gravação atômica (`registry::write_atomic`, `.tmp` + rename). Arquivo que não abre inteiro (um valor fora da faixa já basta, ex.: `hour: 300`) é copiado para `settings.json.bad` antes do próximo save e cada campo que ainda faz parse é mantido: só os quebrados voltam ao padrão (jogos, perfis, regras de prioridade e `game_tweaks` sobrevivem). `settings_set` grava com a cópia viva travada, então `game_tweaks_set`, `pick_exe` e afins não se perdem no meio.
 
 | Campo | Padrão | Uso |
 |---|---|---|
