@@ -129,6 +129,11 @@ pub fn install_kind(exe: &Path) -> &'static str {
     if dir.is_some_and(|d| d.join("portable.txt").is_file()) {
         return "portable";
     }
+    // The installer may put us anywhere (the owner's copy lives in G:\G2 Boost): its uninstaller
+    // next to the exe is what marks an installed copy, Program Files or not.
+    if dir.is_some_and(|d| d.join("uninstall.exe").is_file()) {
+        return "installed";
+    }
     let pf = std::env::var_os("ProgramFiles").map(std::path::PathBuf::from);
     match (pf, dir) {
         (Some(pf), Some(d)) if d.starts_with(&pf) => "installed",
@@ -136,26 +141,43 @@ pub fn install_kind(exe: &Path) -> &'static str {
     }
 }
 
+/// Write `bytes` to `dir\name`, close it, then reopen it read-only, shared for reading only, and
+/// check it still holds exactly `bytes`. While the returned handle lives nobody can change or
+/// delete the file, and Windows can still start it (a handle open for writing would make every
+/// start fail with a sharing violation: the updater never ran its installer before 0.10.2).
+fn write_locked(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<(std::fs::File, std::path::PathBuf)> {
+    use std::io::{Read, Write};
+    use std::os::windows::fs::OpenOptionsExt;
+    std::fs::create_dir_all(dir)?;
+    let path = dir.join(name);
+    let _ = std::fs::remove_file(&path); // an older download of the same version
+    {
+        let mut w = std::fs::OpenOptions::new().write(true).create_new(true).open(&path)?;
+        w.write_all(bytes)?;
+        w.sync_all()?;
+    }
+    const FILE_SHARE_READ: u32 = 1;
+    let mut f = std::fs::OpenOptions::new().read(true).share_mode(FILE_SHARE_READ).open(&path)?;
+    let mut back = Vec::with_capacity(bytes.len());
+    f.read_to_end(&mut back)?;
+    if back != bytes {
+        return Err(std::io::Error::other("changed_on_disk"));
+    }
+    Ok((f, path))
+}
+
 /// Write the verified installer into `dir` and start it (it asks for administrator itself).
-/// The file stays open, shared for reading only, until the installer process exists: nothing can
-/// swap it between the hash check and the start. Documented exception to "no spawning"
+/// The file stays locked (read-only share) from the content check until the installer process
+/// exists: nothing can swap it in between. Documented exception to "no spawning"
 /// (global-rules §1.3): our own installer, hash-checked, started only by a click.
 pub fn run_installer(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    use std::os::windows::fs::OpenOptionsExt;
     use windows::Win32::UI::Shell::{SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, ShellExecuteExW};
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
     use windows::core::PCWSTR;
     if !safe_name(name) || !name.ends_with(".exe") {
         return Err(std::io::Error::other("bad_name"));
     }
-    std::fs::create_dir_all(dir)?;
-    let path = dir.join(name);
-    let _ = std::fs::remove_file(&path); // an older download of the same version
-    const FILE_SHARE_READ: u32 = 1;
-    let mut f = std::fs::OpenOptions::new().write(true).create_new(true).share_mode(FILE_SHARE_READ).open(&path)?;
-    f.write_all(bytes)?;
-    f.flush()?;
+    let (f, path) = write_locked(dir, name, bytes)?;
     let file = crate::registry::wide(&path.to_string_lossy());
     let verb = crate::registry::wide("open");
     // SAFETY: zeroed struct with cbSize; the strings outlive the call.
@@ -175,6 +197,34 @@ pub fn run_installer(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The locked download can still be started, and cannot be rewritten or deleted meanwhile.
+    #[test]
+    fn a_locked_download_still_starts_and_cannot_be_swapped() {
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let bytes = std::fs::read(format!(r"{win}\System32\whoami.exe")).unwrap();
+        let dir = std::env::temp_dir().join(format!("g2boost-selfupdate-{}", std::process::id()));
+        let (f, path) = write_locked(&dir, "probe.exe", &bytes).unwrap();
+        assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err(), "no writer while locked");
+        assert!(std::fs::remove_file(&path).is_err(), "no delete while locked");
+        // ponytail: whoami stands in for the installer; spawning it only proves Windows starts it.
+        assert!(std::process::Command::new(&path).output().is_ok_and(|o| o.status.success()), "starts while locked");
+        drop(f);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_uninstaller_next_to_the_exe_marks_an_installed_copy() {
+        let dir = std::env::temp_dir().join(format!("g2boost-kind-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("G2 Boost.exe");
+        assert_eq!(install_kind(&exe), "dev");
+        std::fs::write(dir.join("uninstall.exe"), b"x").unwrap();
+        assert_eq!(install_kind(&exe), "installed", "an install outside Program Files (G:\\G2 Boost)");
+        std::fs::write(dir.join("portable.txt"), b"x").unwrap();
+        assert_eq!(install_kind(&exe), "portable", "portable wins");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     const JSON: &str = r#"{
         "tag_name": "v0.9.3", "name": "G2 Boost 0.9.3", "body": "Correções\r\n- um\u0007",

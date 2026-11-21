@@ -95,11 +95,17 @@ pub enum ScanError {
 
 /// Scan `root`. `cancel` makes the walk stop early (the partial tree is still returned).
 pub fn scan(root: &Path, progress: &ScanProgress, cancel: &AtomicBool) -> Result<(Node, ScanSummary), ScanError> {
+    // A local drive letter BEFORE any filesystem call: `//host/share` (forward slashes) is also
+    // UNC, and even `is_dir()` on it would send the user's credentials to that host.
+    let local = root.to_string_lossy().replace('/', "\\");
+    if !crate::icons::local_drive_path(&local) {
+        // A share, device path or mapped network drive vs. something that is no drive path at all.
+        let network = local.starts_with(r"\\") || local.as_bytes().get(1) == Some(&b':');
+        return Err(if network { ScanError::Unc } else { ScanError::BadRoot });
+    }
+    let root = Path::new(&local);
     if !root.is_absolute() || !root.is_dir() {
         return Err(ScanError::BadRoot);
-    }
-    if root.to_string_lossy().starts_with("\\\\") {
-        return Err(ScanError::Unc);
     }
     let t0 = Instant::now();
     let name = root.to_string_lossy().trim_end_matches('\\').to_string();
@@ -779,6 +785,25 @@ mod tests {
         mk("b/three.bin", 1000);
         mk("root.bin", 100);
         dir
+    }
+
+    /// No share is ever touched: every network spelling is refused before any filesystem call.
+    #[test]
+    fn network_roots_are_refused_before_touching_them() {
+        let p = ScanProgress::default();
+        let c = AtomicBool::new(false);
+        for hostile in [r"//evil.example/share", r"\\evil.example\share", r"\\?\UNC\evil\s", r"\\?\C:\Windows", r"\\.\C:\"] {
+            assert!(matches!(scan(Path::new(hostile), &p, &c), Err(ScanError::Unc)), "{hostile:?}");
+        }
+        for odd in ["relative\\x", ""] {
+            assert!(matches!(scan(Path::new(odd), &p, &c), Err(ScanError::BadRoot)), "{odd:?}");
+        }
+        assert!(usage(Some("//attacker.example/s"), 5).is_err());
+        // Forward slashes on a local drive are fine.
+        let dir = sandbox("slashes");
+        let fwd = dir.to_string_lossy().replace('\\', "/");
+        assert!(scan(Path::new(&fwd), &p, &c).is_ok());
+        assert!(crate::apps::resolve_drop("//evil.example/share/app.exe", &[]).is_none());
     }
 
     #[test]

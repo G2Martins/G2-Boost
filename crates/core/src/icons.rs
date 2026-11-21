@@ -129,7 +129,7 @@ pub fn store_logo(declared: &Path) -> Option<Vec<u8>> {
 
 /// `C:\…` on a local drive (never UNC, `\\?\`/`\\.\` device paths or a mapped network drive):
 /// reading an icon must never reach a share, which would send the user's credentials.
-fn local_drive_path(s: &str) -> bool {
+pub(crate) fn local_drive_path(s: &str) -> bool {
     use windows::Win32::Storage::FileSystem::GetDriveTypeW;
     let b = s.as_bytes();
     if s.len() > 520 || b.len() < 4 || !b[0].is_ascii_alphabetic() || b[1] != b':' || b[2] != b'\\' || s.contains('/') {

@@ -1449,6 +1449,10 @@ fn running_exe(app: &App) -> Option<String> {
 
 /// The app a dropped `.exe`/`.lnk` belongs to (its exe, or the longest install folder containing it).
 pub fn resolve_drop(path: &str, apps: &[App]) -> Option<String> {
+    // Local drive only, checked before touching the path (a share would get the user's credentials).
+    if !crate::icons::local_drive_path(path) {
+        return None;
+    }
     let p = Path::new(path);
     if !p.is_absolute() || !p.exists() {
         return None;
