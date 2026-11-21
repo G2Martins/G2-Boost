@@ -1,11 +1,12 @@
 # Atualizações (apps pelo winget, Windows Update pela WUA)
 
-**Última revisão:** 2026-10-26 (atualizações do próprio G2 Boost pelo GitHub) · 2026-10-23 · Código: `crates/core/src/updates.rs` (sobre `winget.rs`), shell `src-tauri/src/lib.rs` (`updates_*`), UI `src/components/apps/updates-tab.tsx` (aba **Atualizações** em **Desinstalar apps**, `src/pages/apps.tsx`), MCP `get_updates` (`crates/mcp/src/lib.rs`), configuração `settings.json → update_excluded`.
+**Última revisão:** 2026-11-21 (só o alias do App Installer é iniciado) · 2026-10-26 (atualizações do próprio G2 Boost pelo GitHub) · 2026-10-23 · Código: `crates/core/src/updates.rs` (sobre `winget.rs`), shell `src-tauri/src/lib.rs` (`updates_*`), UI `src/components/apps/updates-tab.tsx` (aba **Atualizações** em **Desinstalar apps**, `src/pages/apps.tsx`), MCP `get_updates` (`crates/mcp/src/lib.rs`), configuração `settings.json → update_excluded`.
 
 Pedido do dono (2026-10-23): o equivalente a `winget upgrade --all` dentro do app, mais o Windows Update, sem shell.
 
 ## Apps (winget)
 
+- **Qual `winget.exe`:** o alias de execução em `%LOCALAPPDATA%\Microsoft\WindowsApps\winget.exe`, pasta que qualquer programa do usuário grava, e o app costuma rodar elevado. `winget::exe()` abre o alias sem segui-lo (`FILE_FLAG_OPEN_REPARSE_POINT`, compartilhado só para leitura: ninguém troca, renomeia nem apaga até o winget iniciar), lê o buffer (`FSCTL_GET_REPARSE_POINT`) e só aceita `IO_REPARSE_TAG_APPEXECLINK` versão 3 com família `Microsoft.DesktopAppInstaller_8wekyb3d8bbwe`, app `<família>!…` e alvo `winget.exe` direto numa pasta `Microsoft.DesktopAppInstaller_*_8wekyb3d8bbwe` de `<Arquivos de Programas>\WindowsApps` (do shell, `FOLDERID_ProgramFiles`; só o TrustedInstaller grava lá). Qualquer outra coisa = `winget_unavailable`. Testes: parser com buffer sintético no formato real e alvos hostis (`only_app_installers_own_alias_is_started`), alias real aceito e `winget --version` iniciando com o handle aberto.
 - **Lista:** `winget::upgrades()` (o mesmo `winget.exe` da exceção registrada em [global-rules §1.3](./global-rules.md)), classificada em `updates::classify`:
   - `skip = self`: o próprio G2 Boost (nome "G2 Boost" ou id com "G2Boost"); atualizar a si mesmo no meio do lote mataria o processo.
   - `skip = unknown_version`: versão instalada ou disponível sem dígito ("Unknown"/"Desconhecido").

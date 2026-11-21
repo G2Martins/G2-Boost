@@ -69,23 +69,95 @@ pub fn valid_query(q: &str) -> bool {
     (1..=64).contains(&q.chars().count()) && !q.starts_with('-') && !q.chars().any(char::is_control)
 }
 
-/// The App Execution Alias App Installer puts on the user's PATH.
-fn exe() -> Result<PathBuf, WingetError> {
+/// App Installer's package family: winget's alias must belong to it.
+const FAMILY: &str = "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe";
+
+/// (package family, app id, target exe) of an `IO_REPARSE_TAG_APPEXECLINK` buffer as
+/// `FSCTL_GET_REPARSE_POINT` returns it: tag, data length, reserved, then version 3 and
+/// NUL-terminated UTF-16 strings (a fourth one, the app type, is ignored).
+pub(crate) fn parse_app_exec_link(buf: &[u8]) -> Option<(String, String, String)> {
+    const IO_REPARSE_TAG_APPEXECLINK: u32 = 0x8000_001B;
+    let u32_at = |b: &[u8], i: usize| Some(u32::from_le_bytes(b.get(i..i + 4)?.try_into().ok()?));
+    if u32_at(buf, 0)? != IO_REPARSE_TAG_APPEXECLINK {
+        return None;
+    }
+    let len = usize::from(u16::from_le_bytes(buf.get(4..6)?.try_into().ok()?));
+    let data = buf.get(8..8 + len)?;
+    if u32_at(data, 0)? != 3 {
+        return None;
+    }
+    let units: Vec<u16> = data[4..].as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
+    let mut it = units.split(|&u| u == 0).map(|s| String::from_utf16(s).ok().filter(|s| !s.is_empty()));
+    Some((it.next()??, it.next()??, it.next()??))
+}
+
+/// App Installer's own alias: its family and app, and a target `winget.exe` directly inside its
+/// package folder under `<program_files>\WindowsApps` (only TrustedInstaller writes there).
+pub(crate) fn alias_ok(link: &(String, String, String), program_files: &std::path::Path) -> bool {
+    let (family, app, target) = link;
+    let (t, root) = (target.to_ascii_lowercase(), format!(r"{}\windowsapps\", program_files.to_string_lossy().trim_end_matches('\\').to_ascii_lowercase()));
+    let in_package = t.strip_prefix(&root).and_then(|rest| rest.split_once('\\')).is_some_and(|(dir, file)| {
+        dir.starts_with("microsoft.desktopappinstaller_") && dir.ends_with("_8wekyb3d8bbwe") && file == "winget.exe"
+    });
+    family.eq_ignore_ascii_case(FAMILY)
+        && app.to_ascii_lowercase().starts_with(&format!("{}!", FAMILY.to_ascii_lowercase()))
+        && !t.contains("..")
+        && !t.contains('/')
+        && in_package
+}
+
+/// The App Execution Alias App Installer puts on the user's PATH, returned with a handle that keeps
+/// it from being changed, renamed or deleted until winget has started. That folder is the user's
+/// (any program can drop a `winget.exe` there), and G2 Boost usually runs elevated: only App
+/// Installer's own alias is ever started.
+fn exe() -> Result<(PathBuf, std::fs::File), WingetError> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::System::IO::DeviceIoControl;
+    use windows::Win32::System::Ioctl::FSCTL_GET_REPARSE_POINT;
+    const FILE_SHARE_READ: u32 = 1;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
     let p = PathBuf::from(std::env::var_os("LOCALAPPDATA").ok_or(WingetError::Unavailable)?)
         .join(r"Microsoft\WindowsApps\winget.exe");
-    // An execution alias is a reparse point: check the link itself, not its target.
-    std::fs::symlink_metadata(&p).map(|_| p).map_err(|_| WingetError::Unavailable)
+    let pf = crate::registry::known_folder(&windows::Win32::UI::Shell::FOLDERID_ProgramFiles).ok_or(WingetError::Unavailable)?;
+    let f = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(&p)
+        .map_err(|_| WingetError::Unavailable)?;
+    let mut buf = vec![0u8; 16 * 1024];
+    let mut n = 0u32;
+    // SAFETY: valid handle owned by `f`; the output buffer and its length match.
+    unsafe {
+        DeviceIoControl(
+            windows::Win32::Foundation::HANDLE(f.as_raw_handle()),
+            FSCTL_GET_REPARSE_POINT,
+            None,
+            0,
+            Some(buf.as_mut_ptr().cast()),
+            buf.len() as u32,
+            Some(&mut n),
+            None,
+        )
+    }
+    .map_err(|_| WingetError::Unavailable)?;
+    buf.truncate(n as usize);
+    parse_app_exec_link(&buf).filter(|l| alias_ok(l, &pf)).ok_or(WingetError::Unavailable)?;
+    Ok((p, f))
 }
 
 /// Run winget with `args`, no window, stdin closed; stdout bounded; killed after `limit`.
 fn run(args: &[&str], limit: Duration) -> Result<(u32, Vec<u8>), WingetError> {
-    let mut child = Command::new(exe()?)
+    let (exe, alias) = exe()?;
+    let mut child = Command::new(exe)
         .args(args)
         .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()?;
+    drop(alias); // started: the checked alias may change now
     let mut out = child.stdout.take().ok_or(WingetError::Unavailable)?;
     let reader = std::thread::spawn(move || {
         let mut buf = Vec::new();
@@ -324,6 +396,62 @@ mod tests {
         assert!(!valid_query("--force"), "never a flag");
         assert!(!valid_query("a\nb"));
         assert!(!valid_query(&"x".repeat(65)));
+    }
+
+    /// A reparse buffer laid out like this PC's real alias (`fsutil reparsepoint query`, 2026-11-21).
+    fn link_buffer(tag: u32, version: u32, strings: &[&str]) -> Vec<u8> {
+        let mut data = version.to_le_bytes().to_vec();
+        for s in strings {
+            data.extend(s.encode_utf16().chain([0]).flat_map(u16::to_le_bytes));
+        }
+        let mut b = tag.to_le_bytes().to_vec();
+        b.extend((data.len() as u16).to_le_bytes());
+        b.extend([0, 0]);
+        b.extend(data);
+        b
+    }
+
+    #[test]
+    fn only_app_installers_own_alias_is_started() {
+        const REAL: &str = r"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.29.380.0_x64__8wekyb3d8bbwe\winget.exe";
+        let pf = std::path::Path::new(r"C:\Program Files");
+        let app = "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe!winget";
+        let real = parse_app_exec_link(&link_buffer(0x8000_001B, 3, &[FAMILY, app, REAL, "0"])).unwrap();
+        assert_eq!(real, (FAMILY.to_string(), app.to_string(), REAL.to_string()));
+        assert!(alias_ok(&real, pf));
+        assert!(alias_ok(&(FAMILY.to_lowercase(), app.to_uppercase(), REAL.to_lowercase()), pf), "any case");
+        let with = |family: &str, app: &str, target: &str| (family.to_string(), app.to_string(), target.to_string());
+        for (f, a, t) in [
+            (FAMILY, app, r"C:\Users\me\AppData\Local\Microsoft\WindowsApps\evil.exe"),
+            (FAMILY, app, r"C:\Program Files\WindowsApps\Evil.Pkg_1.0_x64__8wekyb3d8bbwe\winget.exe"),
+            (FAMILY, app, r"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1_x64__evilpub\winget.exe"),
+            (FAMILY, app, r"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1_x64__8wekyb3d8bbwe\sub\winget.exe"),
+            (FAMILY, app, r"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1_x64__8wekyb3d8bbwe\cmd.exe"),
+            (FAMILY, app, r"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_..\..\..\Users\me_8wekyb3d8bbwe\winget.exe"),
+            (FAMILY, app, r"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_x/../../e_8wekyb3d8bbwe\winget.exe"),
+            (FAMILY, app, r"D:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1_x64__8wekyb3d8bbwe\winget.exe"),
+            ("Evil.Pkg_8wekyb3d8bbwe", app, REAL),
+            (FAMILY, "Evil.Pkg_8wekyb3d8bbwe!winget", REAL),
+        ] {
+            assert!(!alias_ok(&with(f, a, t), pf), "{f} {a} {t}");
+        }
+        assert!(parse_app_exec_link(&link_buffer(0xA000_000C, 3, &[FAMILY, app, REAL])).is_none(), "a symlink is not an alias");
+        assert!(parse_app_exec_link(&link_buffer(0x8000_001B, 2, &[FAMILY, app, REAL])).is_none());
+        assert!(parse_app_exec_link(&link_buffer(0x8000_001B, 3, &[FAMILY, app])).is_none(), "no target");
+        let full = link_buffer(0x8000_001B, 3, &[FAMILY, app, REAL]);
+        assert!(parse_app_exec_link(&full[..full.len() - 10]).is_none(), "truncated");
+        assert!(parse_app_exec_link(&[]).is_none());
+    }
+
+    /// This PC's real alias passes, and winget still starts while it is held open.
+    #[test]
+    fn the_real_alias_is_accepted_and_still_starts() {
+        let alias = PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap()).join(r"Microsoft\WindowsApps\winget.exe");
+        if std::fs::symlink_metadata(&alias).is_err() {
+            return; // App Installer not installed for this user
+        }
+        assert!(exe().is_ok());
+        assert_eq!(run(&["--version"], Duration::from_secs(30)).unwrap().0, 0);
     }
 
     #[test]
