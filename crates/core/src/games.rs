@@ -511,7 +511,15 @@ pub fn launch(t: &LaunchTarget) -> Result<(), LaunchError> {
         }
     };
     let _com = crate::tasksched::Com::init().map_err(|_| LaunchError::Failed)?;
-    if crate::system::is_elevated() { shell_execute_as_user(file, dir) } else { shell_execute(file, dir) }
+    if crate::system::is_elevated() { shell_execute_as_user(file, "", dir) } else { shell_execute(file, dir) }
+}
+
+/// Start `exe args` with the signed-in user's normal rights from an elevated process (through the
+/// desktop's Explorer, as `launch` does). Used for G2 Boost's own `--toast` helper: Windows drops
+/// notifications from an elevated unpackaged app.
+pub fn run_unelevated(exe: &str, args: &str) -> Result<(), LaunchError> {
+    let _com = crate::tasksched::Com::init().map_err(|_| LaunchError::Failed)?;
+    shell_execute_as_user(exe, args, "")
 }
 
 fn shell_execute(file: &str, dir: &str) -> Result<(), LaunchError> {
@@ -531,7 +539,7 @@ fn shell_execute(file: &str, dir: &str) -> Result<(), LaunchError> {
 
 /// Raymond Chen's "launch unelevated from an elevated process": desktop window → its top-level
 /// browser → active view → background automation object → `Shell.Application` → ShellExecute.
-fn shell_execute_as_user(file: &str, dir: &str) -> Result<(), LaunchError> {
+fn shell_execute_as_user(file: &str, args: &str, dir: &str) -> Result<(), LaunchError> {
     let shell = |_| LaunchError::Shell;
     // SAFETY: COM calls on this thread (initialised by the caller); every object is released here.
     unsafe {
@@ -545,7 +553,7 @@ fn shell_execute_as_user(file: &str, dir: &str) -> Result<(), LaunchError> {
         let app = background.cast::<IShellFolderViewDual>().map_err(shell)?.Application().map_err(shell)?;
         app.cast::<IShellDispatch2>()
             .map_err(shell)?
-            .ShellExecute(&BSTR::from(file), &VARIANT::from(""), &VARIANT::from(dir), &VARIANT::from("open"), &VARIANT::from(SW_SHOWNORMAL.0))
+            .ShellExecute(&BSTR::from(file), &VARIANT::from(args), &VARIANT::from(dir), &VARIANT::from("open"), &VARIANT::from(SW_SHOWNORMAL.0))
             .map_err(|_| LaunchError::Failed)
     }
 }

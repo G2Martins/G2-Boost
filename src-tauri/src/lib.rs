@@ -2445,6 +2445,12 @@ pub fn run() {
     if adlx::helper_if_requested() {
         return;
     }
+    // `G2 Boost.exe --toast <title> <body>`: started unelevated by an elevated G2 Boost (Windows
+    // drops toasts from elevated unpackaged apps); shows the notification and exits.
+    if let Some((title, body)) = g2boost_core::winnotify::from_args(&std::env::args().collect::<Vec<_>>()) {
+        let _ = g2boost_core::winnotify::show(&title, &body, || {});
+        return;
+    }
     // `G2 Boost.exe --mcp`: stdio MCP server for Claude Desktop / Claude Code, no window.
     // One signed binary instead of a sidecar; the server is read-only (crates/mcp).
     if std::env::args().any(|a| a == "--mcp") {

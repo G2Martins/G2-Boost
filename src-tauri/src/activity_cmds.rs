@@ -41,15 +41,22 @@ pub fn activity_os_notify(app: AppHandle, r: State<'_, Routines>, title: String,
     }
     let route = route.filter(|r| crate::ROUTES.contains(&r.as_str()));
     if title.len() <= 4096 && body.len() <= 4096 && winnotify::available() {
-        let back = app.clone();
-        let shown = winnotify::show(&title, &body, move || {
-            crate::show_main(&back);
-            if let Some(r) = &route {
-                let _ = back.emit("activity:open", r);
+        // Elevated, Windows would drop it: an unelevated helper shows it (no click-to-reopen).
+        if g2boost_core::system::is_elevated() {
+            if winnotify::show_unelevated(&title, &body).is_ok() {
+                return Delivered::Toast;
             }
-        });
-        if shown.is_ok() {
-            return Delivered::Toast;
+        } else {
+            let back = app.clone();
+            let shown = winnotify::show(&title, &body, move || {
+                crate::show_main(&back);
+                if let Some(r) = &route {
+                    let _ = back.emit("activity:open", r);
+                }
+            });
+            if shown.is_ok() {
+                return Delivered::Toast;
+            }
         }
     }
     if minimized {

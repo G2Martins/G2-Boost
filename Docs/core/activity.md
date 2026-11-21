@@ -58,6 +58,13 @@ notificação do Windows (a pessoa está jogando; o sino basta).
   `System.AppUserModel.ID = com.grovicdata.g2boost`). Sem o atalho o Windows descarta o toast sem erro, então
   `winnotify::available()` procura o atalho antes (cópia portátil e build de dev em PC limpo: pisca a barra de tarefas
   via `request_user_attention` = `FlashWindowEx`; na bandeja sem toast, o sino guarda a linha).
+- **App elevado (2026-11-20, 0.10.1):** o Windows descarta, sem erro, toast de app sem pacote rodando como
+  administrador (confirmado no PC do dono: o handler `com.grovicdata.g2boost` aparece no banco de notificações, mas
+  nenhuma notificação fica; o mesmo teste sem admin entrega). Elevado, `winnotify::show_unelevated` abre
+  `G2 Boost.exe --toast "<título>" "<texto>"` com os direitos normais do usuário pelo Explorer (mesmo caminho do
+  "Preparar e jogar", `games::run_unelevated`); esse processo mostra o toast e sai antes de subir o Tauri. Argumentos
+  limpos, cortados e sem `"`/`\` (não fecham as aspas nem viram outra flag). Limite: o clique nesse toast não reabre a
+  rota (nenhum handler sobrevive ao processo auxiliar).
 - **Texto:** o webview renderiza (tem o i18n) e manda; o core trata como hostil: tira controle e bidi, corta (80/200),
   escapa XML, documento só com dois `<text>` (sem imagem, ação ou URI). Rota do clique só se estiver em `ROUTES`.
 - **Quando:** linha nova (menos `game`) e fim de job; o core responde `visible` se a janela está na tela. Uma por rota
@@ -85,8 +92,8 @@ dentro do app".
 
 ## 7. Não testado / limites
 
-- Toast real pelo app instalado com a janela na bandeja (o teste `--ignored` mostra pelo binário de teste com o mesmo
-  app id; clique → reabrir na rota depende do app vivo).
+- Toast pelo app instalado e elevado com a janela na bandeja (o caminho `--toast` foi conferido sem admin; o
+  lançamento sem admin pelo Explorer é o mesmo do "Preparar e jogar").
 - Fim de job com a janela escondida: a notificação depende do JS receber o evento com o webview escondido (esperado,
   não verificado no app real); timers de página escondida podem atrasar o aviso de fim de job (espera 1,5 s).
 - Rota igual com aba diferente (ex.: estar em Apps › Instalar e clicar numa execução de Atualizações) não troca a aba:

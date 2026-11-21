@@ -83,9 +83,42 @@ pub fn show(title: &str, body: &str, on_click: impl Fn() + Send + 'static) -> Re
     Ok(())
 }
 
+/// Windows silently drops toasts from an elevated unpackaged app (the owner's copy always runs
+/// elevated). Elevated, the toast is shown by `G2 Boost.exe --toast "<title>" "<body>"` started
+/// with the user's normal rights through Explorer; it shows it and exits. A click on that toast
+/// does not reopen a page (no handler outlives the helper).
+pub fn show_unelevated(title: &str, body: &str) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    crate::games::run_unelevated(&exe.to_string_lossy(), &toast_args(title, body)).map_err(|e| e.to_string())
+}
+
+/// One argument per line of text, never able to close its quotes or add another flag: cleaned,
+/// capped, and `"`/`\` (the only characters the command-line parser treats specially) replaced.
+pub fn toast_args(title: &str, body: &str) -> String {
+    let q = |s: &str, max| clean(s, max).replace('"', "'").replace('\\', "/");
+    format!("--toast \"{}\" \"{}\"", q(title, MAX_TITLE), q(body, MAX_BODY))
+}
+
+/// `--toast <title> <body>` on our own command line (the helper mode above).
+pub fn from_args(args: &[String]) -> Option<(String, String)> {
+    let i = args.iter().position(|a| a == "--toast")?;
+    Some((clean(args.get(i + 1)?, MAX_TITLE), clean(args.get(i + 2)?, MAX_BODY)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn helper_arguments_cannot_break_out_of_their_quotes() {
+        let a = toast_args("G2 \"Boost\"", "ok\\\" --route x\r\nC:\\");
+        assert_eq!(a, "--toast \"G2 'Boost'\" \"ok/' --route x C:/\"");
+        assert_eq!(a.matches('"').count(), 4);
+        let args: Vec<String> = ["G2 Boost.exe", "--toast", "Title", "Body\u{202E}"].map(String::from).to_vec();
+        assert_eq!(from_args(&args), Some(("Title".into(), "Body".into())));
+        assert_eq!(from_args(&["x".into(), "--toast".into()]), None);
+        assert_eq!(from_args(&["x".into()]), None);
+    }
 
     #[test]
     fn hostile_text_is_cleaned_and_escaped() {
