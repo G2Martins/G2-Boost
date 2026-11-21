@@ -72,6 +72,7 @@ pub mod winfeature;
 
 // r9:maint
 pub mod antivirus;
+pub mod protect;
 pub mod svc;
 pub mod troubleshoot;
 

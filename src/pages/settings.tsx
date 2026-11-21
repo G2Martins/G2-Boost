@@ -60,6 +60,7 @@ export function SettingsPage() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [safeFolder, setSafeFolder] = useState(true);
   const [status, setStatus] = useState<RoutineStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -67,7 +68,11 @@ export function SettingsPage() {
     let alive = true;
     backend.appInfo().then((i) => alive && setInfo(i));
     backend.settingsGet().then((s) => alive && s && setSettings(s));
-    backend.autostartStatus().then((a) => alive && a && setAutostart(a.enabled));
+    backend.autostartStatus().then((a) => {
+      if (!alive || !a) return;
+      setAutostart(a.enabled);
+      setSafeFolder(a.safe_folder);
+    });
     const tick = () => backend.routineStatus().then((s) => alive && s && setStatus(s));
     tick();
     const id = setInterval(tick, 5000);
@@ -94,7 +99,9 @@ export function SettingsPage() {
   const toggleAutostart = async (on: boolean) => {
     setErr(null);
     try {
-      setAutostart((await backend.autostartSet(on)).enabled);
+      const a = await backend.autostartSet(on);
+      setAutostart(a.enabled);
+      setSafeFolder(a.safe_folder);
     } catch (e) {
       setErr(errorText(e));
     }
@@ -130,7 +137,11 @@ export function SettingsPage() {
               {t("settings.autostart")}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {elevated ? t("settings.autostart.highest") : t("settings.autostart.lua")}
+              {!elevated
+                ? t("settings.autostart.lua")
+                : safeFolder
+                  ? t("settings.autostart.highest")
+                  : t("settings.autostart.unsafe_folder")}
             </p>
             {!elevated ? (
               <div className="mt-3">

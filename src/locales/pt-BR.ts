@@ -1778,6 +1778,7 @@ export const ptBR = {
   "boost.dns.static": "configurado à mão",
   "boost.dns.auto": "automático (DHCP)",
   "boost.dns.applied": "DNS aplicado em {name}.",
+  "boost.dns.restore_to": "Restaurar volta este adaptador para: {servers}.",
   "boost.dns.restored": "DNS restaurado ao que era antes.",
   "boost.dns.loss": "{loss}% perda",
   "boost.dns.measuring": "Medindo…",
@@ -1800,6 +1801,8 @@ export const ptBR = {
     "O app está elevado: a tarefa roda com privilégios de administrador, então as rotinas de sistema e a limpeza de RAM funcionam ao iniciar.",
   "settings.autostart.lua":
     "Sem administrador agora: a tarefa roda como usuário comum e pula as rotinas que precisam de admin. Eleve e ligue de novo para a versão completa.",
+  "settings.autostart.unsafe_folder":
+    "Outros programas podem alterar a pasta do G2 Boost, então a tarefa roda como usuário comum e pula as rotinas que precisam de admin. Para a versão completa, reinstale o G2 Boost em Arquivos de Programas.",
   "settings.tray": "Fechar para a bandeja",
   "settings.tray.hint":
     "Com uma rotina ativa, o X da janela só esconde o app. Sair de verdade pelo menu da bandeja.",

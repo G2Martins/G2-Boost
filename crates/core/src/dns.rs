@@ -23,7 +23,7 @@ use windows::Win32::Networking::WinSock::{AF_INET, AF_UNSPEC, SOCKADDR_IN, SOCKE
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows::core::{GUID, PCWSTR, PWSTR};
 
-use crate::registry::{self, wide};
+use crate::registry::wide;
 use crate::system;
 
 /// The resolvers the UI offers (same set as `src/data/catalogs.ts`).
@@ -389,19 +389,21 @@ struct Backup {
     previous: BTreeMap<String, String>,
 }
 
-fn backup_file() -> std::path::PathBuf {
-    registry::data_dir().join("dns_backup.json")
+/// In the protected store when elevated (`protect::state_dir`): restore feeds it to an admin API.
+fn backup_file() -> std::io::Result<std::path::PathBuf> {
+    Ok(crate::protect::state_dir()?.join("dns_backup.json"))
 }
 
 fn load_backup() -> Backup {
-    std::fs::read_to_string(backup_file()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+    backup_file().and_then(std::fs::read_to_string).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
 
 fn save_backup(b: &Backup) -> Result<(), DnsError> {
-    if let Some(d) = backup_file().parent() {
+    let file = backup_file()?;
+    if let Some(d) = file.parent() {
         std::fs::create_dir_all(d)?;
     }
-    std::fs::write(backup_file(), serde_json::to_string_pretty(b).unwrap_or_default())?;
+    std::fs::write(file, serde_json::to_string_pretty(b).unwrap_or_default())?;
     Ok(())
 }
 
@@ -478,7 +480,12 @@ pub fn restore(guid: &str) -> Result<(), DnsError> {
 }
 
 pub fn has_backup(guid: &str) -> bool {
-    load_backup().previous.contains_key(guid)
+    backup_servers(guid).is_some()
+}
+
+/// What [`restore`] would put back on `guid` (`""` = automatic/DHCP), shown before it runs.
+pub fn backup_servers(guid: &str) -> Option<String> {
+    load_backup().previous.remove(guid)
 }
 
 #[cfg(test)]

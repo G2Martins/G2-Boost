@@ -436,15 +436,20 @@ fn resolve_data_dir(exe_dir: Option<&std::path::Path>, local: Option<PathBuf>) -
     local.unwrap_or_else(std::env::temp_dir).join("G2 Boost")
 }
 
-fn backup_file(tweak: &str) -> PathBuf {
-    data_dir().join("backups").join(format!("{tweak}.json"))
+/// Tweak and fix backups: under [`crate::protect::state_dir`] (the protected store when elevated).
+pub fn backups_dir() -> std::io::Result<PathBuf> {
+    Ok(crate::protect::state_dir()?.join("backups"))
+}
+
+fn backup_file(tweak: &str) -> std::io::Result<PathBuf> {
+    Ok(backups_dir()?.join(format!("{tweak}.json")))
 }
 
 pub fn load_backup(tweak: &str) -> Option<Backup> {
     if !safe_id(tweak) {
         return None;
     }
-    let text = std::fs::read_to_string(backup_file(tweak)).ok()?;
+    let text = std::fs::read_to_string(backup_file(tweak).ok()?).ok()?;
     serde_json::from_str(&text).ok()
 }
 
@@ -452,7 +457,7 @@ pub fn save_backup(b: &Backup) -> std::io::Result<()> {
     if !safe_id(&b.tweak) {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "bad tweak id"));
     }
-    let file = backup_file(&b.tweak);
+    let file = backup_file(&b.tweak)?;
     if let Some(dir) = file.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -460,8 +465,10 @@ pub fn save_backup(b: &Backup) -> std::io::Result<()> {
 }
 
 pub fn delete_backup(tweak: &str) {
-    if safe_id(tweak) {
-        let _ = std::fs::remove_file(backup_file(tweak));
+    if safe_id(tweak)
+        && let Ok(f) = backup_file(tweak)
+    {
+        let _ = std::fs::remove_file(f);
     }
 }
 

@@ -63,6 +63,7 @@ comportamento.
 | [security/kernel-driver-options.md](./security/kernel-driver-options.md) | Sensores de CPU sem driver próprio: v1 lê HWiNFO/LibreHardwareMonitor (feito), v2 PawnIO opt-in, v3 driver KMDF só leitura; WinRing0 proibido. |
 | [security/exposure-audit.md](./security/exposure-audit.md) | Segurança › Exposição: RDP/NLA, Assistência Remota, WinRM, SMBv1, firewall, portas abertas no roteador (UPnP), apps de acesso remoto, escutas e conexões de entrada, sessões, tarefas/serviços sem assinatura; correções com backup e desfazer; monitor no laço de rotinas. Não é antivírus. |
 | [security/antivirus.md](./security/antivirus.md) | Segurança › Antivírus: produtos da Central de Segurança, liberação do próprio exe no Defender (só em Program Files fechado a usuários, com leitura de volta e desfazer), guias por fabricante, aviso do SmartScreen. Nunca enfraquece o antivírus. |
+| [security/protected-storage.md](./security/protected-storage.md) | O que o app elevado confia: backups e desfazer no store protegido `%ProgramData%\G2 Boost\secure` (DACL só SYSTEM/Administradores, pasta pré-criada posta de lado, migração única), DACL da pasta de instalação, tarefa de logon elevada só com o exe numa cadeia de pastas fechada. |
 | [security/kaspersky-false-positive.md](./security/kaspersky-false-positive.md) | Por que antivírus marcaram os scripts antigos e como o app evita os mesmos padrões. |
 
 ## references/ — Pesquisa
