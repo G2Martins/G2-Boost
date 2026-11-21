@@ -1,6 +1,6 @@
 # Analisador de disco
 
-**Última revisão:** 2026-11-20 (selos da Limpeza no mapa e nos maiores, Limpar só isso, chegada filtrada vinda da Limpeza, varredura longa na central de atividade) · 2026-10-22 (essenciais levam à limpeza de arquivos do sistema) · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
+**Última revisão:** 2026-11-21 (Lixeira confere de novo cada caminho num handle logo antes de mandar e o segura durante a operação; pasta do Windows pela API) · 2026-11-20 (selos da Limpeza no mapa e nos maiores, Limpar só isso, chegada filtrada vinda da Limpeza, varredura longa na central de atividade) · 2026-10-22 (essenciais levam à limpeza de arquivos do sistema) · Código: `crates/core/src/disk.rs`, `safety.rs`; shell `src-tauri/src/lib.rs` (`DiskState`, `disk_*`); UI `src/pages/disk.tsx`, `src/components/disk/treemap.tsx` · Spec funcional de origem: [../references/spacesniffer.md](../references/spacesniffer.md) (clean-room).
 
 ## Varredura
 
@@ -33,8 +33,9 @@ Botões de exemplo na UI; resultado com caixa de seleção, **mostrar na pasta**
 
 1. Seleção vem como `ids` (nunca caminho cru da UI); entradas aninhadas em outra selecionada são descartadas; no máximo 500.
 2. Para cada item: caminho reconstruído da árvore, `symlink_metadata` (existe, **não é reparse point**) e `recyclable()`: `SafePath::classify` precisa dar **perfil do usuário** ou **outro local** (bloqueia `C:\Windows`, System32/WinSxS, ProgramData, perfis de outros usuários, UNC, `..`) e o caminho não pode ser raiz de disco, `C:\Users`, `Program Files`/`(x86)`, a raiz do perfil nem `AppData`/`Local`/`Roaming`/`LocalLow` em si (o conteúdo abaixo pode).
-3. `SHFileOperationW(FO_DELETE, FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_WANTNUKEWARNING)`: vai para a Lixeira; **se algo não couber nela (ou o drive não tiver Lixeira), o próprio Windows pergunta antes de apagar de vez**. Arquivo em uso/cancelado = fica e é contado como falha.
-4. O que sumiu é removido da árvore (tamanhos dos ancestrais atualizados) e registrado no histórico de limpeza (`trigger: disk_recycle`). A UI confirma antes (lista + total) e recarrega o recorte.
+3. Logo antes da operação, `shell_recycle` **prende** cada caminho de novo (`safety::pin`: aberto como ele mesmo, não é reparse point, o caminho final ainda é o caminho checado) e segura o handle durante a chamada; o que virou link ou passou a ser alcançado por um desde a checagem fica de fora e conta como falha. Vale para o mapa, para `recycle_validated` (MCP, duplicados) e para as sobras de desinstalação (`apps::remove_in`), que passam todos por aqui. A pasta do Windows usada pela guarda vem de `GetWindowsDirectoryW`, não de `%SystemRoot%` (o ambiente é do usuário).
+4. `SHFileOperationW(FO_DELETE, FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_WANTNUKEWARNING)`: vai para a Lixeira; **se algo não couber nela (ou o drive não tiver Lixeira), o próprio Windows pergunta antes de apagar de vez**. Arquivo em uso/cancelado = fica e é contado como falha.
+5. O que sumiu é removido da árvore (tamanhos dos ancestrais atualizados) e registrado no histórico de limpeza (`trigger: disk_recycle`). A UI confirma antes (lista + total) e recarrega o recorte.
 
 No shell, a árvore é retirada do estado durante a operação (os outros comandos não esperam um diálogo do Windows) e recusada durante uma varredura.
 
