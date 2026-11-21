@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.2 (2026-11-21): caça de bugs: atualizador, segurança com o app como administrador e presets
+
+Uma revisão em quatro frentes (o que apaga arquivos, sistema e rotinas, telas, e o que o app aceita de fora) achou 33 problemas no código anterior. Todos corrigidos.
+
+**Importante para quem já usa:** o botão de atualizar do app nunca conseguia abrir o instalador (o Windows dizia que o arquivo estava em uso). Baixe esta versão manualmente uma última vez; a partir dela o botão funciona.
+
+### Corrigido
+- **Presets:** aplicar Padrão, Alto desempenho ou "Padrão do Windows" como administrador podia **instalar o Recall** em PC sem Copilot+ e **desligar o agendamento de GPU** que o Windows liga sozinho em placas novas. Agora o app só desfaz o que ele mesmo mudou.
+- **Atualizar pelo app:** funciona, inclusive em cópias instaladas fora de Arquivos de Programas.
+- **Limpeza como administrador:** apaga arquivo por arquivo pelo próprio identificador do Windows e confere que ainda está dentro da pasta certa, então trocar uma pasta por um atalho de pasta no meio da limpeza não leva a apagar outra coisa. Caminhos escritos de jeitos diferentes (barras, `.`, `\?\`) não driblam mais a proteção das pastas do sistema. A pasta de temporários só é limpa se for mesmo uma pasta Temp.
+- **Backups e desfazer:** com o app como administrador ficam numa pasta que só administradores alteram. A pasta de instalação fora de Arquivos de Programas passa a ter a mesma proteção, e "Iniciar com o Windows" só abre como administrador quando o programa não pode ser trocado por outro.
+- **Desinstalar:** desinstaladores de apps instalados só para o seu usuário abrem sem administrador. O winget só é usado se for o do próprio Windows.
+- **Análise de disco e Claude:** um caminho de rede (`//servidor/pasta`) não é mais aberto; antes isso podia enviar suas credenciais do Windows para outro computador.
+- **Modo Jogo:** aplica prioridade e núcleos ao processo certo do jogo (não ao inicializador), volta a prioridade que o jogo tinha e devolve o plano de energia mesmo se o app fechar no meio.
+- **Configurações:** um valor inválido no arquivo não apaga mais tudo (jogos, perfis, regras); o arquivo com problema é guardado ao lado.
+- **Rotinas:** a limpeza agendada que caiu num dia em que o PC estava desligado roda na próxima oportunidade.
+- **Telas:** duplo clique não roda a mesma tarefa duas vezes; a Luli não manda duas perguntas ao mesmo tempo; Apps não abre sempre na aba de sobras; presets não ficam clicáveis enquanto o ponto de restauração é criado; sair do Diagnóstico de rede para o teste; "Otimizar agora" avisa quando algo falhou.
+- **Claude / MCP:** pedidos com mais itens do que a janela de confirmação mostra são recusados; ajustes beta não podem ser ligados pelo Claude; restaurar DNS mostra para quais servidores volta.
+
 ## 0.10.1 (2026-11-20): aviso do Windows com o app como administrador, Teamfight Tactics e ícone do Discord
 
 Correções achadas testando a 0.10.0 instalada.
