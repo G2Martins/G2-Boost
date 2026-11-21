@@ -8,7 +8,7 @@ import {
   RotateCcw,
   Stethoscope,
 } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
 import { Badge, Button, Card, CardTitle, selectClass } from "@/components/ui/primitives";
 import {
@@ -99,6 +99,17 @@ export function DiagnosisTab() {
   const [error, setError] = useState<string | null>(null);
   const [routerMsg, setRouterMsg] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  // The per-app ETW session of step 2 is open (closed by hand if the tab goes away meanwhile).
+  const etw = useRef(false);
+  // Leaving the tab ends the run: back on it, a new one would race this one (two speed tests at
+  // once measure each other). The core calls have no cancel; the run stops before its next step.
+  useEffect(
+    () => () => {
+      abort.current?.abort();
+      if (etw.current) void backend.netUsageStop();
+    },
+    [],
+  );
 
   const planMbps = Number(plan) > 0 ? Number(plan) : 0;
   const busy = Object.values(steps).includes("running");
@@ -114,6 +125,10 @@ export function DiagnosisTab() {
   };
 
   const start = async () => {
+    const live = <T,>(v: T): T => {
+      if (abort.current?.signal.aborted) throw new DOMException("left the tab", "AbortError");
+      return v;
+    };
     savePlan(plan);
     setSteps({ ...IDLE, speed: "running" });
     for (const f of [setBefore, setAfter, setPc, setUsage, setWifi, setScan, setAnswer]) f(null);
@@ -123,18 +138,18 @@ export function DiagnosisTab() {
     setChosen({});
     setError(null);
     try {
-      setBefore(await speedTest());
+      setBefore(live(await speedTest()));
       mark("speed", "done");
 
       mark("pc", "running");
       // Per-app rates need two samples of the ETW session a few seconds apart.
-      const [p, r] = await Promise.all([
-        backend.netdiagPc(),
-        backend.dnsRank(4),
-        backend.netUsage(),
-      ]);
-      await sleep(3000);
-      setUsage(await backend.netUsage());
+      etw.current = true;
+      const [p, r] = live(
+        await Promise.all([backend.netdiagPc(), backend.dnsRank(4), backend.netUsage()]),
+      );
+      live(await sleep(3000));
+      setUsage(live(await backend.netUsage()));
+      etw.current = false;
       void backend.netUsageStop();
       setPc(p);
       setRank(r ?? []);
@@ -142,7 +157,7 @@ export function DiagnosisTab() {
 
       if (p?.adapter?.kind === "wifi") {
         mark("wifi", "running");
-        setWifi(await backend.wifiReport(true));
+        setWifi(live(await backend.wifiReport(true)));
         mark("wifi", "done");
         mark("nearby", "done");
       } else {
@@ -151,10 +166,15 @@ export function DiagnosisTab() {
       }
 
       mark("devices", "running");
-      setScan(await backend.devicesScan());
+      setScan(live(await backend.devicesScan()));
       mark("devices", "done");
       mark("fixes", "done");
     } catch (e) {
+      if (abort.current?.signal.aborted) return; // the tab is gone
+      if (etw.current) {
+        etw.current = false;
+        void backend.netUsageStop();
+      }
       setError(errorText(e));
       setSteps((x) => {
         const out = { ...x };

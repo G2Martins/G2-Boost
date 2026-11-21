@@ -22,7 +22,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/primitives";
 import { backend, type Hop, inTauri, type PingReport } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { boot, takeStartTab } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { usePageData } from "@/lib/luli";
 import {
@@ -36,6 +36,7 @@ import { cn, formatBytes, formatMbps, formatMs } from "@/lib/utils";
 
 export function NetworkPage() {
   const { t } = useI18n();
+  const [arrival] = useState(takeStartTab);
   const initial = [
     "diagnosis",
     "monitor",
@@ -45,8 +46,8 @@ export function NetworkPage() {
     "wifi",
     "devices",
     "tools",
-  ].includes(boot.startTab ?? "")
-    ? (boot.startTab as string)
+  ].includes(arrival ?? "")
+    ? (arrival as string)
     : "diagnosis";
   return (
     <PageHeader
@@ -425,6 +426,8 @@ function Scanner() {
   const [result, setResult] = useState<SpeedResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Leaving the tab stops the test: back on it, a second one would share the link with this one.
+  useEffect(() => () => abortRef.current?.abort(), []);
   const running = progress !== null && progress.phase !== "done";
   // ISP, IP and city stay out: only the measurements go to Luli.
   usePageData(

@@ -1,6 +1,6 @@
 # Analisador de rede e DNS Optimizer
 
-**Última revisão:** 2026-11-14 (aba Diagnóstico: internet lenta em 7 passos; `nicpower.rs`; `dns::Adapter.kind/vpn`) · 2026-10-23 (Reparar conexão) · 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), `netrepair.rs`, UI `src/components/network/devices-tab.tsx`, `src/components/network/repair-connection.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`, `net_dhcp_adapters`, `net_renew`, `net_flush_dns`, `net_open_reset`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
+**Última revisão:** 2026-11-21 (sair da aba Diagnóstico ou Velocidade encerra a execução) · 2026-11-14 (aba Diagnóstico: internet lenta em 7 passos; `nicpower.rs`; `dns::Adapter.kind/vpn`) · 2026-10-23 (Reparar conexão) · 2026-10-18 · Código: `crates/core/src/network.rs`, `dns.rs`, `devices.rs` (+ `data/oui.tsv`, gerado por `tools/oui.py`), `netrepair.rs`, UI `src/components/network/devices-tab.tsx`, `src/components/network/repair-connection.tsx`; shell `src-tauri/src/lib.rs` (`ping_host`, `trace_host`, `tcping_host`, `dns_*`, `net_dhcp_adapters`, `net_renew`, `net_flush_dns`, `net_open_reset`); UI `src/pages/network.tsx`, `src/pages/boost.tsx` (aba DNS), `src/lib/speedtest.ts`.
 
 ## Monitor de conexão
 
@@ -21,6 +21,8 @@ UI `src/components/network/diagnosis-tab.tsx`; shell `src-tauri/src/netdiag_cmds
 5. **Vizinhos**: redes, canal, sinal; quantas dividem o seu canal e o mais vazio (`best_channel`).
 6. **Correções** em três grupos com contagem: *Neste computador* (automáticas: economia da placa, DNS mais rápido por 5 ms ou mais; passo a passo: VPN, apps baixando ≥ 1 MB/s, 2,4 → 5 GHz, sinal < 50 %, link do cabo abaixo do plano), *No roteador* (canal, QoS/SQM com nota C ou pior, WPA2/WPA3, < 50 % do plano = reiniciar e chamar a operadora, trocar a senha) com botão **Abrir a página do roteador** (`router_open`: `http://<gateway>/` do adaptador principal, só IPv4 privado; a senha o usuário digita lá; se o roteador só muda pelo app da operadora, o texto manda fazer pelo app), *Aparelhos no Wi-Fi* (bloquear os não reconhecidos). Pergunta: **Sim, fazer todas / Deixe-me escolher / Agora não**. O app nunca pausa, fecha ou bloqueia nada.
 7. **Aplicar**: tabela "valores atuais, guardados para desfazer", depois `nic_power_off` e/ou `dns_apply` (cada um com o próprio backup no core), teste de novo e tabela antes × depois; botões Desfazer (`nic_power_restore`, `dns_restore`).
+
+Sair da aba (ou da página) encerra o diagnóstico: o teste de velocidade é abortado, a sessão ETW do passo 2 fecha (`net_usage_stop`) e a execução para antes do passo seguinte (as chamadas do core não têm cancelamento próprio; a que já estava em curso termina sozinha). Assim, voltar e iniciar de novo não roda dois testes de velocidade ao mesmo tempo. O teste da aba Velocidade também é abortado ao sair dela.
 
 ### Economia de energia da placa (`nicpower.rs`)
 
