@@ -1,10 +1,10 @@
 # Rotinas — iniciar com o Windows, limpeza agendada, RAM ao abrir jogo, bandeja
 
-**Última revisão:** 2026-10-23 (sempre abrir como administrador) · 2026-10-15 · Código: `crates/core/src/settings.rs`, `routines.rs`, `tasksched.rs`; shell `src-tauri/src/lib.rs` (`Routines`, `spawn_routines`, bandeja) · UI: `src/pages/settings.tsx`, aba RAM em `src/pages/boost.tsx`, `src/components/game-exes.tsx`.
+**Última revisão:** 2026-11-21 (agenda diária/semanal recupera o horário perdido com o PC desligado; `settings.json` com campo quebrado mantém o resto e guarda `settings.json.bad`; gravação atômica) · 2026-10-23 (sempre abrir como administrador) · 2026-10-15 · Código: `crates/core/src/settings.rs`, `routines.rs`, `tasksched.rs`; shell `src-tauri/src/lib.rs` (`Routines`, `spawn_routines`, bandeja) · UI: `src/pages/settings.tsx`, aba RAM em `src/pages/boost.tsx`, `src/components/game-exes.tsx`.
 
 ## Configurações (`settings.json`)
 
-`%LOCALAPPDATA%\G2 Boost\settings.json`, validado no load **e** antes de salvar (`settings::sanitize`): categorias desconhecidas caem fora, exes viram `nome.exe` minúsculo sem caminho (máx. 50), horas 1–168, hora 0–23, dia 0–6.
+`%LOCALAPPDATA%\G2 Boost\settings.json`, validado no load **e** antes de salvar (`settings::sanitize`): categorias desconhecidas caem fora, exes viram `nome.exe` minúsculo sem caminho (máx. 50), horas 1–168, hora 0–23, dia 0–6. Gravação atômica (`registry::write_atomic`, `.tmp` + rename). Arquivo que não abre inteiro (um valor fora da faixa já basta, ex.: `hour: 300`) é copiado para `settings.json.bad` antes do próximo save e cada campo que ainda faz parse é mantido: só os quebrados voltam ao padrão (jogos, perfis, regras de prioridade e `game_tweaks` sobrevivem). `settings_set` grava com a cópia viva travada, então `game_tweaks_set`, `pick_exe` e afins não se perdem no meio.
 
 | Campo | Padrão | Uso |
 |---|---|---|
@@ -37,8 +37,10 @@ Thread única no shell (`spawn_routines`): a cada 60 s avalia `routines::due(sch
 |---|---|
 | `at_logon` | uma vez por processo (o app inicia com o Windows → uma vez por logon) |
 | `every_hours{n}` | `agora − última ≥ n h` |
-| `daily{h}` | hora atual ≥ h e a última execução foi antes do slot `h:00` de hoje |
-| `weekly{d,h}` | dia da semana = d, hora ≥ h, última antes do slot de hoje |
+| `daily{h}` | a última execução foi antes do slot `h:00` mais recente que já passou (hoje ou ontem); nunca rodou = hora atual ≥ h |
+| `weekly{d,h}` | a última execução foi antes do slot `d h:00` mais recente que já passou (até 7 dias atrás); nunca rodou = dia d e hora ≥ h |
+
+Slot perdido com o PC desligado roda na próxima chance (ex.: semanal de quarta às 20 h, PC desligado na quarta → roda na quinta ao ligar), em vez de esperar a semana seguinte.
 
 Executa `cleanup::execute(routine_categories, "routine")` **sem token**: a confirmação humana foi o ato de ligar a rotina e marcar as categorias (decisão documentada; o MCP não tem comando de settings). Resultado vai para o histórico com gatilho `routine` e evento `routine:done`. `last_run` fica em `routine.json`.
 

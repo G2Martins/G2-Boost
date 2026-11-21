@@ -315,6 +315,7 @@ mod tests {
             skipped: vec![],
             qos_policy: None,
             affinity: None,
+            prev_priority: None,
         }
     }
 

@@ -82,6 +82,10 @@ pub struct Session {
     /// CPU Sets given to the game (cleared at the end). Written before the change.
     #[serde(default)]
     pub affinity: Option<Vec<u32>>,
+    /// The game's priority class before it went high (back at the end; a fixed-priority rule may
+    /// have set it). Validated on use (`procs::restore_priority`).
+    #[serde(default)]
+    pub prev_priority: Option<u32>,
 }
 
 fn file() -> PathBuf {
@@ -96,8 +100,7 @@ pub fn session() -> Option<Session> {
 }
 
 fn save(s: &Session) {
-    let _ = std::fs::create_dir_all(registry::data_dir());
-    let _ = std::fs::write(file(), serde_json::to_string_pretty(s).unwrap_or_default());
+    let _ = registry::write_atomic(&file(), serde_json::to_string_pretty(s).unwrap_or_default().as_bytes());
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,8 +140,11 @@ pub fn start(game: &InstalledGame, pid: Option<u32>, opts: &Options, tweaks: &Ga
         skipped: Vec::new(),
         qos_policy: None,
         affinity: None,
+        prev_priority: None,
     };
     if opts.power_plan {
+        // Saved with `prev_plan` before the switch: `stop` restores it whenever it is set, so a
+        // crash anywhere after this line still gives the user's plan back on the next start.
         s.prev_plan = active_plan();
         save(&s);
         match crate::power::create_max_performance().and_then(|g| {
@@ -151,27 +157,7 @@ pub fn start(game: &InstalledGame, pid: Option<u32>, opts: &Options, tweaks: &Ga
             Err(_) => s.skipped.push("plan_failed".into()),
         }
     }
-    if (opts.high_priority || tweaks.high_priority)
-        && let (Some(pid), Some(dir)) = (pid, game.install_dir.as_deref())
-    {
-        match crate::procs::raise_priority(pid, dir) {
-            Ok(()) => s.applied.push("priority".into()),
-            Err(_) => s.skipped.push("priority_denied".into()), // anti-cheat protected or elevated game
-        }
-    }
-    if let (Some(pid), Some(dir)) = (pid, game.install_dir.as_deref())
-        && let Some(ids) = crate::cpusets::select(&crate::cpusets::topology(), tweaks)
-    {
-        s.affinity = Some(ids.clone());
-        save(&s); // recorded first: a crash in between is still undone on the next start
-        match crate::procs::set_cpu_sets(pid, dir, Some(&ids)) {
-            Ok(()) => s.applied.push("affinity".into()),
-            Err(_) => {
-                s.affinity = None;
-                s.skipped.push("affinity_denied".into()); // anti-cheat protected: not insisting
-            }
-        }
-    }
+    apply_process(&mut s, game, opts, tweaks);
     if opts.purge_ram {
         if crate::system::is_elevated() {
             if let Ok(p) = crate::boost::purge_standby_list() {
@@ -201,19 +187,59 @@ pub fn start(game: &InstalledGame, pid: Option<u32>, opts: &Options, tweaks: &Ga
     s
 }
 
-/// Undo the session (if any): previous power plan back, normal priority if the game still runs.
-/// The QoS policy is removed too (it lives in the ActiveStore: a reboot would clear it anyway).
+/// Priority and CPU cores on the session's process (`s.pid`), when it is known.
+fn apply_process(s: &mut Session, game: &InstalledGame, opts: &Options, tweaks: &GameTweaks) {
+    let (Some(pid), Some(dir)) = (s.pid, game.install_dir.as_deref()) else { return };
+    if opts.high_priority || tweaks.high_priority {
+        match crate::procs::raise_priority(pid, dir) {
+            Ok(before) => {
+                s.prev_priority = Some(before);
+                s.applied.push("priority".into());
+            }
+            Err(_) => s.skipped.push("priority_denied".into()), // anti-cheat protected or elevated game
+        }
+    }
+    if let Some(ids) = crate::cpusets::select(&crate::cpusets::topology(), tweaks) {
+        s.affinity = Some(ids.clone());
+        save(s); // recorded first: a crash in between is still undone on the next start
+        match crate::procs::set_cpu_sets(pid, dir, Some(&ids)) {
+            Ok(()) => s.applied.push("affinity".into()),
+            Err(_) => {
+                s.affinity = None;
+                s.skipped.push("affinity_denied".into()); // anti-cheat protected: not insisting
+            }
+        }
+    }
+}
+
+/// The session's process is gone or was never known (Steam says the game runs before its exe
+/// starts; a launcher hands over to the real game): priority and cores go to `pid` instead.
+/// Plan, RAM and QoS stay as they are.
+pub fn retarget(game: &InstalledGame, pid: u32, opts: &Options, tweaks: &GameTweaks) -> Option<Session> {
+    let mut s = session().filter(|s| s.game_id == game.id && s.pid != Some(pid))?;
+    s.pid = Some(pid);
+    s.install_dir = game.install_dir.clone();
+    s.prev_priority = None;
+    s.affinity = None;
+    s.applied.retain(|a| a != "priority" && a != "affinity");
+    s.skipped.retain(|a| a != "priority_denied" && a != "affinity_denied");
+    apply_process(&mut s, game, opts, tweaks);
+    save(&s);
+    Some(s)
+}
+
+/// Undo the session (if any): previous power plan back, the game's previous priority if it still
+/// runs. The QoS policy is removed too (it lives in the ActiveStore: a reboot would clear it anyway).
 pub fn stop() -> Option<Session> {
     let s = session()?;
-    if let Some(plan) = &s.prev_plan
-        && s.applied.iter().any(|a| a == "power_plan")
-    {
+    // `prev_plan` alone (not `applied`): it is saved before the switch, `applied` only after it.
+    if let Some(plan) = &s.prev_plan {
         let _ = crate::power::set_active(plan);
     }
     if s.applied.iter().any(|a| a == "priority")
         && let (Some(pid), Some(dir)) = (s.pid, s.install_dir.as_deref())
     {
-        let _ = crate::procs::normal_priority(pid, dir); // fails harmlessly once the game exited
+        let _ = crate::procs::restore_priority(pid, dir, s.prev_priority); // fails harmlessly once the game exited
     }
     if s.affinity.is_some()
         && let (Some(pid), Some(dir)) = (s.pid, s.install_dir.as_deref())
@@ -400,13 +426,14 @@ mod tests {
         let tweaks = GameTweaks { free_core0: true, ..Default::default() };
         let s = start(&game, Some(child.id()), &Options::default(), &tweaks);
         let during = active_plan();
-        let class = {
+        let read_class = || {
             // SAFETY: query-only handle, closed below.
             let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, child.id()) }.unwrap();
             let c = unsafe { GetPriorityClass(h) };
             let _ = unsafe { CloseHandle(h) };
             c
         };
+        let class = read_class();
         log += &format!("before={before:?} during={during:?} applied={:?} skipped={:?} ram_freed={} priority_class=0x{class:x}\n", s.applied, s.skipped, s.ram_freed);
         assert!(s.applied.contains(&"power_plan".to_string()), "{log}");
         assert!(s.applied.contains(&"priority".to_string()), "{log}");
@@ -416,6 +443,7 @@ mod tests {
         assert_eq!(class, 0x80, "HIGH_PRIORITY_CLASS\n{log}");
         assert_eq!(session().map(|x| x.game_id), Some("exe:fakegame.exe".into()));
         assert!(stop().is_some());
+        assert_eq!(read_class(), 0x20, "the class it had before (normal) is back\n{log}");
         let after = active_plan();
         log += &format!("after={after:?}\n");
         assert_ne!(during, before, "the plan switched while playing\n{log}");
@@ -449,13 +477,29 @@ mod tests {
             skipped: vec![],
             qos_policy: None,
             affinity: Some(vec![256]),
+            prev_priority: None,
         };
         save(&s);
         assert_eq!(session().as_ref().map(|x| x.game_id.as_str()), Some("steam:730"));
         s.prev_plan = Some("not a guid; calc.exe".into());
         save(&s);
         assert!(session().is_none(), "a tampered plan id is ignored");
-        save(&Session { prev_plan: None, ..s });
+        save(&Session { prev_plan: None, applied: vec!["qos".into(), "priority".into()], skipped: vec!["priority_denied".into()], ..s });
+        // Steam said "running" before the exe existed (pid None): the real process takes over.
+        let game = InstalledGame {
+            id: "steam:730".into(),
+            name: "CS2".into(),
+            launcher: crate::games::Launcher::Steam,
+            install_dir: Some(r"C:\g2boost-test-missing".into()),
+            main_exe: None,
+            size_bytes: None,
+        };
+        let off = Options { high_priority: false, ..Options::default() };
+        assert!(retarget(&InstalledGame { id: "steam:1".into(), ..game.clone() }, 1234, &off, &GameTweaks::default()).is_none(), "another game");
+        let r = retarget(&game, 1234, &off, &GameTweaks::default()).unwrap();
+        assert_eq!((r.pid, r.applied.clone(), r.skipped.clone()), (Some(1234), vec!["qos".to_string()], vec![]), "per-process state reset");
+        assert_eq!(session().unwrap().pid, Some(1234), "saved");
+        assert!(retarget(&game, 1234, &off, &GameTweaks::default()).is_none(), "same process: nothing to do");
         assert!(stop().is_some());
         assert!(session().is_none() && stop().is_none());
     }

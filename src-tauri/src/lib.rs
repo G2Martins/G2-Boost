@@ -351,7 +351,11 @@ fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
     }
     std::thread::spawn(move || {
         let st = app.state::<Dashboard>();
-        if let Some(mut m) = Monitor::new() {
+        let Some(mut m) = Monitor::new() else {
+            st.monitor_running.store(false, Ordering::SeqCst);
+            return;
+        };
+        loop {
             // Fixed 1 s cadence like Task Manager: sleep to the next deadline, not 1 s after a slow
             // sample (sensors/NVML can take hundreds of ms), so ticks don't drift to 1.1–1.8 s.
             let mut next = std::time::Instant::now();
@@ -373,8 +377,13 @@ fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
                 }
                 let _ = app.emit("monitor:tick", m.sample());
             }
+            st.monitor_running.store(false, Ordering::SeqCst);
+            // A page subscribed between the check above and the store saw `running` and left it to
+            // this thread: take the job back unless a new thread already did.
+            if st.monitor_subs.load(Ordering::SeqCst) == 0 || st.monitor_running.swap(true, Ordering::SeqCst) {
+                break;
+            }
         }
-        st.monitor_running.store(false, Ordering::SeqCst);
     });
 }
 
@@ -1034,7 +1043,8 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
     }
     let gs = app.state::<GamesState>();
     let list = gs.current(s, false);
-    let mut running = games::running(&list, &procs::list_paths(), games::steam_running_app());
+    let procs_now = procs::list_paths();
+    let mut running = games::running(&list, &procs_now, games::steam_running_app());
     {
         let mut sup = gs.suppressed.lock().unwrap();
         if sup.as_ref().is_some_and(|id| !running.iter().any(|r| &r.id == id)) {
@@ -1051,19 +1061,22 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
     } else {
         gamemode::decide(current_id.as_deref(), &running, &enabled)
     };
+    // The library entry, with a folder for a game added by hand (the running exe's own), so the
+    // priority check ("process inside the game's folder") still holds.
+    let game_for = |rg: &games::RunningGame| {
+        let mut g = list.iter().find(|g| g.id == rg.id)?.clone();
+        if g.install_dir.is_none()
+            && let Some(pid) = rg.pid
+            && let Some((_, path)) = procs_now.iter().find(|(p, _)| *p == pid)
+        {
+            g.install_dir = std::path::Path::new(path).parent().map(|d| d.to_string_lossy().into_owned());
+        }
+        Some(g)
+    };
     match decision {
         gamemode::Decision::Start(i) => {
             let rg = &running[i];
-            if let Some(g) = list.iter().find(|g| g.id == rg.id) {
-                // A game added by hand has no install folder: use the running exe's own folder, so
-                // the priority check ("process inside the game's folder") still holds.
-                let mut g = g.clone();
-                if g.install_dir.is_none()
-                    && let Some(pid) = rg.pid
-                    && let Some((_, path)) = procs::list_paths().into_iter().find(|(p, _)| *p == pid)
-                {
-                    g.install_dir = std::path::Path::new(&path).parent().map(|d| d.to_string_lossy().into_owned());
-                }
+            if let Some(g) = game_for(rg) {
                 let tweaks = s.game_tweaks.get(&g.id).copied().unwrap_or_default();
                 let session = gamemode::start(&g, rg.pid, &s.game_mode, &tweaks);
                 let _ = app.emit("gamemode:changed", Some(session));
@@ -1076,7 +1089,21 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
             let _ = app.emit("gamemode:changed", None::<gamemode::Session>);
             false
         }
-        gamemode::Decision::Keep => current.is_some(),
+        gamemode::Decision::Keep => {
+            // Its process is gone or was never known (Steam flags the game before the exe starts,
+            // a launcher hands over): priority and cores follow the game's process now.
+            if let Some(c) = current.as_ref()
+                && c.pid.is_none_or(|p| !procs_now.iter().any(|(x, _)| *x == p))
+                && let Some(rg) = running.iter().find(|r| r.id == c.game_id && r.pid.is_some())
+                && let (Some(g), Some(pid)) = (game_for(rg), rg.pid)
+            {
+                let tweaks = s.game_tweaks.get(&g.id).copied().unwrap_or_default();
+                if let Some(session) = gamemode::retarget(&g, pid, &s.game_mode, &tweaks) {
+                    let _ = app.emit("gamemode:changed", Some(session));
+                }
+            }
+            current.is_some()
+        }
     }
 }
 
@@ -1220,18 +1247,19 @@ fn luli_forget(id: String) -> Result<Vec<luli::MemoryItem>, String> {
 fn settings_set(r: State<'_, Routines>, settings: Settings) -> Result<Settings, String> {
     // Per-game options mirror the GPU preference in the registry: only `game_tweaks_set` changes
     // them (a page holding an older copy must not undo them). Picked exes: only `pick_exe` & co.
-    // Profiles and the overlay: only their own commands.
-    let live = r.settings.lock().unwrap().clone();
+    // Profiles and the overlay: only their own commands. Held locked through the save, so one of
+    // those commands cannot land in between and be undone by this older copy.
+    let mut live = r.settings.lock().unwrap();
     let settings = Settings {
-        game_tweaks: live.game_tweaks,
-        game_paths: live.game_paths,
-        game_exe_override: live.game_exe_override,
-        profiles: live.profiles,
-        overlay: live.overlay,
+        game_tweaks: live.game_tweaks.clone(),
+        game_paths: live.game_paths.clone(),
+        game_exe_override: live.game_exe_override.clone(),
+        profiles: live.profiles.clone(),
+        overlay: live.overlay.clone(),
         ..settings
     };
     let saved = settings::save(&settings).map_err(|e| e.to_string())?;
-    *r.settings.lock().unwrap() = saved.clone();
+    *live = saved.clone();
     Ok(saved)
 }
 
@@ -2489,6 +2517,7 @@ pub fn run() {
             gamemode::stop();
             if system::is_elevated() {
                 let _ = qos::clear_all_ours(); // orphaned QoS policies (non-elevated: a reboot clears them)
+                netetw::stop_stale(); // a network usage session a crash left tracing
             }
             watch_uninstalls(app.handle().clone());
             // Reinstalled to another folder: the Claude apps the user connected keep finding us.
@@ -2840,6 +2869,10 @@ pub fn run() {
             // Quitting from the tray in the middle of a game: undo Game Mode on the way out.
             if let tauri::RunEvent::Exit = event {
                 gamemode::stop();
+                // The network usage tab was open: its ETW session would outlive the app.
+                if let Ok(mut m) = _app.state::<NetEtwState>().monitor.lock() {
+                    *m = None; // Drop stops the session
+                }
                 // r9:overlay: release the hotkey and close the FPS session on the way out.
                 overlay_cmds::shutdown(_app);
             }

@@ -418,6 +418,7 @@ pub struct RunningGame {
 
 /// Which of `games` are running: a process inside the game's install folder, the exact exe (or
 /// the exe name, when only the name is known) for hand-added games, or Steam's `RunningAppID`.
+/// `procs` comes biggest working set first (`procs::list_paths`).
 pub fn running(games: &[InstalledGame], procs: &[(u32, String)], steam_app: Option<u32>) -> Vec<RunningGame> {
     let procs: Vec<(u32, String)> = procs.iter().map(|(pid, p)| (*pid, p.to_ascii_lowercase())).collect();
     let mut out = Vec::new();
@@ -425,8 +426,11 @@ pub fn running(games: &[InstalledGame], procs: &[(u32, String)], steam_app: Opti
         let pid = match (&g.install_dir, g.launcher) {
             (Some(dir), _) => {
                 let d = format!("{}\\", lower(dir));
-                // The biggest match is usually the game; launchers live elsewhere.
-                procs.iter().find(|(_, p)| p.starts_with(&d)).map(|(pid, _)| *pid)
+                // The game's own exe; otherwise the biggest process in its folder (a crash reporter
+                // or a stub is small; launchers live elsewhere).
+                let main = g.main_exe.as_deref().map(str::to_ascii_lowercase);
+                let inside: Vec<&(u32, String)> = procs.iter().filter(|(_, p)| p.starts_with(&d)).collect();
+                inside.iter().find(|(_, p)| main.as_deref() == Some(p.as_str())).or(inside.first()).map(|(pid, _)| *pid)
             }
             (None, Launcher::Custom) if g.main_exe.is_some() => {
                 // A picked exe has no folder of its own to match: other games may share it.
@@ -667,6 +671,19 @@ mod tests {
             "a sibling folder with the same prefix is not the game"
         );
         assert!(running(&games, &[], None).is_empty());
+    }
+
+    #[test]
+    fn running_picks_the_main_exe_then_the_biggest_process_in_the_folder() {
+        let dir = r"D:\Games\Shooter";
+        let crash = (5, format!(r"{dir}\CrashReporter.exe"));
+        let game_proc = (6, format!(r"{dir}\bin\Shooter.exe"));
+        let g = InstalledGame { main_exe: Some(format!(r"{dir}\BIN\shooter.exe")), ..game("app:s", "Shooter", Launcher::Other, Some(dir)) };
+        // The main exe wins even listed after a bigger helper.
+        assert_eq!(running(std::slice::from_ref(&g), &[crash.clone(), game_proc.clone()], None)[0].pid, Some(6));
+        // No main exe known: the first in the list (biggest working set, `procs::list_paths`).
+        let g = InstalledGame { main_exe: None, ..g };
+        assert_eq!(running(std::slice::from_ref(&g), &[game_proc, crash], None)[0].pid, Some(6));
     }
 
     fn with_exe(id: &str, launcher: Launcher, dir: Option<&str>, exe: Option<&str>) -> InstalledGame {

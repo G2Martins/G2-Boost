@@ -280,6 +280,11 @@ pub(crate) fn props() -> Vec<u64> {
     buf
 }
 
+/// Stop a session a crash left running (it outlives the process that started it).
+pub fn stop_stale() {
+    control(EVENT_TRACE_CONTROL_STOP);
+}
+
 /// ControlTraceW on our session by name. Returns the Win32 code (0 = ok,
 /// 4201 = ERROR_WMI_INSTANCE_NOT_FOUND when no such session).
 fn control(code: EVENT_TRACE_CONTROL) -> u32 {

@@ -33,15 +33,17 @@ impl Clock {
         }
     }
 
-    /// Unix time of today's `hour:00:00` (only meaningful when `self.hour >= hour`).
-    fn todays_slot(&self, hour: u8) -> u64 {
+    /// Unix time of `hour:00:00`, `days_back` days before today (0 = today).
+    fn slot(&self, hour: u8, days_back: u64) -> u64 {
         let since_midnight = u64::from(self.hour) * 3600 + u64::from(self.minute) * 60 + u64::from(self.second);
-        self.unix.saturating_sub(since_midnight) + u64::from(hour) * 3600
+        (self.unix.saturating_sub(since_midnight) + u64::from(hour) * 3600).saturating_sub(days_back * 86_400)
     }
 }
 
 /// Is a routine run due now? `last_run` = unix time of the previous routine run,
-/// `ran_since_start` = whether this process already ran its at-logon cleanup.
+/// `ran_since_start` = whether this process already ran its at-logon cleanup. A daily or weekly
+/// slot missed while the PC was off runs at the next chance (any run before the latest slot =
+/// due); never ran = wait for the slot itself.
 pub fn due(schedule: &Schedule, clock: Clock, last_run: Option<u64>, ran_since_start: bool) -> bool {
     match *schedule {
         Schedule::Off => false,
@@ -49,9 +51,16 @@ pub fn due(schedule: &Schedule, clock: Clock, last_run: Option<u64>, ran_since_s
         Schedule::EveryHours { hours } => {
             last_run.is_none_or(|l| clock.unix.saturating_sub(l) >= u64::from(hours.max(1)) * 3600)
         }
-        Schedule::Daily { hour } => clock.hour >= hour && last_run.is_none_or(|l| l < clock.todays_slot(hour)),
+        Schedule::Daily { hour } => {
+            let passed = clock.hour >= hour;
+            last_run.map_or(passed, |l| l < clock.slot(hour, if passed { 0 } else { 1 }))
+        }
         Schedule::Weekly { weekday, hour } => {
-            clock.weekday == weekday && clock.hour >= hour && last_run.is_none_or(|l| l < clock.todays_slot(hour))
+            let mut back = (7 + u64::from(clock.weekday % 7) - u64::from(weekday % 7)) % 7;
+            if back == 0 && clock.hour < hour {
+                back = 7;
+            }
+            last_run.map_or(back == 0, |l| l < clock.slot(hour, back))
         }
     }
 }
@@ -175,6 +184,30 @@ mod tests {
         assert!(!due(&weekly, clock(2, 21, 0), None, false), "wrong day");
         assert!(due(&weekly, clock(3, 20, 0), None, false));
         assert!(!due(&weekly, clock(3, 21, 0), Some(clock(3, 20, 1).unix), false));
+    }
+
+    #[test]
+    fn a_slot_missed_while_the_pc_was_off_runs_at_the_next_chance() {
+        const DAY: u64 = 86_400;
+        // Daily at 9: the PC was off yesterday at 9; today at 8 the run from two days ago is stale.
+        let daily = Schedule::Daily { hour: 9 };
+        let yesterday_9 = clock(3, 9, 5).unix - DAY;
+        assert!(due(&daily, clock(3, 8, 0), Some(yesterday_9 - DAY), false), "yesterday's slot missed");
+        assert!(!due(&daily, clock(3, 8, 0), Some(yesterday_9), false), "ran yesterday: wait for 9");
+        // Weekly on Wednesday (3) at 20: Thursday morning, the PC was off on Wednesday night.
+        let weekly = Schedule::Weekly { weekday: 3, hour: 20 };
+        let last_wed = clock(3, 20, 5).unix - DAY; // the clocks share one date: Thursday's "yesterday"
+        assert!(due(&weekly, clock(4, 10, 0), Some(last_wed - 7 * DAY), false), "Wednesday's slot missed");
+        assert!(!due(&weekly, clock(4, 10, 0), Some(last_wed), false), "ran on Wednesday");
+        assert!(!due(&weekly, clock(4, 10, 0), None, false), "never ran: waits for the day");
+        // Wednesday before 20: the slot to compare is last week's.
+        let week_ago = clock(3, 20, 5).unix - 7 * DAY;
+        assert!(!due(&weekly, clock(3, 10, 0), Some(week_ago), false));
+        assert!(due(&weekly, clock(3, 10, 0), Some(week_ago - 7 * DAY), false), "last week's slot missed");
+        // Sunday (0) slot seen from Saturday (6): six days back.
+        let sunday = Schedule::Weekly { weekday: 0, hour: 9 };
+        assert!(due(&sunday, clock(6, 12, 0), Some(clock(6, 9, 0).unix - 7 * DAY), false));
+        assert!(!due(&sunday, clock(6, 12, 0), Some(clock(6, 9, 5).unix - 6 * DAY), false));
     }
 
     #[test]
