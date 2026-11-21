@@ -102,6 +102,7 @@ async function loadRuns() {
 }
 
 async function runApps(ids: string[]) {
+  if (store.appsRun && !store.appsRun.result) return; // one batch at a time
   set({ appsRun: { ids, progress: {}, result: null, stopping: false }, appsError: null });
   const off = await backend.on<AppUpdateProgress>("updates:apps", (p) => {
     const r = store.appsRun;
@@ -136,6 +137,7 @@ async function searchWu(online: boolean) {
 }
 
 async function installWu(ids: string[]) {
+  if (store.wuBusy) return;
   set({ wuBusy: "install", wuError: null, wuProgress: null, wuResult: null });
   const off = await backend.on<WuProgress>("updates:wu", (p) => set({ wuProgress: p }));
   try {

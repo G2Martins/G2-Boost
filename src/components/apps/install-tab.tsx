@@ -163,6 +163,7 @@ function pickMany(ids: string[]) {
 }
 
 async function startRun(ids: string[]) {
+  if (store.run && !store.run.result) return; // one batch at a time
   set({ run: { ids, progress: {}, result: null, stopping: false }, error: null });
   const off = await backend.on<InstallProgress>("install:progress", (p) => {
     const r = store.run;
@@ -588,7 +589,7 @@ const counts = (b: InstallBatch) => ({
   cancelled: b.items.filter((i) => i.status === "cancelled").length,
 });
 
-function errorText(code: string, t: ReturnType<typeof useI18n>["t"]) {
+export function errorText(code: string, t: ReturnType<typeof useI18n>["t"]) {
   if (code === "busy") return t("install.error.busy");
   if (code === "bad_selection" || code === "bad_token") return t("install.error.bad_selection");
   if (code === "winget_unavailable") return t("updates.error.winget_missing");
@@ -968,6 +969,17 @@ const SHARED_REASONS = [
 const codeText = (c: number) =>
   c > 0xffff ? `0x${(c >>> 0).toString(16).toUpperCase().padStart(8, "0")}` : String(c);
 
+/** A package's outcome in words (the post-format log shows the same texts). */
+export const reasonText = (
+  p: { reason: string; code: number },
+  t: ReturnType<typeof useI18n>["t"],
+) =>
+  OWN_REASONS.includes(p.reason)
+    ? t(`install.reason.${p.reason}` as I18nKey)
+    : SHARED_REASONS.includes(p.reason)
+      ? t(`updates.reason.${p.reason}` as I18nKey)
+      : t("updates.reason.failed", { code: codeText(p.code) });
+
 function RunCard({
   run,
   names,
@@ -979,12 +991,7 @@ function RunCard({
 }) {
   const { t } = useI18n();
   const finished = run.result !== null;
-  const reason = (p: { reason: string; code: number }) =>
-    OWN_REASONS.includes(p.reason)
-      ? t(`install.reason.${p.reason}` as I18nKey)
-      : SHARED_REASONS.includes(p.reason)
-        ? t(`updates.reason.${p.reason}` as I18nKey)
-        : t("updates.reason.failed", { code: codeText(p.code) });
+  const reason = (p: { reason: string; code: number }) => reasonText(p, t);
   const rows = run.result
     ? run.result.items.map((i) => ({ ...i, index: 0, total: run.ids.length }))
     : run.ids.map(

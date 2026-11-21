@@ -194,7 +194,8 @@ test("install: pick in order, confirm the exact list, see the result, keep what 
   await expect(dialog.getByRole("heading", { name: "Instalar 2 apps?" })).toBeVisible();
   await expect(dialog.getByText(t["install.confirm.uac"])).toBeVisible();
   await expect(dialog.getByRole("listitem")).toHaveText([/Opera/, /Brave/]);
-  await dialog.getByRole("button", { name: t["install.confirm.go"] }).click();
+  // A double click: the closing dialog takes no second click (one batch, asserted below).
+  await dialog.getByRole("button", { name: t["install.confirm.go"] }).dblclick();
 
   // The result: the second package failed (app open), the first is done.
   await expect(page.getByText(t["updates.reason.in_use"])).toBeVisible();
