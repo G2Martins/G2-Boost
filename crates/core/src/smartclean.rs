@@ -492,7 +492,7 @@ const APP_EXES: &[(&str, char, &str)] = &[
     ("opera_cache", 'L', r"Programs\Opera GX\opera.exe"),
     ("opera_cache", 'L', r"Programs\Opera\opera.exe"),
     ("vivaldi_cache", 'L', r"Vivaldi\Application\vivaldi.exe"),
-    ("discord_cache", 'L', r"Discord\Update.exe"),
+    ("discord_cache", 'L', r"Discord\Discord.exe"),
     ("spotify_cache", 'R', r"Spotify\Spotify.exe"),
     ("steam_cache", 'X', r"Steam\steam.exe"),
     ("epic_cache", 'X', r"Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe"),

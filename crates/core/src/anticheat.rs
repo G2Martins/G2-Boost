@@ -159,6 +159,8 @@ const VANGUARD_ON_DEMAND: &[Check] = &[Win25h2, SecureBoot, Tpm2, Vbs, Hvci, Iom
 pub const TITLES: &[Title] = &[
     Title { id: "valorant", anticheat: "vanguard", required: FIRMWARE, recommended: &[], on_demand: VANGUARD_ON_DEMAND },
     Title { id: "lol", anticheat: "vanguard", required: FIRMWARE, recommended: &[], on_demand: VANGUARD_ON_DEMAND },
+    // Teamfight Tactics installs on its own entry but runs under the same Vanguard as League.
+    Title { id: "tft", anticheat: "vanguard", required: FIRMWARE, recommended: &[], on_demand: VANGUARD_ON_DEMAND },
     Title { id: "faceit", anticheat: "faceit", required: &[Uefi, Gpt, SecureBoot, Tpm2, Win11], recommended: &[Vbs, Iommu], on_demand: &[] },
     Title { id: "bf6", anticheat: "javelin", required: FIRMWARE, recommended: &[], on_demand: &[] },
     Title { id: "cod", anticheat: "ricochet", required: FIRMWARE, recommended: &[], on_demand: &[] },
@@ -186,6 +188,8 @@ fn title_of_app(name: &str, publisher: &str) -> Option<&'static str> {
         Some("valorant")
     } else if riot && n.starts_with("leagueoflegends") {
         Some("lol")
+    } else if riot && n.starts_with("teamfighttactics") {
+        Some("tft")
     } else if n.starts_with("faceit") && p.contains("faceit") {
         Some("faceit")
     } else if n.contains("battlefield6") && (p.contains("electronicarts") || p == "ea") {
@@ -613,13 +617,15 @@ mod tests {
             a("VALORANT", "Riot Games, Inc"),
             a("Riot Vanguard", "Riot Games, Inc"),
             a("League of Legends", "Riot Games, Inc"),
+            a("Teamfight Tactics", "Riot Games, Inc"),
+            a("Patriot Viper M2 SSD RGB", "Patriot Memory"),
             a("FACEIT", "FACEIT Ltd"),
             a("Call of Duty", "Blizzard Entertainment"),
         ];
         let got = detect(&steam, &apps);
         assert_eq!(
             got,
-            vec![("valorant", "VALORANT".into()), ("lol", "League of Legends".into()), ("faceit", "FACEIT".into()), ("bf6", "Battlefield™ 6".into()), ("cod", "Call of Duty".into())]
+            vec![("valorant", "VALORANT".into()), ("lol", "League of Legends".into()), ("tft", "Teamfight Tactics".into()), ("faceit", "FACEIT".into()), ("bf6", "Battlefield™ 6".into()), ("cod", "Call of Duty".into())]
         );
         // Older Call of Duty and a fake "VALORANT" from someone else are not the real thing.
         let got = detect(&[s(42_700, "Call of Duty: Black Ops"), s(10, "Call of Duty: Modern Warfare 2 (2009)")], &[a("VALORANT", "Some Modder"), a("Faceit Overlay", "Other")]);

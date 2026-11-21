@@ -118,7 +118,7 @@ fn run_items(root: Root, path: &str, location: Location, out: &mut Vec<StartupIt
             enabled: state(location, &name),
             needs_admin: location.needs_admin(),
             protected: is_protected(&name, &command),
-            exe: program_of(&command).and_then(|p| existing(&p)),
+            exe: program_of(&command).and_then(|p| existing(&updater_target(&p, &command).unwrap_or(p))),
             name,
             command,
             location,
@@ -177,6 +177,35 @@ pub(crate) fn program_of(command: &str) -> Option<String> {
         return Some(prog);
     }
     Some(format!(r"{}\System32\{prog}", system::system_root()))
+}
+
+/// Apps that start through their updater (`<dir>\Update.exe --processStart Discord.exe`): the
+/// program the user knows lives in the newest `<dir>\app-<version>\` (the one that shows up running
+/// and has the app's icon), else the stub next to the updater. `None` = not that pattern.
+fn updater_target(prog: &str, command: &str) -> Option<String> {
+    let p = std::path::Path::new(prog);
+    if !p.file_name()?.to_str()?.eq_ignore_ascii_case("update.exe") {
+        return None;
+    }
+    let (_, args) = crate::apps::parse_command(&crate::apps::expand_env(command.trim()))?;
+    let mut it = args.split_whitespace();
+    it.find(|a| a.eq_ignore_ascii_case("--processStart"))?;
+    let name = it.next()?.trim_matches('"');
+    // A bare file name only: anything with a path or that is not an .exe is not followed.
+    if name.contains(['\\', '/', ':']) || name.contains("..") || !name.to_ascii_lowercase().ends_with(".exe") {
+        return None;
+    }
+    let dir = p.parent()?;
+    let newest = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().to_ascii_lowercase().starts_with("app-"))
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path().join(name))))
+        .filter(|(_, x)| x.is_file())
+        .max_by_key(|(t, _)| *t)
+        .map(|(_, x)| x);
+    Some(newest.unwrap_or_else(|| dir.join(name)).to_string_lossy().into_owned())
 }
 
 /// The long, real path of a program that exists (8.3 names and `..` resolved), a local file only.
@@ -263,6 +292,30 @@ mod tests {
         assert!(existing(&format!(r"{win}\explorer.exe")).is_some_and(|p| p.to_ascii_lowercase().ends_with(r"\explorer.exe")));
         assert_eq!(existing(r"C:\nope\nope.exe"), None);
         assert_eq!(existing(r"\\server\share\x.exe"), None);
+    }
+
+    /// Sandbox: `Update.exe --processStart App.exe` names the newest `app-*\App.exe`, never a path.
+    #[test]
+    fn updater_started_apps_point_at_the_real_program() {
+        let root = std::env::temp_dir().join(format!("g2boost-squirrel-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for d in ["app-1.0.9", "app-1.0.10"] {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+            std::fs::write(root.join(d).join("App.exe"), b"x").unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        let update = root.join("Update.exe").to_string_lossy().into_owned();
+        let cmd = format!(r#""{update}" --processStart App.exe"#);
+        assert_eq!(updater_target(&update, &cmd), Some(root.join(r"app-1.0.10\App.exe").to_string_lossy().into_owned()));
+        // No app-* folder with it: the stub next to the updater.
+        let cmd2 = format!(r#""{update}" --processStart Other.exe"#);
+        assert_eq!(updater_target(&update, &cmd2), Some(root.join("Other.exe").to_string_lossy().into_owned()));
+        // Hostile or other shapes are not followed.
+        assert_eq!(updater_target(&update, &format!(r#""{update}" --processStart ..\..\x.exe"#)), None);
+        assert_eq!(updater_target(&update, &format!(r#""{update}" --processStart C:\x.exe"#)), None);
+        assert_eq!(updater_target(&update, &format!(r#""{update}" --other"#)), None);
+        assert_eq!(updater_target(r"C:\App\app.exe", r#""C:\App\app.exe" --processStart App.exe"#), None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Round-trips a throwaway HKCU Run entry through disable/enable and removes it.

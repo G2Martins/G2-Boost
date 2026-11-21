@@ -33,7 +33,7 @@ Estado = `ok` / `missing` / `unknown` (não deu para ler: nunca chute). Cada che
 
 ## Detecção dos jogos
 
-Só manifestos da Steam (`steam::installs`) e entradas de desinstalação (`apps::desktop_list`): nome + publisher, sem varrer pastas, sem spawn. Regras (nome normalizado para letras/dígitos): `valorant`/`leagueoflegends*` com publisher Riot; `faceit*` com publisher FACEIT; Battlefield 6 pela appid 2807960 ou nome `battlefield6` (EA); Call of Duty pela appid 1938090 (HQ) ou nome `callofduty`/`blackops7`/`warzone` (Activision/Blizzard). CoD antigos ("Black Ops III") e homônimos de outro publisher não contam. Nomes são dado hostil: sem caracteres de controle nem de direção (bidi), até 80 caracteres.
+Só manifestos da Steam (`steam::installs`) e entradas de desinstalação (`apps::desktop_list`): nome + publisher, sem varrer pastas, sem spawn. Regras (nome normalizado para letras/dígitos): `valorant`/`leagueoflegends*`/`teamfighttactics*` com publisher Riot (o Teamfight Tactics tem entrada própria e roda sob o mesmo Vanguard do League); `faceit*` com publisher FACEIT; Battlefield 6 pela appid 2807960 ou nome `battlefield6` (EA); Call of Duty pela appid 1938090 (HQ) ou nome `callofduty`/`blackops7`/`warzone` (Activision/Blizzard). CoD antigos ("Black Ops III") e homônimos de outro publisher não contam. Nomes são dado hostil: sem caracteres de controle nem de direção (bidi), até 80 caracteres.
 
 ## Re-checagem depois do boot
 

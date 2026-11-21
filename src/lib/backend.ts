@@ -1962,7 +1962,7 @@ export type AnticheatCheckState = {
   bios: BiosItemId | null;
   windows: AnticheatWindowsFix | null;
 };
-export type AnticheatTitleId = "valorant" | "lol" | "faceit" | "bf6" | "cod";
+export type AnticheatTitleId = "valorant" | "lol" | "tft" | "faceit" | "bf6" | "cod";
 export type AnticheatTitle = {
   id: AnticheatTitleId;
   anticheat: "vanguard" | "faceit" | "javelin" | "ricochet";

@@ -4396,6 +4396,7 @@ export const en = {
   "anticheat.check.blocklist": "Vulnerable driver blocklist",
   "anticheat.title.valorant": "Valorant",
   "anticheat.title.lol": "League of Legends",
+  "anticheat.title.tft": "Teamfight Tactics",
   "anticheat.title.faceit": "FACEIT (CS2)",
   "anticheat.title.bf6": "Battlefield 6",
   "anticheat.title.cod": "Call of Duty: Black Ops 7 and Warzone",
