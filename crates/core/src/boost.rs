@@ -66,6 +66,10 @@ pub enum BoostError {
     /// Widgets policy on 24H2+) or an antivirus. Nothing stays changed (partial writes go back).
     #[error("blocked")]
     Blocked,
+    /// Off asked with no backup for a setting whose Windows default depends on the PC
+    /// ([`default_varies`]): G2 Boost never changed it, so there is nothing of ours to undo.
+    #[error("not_ours")]
+    NotOurs,
     #[error("{0}")]
     Registry(#[from] registry::RegError),
     #[error("{0}")]
@@ -1013,9 +1017,20 @@ pub fn changes(id: &str) -> Result<Vec<Change>, BoostError> {
 
 /* ---------------- apply / revert ---------------- */
 
+/// Windows' own default here depends on the PC, so "write the default" has no single answer: the
+/// Recall feature ships only on Copilot+ PCs (turning it "back on" elsewhere installs it), and
+/// Memory Integrity is on only where the hardware and every driver allow it (forcing it on can stop
+/// drivers from loading). Without a backup, turning these off does nothing.
+pub fn default_varies(id: &str) -> bool {
+    find(id).is_ok_and(|t| matches!(t.kind, Kind::Feature(_)) || t.id == "hvci_off")
+}
+
 /// Turn a tweak on (with backup) or off (restore backup, else Windows default).
 pub fn apply(id: &str, on: bool) -> Result<TweakState, BoostError> {
     let t = find(id)?;
+    if !on && default_varies(t.id) && registry::load_backup(t.id).is_none() {
+        return Err(BoostError::NotOurs);
+    }
     if t.admin && !system::is_elevated() {
         return Err(BoostError::NeedsAdmin);
     }
@@ -1328,9 +1343,8 @@ fn apply_default(t: &Tweak) -> Result<(), BoostError> {
             }
         }
         Kind::DxFlag(key) => dx_write(key, None)?,
-        Kind::Feature(name) => {
-            winfeature::set(name, true)?;
-        }
+        // `apply` refuses before (`default_varies`): never install a feature G2 Boost did not remove.
+        Kind::Feature(_) => return Err(BoostError::NotOurs),
         Kind::PowerSetting(ops) => {
             // Windows' own default for the setting (the Balanced personality), never a guess.
             let scheme = active_scheme()?;

@@ -4037,6 +4037,8 @@ export const en = {
   "maint3.do.delete": "{target} deleted",
   "maint3.do.delete.fail": "{target} was not fully deleted: {why}",
   "maint3.do.delete.reparse_point": "{target} points to another folder: left as it was",
+  "boost.error.not_ours":
+    "The Windows default for this varies from PC to PC and G2 Boost did not change it here, so there is no original to go back to. To change it, use Windows Settings.",
   "boost.error.blocked":
     "Windows or the antivirus protects this setting on this PC and refused the change, even as administrator. Nothing was changed; you can change it in Windows Settings.",
   "setup.subtitle": "Just reinstalled? Pick the apps and tweaks and get Windows ready at once.",

@@ -343,6 +343,13 @@ pub struct Plan {
     pub already: usize,
 }
 
+/// Applied, and turning it off means something. "On" without a backup where Windows' default
+/// depends on the PC (Recall absent on a PC that never had it, `boost::default_varies`) is how the
+/// PC came, not something G2 Boost applied: never offered to undo.
+fn undoable(st: &TweakState) -> bool {
+    matches!(st.status, Status::On | Status::Partial) && (st.has_backup || !boost::default_varies(st.id))
+}
+
 /// Pure: live states in, steps out.
 pub fn plan(target: &Target, states: &[TweakState], elevated: bool) -> Plan {
     let wanted = clean_ids(&target.ids);
@@ -371,7 +378,7 @@ pub fn plan(target: &Target, states: &[TweakState], elevated: bool) -> Plan {
     }
     if target.off_others {
         for st in states.iter().filter(|s| !wanted.iter().any(|w| w == s.id)) {
-            if matches!(st.status, Status::On | Status::Partial) {
+            if undoable(st) {
                 let step = Step { id: st.id.to_string(), op: Op::Off, level: st.level.map(|l| level_str(l).to_string()) };
                 put(&mut plan, st, step);
             }
@@ -578,7 +585,7 @@ fn others() -> Vec<Other> {
 pub fn restoration() -> Restoration {
     let tweaks = boost::detect_all()
         .into_iter()
-        .filter(|s| matches!(s.status, Status::On | Status::Partial))
+        .filter(undoable)
         .map(|s| AppliedTweak { id: s.id, status: s.status, has_backup: s.has_backup, admin: s.admin, detail: s.detail })
         .collect();
     Restoration { tweaks, others: others() }
@@ -864,6 +871,28 @@ mod tests {
         assert_eq!(ids(&plan.steps), vec![("keyboard", Op::Off), ("tips", Op::Off), ("hags", Op::Off)]);
         // Without `off_others` the rest is left alone.
         assert!(super::plan(&target(&[], false), &states, true).steps.is_empty());
+    }
+
+    /// 2026-11-21 review: on a PC without Recall the feature reads "removed" with no backup, and
+    /// "Windows defaults" turned it off, which installs Recall. Same for Memory Integrity.
+    #[test]
+    fn turning_the_others_off_skips_what_the_pc_came_with() {
+        let mut recall = st("recall_feature_off", Status::On, true);
+        let states = [recall.clone(), st("hvci_off", Status::On, true), st("keyboard", Status::On, false)];
+        let plan = super::plan(&target(&[], true), &states, true);
+        assert_eq!(ids(&plan.steps), vec![("keyboard", Op::Off)]);
+        // Removed by G2 Boost (backup taken): putting it back is ours to do.
+        recall.has_backup = true;
+        let plan = super::plan(&target(&[], true), &[recall], true);
+        assert_eq!(ids(&plan.steps), vec![("recall_feature_off", Op::Off)]);
+        // And the tweak itself refuses, elevated or not, before touching Windows.
+        // SAFETY: shared data-dir override for tests (same value everywhere).
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
+        for id in ["recall_feature_off", "hvci_off"] {
+            crate::registry::delete_backup(id); // the test data dir, never the real one
+            assert!(matches!(boost::apply(id, false), Err(boost::BoostError::NotOurs)), "{id}");
+        }
+        assert!(!boost::default_varies("keyboard") && boost::default_varies("recall_feature_off"));
     }
 
     #[test]

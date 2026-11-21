@@ -4059,6 +4059,8 @@ export const ptBR = {
   "maint3.do.delete": "{target} apagada",
   "maint3.do.delete.fail": "{target} não foi apagada por inteiro: {why}",
   "maint3.do.delete.reparse_point": "{target} aponta para outra pasta: ficou como estava",
+  "boost.error.not_ours":
+    "O padrão do Windows para isto muda de PC para PC e o G2 Boost não mexeu nisto aqui, então não há original para voltar. Para mudar, use as Configurações do Windows.",
   "boost.error.blocked":
     "O Windows ou o antivírus protege esta configuração neste PC e recusou a mudança, mesmo como administrador. Nada foi alterado; dá para mudar pelas Configurações do Windows.",
   "setup.subtitle":
