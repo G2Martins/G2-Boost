@@ -13,9 +13,9 @@ use windows::Win32::Foundation::{CloseHandle, FILETIME, HANDLE};
 use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX};
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
-    GetPriorityClass, GetProcessTimes, HIGH_PRIORITY_CLASS, IsProcessCritical, NORMAL_PRIORITY_CLASS, OpenProcess,
-    PROCESS_ACCESS_RIGHTS, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE,
-    SetPriorityClass, TerminateProcess,
+    ABOVE_NORMAL_PRIORITY_CLASS, BELOW_NORMAL_PRIORITY_CLASS, GetPriorityClass, GetProcessTimes, HIGH_PRIORITY_CLASS,
+    IDLE_PRIORITY_CLASS, IsProcessCritical, NORMAL_PRIORITY_CLASS, OpenProcess, PROCESS_ACCESS_RIGHTS, PROCESS_CREATION_FLAGS,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE, SetPriorityClass, TerminateProcess,
 };
 use windows::Win32::System::Threading::{PROCESS_SET_LIMITED_INFORMATION, SetProcessDefaultCpuSets};
 use windows::core::BOOL;
@@ -274,31 +274,43 @@ pub fn end(pid: u32, created: u64) -> Result<(), ProcError> {
     result
 }
 
-/// Every process this user can see, as (pid, image path); unreadable paths are left out.
+/// Every process this user can see, as (pid, image path), biggest working set first (the first
+/// match inside a game's folder is the game, not its crash reporter); unreadable paths are left out.
 pub fn list_paths() -> Vec<(u32, String)> {
-    snapshot().into_iter().filter(|(_, s)| !s.path.is_empty()).map(|(pid, s)| (pid, s.path)).collect()
+    let mut v: Vec<(u64, u32, String)> = snapshot().into_iter().filter(|(_, s)| !s.path.is_empty()).map(|(pid, s)| (s.ram, pid, s.path)).collect();
+    v.sort_by_key(|(ram, _, _)| std::cmp::Reverse(*ram));
+    v.into_iter().map(|(_, pid, path)| (pid, path)).collect()
 }
 
 /// Raise a game to high priority (never realtime). Only a process whose image lives under
 /// `inside` (the game's install folder) and that is a normal user-session process: the pid comes
-/// from a detection a few seconds old and could have been reused.
-pub fn raise_priority(pid: u32, inside: &str) -> Result<(), ProcError> {
+/// from a detection a few seconds old and could have been reused. Returns the class it had before.
+pub fn raise_priority(pid: u32, inside: &str) -> Result<u32, ProcError> {
     set_priority(pid, inside, HIGH_PRIORITY_CLASS)
 }
 
-/// Back to normal priority (Game Mode turned off while the game still runs).
-pub fn normal_priority(pid: u32, inside: &str) -> Result<(), ProcError> {
-    set_priority(pid, inside, NORMAL_PRIORITY_CLASS)
+/// Back to the class the game had before Game Mode (`raise_priority`'s result, which a fixed
+/// priority rule may have set). Unknown, realtime or a tampered session value = normal.
+pub fn restore_priority(pid: u32, inside: &str, class: Option<u32>) -> Result<(), ProcError> {
+    set_priority(pid, inside, restorable_class(class)).map(|_| ())
 }
 
-fn set_priority(pid: u32, inside: &str, class: windows::Win32::System::Threading::PROCESS_CREATION_FLAGS) -> Result<(), ProcError> {
+fn restorable_class(class: Option<u32>) -> PROCESS_CREATION_FLAGS {
+    [IDLE_PRIORITY_CLASS, BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, HIGH_PRIORITY_CLASS]
+        .into_iter()
+        .find(|c| Some(c.0) == class)
+        .unwrap_or(NORMAL_PRIORITY_CLASS)
+}
+
+fn set_priority(pid: u32, inside: &str, class: PROCESS_CREATION_FLAGS) -> Result<u32, ProcError> {
     with_game_process(pid, inside, PROCESS_SET_INFORMATION, |h| {
-        // SAFETY: valid handle from `with_game_process`.
+        // SAFETY: valid handle from `with_game_process` (opened with query access too).
         unsafe {
-            if GetPriorityClass(h) == class.0 {
-                return Ok(());
+            let before = GetPriorityClass(h);
+            if before != class.0 {
+                SetPriorityClass(h, class).map_err(|e| ProcError::Win32(e.message()))?;
             }
-            SetPriorityClass(h, class).map_err(|e| ProcError::Win32(e.message()))
+            Ok(before)
         }
     })
 }
@@ -431,6 +443,36 @@ mod tests {
         assert!(read().is_empty(), "no default set = every CPU");
         assert_eq!(set_cpu_sets(pid, r"C:\Some\Other\Game", Some(&ids)), Err(ProcError::Gone), "not inside the game folder");
         assert_eq!(set_cpu_sets(std::process::id(), &dir, Some(&ids)), Err(ProcError::Protected), "never G2 Boost itself");
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+
+    /// Game Mode's priority on a real child: the class it had (a fixed-priority rule's below
+    /// normal) comes back at the end, not "normal"; realtime or garbage from the session = normal.
+    #[test]
+    fn priority_raised_then_restored_to_what_it_was() {
+        let me = std::env::current_exe().unwrap();
+        let dir = me.parent().unwrap().to_string_lossy().into_owned();
+        let mut child = std::process::Command::new(&me)
+            .args(["--ignored", "--exact", "procs::tests::sleep_helper", "--test-threads=1"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        // SAFETY: handle on our own child, closed at the end.
+        let h = unsafe { OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.unwrap();
+        // SAFETY: valid handle (both calls).
+        let class = || unsafe { GetPriorityClass(h) };
+        unsafe { SetPriorityClass(h, BELOW_NORMAL_PRIORITY_CLASS) }.unwrap(); // what a priority rule would leave
+        assert_eq!(raise_priority(pid, &dir), Ok(BELOW_NORMAL_PRIORITY_CLASS.0));
+        assert_eq!(class(), HIGH_PRIORITY_CLASS.0);
+        restore_priority(pid, &dir, Some(BELOW_NORMAL_PRIORITY_CLASS.0)).unwrap();
+        assert_eq!(class(), BELOW_NORMAL_PRIORITY_CLASS.0, "the rule's class back");
+        restore_priority(pid, &dir, Some(0x100)).unwrap();
+        assert_eq!(class(), NORMAL_PRIORITY_CLASS.0, "realtime is never restored");
+        // SAFETY: handle from OpenProcess above.
+        let _ = unsafe { CloseHandle(h) };
         let _ = child.kill();
         let _ = child.wait();
     }

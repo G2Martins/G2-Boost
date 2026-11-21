@@ -1034,7 +1034,8 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
     }
     let gs = app.state::<GamesState>();
     let list = gs.current(s, false);
-    let mut running = games::running(&list, &procs::list_paths(), games::steam_running_app());
+    let procs_now = procs::list_paths();
+    let mut running = games::running(&list, &procs_now, games::steam_running_app());
     {
         let mut sup = gs.suppressed.lock().unwrap();
         if sup.as_ref().is_some_and(|id| !running.iter().any(|r| &r.id == id)) {
@@ -1051,19 +1052,22 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
     } else {
         gamemode::decide(current_id.as_deref(), &running, &enabled)
     };
+    // The library entry, with a folder for a game added by hand (the running exe's own), so the
+    // priority check ("process inside the game's folder") still holds.
+    let game_for = |rg: &games::RunningGame| {
+        let mut g = list.iter().find(|g| g.id == rg.id)?.clone();
+        if g.install_dir.is_none()
+            && let Some(pid) = rg.pid
+            && let Some((_, path)) = procs_now.iter().find(|(p, _)| *p == pid)
+        {
+            g.install_dir = std::path::Path::new(path).parent().map(|d| d.to_string_lossy().into_owned());
+        }
+        Some(g)
+    };
     match decision {
         gamemode::Decision::Start(i) => {
             let rg = &running[i];
-            if let Some(g) = list.iter().find(|g| g.id == rg.id) {
-                // A game added by hand has no install folder: use the running exe's own folder, so
-                // the priority check ("process inside the game's folder") still holds.
-                let mut g = g.clone();
-                if g.install_dir.is_none()
-                    && let Some(pid) = rg.pid
-                    && let Some((_, path)) = procs::list_paths().into_iter().find(|(p, _)| *p == pid)
-                {
-                    g.install_dir = std::path::Path::new(&path).parent().map(|d| d.to_string_lossy().into_owned());
-                }
+            if let Some(g) = game_for(rg) {
                 let tweaks = s.game_tweaks.get(&g.id).copied().unwrap_or_default();
                 let session = gamemode::start(&g, rg.pid, &s.game_mode, &tweaks);
                 let _ = app.emit("gamemode:changed", Some(session));
@@ -1076,7 +1080,21 @@ fn game_mode_tick(app: &AppHandle, s: &Settings) -> bool {
             let _ = app.emit("gamemode:changed", None::<gamemode::Session>);
             false
         }
-        gamemode::Decision::Keep => current.is_some(),
+        gamemode::Decision::Keep => {
+            // Its process is gone or was never known (Steam flags the game before the exe starts,
+            // a launcher hands over): priority and cores follow the game's process now.
+            if let Some(c) = current.as_ref()
+                && c.pid.is_none_or(|p| !procs_now.iter().any(|(x, _)| *x == p))
+                && let Some(rg) = running.iter().find(|r| r.id == c.game_id && r.pid.is_some())
+                && let (Some(g), Some(pid)) = (game_for(rg), rg.pid)
+            {
+                let tweaks = s.game_tweaks.get(&g.id).copied().unwrap_or_default();
+                if let Some(session) = gamemode::retarget(&g, pid, &s.game_mode, &tweaks) {
+                    let _ = app.emit("gamemode:changed", Some(session));
+                }
+            }
+            current.is_some()
+        }
     }
 }
 
