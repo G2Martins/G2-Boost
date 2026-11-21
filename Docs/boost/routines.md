@@ -37,8 +37,10 @@ Thread única no shell (`spawn_routines`): a cada 60 s avalia `routines::due(sch
 |---|---|
 | `at_logon` | uma vez por processo (o app inicia com o Windows → uma vez por logon) |
 | `every_hours{n}` | `agora − última ≥ n h` |
-| `daily{h}` | hora atual ≥ h e a última execução foi antes do slot `h:00` de hoje |
-| `weekly{d,h}` | dia da semana = d, hora ≥ h, última antes do slot de hoje |
+| `daily{h}` | a última execução foi antes do slot `h:00` mais recente que já passou (hoje ou ontem); nunca rodou = hora atual ≥ h |
+| `weekly{d,h}` | a última execução foi antes do slot `d h:00` mais recente que já passou (até 7 dias atrás); nunca rodou = dia d e hora ≥ h |
+
+Slot perdido com o PC desligado roda na próxima chance (ex.: semanal de quarta às 20 h, PC desligado na quarta → roda na quinta ao ligar), em vez de esperar a semana seguinte.
 
 Executa `cleanup::execute(routine_categories, "routine")` **sem token**: a confirmação humana foi o ato de ligar a rotina e marcar as categorias (decisão documentada; o MCP não tem comando de settings). Resultado vai para o histórico com gatilho `routine` e evento `routine:done`. `last_run` fica em `routine.json`.
 
