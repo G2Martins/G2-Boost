@@ -470,15 +470,22 @@ function useLuliState() {
         setNote(t("ai.key.missing"));
         return;
       }
+      // Claim the turn before the first await: a second Enter while the context loads is ignored.
+      const ctrl = new AbortController();
+      inflight.current = ctrl;
+      setBusy(true);
       const ctx = context ?? (await fetchContext());
-      if (!ctx) return;
+      if (!ctx || ctrl.signal.aborted) {
+        if (inflight.current === ctrl) inflight.current = null;
+        setBusy(false);
+        return;
+      }
       const noWeb = !PROVIDER_WEB[provider];
       const web = !noWeb && (opts.web ?? (webAlways || webHere));
       const sent = opts.sent ?? q;
       const prior = opts.prior ?? messages;
       setNote(null);
       setDraft("");
-      setBusy(true);
       setStreaming("");
       const userMsg: LuliMessage = { role: "user", text: q, sent: sent === q ? undefined : sent };
       setMessages([...prior, userMsg]);
@@ -490,8 +497,6 @@ function useLuliState() {
         instructions,
         skills: enabledSkills,
       });
-      const ctrl = new AbortController();
-      inflight.current = ctrl;
       try {
         let answer: Answer;
         if (provider === "anthropic") {
