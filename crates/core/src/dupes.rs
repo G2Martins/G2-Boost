@@ -228,6 +228,16 @@ pub fn find(files: Vec<(PathBuf, u64)>, cancel: &AtomicBool, progress: &DupProgr
     groups
 }
 
+/// Every group the selection touches keeps a copy: a path not picked that is, on disk right now,
+/// still a plain file of the group's size. The result is from the scan; a copy deleted or changed
+/// outside the app since then does not count.
+pub fn keeps_a_copy(groups: &[DupGroup], picked: &[String]) -> bool {
+    let left = |g: &DupGroup, p: &String| {
+        !picked.contains(p) && std::fs::symlink_metadata(p).is_ok_and(|m| m.is_file() && m.len() == g.size)
+    };
+    groups.iter().filter(|g| g.paths.iter().any(|p| picked.contains(p))).all(|g| g.paths.iter().any(|p| left(g, p)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,6 +255,28 @@ mod tests {
         let pr = DupProgress::default();
         let g = find(v, &AtomicBool::new(false), &pr);
         (g, pr)
+    }
+
+    /// 2026-11-21 review: the "one copy stays" check used the scan result; with a copy deleted in
+    /// Explorer since, picking the others removed every copy.
+    #[test]
+    fn a_copy_must_still_be_on_disk() {
+        let d = sandbox("keep");
+        let (a, b, c) = (d.join("a"), d.join("b"), d.join("c"));
+        for p in [&a, &b, &c] {
+            fs::write(p, [5u8; 100]).unwrap();
+        }
+        let s = |p: &Path| p.to_string_lossy().into_owned();
+        let groups = vec![DupGroup { size: 100, paths: vec![s(&a), s(&b), s(&c)], wasted: 200 }];
+        assert!(keeps_a_copy(&groups, &[s(&a), s(&b)]));
+        assert!(!keeps_a_copy(&groups, &[s(&a), s(&b), s(&c)]));
+        fs::remove_file(&c).unwrap(); // deleted outside the app
+        assert!(!keeps_a_copy(&groups, &[s(&a), s(&b)]));
+        fs::write(&c, [5u8; 10]).unwrap(); // or no longer the same file
+        assert!(!keeps_a_copy(&groups, &[s(&a), s(&b)]));
+        assert!(keeps_a_copy(&groups, &[s(&a)]));
+        assert!(keeps_a_copy(&groups, &[]), "nothing picked, nothing to keep");
+        let _ = fs::remove_dir_all(&d);
     }
 
     #[test]

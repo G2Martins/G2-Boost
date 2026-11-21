@@ -886,7 +886,8 @@ export const ptBR = {
   "dupes.pick_copies": "Marcar as cópias (mantém a primeira de cada grupo)",
   "dupes.copies": "{n} cópias",
   "dupes.wasted": "{size} sobrando",
-  "dupes.keeps_none": "Deixe pelo menos uma cópia de cada grupo sem marcar.",
+  "dupes.keeps_none":
+    "Deixe sem marcar pelo menos uma cópia de cada grupo que ainda esteja no disco (se apagou alguma por fora, procure de novo).",
   "dupes.confirm_body":
     "As cópias marcadas vão para a Lixeira e dá para restaurar. O Mapa do disco mostra os tamanhos antigos até a próxima análise.",
   "disk.drive": "Unidade",
@@ -4062,6 +4063,8 @@ export const ptBR = {
   "maint3.do.delete": "{target} apagada",
   "maint3.do.delete.fail": "{target} não foi apagada por inteiro: {why}",
   "maint3.do.delete.reparse_point": "{target} aponta para outra pasta: ficou como estava",
+  "boost.error.not_ours":
+    "O padrão do Windows para isto muda de PC para PC e o G2 Boost não mexeu nisto aqui, então não há original para voltar. Para mudar, use as Configurações do Windows.",
   "boost.error.blocked":
     "O Windows ou o antivírus protege esta configuração neste PC e recusou a mudança, mesmo como administrador. Nada foi alterado; dá para mudar pelas Configurações do Windows.",
   "setup.subtitle":

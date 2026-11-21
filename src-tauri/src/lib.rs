@@ -899,11 +899,9 @@ async fn dupes_recycle(dup: State<'_, DupState>, paths: Vec<String>) -> Result<d
     if paths.is_empty() || paths.iter().any(|p| !known.contains(p)) {
         return Err("unknown_item".into());
     }
-    // Never every copy of a group: one always stays.
-    for g in dup.result.lock().unwrap().iter().flatten() {
-        if g.paths.iter().all(|p| paths.contains(p)) {
-            return Err("keeps_none".into());
-        }
+    // Never every copy of a group: one always stays, checked on disk now (not in the scan result).
+    if !dupes::keeps_a_copy(dup.result.lock().unwrap().as_deref().unwrap_or_default(), &paths) {
+        return Err("keeps_none".into());
     }
     let out = tauri::async_runtime::spawn_blocking(move || {
         let checked = disk::validate_recycle(&paths).map_err(|e| e.to_string())?;

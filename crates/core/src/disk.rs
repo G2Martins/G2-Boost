@@ -532,7 +532,7 @@ pub fn recycle(root: &mut Node, selection: &[Vec<u32>]) -> Result<RecycleOutcome
     if sel.is_empty() {
         return Err(RecycleError::NotFound);
     }
-    let win = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let win = crate::repair::windows_dir(); // from Windows, not the user's environment
     let profile = crate::cleanup::env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
     let mut paths = Vec::with_capacity(sel.len());
     for ids in &sel {
@@ -595,7 +595,7 @@ pub fn validate_recycle(paths: &[String]) -> Result<Vec<PathBuf>, RecycleError> 
     if paths.is_empty() || paths.len() > 50 {
         return Err(RecycleError::NotFound);
     }
-    let win = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let win = crate::repair::windows_dir(); // from Windows, not the user's environment
     let profile = crate::cleanup::env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
     let mut out: Vec<PathBuf> = Vec::new();
     for raw in paths {
@@ -659,17 +659,21 @@ fn size_of_path(p: &Path) -> u64 {
     }
 }
 
-/// One shell operation sending `paths` (validated by the caller) to the Recycle Bin. Windows asks
-/// itself before deleting for good anything too big for the Bin. Returns (code, user aborted).
+/// One shell operation sending `paths` (validated by the caller, resolved: no link on the way) to
+/// the Recycle Bin. Windows asks itself before deleting for good anything too big for the Bin.
+/// Returns (code, user aborted). Every path is pinned again right before the call and held open
+/// through it: one that became a link, or is now reached through one, since the caller checked it
+/// is left out (it stays, so callers count it as failed).
 pub(crate) fn shell_recycle(paths: &[PathBuf]) -> (i32, bool) {
     use windows::Win32::UI::Shell::{FO_DELETE, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
     use windows::core::PCWSTR;
-    if paths.is_empty() {
+    let pinned: Vec<(&PathBuf, crate::safety::Pinned)> = paths.iter().filter_map(|p| Some((p, crate::safety::pin(p).ok()?))).collect();
+    if pinned.is_empty() {
         return (0, false);
     }
     // Double-NUL-terminated list.
     let mut from: Vec<u16> = Vec::new();
-    for p in paths {
+    for (p, _) in &pinned {
         use std::os::windows::ffi::OsStrExt;
         from.extend(p.as_os_str().encode_wide());
         from.push(0);
@@ -948,6 +952,22 @@ mod tests {
         assert_eq!(recycle(&mut tree, &[vec![0]]).unwrap_err(), RecycleError::Protected);
         assert!(Path::new(&win).join("System32").exists(), "nothing behind the junction was touched");
         fs::remove_dir(dir.join("a")).unwrap(); // removes the junction only
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// 2026-11-21 review (TOCTOU): a path checked by the caller whose parent became a junction
+    /// before the shell call is left out by the re-check inside `shell_recycle`, never sent.
+    #[test]
+    fn shell_recycle_leaves_out_what_became_a_link_after_the_check() {
+        let dir = std::env::temp_dir().join(format!("g2boost-scan-{}-swap", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(r"victim\keep")).unwrap();
+        fs::write(dir.join(r"victim\keep\x.bin"), [0u8; 10]).unwrap();
+        // The caller validated `dir\a\keep` while `a` was a real folder; `a` is a junction now.
+        crate::cleanup::tests::make_junction(&dir.join("a"), &dir.join("victim"));
+        assert_eq!(shell_recycle(&[dir.join(r"a\keep"), dir.join(r"a")]), (0, false), "nothing sent");
+        assert!(dir.join(r"victim\keep\x.bin").exists());
+        fs::remove_dir(dir.join("a")).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 

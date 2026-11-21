@@ -23,7 +23,7 @@ use windows::Win32::UI::Shell::{
 use windows::core::PCWSTR;
 
 use crate::registry::{self, wide};
-use crate::safety::{PathClass, SafePath, SafePathError, is_reparse};
+use crate::safety::{self, PathClass, Pinned, SafePath, SafePathError, is_reparse};
 use crate::system;
 use crate::tasksched;
 
@@ -161,10 +161,18 @@ fn under(base: Option<PathBuf>, rel: &str) -> Option<PathBuf> {
     base.map(|b| b.join(rel))
 }
 
-/// `C:\` of the system drive (`%SystemDrive%` is `C:`, not an absolute path by itself).
+/// `C:\` of the system drive. Like the Windows folder and ProgramData, from Windows itself: the
+/// environment is the user's to change (`HKCU\Environment`), and an elevated run inherits it.
 fn drive_root() -> Option<PathBuf> {
-    let d = std::env::var("SystemDrive").ok()?;
-    (d.len() == 2 && d.ends_with(':')).then(|| PathBuf::from(format!("{d}\\")))
+    let w = crate::repair::windows_dir();
+    w.to_str().and_then(|s| s.get(..3)).filter(|d| d.ends_with(":\\")).map(PathBuf::from)
+}
+
+/// TEMP/TMP come from the user's environment, which any program the user runs can point anywhere
+/// (`D:\`, the profile): only a folder named Temp or Tmp is a temp root. Drive and profile roots,
+/// AppData and the other known folders are never named that.
+fn temp_root(p: Option<PathBuf>) -> Option<PathBuf> {
+    p.filter(|p| p.file_name().is_some_and(|n| n.eq_ignore_ascii_case("temp") || n.eq_ignore_ascii_case("tmp")))
 }
 
 /// Folders AMD's and NVIDIA's driver installers unpack into and leave behind.
@@ -217,11 +225,11 @@ fn epic_caches(saved: Option<PathBuf>) -> Vec<PathBuf> {
 pub fn paths(id: &str) -> Vec<PathBuf> {
     let local = || env_dir("LOCALAPPDATA");
     let roaming = || env_dir("APPDATA");
-    let program_data = || env_dir("PROGRAMDATA");
-    let win = || env_dir("SystemRoot");
+    let program_data = || registry::known_folder(&windows::Win32::UI::Shell::FOLDERID_ProgramData);
+    let win = || Some(crate::repair::windows_dir());
     let list: Vec<Option<PathBuf>> = match id {
         "temp_windows" => vec![under(win(), "Temp")],
-        "temp_user" => vec![env_dir("TEMP"), env_dir("TMP")],
+        "temp_user" => vec![temp_root(env_dir("TEMP")), temp_root(env_dir("TMP"))],
         "wer" => vec![
             under(local(), r"Microsoft\Windows\WER\ReportArchive"),
             under(local(), r"Microsoft\Windows\WER\ReportQueue"),
@@ -327,21 +335,25 @@ pub fn paths(id: &str) -> Vec<PathBuf> {
     list.into_iter().flatten().collect()
 }
 
-/// Validate one catalog root: absolute, inside an allowed class, exists, not a reparse point.
-fn checked_root(p: &Path) -> Result<Option<SafePath>, SafePathError> {
-    let win = env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+/// Validate one catalog root: absolute, plain, inside an allowed class, exists, and pinned (opened
+/// as itself, not a reparse point and not reached through one). Where it really is, short names
+/// expanded, is classified again. `Ok(None)` = nothing to clean here.
+fn checked_root(p: &Path) -> Result<Option<Pinned>, SafePathError> {
+    let win = crate::repair::windows_dir();
     let profile = env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
-    let safe = SafePath::classify(p, &win, &profile)?;
-    if !matches!(safe.class(), PathClass::System | PathClass::UserProfile | PathClass::Other) {
-        return Err(SafePathError::SystemCritical);
-    }
-    let Ok(md) = fs::symlink_metadata(p) else {
-        return Ok(None); // does not exist on this machine
+    let allowed = |safe: SafePath| match safe.class() {
+        PathClass::System | PathClass::UserProfile | PathClass::Other => Ok(()),
+        _ => Err(SafePathError::SystemCritical),
     };
-    if !md.is_dir() || is_reparse(&md) {
+    allowed(SafePath::classify(p, &win, &profile)?)?;
+    let Ok(root) = safety::pin(p) else {
+        return Ok(None); // missing on this machine, a link, or reached through one
+    };
+    if !root.md.is_dir() {
         return Ok(None);
     }
-    Ok(Some(safe))
+    allowed(SafePath::classify(&root.real, &win, &profile)?)?;
+    Ok(Some(root))
 }
 
 /// `thumbcache_*.db` style match: one `*` at most, case-insensitive.
@@ -415,40 +427,52 @@ fn measure_dir_with(dir: &Path, t: &mut Tally, keep_after: Option<SystemTime>, t
     true
 }
 
-/// Delete files under `dir` and then the emptied subdirectories (bottom-up). `dir` itself stays.
+/// Delete files under `dir` and then the emptied subdirectories (bottom-up). `dir` itself stays,
+/// and nothing happens when it is a link or is reached through one.
 pub(crate) fn delete_dir_contents(dir: &Path, t: &mut Tally) {
     delete_dir_contents_with(dir, t, None, &mut |_| true);
 }
 
 /// [`delete_dir_contents`] that calls `tick` after each file; `false` = it stopped early.
 fn delete_dir_contents_with(dir: &Path, t: &mut Tally, keep_after: Option<SystemTime>, tick: &mut Tick) -> bool {
+    match safety::pin(dir) {
+        Ok(root) if root.md.is_dir() => delete_below(&root, dir, t, keep_after, tick),
+        _ => true,
+    }
+}
+
+/// The walk under a pinned root. The listing only proposes names: each entry is opened as itself,
+/// checked on its handle (not a link, still below `root`) and deleted through that handle, so a
+/// folder swapped for a junction after it was listed is refused, never followed (the app runs
+/// elevated, and several roots are writable by any user).
+fn delete_below(root: &Pinned, dir: &Path, t: &mut Tally, keep_after: Option<SystemTime>, tick: &mut Tick) -> bool {
     let Ok(rd) = fs::read_dir(dir) else {
         return true;
     };
     for e in rd.flatten() {
-        let Ok(md) = e.metadata() else {
-            t.skipped += 1;
-            continue;
-        };
-        if is_reparse(&md) {
+        if e.metadata().is_ok_and(|md| is_reparse(&md)) {
             continue; // never follow, never remove: not ours
         }
         let p = e.path();
+        let Ok((f, md)) = root.open_below(&p) else {
+            t.skipped += 1; // vanished, access denied, or swapped for a link meanwhile
+            continue;
+        };
         if md.is_dir() {
-            let go_on = delete_dir_contents_with(&p, t, keep_after, tick);
-            let _ = fs::remove_dir(&p); // only succeeds when empty
+            let go_on = delete_below(root, &p, t, keep_after, tick);
+            let _ = safety::delete_open(&f); // only succeeds when empty
             if !go_on {
                 return false;
             }
         } else if !too_fresh(&md, keep_after) {
-            let len = md.len();
-            match fs::remove_file(&p) {
+            match safety::delete_open(&f) {
                 Ok(()) => {
-                    t.bytes += len;
+                    t.bytes += md.len();
                     t.files += 1;
                 }
                 Err(_) => t.skipped += 1,
             }
+            drop(f); // the delete happens on close: before the tick reports it
             if !tick(t) {
                 return false;
             }
@@ -742,24 +766,24 @@ fn run_one(c: &Category, item: &mut ExecItem, tick: &mut Tick) {
         Action::DirContents | Action::TopFiles(_) => {
             let mut t = Tally::default();
             for p in paths(c.id) {
-                let Ok(Some(_)) = checked_root(&p) else {
+                let Ok(Some(root)) = checked_root(&p) else {
                     continue;
                 };
                 match c.action {
                     Action::DirContents => {
-                        if !delete_dir_contents_with(&p, &mut t, cutoff(c.id), tick) {
+                        if !delete_below(&root, &p, &mut t, cutoff(c.id), tick) {
                             item.error = Some("cancelled".into());
                             break;
                         }
                     }
                     Action::TopFiles(globs) => {
-                        for (f, len) in top_files(&p, globs) {
-                            match fs::remove_file(&f) {
-                                Ok(()) => {
-                                    t.bytes += len;
+                        for (f, _) in top_files(&p, globs) {
+                            match root.open_below(&f) {
+                                Ok((h, md)) if !md.is_dir() && safety::delete_open(&h).is_ok() => {
+                                    t.bytes += md.len();
                                     t.files += 1;
                                 }
-                                Err(_) => t.skipped += 1,
+                                _ => t.skipped += 1,
                             }
                         }
                     }
@@ -920,6 +944,47 @@ pub(crate) mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// TOCTOU (2026-11-21 review): a folder the listing saw as a real folder is swapped for a
+    /// junction to somewhere else before the walk reaches it. Nothing behind the junction may go.
+    #[test]
+    fn a_folder_swapped_for_a_junction_mid_walk_is_refused() {
+        let dir = tmp_tree("swap");
+        let (root, victim) = (dir.join("root"), dir.join("victim"));
+        fs::create_dir_all(root.join("z")).unwrap();
+        fs::create_dir_all(&victim).unwrap();
+        fs::write(root.join("a.tmp"), [0u8; 10]).unwrap();
+        fs::write(root.join(r"z\inner.tmp"), [0u8; 10]).unwrap();
+        fs::write(victim.join("inner.tmp"), b"precious").unwrap();
+        let mut swapped = false;
+        let mut t = Tally::default();
+        // After the first file (`a.tmp` sorts first), `z` becomes a junction to the victim.
+        delete_dir_contents_with(&root, &mut t, None, &mut |_| {
+            if !swapped {
+                swapped = true;
+                fs::rename(root.join("z"), dir.join("z_moved")).unwrap();
+                make_junction(&root.join("z"), &victim);
+            }
+            true
+        });
+        assert!(swapped);
+        assert!(!root.join("a.tmp").exists());
+        assert!(victim.join("inner.tmp").exists(), "deleted through a junction swapped in mid-walk");
+        // A root reached through a junction (an ancestor swapped for a link) is not cleaned at all.
+        make_junction(&dir.join("via"), &dir.join("z_moved"));
+        let mut t = Tally::default();
+        delete_dir_contents(&dir.join(r"via"), &mut t);
+        assert!(dir.join(r"z_moved\inner.tmp").exists(), "the junction root itself");
+        fs::create_dir_all(dir.join(r"z_moved\sub")).unwrap();
+        fs::write(dir.join(r"z_moved\sub\x.tmp"), [0u8; 3]).unwrap();
+        delete_dir_contents(&dir.join(r"via\sub"), &mut t);
+        assert!(dir.join(r"z_moved\sub\x.tmp").exists(), "a root below a junction");
+        assert!(matches!(checked_root(&dir.join(r"via\sub")), Ok(None)));
+        assert_eq!(t.files, 0);
+        let _ = fs::remove_dir(root.join("z"));
+        let _ = fs::remove_dir(dir.join("via"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// Fabricated profile tree: cache folders plus files that must survive.
     fn fake_profile(root: &Path, caches: &[&str], keep: &[&str]) {
         for c in caches {
@@ -1042,10 +1107,20 @@ pub(crate) mod tests {
             use std::os::windows::fs::OpenOptionsExt;
             fs::OpenOptions::new().write(true).create(true).truncate(true).share_mode(0).open(&held).unwrap()
         };
+        // A subfolder another program holds open without delete sharing (its current folder): it
+        // stays, what is inside still goes.
+        fs::create_dir_all(dir.join(r"cache\busy")).unwrap();
+        fs::write(dir.join(r"cache\busy\x.tmp"), [0u8; 4]).unwrap();
+        let busy = {
+            use std::os::windows::fs::OpenOptionsExt;
+            fs::OpenOptions::new().read(true).share_mode(1 | 2).custom_flags(0x0200_0000).open(dir.join(r"cache\busy")).unwrap()
+        };
         let mut t = Tally::default();
         delete_dir_contents(&dir.join("cache"), &mut t);
         assert_eq!(t.skipped, 1);
         assert!(held.exists());
+        assert!(dir.join(r"cache\busy").exists() && !dir.join(r"cache\busy\x.tmp").exists());
+        drop(busy);
         drop(f);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -1062,6 +1137,23 @@ pub(crate) mod tests {
                 assert!(checked_root(&p).is_ok(), "{}: {}", c.id, p.display());
             }
         }
+    }
+
+    /// 2026-11-21 review: TEMP/TMP are the user's to set; `D:\` or the profile as TEMP emptied
+    /// everything older than a day there, elevated and on a schedule.
+    #[test]
+    fn temp_roots_are_only_folders_named_temp() {
+        for bad in [r"C:\", r"D:\", r"C:\Users\Windows", r"C:\Users\Windows\AppData", r"C:\Users\Windows\AppData\Local", r"C:\Users\Windows\Documents", r"C:\Windows\System32"] {
+            assert_eq!(temp_root(Some(PathBuf::from(bad))), None, "{bad}");
+        }
+        for ok in [r"C:\Users\Windows\AppData\Local\Temp", r"C:\Temp\", r"D:\tmp", r"C:\Windows\TEMP"] {
+            assert!(temp_root(Some(PathBuf::from(ok))).is_some(), "{ok}");
+        }
+        assert!(paths("temp_user").iter().all(|p| temp_root(Some(p.clone())).is_some()));
+        // Spellings Windows rewrites never reach the walk (TEMP=C:\Windows\.\System32\Temp).
+        assert!(matches!(checked_root(Path::new(r"C:\Windows\.\System32\Temp")), Err(SafePathError::NotPlain)));
+        assert!(matches!(checked_root(Path::new(r"C:\Windows/System32/Temp")), Err(SafePathError::NotPlain)));
+        assert!(matches!(checked_root(Path::new(r"C:\Windows\System32\Temp")), Err(SafePathError::SystemCritical)));
     }
 
     #[test]
