@@ -351,7 +351,11 @@ fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
     }
     std::thread::spawn(move || {
         let st = app.state::<Dashboard>();
-        if let Some(mut m) = Monitor::new() {
+        let Some(mut m) = Monitor::new() else {
+            st.monitor_running.store(false, Ordering::SeqCst);
+            return;
+        };
+        loop {
             // Fixed 1 s cadence like Task Manager: sleep to the next deadline, not 1 s after a slow
             // sample (sensors/NVML can take hundreds of ms), so ticks don't drift to 1.1–1.8 s.
             let mut next = std::time::Instant::now();
@@ -373,8 +377,13 @@ fn monitor_start(app: AppHandle, state: State<'_, Dashboard>) {
                 }
                 let _ = app.emit("monitor:tick", m.sample());
             }
+            st.monitor_running.store(false, Ordering::SeqCst);
+            // A page subscribed between the check above and the store saw `running` and left it to
+            // this thread: take the job back unless a new thread already did.
+            if st.monitor_subs.load(Ordering::SeqCst) == 0 || st.monitor_running.swap(true, Ordering::SeqCst) {
+                break;
+            }
         }
-        st.monitor_running.store(false, Ordering::SeqCst);
     });
 }
 
