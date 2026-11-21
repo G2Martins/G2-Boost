@@ -4094,6 +4094,7 @@ export const en = {
   "dash.boost.ram": "Free the standby memory at the end",
   "dash.boost.restore": "First, a Windows restore point.",
   "dash.boost.done": "Boost finished",
+  "dash.boost.partial": "Boost finished, but {count} step(s) failed",
   "admin.gate.title": "Administrator permission",
   "admin.gate.body":
     "G2 Boost applies tweaks, cleanups and repairs in protected areas of Windows. In the Windows prompt that opens next, click Yes.",

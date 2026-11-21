@@ -11,6 +11,9 @@ export type Bridge = {
   checkup?: unknown;
   /** Fixed answers by command name (anything else answers null). */
   answers?: Record<string, unknown>;
+  /** Milliseconds a command takes to answer (a restore point, a slow read). */
+  delays?: Record<string, number>;
+  elevated?: boolean;
 };
 
 export async function fakeTauri(page: Page, bridge: Bridge) {
@@ -35,6 +38,8 @@ export async function fakeTauri(page: Page, bridge: Bridge) {
       },
       async invoke(cmd: string, args: Record<string, unknown>) {
         calls.push({ cmd, args });
+        const wait = b.delays?.[cmd];
+        if (wait) await new Promise((r) => setTimeout(r, wait));
         if (cmd === "plugin:event|listen") {
           const id = ++seq;
           const event = String(args.event);
@@ -52,7 +57,7 @@ export async function fakeTauri(page: Page, bridge: Bridge) {
             version: "0.1.0",
             core_version: "0.1.0",
             os: "Windows 11 (build 26200)",
-            elevated: false,
+            elevated: b.elevated ?? false,
             user: "tester",
             start_route: b.route,
             start_tab: b.tab ?? null,

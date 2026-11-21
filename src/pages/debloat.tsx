@@ -104,6 +104,8 @@ export function DebloatPage() {
   const applyIds = async (ids: string[], withRestore: boolean) => {
     setAsk(null);
     setNote(null);
+    // Locks every apply button now: the restore point takes a while.
+    setRun({ done: 0, total: ids.length });
     if (withRestore && elevated) {
       try {
         const out = await backend.restoreCreate(t("dash.restore.description"));
@@ -114,7 +116,6 @@ export function DebloatPage() {
     }
     const done: string[] = [];
     const errors: string[] = [];
-    setRun({ done: 0, total: ids.length });
     for (const [i, id] of ids.entries()) {
       try {
         put(await setTweak(id, true));

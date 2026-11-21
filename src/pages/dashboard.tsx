@@ -112,18 +112,13 @@ function Overview({ elevated }: { elevated: boolean }) {
       .cleanupPreview(DEFAULT_CLEANUP)
       .then((items) => alive && setCleanupBytes(items.reduce((s, i) => s + i.bytes, 0)))
       .catch(() => alive && setCleanupBytes(null));
-    let off: (() => void) | null = null;
     backend.monitorStart();
-    backend
-      .on<MonitorSample>("monitor:tick", (s) => {
-        if (alive) setSamples((prev) => [...prev.slice(-(WINDOW - 1)), s]);
-      })
-      .then((u) => {
-        off = u;
-      });
+    const off = backend.on<MonitorSample>("monitor:tick", (s) => {
+      if (alive) setSamples((prev) => [...prev.slice(-(WINDOW - 1)), s]);
+    });
     return () => {
       alive = false;
-      off?.();
+      void off.then((u) => u());
       backend.monitorStop();
     };
   }, [loadRecs]);
@@ -140,6 +135,9 @@ function Overview({ elevated }: { elevated: boolean }) {
     const runnable = todo.filter((tw) => !tw.admin || elevated);
     setSkipped(todo.length - runnable.length);
     setMsg(null);
+    // Locks the button now: the restore point takes a while.
+    setBoosting({ done: 0, total: runnable.length });
+    let failed = 0;
     if (restoreBefore && elevated) {
       try {
         const out = await backend.restoreCreate(t("dash.restore.description"));
@@ -152,13 +150,13 @@ function Overview({ elevated }: { elevated: boolean }) {
         setMsg(errorText(e));
       }
     }
-    setBoosting({ done: 0, total: runnable.length });
     let done = 0;
     for (const tw of runnable) {
       try {
         if (tw.id === "visual_fx") await backend.boostVisualFx("balanced");
         else await backend.boostApply(tw.id, true);
       } catch (e) {
+        failed += 1;
         setMsg(errorText(e));
       }
       done += 1;
@@ -171,12 +169,18 @@ function Overview({ elevated }: { elevated: boolean }) {
         const items = await backend.cleanupPreview(DEFAULT_CLEANUP);
         setCleanupBytes(items.reduce((sum, i) => sum + i.bytes, 0));
       } catch (e) {
+        failed += 1;
         setMsg(errorText(e));
       }
     }
-    if (extras.ram && elevated) await backend.ramPurge().catch(() => undefined);
+    if (extras.ram && elevated)
+      await backend.ramPurge().catch(() => {
+        failed += 1;
+      });
     setBoosting(null);
-    toast(t("dash.boost.done"), { tone: "success" });
+    toast(failed > 0 ? t("dash.boost.partial", { count: failed }) : t("dash.boost.done"), {
+      tone: failed > 0 ? "warning" : "success",
+    });
     await loadRecs();
     backend.restoreStatus().then((r) => r && setRestore(r));
   };

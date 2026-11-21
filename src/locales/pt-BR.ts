@@ -4117,6 +4117,7 @@ export const ptBR = {
   "dash.boost.ram": "Liberar a memória em espera no fim",
   "dash.boost.restore": "Antes de tudo, um ponto de restauração do Windows.",
   "dash.boost.done": "Boost concluído",
+  "dash.boost.partial": "Boost concluído, mas {count} etapa(s) falharam",
   "admin.gate.title": "Permissão de administrador",
   "admin.gate.body":
     "O G2 Boost aplica ajustes, limpezas e reparos em áreas protegidas do Windows. Na janela do Windows que vai abrir, clique em Sim.",

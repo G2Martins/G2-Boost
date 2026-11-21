@@ -1,5 +1,5 @@
 import { Lock, RefreshCw, Search, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PowerTab } from "@/components/boost/power-tab";
 import { BootCard, PrivacyTab } from "@/components/boost/privacy-boot";
 import { ProcsTab } from "@/components/boost/procs-tab";
@@ -60,7 +60,7 @@ import {
   type TweakCategory,
   type TweakState,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -72,9 +72,10 @@ const TABS = ["ram", "dns", "startup", "privacy", "power", "procs"];
 export function BoostPage() {
   const { t } = useI18n();
   const [elevated, setElevated] = useState(false);
-  const [tab, setTab] = useState(() =>
-    TABS.includes(boot.startTab ?? "") ? (boot.startTab as string) : "tweaks",
-  );
+  const [tab, setTab] = useState(() => {
+    const arrival = takeStartTab() ?? "";
+    return TABS.includes(arrival) ? arrival : "tweaks";
+  });
   // "Ver no gerenciador" from the RAM list: the task manager opens filtered on that program.
   const [procsQuery, setProcsQuery] = useState("");
   const openProcs = useCallback((name: string) => {
@@ -190,9 +191,12 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
   const { t } = useI18n();
   const errorText = useTweakErrorText();
   const { states, put } = useTweakStates();
-  const [busy, setBusy] = useState<string | null>(null);
+  // Cards being switched (several can run at once; each stays locked until its own call ends).
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [run, setRun] = useState<{ done: number; total: number } | null>(null);
+  // The toast's undo holds an old `run`: the ref is what keeps two batches from interleaving.
+  const batching = useRef(false);
   const [skipped, setSkipped] = useState(0);
   const [recs, setRecs] = useState<Record<string, Recommendation>>({});
   const [restoreBefore, setRestoreBefore] = useState(true);
@@ -213,7 +217,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
 
   /** One tweak on/off (visual effects take a level). Returns false on failure. */
   const one = async ({ tw, on, level }: Step): Promise<boolean> => {
-    setBusy(tw.id);
+    setBusy((b) => new Set(b).add(tw.id));
     setErrors((e) => ({ ...e, [tw.id]: "" }));
     try {
       put(await setTweak(tw.id, on, level));
@@ -222,7 +226,11 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
       setErrors((m) => ({ ...m, [tw.id]: errorText(e) }));
       return false;
     } finally {
-      setBusy(null);
+      setBusy((b) => {
+        const n = new Set(b);
+        n.delete(tw.id);
+        return n;
+      });
     }
   };
 
@@ -242,25 +250,33 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
 
   /** Several in a row, after a restore point when the setting asks for one. */
   const runBatch = async (steps: Step[]): Promise<Tweak[]> => {
-    if (steps.length === 0) return [];
-    if (restoreBefore && elevated) {
-      try {
-        const out = await backend.restoreCreate(t("dash.restore.description"));
-        setRestoreMsg(
-          out === "created" ? t("boost.preset.restore_created") : t("boost.preset.restore_skipped"),
-        );
-      } catch (e) {
-        setRestoreMsg(errorText(e));
-      }
-    }
-    const done: Tweak[] = [];
+    if (steps.length === 0 || batching.current) return [];
+    batching.current = true;
+    // Locks the presets and the cards now: the restore point takes a while.
     setRun({ done: 0, total: steps.length });
-    for (const [i, step] of steps.entries()) {
-      if (await one(step)) done.push(step.tw);
-      setRun({ done: i + 1, total: steps.length });
+    try {
+      if (restoreBefore && elevated) {
+        try {
+          const out = await backend.restoreCreate(t("dash.restore.description"));
+          setRestoreMsg(
+            out === "created"
+              ? t("boost.preset.restore_created")
+              : t("boost.preset.restore_skipped"),
+          );
+        } catch (e) {
+          setRestoreMsg(errorText(e));
+        }
+      }
+      const done: Tweak[] = [];
+      for (const [i, step] of steps.entries()) {
+        if (await one(step)) done.push(step.tw);
+        setRun({ done: i + 1, total: steps.length });
+      }
+      return done;
+    } finally {
+      batching.current = false;
+      setRun(null);
     }
-    setRun(null);
-    return done;
   };
 
   const applyPreset = async (p: Preset) => {
@@ -432,7 +448,7 @@ function TweaksTab({ elevated }: { elevated: boolean }) {
               state={states?.[tw.id]}
               loading={inTauri && states === null}
               elevated={elevated}
-              busy={busy === tw.id || run !== null}
+              busy={busy.has(tw.id) || run !== null}
               error={errors[tw.id]}
               rec={recs[tw.id]}
               onToggle={(on, level) =>
