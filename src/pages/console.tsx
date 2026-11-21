@@ -16,7 +16,7 @@ import {
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { useLuli } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
-import { cn } from "@/lib/utils";
+import { cn, redactPaths } from "@/lib/utils";
 
 /* ---------------- session store (survives leaving the page) ---------------- */
 
@@ -34,6 +34,8 @@ type Entry = {
 
 let entries: Entry[] = [];
 let nextId = 1;
+/** winget confirmations already answered: the log outlives the page, a used token is never offered again. */
+const answered = new Set<number>();
 const listeners = new Set<() => void>();
 function update(f: (e: Entry[]) => Entry[]) {
   entries = f(entries);
@@ -168,9 +170,13 @@ export function ConsolePage() {
     if (!question && !about) return;
     const id = nextId++;
     update((l) => [...l, { id, line, kind: "luli", status: "running" }]);
-    const data = about?.reply
-      ? `\n\n<page_data>\nConsole: ${about.line}\n${tableText(about.reply).replace(/</g, "\\u003c").slice(0, 12000)}\n</page_data>`
+    // Same treatment as the page data: profile paths (the user's name) never reach the AI.
+    const block = about?.reply
+      ? redactPaths(`Console: ${about.line}\n${tableText(about.reply)}`)
+          .replace(/</g, "\\u003c")
+          .slice(0, 12000)
       : "";
+    const data = block ? `\n\n<page_data>\n${block}\n</page_data>` : "";
     const q = question || t("console.explain.question");
     try {
       const answer = await luli.askOnce(q, {
@@ -477,8 +483,12 @@ function EntryView({
 /** A change waiting for the user's click; the core runs it once with its token. */
 function ConfirmBlock({ block: b }: { block: Extract<ConsoleBlock, { kind: "confirm" }> }) {
   const { t } = useI18n();
-  const [state, setState] = useState<"ask" | "running" | "done">("ask");
+  const [state, setState] = useState<"ask" | "running" | "done">(() =>
+    answered.has(b.token) ? "done" : "ask",
+  );
   const go = async () => {
+    if (answered.has(b.token)) return;
+    answered.add(b.token);
     setState("running");
     const id = nextId++;
     const line = `winget ${b.action === "install" ? "instalar" : "atualizar"} ${b.id}`;
@@ -522,7 +532,10 @@ function ConfirmBlock({ block: b }: { block: Extract<ConsoleBlock, { kind: "conf
           </button>
           <button
             type="button"
-            onClick={() => setState("done")}
+            onClick={() => {
+              answered.add(b.token);
+              setState("done");
+            }}
             className="press rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
           >
             {t("common.cancel")}
