@@ -445,7 +445,8 @@ export function DetailedMode({
               </div>
               <Switch
                 checked={!!on[c.id]}
-                disabled={busy}
+                // Confirming: the list on screen is what runs, nothing joins it without a preview.
+                disabled={busy || phase === "confirm"}
                 onCheckedChange={(v) => setOn((s) => ({ ...s, [c.id]: v }))}
                 aria-label={name(c.id)}
                 className={cn(
