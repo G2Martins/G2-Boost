@@ -7,7 +7,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { GameExesEditor } from "@/components/game-exes";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
@@ -62,11 +62,19 @@ export function SettingsPage() {
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [status, setStatus] = useState<RoutineStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // What the next save builds on: the last answer plus the saves still in flight, so two quick
+  // switches never send each other's old value. `seq` keeps a late answer from undoing a newer one.
+  const latest = useRef<Settings | null>(null);
+  const seq = useRef(0);
 
   useEffect(() => {
     let alive = true;
     backend.appInfo().then((i) => alive && setInfo(i));
-    backend.settingsGet().then((s) => alive && s && setSettings(s));
+    backend.settingsGet().then((s) => {
+      if (!alive || !s) return;
+      latest.current = s;
+      setSettings(s);
+    });
     backend.autostartStatus().then((a) => alive && a && setAutostart(a.enabled));
     const tick = () => backend.routineStatus().then((s) => alive && s && setStatus(s));
     tick();
@@ -80,15 +88,24 @@ export function SettingsPage() {
   const luli = useLuli();
   const save = useCallback(
     async (patch: Partial<Settings>) => {
-      if (!settings) return;
+      const prev = latest.current;
+      if (!prev) return;
+      const next = { ...prev, ...patch };
+      latest.current = next;
+      const at = ++seq.current;
       setErr(null);
       try {
-        setSettings(await backend.settingsSet({ ...settings, ...patch }));
+        const s = await backend.settingsSet(next);
+        if (at === seq.current) {
+          latest.current = s;
+          setSettings(s);
+        }
       } catch (e) {
+        if (latest.current === next) latest.current = prev; // refused: the next save starts from before it
         setErr(errorText(e));
       }
     },
-    [settings, errorText],
+    [errorText],
   );
 
   const toggleAutostart = async (on: boolean) => {

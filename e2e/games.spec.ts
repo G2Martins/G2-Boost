@@ -1,4 +1,5 @@
 import { expect, open, t, test } from "./fixtures";
+import { emit, fakeTauri, listening } from "./tauri-bridge";
 
 const fill = (key: keyof typeof t, game: string) => t[key].replace("{game}", game);
 
@@ -72,4 +73,36 @@ test("poster grid: search, launcher filter, keyboard reveal, options and route",
   await expect(route).toHaveAttribute("aria-pressed", "true");
   await route.click();
   await expect(page.getByRole("heading", { name: fill("route.title", "Arena Tática") })).toBeHidden();
+});
+
+const options = (power_plan: boolean) => ({
+  game_mode: {
+    power_plan,
+    high_priority: false,
+    purge_ram: false,
+    network_priority: false,
+    pause_routines: false,
+  },
+  game_mode_games: [],
+  game_exe_override: {},
+  game_tweaks: {},
+});
+
+test("a refresh that started before a switch was saved does not turn it back", async ({ page }) => {
+  await fakeTauri(page, {
+    route: "games",
+    // The library refresh reads the old settings slowly; the save answers with the new ones.
+    delays: { settings_get: 800 },
+    answers: { games_list: [], settings_get: options(false), settings_set: options(true) },
+  });
+  await page.goto("/");
+  const power = page.getByRole("switch", { name: t["games.options.power_plan"] });
+  await expect(power).toBeEnabled();
+  await listening(page, "gamemode:changed");
+  await emit(page, "gamemode:changed", null); // starts a refresh
+  await power.click();
+  await expect(power).toBeChecked();
+  // Past the refresh's answer: the switch keeps what the user chose.
+  await page.waitForTimeout(1200);
+  await expect(power).toBeChecked();
 });
