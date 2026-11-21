@@ -881,7 +881,8 @@ export const en = {
   "dupes.pick_copies": "Tick the copies (keeps the first of each group)",
   "dupes.copies": "{n} copies",
   "dupes.wasted": "{size} extra",
-  "dupes.keeps_none": "Leave at least one copy of each group unticked.",
+  "dupes.keeps_none":
+    "Leave at least one copy of each group unticked, one that is still on the disk (if you deleted one elsewhere, scan again).",
   "dupes.confirm_body":
     "The ticked copies go to the Recycle Bin and can be restored. The Disk map shows the old sizes until the next scan.",
   "disk.drive": "Drive",

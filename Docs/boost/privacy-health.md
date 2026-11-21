@@ -1,6 +1,6 @@
 # Privacidade, saúde dos discos, rede por app, Wi-Fi, boot, prioridades, apps pouco usados, duplicados
 
-**Última revisão:** 2026-10-19 (testes ponta a ponta com e sem admin, taxas por processo via ETW, ícones dos programas, boot com DPS desligado) · Módulos de core feitos por subagentes em worktrees isolados e integrados no mesmo dia; todos só leitura, sem spawn de processo, com testes das partes puras e um teste ao vivo ignorado. Ideias vindas do inventário do Kaspersky ([../references/kaspersky.md](../references/kaspersky.md)).
+**Última revisão:** 2026-11-21 (duplicados: a cópia que fica é conferida no disco na hora) · 2026-10-19 (testes ponta a ponta com e sem admin, taxas por processo via ETW, ícones dos programas, boot com DPS desligado) · Módulos de core feitos por subagentes em worktrees isolados e integrados no mesmo dia; todos só leitura, sem spawn de processo, com testes das partes puras e um teste ao vivo ignorado. Ideias vindas do inventário do Kaspersky ([../references/kaspersky.md](../references/kaspersky.md)).
 
 | Tela | Módulo | Fonte | Admin | Na máquina do dono (2026-10-18) |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@
 | Desinstalar apps › ordenar por Uso | `userassist.rs` | `UserAssist\{GUID}\Count` (ROT13; registro de 72 bytes: execuções, foco, última execução) | não | 273 entradas; é pista (apps abertos por outros programas não contam) |
 | Disco › Duplicados | `dupes.rs` | árvore do último scan → tamanho → hash do começo e do fim (64 KiB) → comparação byte a byte; hard links excluídos | não | — |
 
-**Segurança dos duplicados:** `dupes_recycle` só aceita caminhos que estão no último resultado, recusa apagar todas as cópias de um grupo (`keeps_none`), passa cada caminho pela guarda do mapa do disco (`validate_recycle`) e manda para a Lixeira.
+**Segurança dos duplicados:** `dupes_recycle` só aceita caminhos que estão no último resultado, recusa apagar todas as cópias de um grupo (`keeps_none`; desde 2026-11-21 conferido no disco na hora por `dupes::keeps_a_copy`: precisa sobrar, sem marcar, um arquivo comum do tamanho do grupo; cópia apagada no Explorer depois da busca não conta), passa cada caminho pela guarda do mapa do disco (`validate_recycle`) e manda para a Lixeira.
 
 **Alerta de saúde:** `disk_health` guarda uma leitura por dia por disco (chave = hash de modelo+serial, sem serial cru) e mostra o que piorou (`worsened`: realocados/pendentes subiram, desgaste +5, reserva −10, alerta crítico novo).
 
