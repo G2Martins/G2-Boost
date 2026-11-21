@@ -92,15 +92,10 @@ export function MaintenancePage() {
       if (s.running && !plan)
         setRun({ tool: s.running, percent: s.percent, since: Date.now(), adopted: true });
     });
-    let off: (() => void) | null = null;
-    backend
-      .on<RepairProgress>("maintenance:progress", (p) =>
-        setRun((r) => (r && r.tool === p.tool ? { ...r, percent: p.percent } : r)),
-      )
-      .then((u) => {
-        off = u;
-      });
-    return () => off?.();
+    const off = backend.on<RepairProgress>("maintenance:progress", (p) =>
+      setRun((r) => (r && r.tool === p.tool ? { ...r, percent: p.percent } : r)),
+    );
+    return () => void off.then((u) => u());
   }, []);
 
   useEffect(() => {

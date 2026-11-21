@@ -82,14 +82,11 @@ export function RamTab({
     backend.startupList().then((s) => alive && s && setStartup(s));
     backend.settingsGet().then((s) => alive && s && setSettings(s));
     const id = window.setInterval(tick, POLL_MS);
-    let off: (() => void) | null = null;
-    backend.on<GameEvent>("game:started", setLastGame).then((u) => {
-      off = u;
-    });
+    const off = backend.on<GameEvent>("game:started", setLastGame);
     return () => {
       alive = false;
       window.clearInterval(id);
-      off?.();
+      void off.then((u) => u());
     };
   }, []);
 

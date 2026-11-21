@@ -116,15 +116,10 @@ export function WeeklyReview({
     backend.maintPlanStatus().then((p) => {
       if (p) setRunning({ ...p, since: Date.now(), adopted: true });
     });
-    let off: (() => void) | null = null;
-    backend
-      .on<MaintPlanRunning>("maintenance:plan-progress", (p) =>
-        setRunning((r) => (r && r.plan === p.plan ? { ...r, ...p } : r)),
-      )
-      .then((u) => {
-        off = u;
-      });
-    return () => off?.();
+    const off = backend.on<MaintPlanRunning>("maintenance:plan-progress", (p) =>
+      setRunning((r) => (r && r.plan === p.plan ? { ...r, ...p } : r)),
+    );
+    return () => void off.then((u) => u());
   }, []);
 
   useEffect(() => onRunning(running !== null), [running, onRunning]);
