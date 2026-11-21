@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.1 (2026-11-20): aviso do Windows com o app como administrador, Teamfight Tactics e ícone do Discord
+
+Correções achadas testando a 0.10.0 instalada.
+
+- **Aviso do Windows:** com o G2 Boost aberto como administrador (o padrão de quem liga "Sempre abrir como administrador"), o Windows descartava a notificação sem avisar. Agora ela é mostrada por um processo auxiliar sem administrador. Nesse caso, clicar no aviso não reabre a página.
+- **Anti-cheat:** o Teamfight Tactics entra na checagem (usa o mesmo Vanguard do League of Legends).
+- **Ícones:** Discord e outros apps que iniciam pelo próprio atualizador mostram o ícone real na Inicialização, na Limpeza e na lista de quem usa a RAM, e o atalho "tirar da inicialização" passa a reconhecê-los.
+
 ## 0.10.0 (2026-11-20): central de atividade, limpeza inteligente, prontidão para anti-cheat e Conexões da Luli
 
 ### Novo
