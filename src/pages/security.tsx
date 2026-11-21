@@ -40,7 +40,7 @@ import {
   type ExposureSeverity,
   inTauri,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { usePageData } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
@@ -82,7 +82,7 @@ const isIssue = (c: ExposureCheck) => c.state === "exposed" && c.severity !== "i
 export function SecurityPage() {
   const { t } = useI18n();
   const errorText = useErrorText();
-  const [tab, setTab] = useState(boot.startTab === "antivirus" ? "antivirus" : "exposure");
+  const [tab, setTab] = useState(() => (takeStartTab() === "antivirus" ? "antivirus" : "exposure"));
   const [report, setReport] = useState<ExposureReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [alerts, setAlerts] = useState<ExposureAlert[]>([]);

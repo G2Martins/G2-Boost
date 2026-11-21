@@ -44,7 +44,7 @@ import {
   type ScanProgressEvent,
   type ScanSummary,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { boot, takeStartTab } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { sizeText, usePageData } from "@/lib/luli";
 import { navigate } from "@/lib/nav";
@@ -71,6 +71,7 @@ export function DiskPage() {
   const started = useRef(false);
   // Sent here by the cleanup page ("see what else takes the space"): tab, filter, scan.
   const [intent] = useState(takeDiskIntent);
+  const [arrival] = useState(takeStartTab);
   const [owners, setOwners] = useState<OwnerHit[]>([]);
 
   // While scanning: the root's direct children growing, as a one-level treemap.
@@ -200,8 +201,8 @@ export function DiskPage() {
   const current = drives.find((d) => d.letter === selected);
   const initialTab =
     intent.tab ??
-    (["treemap", "largest", "dupes", "essentials"].includes(boot.startTab ?? "")
-      ? (boot.startTab as string)
+    (["treemap", "largest", "dupes", "essentials"].includes(arrival ?? "")
+      ? (arrival as string)
       : "treemap");
 
   const luliData = useMemo(() => {
@@ -422,7 +423,10 @@ export function DiskPage() {
           </TabsContent>
           <TabsContent value="dupes">
             <PageBody className="px-0 pb-0">
-              <DupesTab hasScan={summary !== null} />
+              <DupesTab
+                hasScan={summary !== null}
+                autorun={!!boot.autorun && arrival === "dupes"}
+              />
             </PageBody>
           </TabsContent>
           <TabsContent value="essentials">

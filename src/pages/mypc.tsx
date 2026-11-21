@@ -37,7 +37,7 @@ import {
   type Profile,
   type WinSat,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -532,7 +532,7 @@ export function MyPcPage() {
   }, []);
   const elevated = info?.elevated ?? false;
   // Controlled so a check-up row can send the user to the overview (BIOS guide, disk health).
-  const [tab, setTab] = useState(boot.startTab === "checkup" ? "checkup" : "overview");
+  const [tab, setTab] = useState(() => (takeStartTab() === "checkup" ? "checkup" : "overview"));
   return (
     <PageHeader
       title={t("nav.mypc")}

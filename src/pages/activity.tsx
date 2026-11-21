@@ -23,7 +23,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/primitives";
 import { backend, inTauri } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { clearFeed, goTo, markRead, onJobEnded } from "@/lib/jobs";
 import { dayKey, formatDuration, formatParams, normalizeRuns, type Run } from "@/lib/runs";
@@ -32,12 +32,13 @@ import { cn } from "@/lib/utils";
 /** Notification center + the unified run history of every module (r11:activity). */
 export function ActivityPage() {
   const { t } = useI18n();
+  const [arrival] = useState(takeStartTab);
   return (
     <PageHeader
       title={t("activity.title")}
       subtitle={t("activity.subtitle")}
       tabs={
-        <Tabs defaultValue={boot.startTab === "runs" ? "runs" : "notifications"}>
+        <Tabs defaultValue={arrival === "runs" ? "runs" : "notifications"}>
           <TabsList>
             <TabsTrigger value="notifications">{t("activity.tab.notifications")}</TabsTrigger>
             <TabsTrigger value="runs">{t("activity.tab.runs")}</TabsTrigger>

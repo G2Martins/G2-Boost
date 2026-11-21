@@ -107,17 +107,12 @@ export function DriveTools({
           adopted: true,
         });
     });
-    let off: (() => void) | null = null;
-    backend
-      .on<VolumeProgress>("maintenance:volume-progress", (p) =>
-        setJob((j) =>
-          j && j.volume === p.volume && j.op === p.op ? { ...j, percent: p.percent } : j,
-        ),
-      )
-      .then((u) => {
-        off = u;
-      });
-    return () => off?.();
+    const off = backend.on<VolumeProgress>("maintenance:volume-progress", (p) =>
+      setJob((j) =>
+        j && j.volume === p.volume && j.op === p.op ? { ...j, percent: p.percent } : j,
+      ),
+    );
+    return () => void off.then((u) => u());
   }, []);
 
   useEffect(() => onRunning(job !== null), [job, onRunning]);

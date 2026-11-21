@@ -1,5 +1,5 @@
 import { Gamepad2, Plus, RefreshCw, Search, Square, Zap } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ElevateButton, useErrorText } from "@/components/elevate-button";
 import { AnticheatPanel } from "@/components/games/anticheat-panel";
 import { GameTweaksDialog, optionsOf } from "@/components/games/game-tweaks";
@@ -27,7 +27,7 @@ import {
   type Launcher,
   type Settings,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { boot, takeStartTab } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -97,13 +97,16 @@ export function GamesPage() {
   const [filter, setFilter] = useState<Launcher | "all">("all");
   const [launching, setLaunching] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [arrival] = useState(takeStartTab);
+  // Bumped by every save: a refresh that started before it must not bring the old switches back.
+  const rev = useRef(0);
   useEffect(() => {
     backend.gameTweaksInfo().then(setTweakInfo);
   }, []);
   // Dev aid: G2BOOST_START_TAB=route opens the first game's route (and traces it with autorun).
   useEffect(() => {
-    if (boot.startTab === "route" && games?.[0] && selected === null) setSelected(games[0].id);
-  }, [games, selected]);
+    if (arrival === "route" && games?.[0] && selected === null) setSelected(games[0].id);
+  }, [arrival, games, selected]);
   // The route opens below the library: bring it into view.
   useEffect(() => {
     if (!selected) return;
@@ -115,20 +118,24 @@ export function GamesPage() {
     return () => cancelAnimationFrame(id);
   }, [selected]);
 
-  const load = useCallback(async (refresh = false) => {
-    setBusy(refresh);
-    const [list, s, sess, rs] = await Promise.all([
-      backend.gamesList(refresh),
-      backend.settingsGet(),
-      backend.gameModeStatus(),
-      backend.routineStatus(),
-    ]);
-    setGames(list ?? (!inTauri && boot.startTab === "demo" ? DEMO : []));
-    if (s) setSettings(s);
-    setSession(sess);
-    setElevated(!!rs?.elevated);
-    setBusy(false);
-  }, []);
+  const load = useCallback(
+    async (refresh = false) => {
+      const at = rev.current;
+      setBusy(refresh);
+      const [list, s, sess, rs] = await Promise.all([
+        backend.gamesList(refresh),
+        backend.settingsGet(),
+        backend.gameModeStatus(),
+        backend.routineStatus(),
+      ]);
+      setGames(list ?? (!inTauri && arrival === "demo" ? DEMO : []));
+      if (s && rev.current === at) setSettings(s);
+      setSession(sess);
+      setElevated(!!rs?.elevated);
+      setBusy(false);
+    },
+    [arrival],
+  );
 
   useEffect(() => {
     void load();
@@ -145,9 +152,11 @@ export function GamesPage() {
   }, [load]);
 
   const save = async (next: Settings) => {
+    const at = ++rev.current;
     setSettings(next);
     try {
-      setSettings(await backend.settingsSet(next));
+      const s = await backend.settingsSet(next);
+      if (rev.current === at) setSettings(s);
     } catch {
       void load();
     }
@@ -428,7 +437,7 @@ export function GamesPage() {
 
         {selectedGame ? (
           <div id="game-route" className="scroll-mt-4">
-            <RoutePanel game={selectedGame} />
+            <RoutePanel game={selectedGame} autorun={!!boot.autorun && arrival === "route"} />
           </div>
         ) : null}
 

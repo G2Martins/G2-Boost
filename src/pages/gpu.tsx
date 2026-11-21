@@ -30,7 +30,7 @@ import {
   type NvProfile,
   type NvSetting,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -108,18 +108,13 @@ function Hero({ gpu, driver }: { gpu: Gpu; driver: GpuOverview["nvidia"] }) {
   const [samples, setSamples] = useState<MonitorSample[]>([]);
   useEffect(() => {
     let alive = true;
-    let off: (() => void) | null = null;
     backend.monitorStart();
-    backend
-      .on<MonitorSample>("monitor:tick", (s) => {
-        if (alive) setSamples((prev) => [...prev.slice(-(WINDOW - 1)), s]);
-      })
-      .then((u) => {
-        off = u;
-      });
+    const off = backend.on<MonitorSample>("monitor:tick", (s) => {
+      if (alive) setSamples((prev) => [...prev.slice(-(WINDOW - 1)), s]);
+    });
     return () => {
       alive = false;
-      off?.();
+      void off.then((u) => u());
       backend.monitorStop();
     };
   }, []);
@@ -234,9 +229,10 @@ function Readout({
 
 function NvidiaSection() {
   const { t } = useI18n();
+  const [arrival] = useState(takeStartTab);
   return (
     <Card className="animate-rise" style={rise(1)}>
-      <Tabs defaultValue={boot.startTab === "game" ? "game" : "global"}>
+      <Tabs defaultValue={arrival === "game" ? "game" : "global"}>
         <TabsList className="-mx-5 -mt-1 mb-1 px-5">
           <TabsTrigger value="global">{t("gpu.tab.global")}</TabsTrigger>
           <TabsTrigger value="game">{t("gpu.tab.game")}</TabsTrigger>

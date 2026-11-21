@@ -307,19 +307,24 @@ export function Modal({
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) {
+    if (open) {
+      // Also cancels a close still fading out (reopened within 240 ms).
       d.removeAttribute("data-closing");
-      d.showModal();
+      d.inert = false;
+      if (!d.open) d.showModal();
       return;
     }
-    if (!open && d.open) {
+    if (d.open) {
       // Exit is shorter than entry (200 vs 300 ms); close for real when it ends.
       const done = () => {
         d.removeAttribute("data-closing");
+        d.inert = false;
         d.close();
       };
       if (reducedMotion()) return done();
       d.setAttribute("data-closing", "");
+      // A second click or Enter on the confirm button while it fades would start the job twice.
+      d.inert = true;
       const timer = window.setTimeout(done, 240);
       return () => window.clearTimeout(timer);
     }

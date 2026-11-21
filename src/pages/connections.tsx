@@ -7,7 +7,7 @@ import { LuliCard } from "@/components/luli-card";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/primitives";
 import { backend, inTauri } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 
 const TABS = ["providers", "skills", "mcp"] as const;
@@ -17,11 +17,10 @@ type Tab = (typeof TABS)[number];
 // (G2 Boost into the AI apps; the read-only map of what those apps start).
 export function ConnectionsPage() {
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>(() =>
-    (TABS as readonly string[]).includes(boot.startTab ?? "")
-      ? (boot.startTab as Tab)
-      : "providers",
-  );
+  const [tab, setTab] = useState<Tab>(() => {
+    const arrival = takeStartTab() ?? "";
+    return (TABS as readonly string[]).includes(arrival) ? (arrival as Tab) : "providers";
+  });
   // A SKILL.md or .zip dropped on the window lands here (the shell routes it): take its bytes once.
   const [dropped, setDropped] = useState<ArrayBuffer | null>(null);
   useEffect(() => {

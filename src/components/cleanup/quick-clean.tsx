@@ -39,13 +39,8 @@ export function QuickClean({
 
   useEffect(() => {
     if (state !== "running") return;
-    let off: (() => void) | null = null;
-    backend
-      .on<CleanupProgress>("smart:progress", (p) => setLive(p.bytes))
-      .then((u) => {
-        off = u;
-      });
-    return () => off?.();
+    const off = backend.on<CleanupProgress>("smart:progress", (p) => setLive(p.bytes));
+    return () => void off.then((u) => u());
   }, [state]);
 
   const measure = async () => {
