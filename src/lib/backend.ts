@@ -601,7 +601,11 @@ export type MonitorSample = {
   net_tx_bytes_s: number;
 };
 export type Game = { name: string; source: "steam" | "exe" | "steamapps" };
-export type AutostartStatus = { enabled: boolean };
+export type AutostartStatus = {
+  enabled: boolean;
+  /** Only admins can change the exe and the folders above it (a portable copy never counts). */
+  safe_folder: boolean;
+};
 export type RoutineStatus = {
   last_run: number | null;
   game: Game | null;
@@ -637,6 +641,8 @@ export type DnsAdapter = {
   /** The interface Windows routes internet traffic through. */
   primary: boolean;
   has_backup: boolean;
+  /** What "restore" puts back ("" = automatic/DHCP); null without a backup. */
+  backup_servers: string | null;
   kind: "wifi" | "ethernet" | "other";
   vpn: boolean;
 };
@@ -644,7 +650,7 @@ export type DnsAdapter = {
 export type NicPower = { guid: string; name: string; on: string[] };
 /** Rede › Diagnóstico: this PC's side of a slow connection. */
 export type NetDiagPc = {
-  adapter: Omit<DnsAdapter, "has_backup"> | null;
+  adapter: Omit<DnsAdapter, "has_backup" | "backup_servers"> | null;
   vpns: string[];
   nic_power: NicPower | null;
   nic_backup: boolean;

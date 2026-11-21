@@ -79,7 +79,7 @@ Do mais leve ao mais forte, sem `ipconfig`/`netsh`:
 - **Compatibilidade:** `Get/Set/FreeInterfaceDnsSettings` só existem no Windows 10 2004+; são carregadas por `GetProcAddress` (`dns_api()`), então o app abre em builds antigos e aplicar responde `unsupported_windows` (a medição funciona em qualquer versão).
 - **Adaptador:** `GetBestInterface` (rota para 8.8.8.8, nada é enviado) marca `primary` = o que carrega o tráfego; ele vem primeiro e a UI deixa escolher outro quando há vários (VPN, Wi-Fi + cabo).
 - **Allowlist no core:** `dns::apply(guid, provider_id)` aceita só id de `PROVIDERS` — UI, MCP e rotinas passam pela mesma validação.
-- **Aplicar (admin):** `SetInterfaceDnsSettings` no GUID do adaptador (precisa existir na lista ao vivo), backup do estado anterior em `%LOCALAPPDATA%\G2 Boost\dns_backup.json` (só na primeira troca) e flush do cache DNS. **Restaurar** devolve exatamente o anterior (estático ou automático/DHCP).
+- **Aplicar (admin):** `SetInterfaceDnsSettings` no GUID do adaptador (precisa existir na lista ao vivo), backup do estado anterior em `dns_backup.json` no store protegido (`%ProgramData%\G2 Boost\secure`, [protected-storage.md](../security/protected-storage.md); só na primeira troca) e flush do cache DNS. **Restaurar** devolve exatamente o anterior (estático ou automático/DHCP); a tela de DNS e a janela do MCP mostram antes quais servidores voltam (2026-11-21).
 - Medição real na máquina do dono (2026-10-15): NextDNS 4,1 ms, Cloudflare 4,3, Quad9 4,5, Google 33,8.
 - DNS não aumenta FPS: só encurta resolução de nomes (a IA é instruída a dizer isso).
 

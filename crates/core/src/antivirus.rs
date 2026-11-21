@@ -49,7 +49,7 @@ const TRUSTED: [&str; 3] = ["S-1-5-18", "S-1-5-32-544", "S-1-5-80-956008885-3418
 /// Rights that let someone replace, rename or delete the file, drop files next to it, or change its
 /// permissions or owner: write/add file, append/add folder, delete child, delete, WRITE_DAC,
 /// WRITE_OWNER, GENERIC_ALL, GENERIC_WRITE.
-const WRITE_RIGHTS: u32 = 0x2 | 0x4 | 0x40 | 0x1_0000 | 0x4_0000 | 0x8_0000 | 0x1000_0000 | 0x4000_0000;
+pub(crate) const WRITE_RIGHTS: u32 = 0x2 | 0x4 | 0x40 | 0x1_0000 | 0x4_0000 | 0x8_0000 | 0x1000_0000 | 0x4000_0000;
 const ACCESS_ALLOWED: u8 = 0;
 const ACCESS_ALLOWED_CALLBACK: u8 = 9;
 
@@ -147,7 +147,7 @@ pub(crate) fn defender_active(products: &[Product]) -> bool {
 
 /// `\\?\C:\x` (what `current_exe` can return) → `C:\x`, rebuilt from its components (a `.`
 /// segment is dropped, as Windows does; `..` is kept and refused later).
-fn plain(p: &Path) -> PathBuf {
+pub(crate) fn plain(p: &Path) -> PathBuf {
     let s = p.to_string_lossy();
     Path::new(s.strip_prefix(r"\\?\").filter(|r| r.as_bytes().get(1) == Some(&b':')).unwrap_or(&s)).components().collect()
 }
@@ -209,11 +209,16 @@ pub(crate) struct Ace {
 /// inherit-only grants do not apply to the object itself. Deny entries are not listed (they could
 /// only make it stricter).
 pub(crate) fn writable_by_others(owner: &str, dacl: Option<&[Ace]>) -> bool {
+    grants_others(owner, dacl, WRITE_RIGHTS)
+}
+
+/// [`writable_by_others`] for any set of `rights`.
+pub(crate) fn grants_others(owner: &str, dacl: Option<&[Ace]>, rights: u32) -> bool {
     let trusted = |s: &str| TRUSTED.iter().any(|t| t.eq_ignore_ascii_case(s));
     let Some(aces) = dacl else {
         return true;
     };
-    !trusted(owner) || aces.iter().any(|a| !a.inherit_only && a.mask & WRITE_RIGHTS != 0 && !trusted(&a.sid))
+    !trusted(owner) || aces.iter().any(|a| !a.inherit_only && a.mask & rights != 0 && !trusted(&a.sid))
 }
 
 /* ---------------- readers ---------------- */
@@ -231,7 +236,7 @@ fn sid_string(sid: PSID) -> Option<String> {
 }
 
 /// (owner SID, allow grants) of a file or folder; `None` when it cannot be read.
-fn read_acl(p: &Path) -> Option<(String, Option<Vec<Ace>>)> {
+pub(crate) fn read_acl(p: &Path) -> Option<(String, Option<Vec<Ace>>)> {
     let w = wide(&p.to_string_lossy());
     let mut owner = PSID::default();
     let mut dacl: *mut ACL = std::ptr::null_mut();
@@ -275,7 +280,7 @@ fn read_acl(p: &Path) -> Option<(String, Option<Vec<Ace>>)> {
 }
 
 /// Unreadable permissions count as writable: refusing is the safe answer.
-fn writable(p: &Path) -> bool {
+pub(crate) fn writable(p: &Path) -> bool {
     read_acl(p).is_none_or(|(owner, aces)| writable_by_others(&owner, aces.as_deref()))
 }
 

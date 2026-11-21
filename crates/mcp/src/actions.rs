@@ -33,23 +33,30 @@ pub fn clean_line(s: &str, max: usize) -> String {
     if t.chars().count() > max { t.chars().take(max).collect::<String>() + "…" } else { t }
 }
 
-/// The dialog body: what will happen, the exact items, and a reminder.
+/// The dialog body: what will happen, every item (`confirm` never asks with more than
+/// [`MAX_LINES`]), and a reminder.
 pub fn dialog_text(pt: bool, action: (&str, &str), details: &[String]) -> String {
-    let (head, foot, more) = if pt {
-        ("O Claude pediu ao G2 Boost para:", "Só confirme se foi você quem pediu. Clicar em Não não muda nada.", "e mais")
+    let (head, foot) = if pt {
+        ("O Claude pediu ao G2 Boost para:", "Só confirme se foi você quem pediu. Clicar em Não não muda nada.")
     } else {
-        ("Claude asked G2 Boost to:", "Only confirm if you asked for this. Clicking No changes nothing.", "and")
+        ("Claude asked G2 Boost to:", "Only confirm if you asked for this. Clicking No changes nothing.")
     };
-    let mut lines: Vec<String> = details.iter().take(MAX_LINES).map(|d| format!("• {}", clean_line(d, 150))).collect();
-    if details.len() > MAX_LINES {
-        lines.push(format!("… {more} {}", details.len() - MAX_LINES));
-    }
+    let lines: Vec<String> = details.iter().map(|d| format!("• {}", clean_line(d, 150))).collect();
     let what = clean_line(if pt { action.0 } else { action.1 }, 200);
     format!("{head}\n\n{what}\n\n{}\n\n{foot}", lines.join("\n"))
 }
 
-/// Ask the person at this PC. Blocks until they answer.
-pub fn confirm(action: (&str, &str), details: &[String]) -> bool {
+/// Ask the person at this PC; blocks until they answer. `Err` is the reply for the client: they
+/// said no (or too late), or the request has more items than the dialog can show, refused before
+/// asking (nothing may change that the person did not see).
+pub fn confirm(action: (&str, &str), details: &[String]) -> Result<(), Value> {
+    if details.len() > MAX_LINES {
+        return Err(json!({
+            "error": "too_many_items",
+            "max_items": MAX_LINES,
+            "note": format!("The confirmation dialog shows at most {MAX_LINES} items: ask again with {MAX_LINES} or fewer per request. Nothing changed."),
+        }));
+    }
     let pt = is_pt();
     let body = g2boost_core::registry::wide(&dialog_text(pt, action, details));
     let title = g2boost_core::registry::wide(if pt { "G2 Boost: confirmar pedido do Claude" } else { "G2 Boost: confirm Claude's request" });
@@ -63,7 +70,7 @@ pub fn confirm(action: (&str, &str), details: &[String]) -> bool {
             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2 | MB_TOPMOST | MB_SETFOREGROUND | MB_TASKMODAL,
         )
     };
-    r == IDYES && t0.elapsed() < ANSWER_WINDOW
+    if r == IDYES && t0.elapsed() < ANSWER_WINDOW { Ok(()) } else { Err(declined()) }
 }
 
 fn declined() -> Value {
@@ -86,8 +93,8 @@ pub fn run_cleanup(ids: Vec<String>) -> Value {
     let preview = cleanup::preview(&ids);
     let total: u64 = preview.iter().map(|p| p.bytes).sum();
     let details: Vec<String> = preview.iter().map(|p| format!("{}: {}{}", p.id, gb(p.bytes), if p.needs_admin { " (admin)" } else { "" })).collect();
-    if !confirm((&format!("limpar {} ({} medidos agora)", ids.len(), gb(total)), &format!("clean {} categories ({} measured now)", ids.len(), gb(total))), &details) {
-        return declined();
+    if let Err(v) = confirm((&format!("limpar {} ({} medidos agora)", ids.len(), gb(total)), &format!("clean {} categories ({} measured now)", ids.len(), gb(total))), &details) {
+        return v;
     }
     json!({ "done": true, "run": cleanup::execute(&ids, "mcp", &std::sync::atomic::AtomicBool::new(false), |_| {}) })
 }
@@ -98,9 +105,12 @@ pub fn set_tweak(id: &str, enabled: bool) -> Value {
     let Ok(t) = boost::find(id) else {
         return json!({ "error": "unknown_tweak" });
     };
+    if t.beta {
+        return json!({ "error": "beta_in_app_only", "note": "Beta tweaks are changed only in the G2 Boost app, where their warning is shown." });
+    }
     let (pt, en) = if enabled { ("ligar o ajuste", "turn on the tweak") } else { ("desligar o ajuste (restaura o valor original)", "turn off the tweak (restores the original value)") };
-    if !confirm((pt, en), &[format!("{} ({})", t.id, if t.admin { "admin" } else { "user" }), "backup antes de mudar / backup before changing".into()]) {
-        return declined();
+    if let Err(v) = confirm((pt, en), &[format!("{} ({})", t.id, if t.admin { "admin" } else { "user" }), "backup antes de mudar / backup before changing".into()]) {
+        return v;
     }
     match boost::apply(t.id, enabled) {
         Ok(s) => json!({ "done": true, "state": s }),
@@ -110,8 +120,8 @@ pub fn set_tweak(id: &str, enabled: bool) -> Value {
 
 pub fn set_visual_effects(level: visualfx::Level) -> Value {
     let name = serde_json::to_value(level).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default();
-    if !confirm(("mudar os efeitos visuais do Windows", "change Windows visual effects"), &[format!("nivel / level: {name}")]) {
-        return declined();
+    if let Err(v) = confirm(("mudar os efeitos visuais do Windows", "change Windows visual effects"), &[format!("nivel / level: {name}")]) {
+        return v;
     }
     match boost::apply_visual_fx(level) {
         Ok(s) => json!({ "done": true, "state": s }),
@@ -129,8 +139,8 @@ pub fn set_startup(location: startup::Location, name: &str, enabled: bool) -> Va
         return json!({ "error": "protected_item" });
     }
     let (pt, en) = if enabled { ("voltar a iniciar com o Windows", "start with Windows again") } else { ("não iniciar mais com o Windows", "stop starting with Windows") };
-    if !confirm((pt, en), std::slice::from_ref(&item.name)) {
-        return declined();
+    if let Err(v) = confirm((pt, en), std::slice::from_ref(&item.name)) {
+        return v;
     }
     match startup::set_enabled(location, name, enabled) {
         Ok(s) => json!({ "done": true, "item": s }),
@@ -145,8 +155,8 @@ pub fn set_power_plan(guid: &str) -> Value {
     let Some(p) = plans.plans.iter().find(|p| p.guid.eq_ignore_ascii_case(guid.trim_matches(['{', '}']))) else {
         return json!({ "error": "unknown_plan" });
     };
-    if !confirm(("ativar o plano de energia", "switch the power plan"), std::slice::from_ref(&p.name)) {
-        return declined();
+    if let Err(v) = confirm(("ativar o plano de energia", "switch the power plan"), std::slice::from_ref(&p.name)) {
+        return v;
     }
     match power::set_active(&p.guid) {
         Ok(()) => json!({ "done": true, "active": p.name }),
@@ -155,8 +165,8 @@ pub fn set_power_plan(guid: &str) -> Value {
 }
 
 pub fn create_max_performance_plan() -> Value {
-    if !confirm(("criar e ativar uma cópia do plano Desempenho máximo", "create and activate an Ultimate Performance copy"), &["mais consumo e calor / more power and heat".into()]) {
-        return declined();
+    if let Err(v) = confirm(("criar e ativar uma cópia do plano Desempenho máximo", "create and activate an Ultimate Performance copy"), &["mais consumo e calor / more power and heat".into()]) {
+        return v;
     }
     match power::create_max_performance() {
         Ok(guid) => json!({ "done": true, "guid": guid }),
@@ -168,8 +178,8 @@ pub fn set_dns(adapter: &str, provider: &str) -> Value {
     let Some(a) = dns::adapters().into_iter().find(|a| a.guid.eq_ignore_ascii_case(adapter)) else {
         return json!({ "error": "unknown_adapter" });
     };
-    if !confirm(("trocar o DNS do adaptador (backup antes)", "change the adapter's DNS (backup first)"), &[a.name.clone(), format!("-> {provider}")]) {
-        return declined();
+    if let Err(v) = confirm(("trocar o DNS do adaptador (backup antes)", "change the adapter's DNS (backup first)"), &[a.name.clone(), format!("-> {provider}")]) {
+        return v;
     }
     match dns::apply(&a.guid, provider) {
         Ok(()) => json!({ "done": true }),
@@ -181,8 +191,13 @@ pub fn restore_dns(adapter: &str) -> Value {
     let Some(a) = dns::adapters().into_iter().find(|a| a.guid.eq_ignore_ascii_case(adapter)) else {
         return json!({ "error": "unknown_adapter" });
     };
-    if !confirm(("voltar o DNS do adaptador ao que era antes", "restore the adapter's previous DNS"), std::slice::from_ref(&a.name)) {
-        return declined();
+    let Some(prev) = dns::backup_servers(&a.guid) else {
+        return json!({ "error": "no_backup", "note": "G2 Boost never changed this adapter's DNS: nothing to restore." });
+    };
+    // The exact servers restore will apply, from G2 Boost's own backup.
+    let to = if prev.is_empty() { "automático (DHCP) / automatic (DHCP)".to_string() } else { prev };
+    if let Err(v) = confirm(("voltar o DNS do adaptador para o que era antes", "set the adapter's DNS back to what it was"), &[a.name.clone(), format!("-> {to}")]) {
+        return v;
     }
     match dns::restore(&a.guid) {
         Ok(()) => json!({ "done": true }),
@@ -191,8 +206,8 @@ pub fn restore_dns(adapter: &str) -> Value {
 }
 
 pub fn purge_standby_memory() -> Value {
-    if !confirm(("liberar a memória em espera (standby list)", "free the standby memory list"), &["admin".into()]) {
-        return declined();
+    if let Err(v) = confirm(("liberar a memória em espera (standby list)", "free the standby memory list"), &["admin".into()]) {
+        return v;
     }
     match boost::purge_standby_list() {
         Ok(r) => json!({ "done": true, "result": r }),
@@ -201,8 +216,8 @@ pub fn purge_standby_memory() -> Value {
 }
 
 pub fn create_restore_point() -> Value {
-    if !confirm(("criar um ponto de restauração do Windows", "create a Windows restore point"), &["admin".into()]) {
-        return declined();
+    if let Err(v) = confirm(("criar um ponto de restauração do Windows", "create a Windows restore point"), &["admin".into()]) {
+        return v;
     }
     match restore::create("G2 Boost (Claude)") {
         Ok(o) => json!({ "done": true, "outcome": o }),
@@ -235,8 +250,8 @@ pub fn end_process(pid: u32, created: u64) -> Value {
     if p.system || p.protected.is_some() {
         return json!({ "error": "protected_process" });
     }
-    if !confirm(("encerrar o processo (dados não salvos se perdem)", "end the process (unsaved data is lost)"), &[format!("{} (PID {pid})", p.name), p.path.clone()]) {
-        return declined();
+    if let Err(v) = confirm(("encerrar o processo (dados não salvos se perdem)", "end the process (unsaved data is lost)"), &[format!("{} (PID {pid})", p.name), p.path.clone()]) {
+        return v;
     }
     match procs::end(pid, created) {
         Ok(()) => json!({ "done": true }),
@@ -254,14 +269,16 @@ fn find_app(id: &str) -> Option<apps::App> {
 }
 
 pub fn uninstall_app(id: &str) -> Value {
-    let Some(app) = find_app(id) else {
+    // Installed apps only, as read now: the remembered snapshot is a user-writable file and its
+    // uninstall command (and hive) must never reach the uninstaller.
+    let Some(app) = apps::list(&settings::load().protected_apps).into_iter().find(|a| a.id == id) else {
         return json!({ "error": "unknown_app" });
     };
     if app.protected.is_some() {
         return json!({ "error": "protected_app", "why": app.protected });
     }
-    if !confirm(("abrir o desinstalador do app", "open the app's uninstaller"), &[format!("{} ({})", app.name, app.publisher)]) {
-        return declined();
+    if let Err(v) = confirm(("abrir o desinstalador do app", "open the app's uninstaller"), &[format!("{} ({})", app.name, app.publisher)]) {
+        return v;
     }
     match apps::uninstall(&app) {
         Ok(()) => json!({ "done": true, "next": "When the app's own uninstaller finishes, call get_app_leftovers with the same id." }),
@@ -306,8 +323,8 @@ pub fn remove_app_leftovers(id: &str) -> Value {
     }
     let total: u64 = items.iter().map(|l| l.bytes).sum();
     let details: Vec<String> = items.iter().map(|l| g2boost_core::winevents::redact_here(&l.path)).collect();
-    if !confirm((&format!("remover as sobras de {} ({}, Lixeira e backup do registro)", app.name, gb(total)), &format!("remove {}'s leftovers ({}, Recycle Bin and registry backup)", app.name, gb(total))), &details) {
-        return declined();
+    if let Err(v) = confirm((&format!("remover as sobras de {} ({}, Lixeira e backup do registro)", app.name, gb(total)), &format!("remove {}'s leftovers ({}, Recycle Bin and registry backup)", app.name, gb(total))), &details) {
+        return v;
     }
     match apps::remove(&app, &items) {
         Ok(o) => json!({ "done": true, "outcome": o }),
@@ -338,8 +355,8 @@ pub fn remove_unowned_folders(paths: Vec<String>) -> Value {
     }
     let total: u64 = items.iter().map(|l| l.bytes).sum();
     let details: Vec<String> = items.iter().map(|l| g2boost_core::winevents::redact_here(&l.path)).collect();
-    if !confirm((&format!("enviar {} pasta(s) sem dono para a Lixeira ({})", items.len(), gb(total)), &format!("send {} folder(s) nobody owns to the Recycle Bin ({})", items.len(), gb(total))), &details) {
-        return declined();
+    if let Err(v) = confirm((&format!("enviar {} pasta(s) sem dono para a Lixeira ({})", items.len(), gb(total)), &format!("send {} folder(s) nobody owns to the Recycle Bin ({})", items.len(), gb(total))), &details) {
+        return v;
     }
     json!({ "done": true, "outcome": apps::remove_unowned(&items, apps::SWEEP_ID) })
 }
@@ -352,8 +369,8 @@ pub fn recycle_paths(paths: Vec<String>) -> Value {
         Err(e) => return json!({ "error": e.to_string() }),
     };
     let details: Vec<String> = checked.iter().map(|p| g2boost_core::winevents::redact_here(&p.to_string_lossy())).collect();
-    if !confirm((&format!("enviar {} item(ns) para a Lixeira", checked.len()), &format!("send {} item(s) to the Recycle Bin", checked.len())), &details) {
-        return declined();
+    if let Err(v) = confirm((&format!("enviar {} item(ns) para a Lixeira", checked.len()), &format!("send {} item(s) to the Recycle Bin", checked.len())), &details) {
+        return v;
     }
     json!({ "done": true, "outcome": disk::recycle_validated(&checked, "mcp_recycle") })
 }
@@ -366,8 +383,8 @@ pub fn winget_install(id: &str, upgrade: bool) -> Value {
         Err(e) => return json!({ "error": e.to_string() }),
     };
     let (pt, en) = if upgrade { ("atualizar pelo winget", "update with winget") } else { ("instalar pelo winget (fonte oficial)", "install with winget (official source)") };
-    if !confirm((pt, en), &[format!("{} {} ({})", pkg.name, pkg.version, pkg.id)]) {
-        return declined();
+    if let Err(v) = confirm((pt, en), &[format!("{} {} ({})", pkg.name, pkg.version, pkg.id)]) {
+        return v;
     }
     match winget::install(&pkg.id, upgrade) {
         Ok(o) => json!({ "done": o.ok, "outcome": o }),
@@ -383,12 +400,20 @@ mod tests {
     fn dialog_text_is_bounded_and_cannot_be_disguised() {
         let evil = "fotos\u{202E}gpj.exe\nlinha falsa\u{0}";
         assert_eq!(clean_line(evil, 100), "fotos gpj.exe linha falsa");
-        let many: Vec<String> = (0..30).map(|i| format!("item {i}")).collect();
-        let t = dialog_text(true, ("limpar", "clean"), &many);
+        let all: Vec<String> = (0..MAX_LINES).map(|i| format!("item {i}")).collect();
+        let t = dialog_text(true, ("limpar", "clean"), &all);
         assert!(t.starts_with("O Claude pediu ao G2 Boost para:"));
-        assert!(t.contains("• item 13") && !t.contains("item 14\n") && t.contains("e mais 16"));
+        assert!(t.contains("• item 0") && t.contains("• item 13"), "every item is shown");
         assert!(dialog_text(false, ("limpar", "clean"), &[]).contains("Claude asked G2 Boost to:"));
         assert!(clean_line(&"x".repeat(300), 150).chars().count() <= 151);
+    }
+
+    /// More items than the dialog shows: refused before any dialog (this test would block on one).
+    #[test]
+    fn requests_larger_than_the_dialog_are_refused() {
+        let many: Vec<String> = (0..=MAX_LINES).map(|i| format!("item {i}")).collect();
+        let e = confirm(("enviar para a Lixeira", "send to the Recycle Bin"), &many).unwrap_err();
+        assert_eq!((e["error"].as_str(), e["max_items"].as_u64()), (Some("too_many_items"), Some(MAX_LINES as u64)));
     }
 
     #[test]
@@ -396,6 +421,7 @@ mod tests {
         // Each returns before `confirm` (which would block a test on a dialog).
         assert_eq!(run_cleanup(vec!["../../x".into()])["error"], "unknown_categories");
         assert_eq!(set_tweak("rm -rf", true)["error"], "unknown_tweak");
+        assert_eq!(set_tweak("hvci_off", true)["error"], "beta_in_app_only", "Memory Integrity off is app-only");
         assert_eq!(set_power_plan("{00000000-0000-0000-0000-000000000000}")["error"], "unknown_plan");
         assert_eq!(set_dns("{bad}", "cloudflare")["error"], "unknown_adapter");
         assert_eq!(end_process(0, 0)["error"], "process_gone");

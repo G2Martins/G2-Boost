@@ -744,6 +744,15 @@ function DnsTab({ elevated }: { elevated: boolean }) {
               ? t("boost.dns.no_adapter")
               : t("boost.dns.measuring")}
         </p>
+        {main?.backup_servers != null ? (
+          <p className="w-full text-xs text-muted-foreground">
+            {t("boost.dns.restore_to", {
+              servers: main.backup_servers
+                ? main.backup_servers.split(",").join(", ")
+                : t("boost.dns.auto"),
+            })}
+          </p>
+        ) : null}
         {msg ? <p className="w-full text-xs text-foreground/90">{msg}</p> : null}
       </Card>
       {rank === null && inTauri

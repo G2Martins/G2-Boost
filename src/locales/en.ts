@@ -1772,6 +1772,7 @@ export const en = {
   "boost.dns.static": "set manually",
   "boost.dns.auto": "automatic (DHCP)",
   "boost.dns.applied": "DNS applied to {name}.",
+  "boost.dns.restore_to": "Restore puts this adapter back to: {servers}.",
   "boost.dns.restored": "DNS restored to what it was before.",
   "boost.dns.loss": "{loss}% loss",
   "boost.dns.measuring": "Measuring…",
@@ -1794,6 +1795,8 @@ export const en = {
     "The app is elevated: the task runs with administrator privileges, so system routines and RAM cleanup work at startup.",
   "settings.autostart.lua":
     "No administrator right now: the task runs as a normal user and skips routines that need admin. Elevate and switch it on again for the full version.",
+  "settings.autostart.unsafe_folder":
+    "Other programs can change G2 Boost's folder, so the task runs as a normal user and skips routines that need admin. For the full version, reinstall G2 Boost in Program Files.",
   "settings.tray": "Close to tray",
   "settings.tray.hint":
     "With a routine active, the window's X only hides the app. Quit for real from the tray menu.",

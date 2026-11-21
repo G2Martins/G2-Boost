@@ -1412,6 +1412,11 @@ pub fn uninstall(app: &App) -> Result<(), AppsError> {
     }
     let windows = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
     let (exe, args) = uninstaller(app, &windows)?;
+    // Any program of this user can write an HKCU entry: what it names never gets our admin token.
+    // It starts through Explorer with the user's own rights (its manifest may still ask for UAC).
+    if app.hive == Hive::User && crate::system::is_elevated() {
+        return crate::games::run_unelevated(&exe.to_string_lossy(), &args).map_err(|e| AppsError::Win32(e.to_string()));
+    }
     let file = registry::wide(&exe.to_string_lossy());
     let params = registry::wide(&args);
     let dir = registry::wide(&exe.parent().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default());
@@ -1484,8 +1489,20 @@ pub struct RemoveOutcome {
     pub needs_admin: u32,
 }
 
-fn backup_dir() -> PathBuf {
-    registry::data_dir().join("uninstall_backups")
+/// Registry trees saved before a removal: in the protected store when elevated (undo re-imports them).
+fn backup_dir() -> std::io::Result<PathBuf> {
+    Ok(crate::protect::state_dir()?.join("uninstall_backups"))
+}
+
+/// Export `root\path` to a new backup file before it is deleted (also the undo source).
+fn save_key_backup(app_name: &str, root: Root, path: &str, n: u32) -> Option<PathBuf> {
+    let tree = registry::export_tree(root, path).ok()?;
+    let dir = backup_dir().ok()?;
+    fs::create_dir_all(&dir).ok()?;
+    let file = dir.join(format!("{}-{n}.json", registry::now_unix()));
+    let doc = KeyBackup { app: app_name.to_string(), root, path: path.to_string(), tree };
+    fs::write(&file, serde_json::to_string_pretty(&doc).ok()?).ok()?;
+    Some(file)
 }
 
 /// Remove the chosen leftovers (already confirmed with a token by the caller). Each one is
@@ -1514,24 +1531,13 @@ pub(crate) fn remove_in(items: &[Leftover], app_name: &str, ctx: &Ctx, elevated:
                 _ => out.failed += 1,
             },
             Target::Reg(root, path) => {
-                let done = reg_path_allowed(*root, path, ctx)
-                    .then(|| registry::export_tree(*root, path).ok())
-                    .flatten()
-                        .and_then(|tree| {
-                            fs::create_dir_all(backup_dir()).ok()?;
-                            let file = backup_dir().join(format!("{}-{}.json", registry::now_unix(), out.registry + out.failed));
-                            let doc = KeyBackup { app: app_name.to_string(), root: *root, path: path.clone(), tree };
-                            fs::write(&file, serde_json::to_string_pretty(&doc).ok()?).ok()?;
-                            Some(file)
-                        })
-                        .filter(|_| registry::delete_tree(*root, path).is_ok());
-                match done {
-                    Some(file) => {
-                        out.registry += 1;
-                        undo.keys.push(file.to_string_lossy().into_owned());
-                    }
-                    None => out.failed += 1,
+                let saved = reg_path_allowed(*root, path, ctx).then(|| save_key_backup(app_name, *root, path, out.registry + out.failed)).flatten();
+                // RegDeleteTree is not atomic: a delete that fails half-way still keeps its undo.
+                let deleted = saved.is_some() && registry::delete_tree(*root, path).is_ok();
+                if let Some(file) = saved {
+                    undo.keys.push(file.to_string_lossy().into_owned());
                 }
+                if deleted { out.registry += 1 } else { out.failed += 1 }
             }
             Target::Service(name) => {
                 if crate::boost::delete_orphan_service(name).is_ok() {
@@ -1602,17 +1608,32 @@ pub struct UndoOutcome {
     pub failed: u32,
 }
 
-fn undo_file() -> PathBuf {
-    registry::data_dir().join("uninstall_undo.json")
+fn undo_file() -> std::io::Result<PathBuf> {
+    Ok(crate::protect::state_dir()?.join("uninstall_undo.json"))
 }
 
 fn save_undo(u: &UndoRecord) {
-    let _ = fs::create_dir_all(registry::data_dir());
-    let _ = fs::write(undo_file(), serde_json::to_string_pretty(u).unwrap_or_default());
+    if let Ok(f) = undo_file()
+        && let Some(dir) = f.parent()
+        && fs::create_dir_all(dir).is_ok()
+    {
+        let _ = fs::write(f, serde_json::to_string_pretty(u).unwrap_or_default());
+    }
 }
 
 pub fn undo_status() -> Option<UndoRecord> {
-    fs::read_to_string(undo_file()).ok().and_then(|t| serde_json::from_str(&t).ok())
+    fs::read_to_string(undo_file().ok()?).ok().and_then(|t| serde_json::from_str(&t).ok())
+}
+
+/// The backup an undo entry names, always inside today's [`backup_dir`] (only its file name
+/// counts: a record moved by the migration, or edited, never points anywhere else).
+fn key_backup_file(entry: &str) -> Option<PathBuf> {
+    let name = Path::new(entry).file_name()?.to_str()?;
+    let stem = name.strip_suffix(".json")?;
+    if stem.is_empty() || stem.len() > 40 || !stem.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
+        return None;
+    }
+    Some(backup_dir().ok()?.join(name))
 }
 
 /// Only keys directly under the searched bases (or one publisher level below), none of them shared.
@@ -1694,13 +1715,15 @@ pub fn undo() -> Result<UndoOutcome, AppsError> {
         }
     }
     for file in &rec.keys {
-        let backup: Option<KeyBackup> = fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok());
+        let backup: Option<KeyBackup> = key_backup_file(file).and_then(|f| fs::read_to_string(f).ok()).and_then(|t| serde_json::from_str(&t).ok());
         match backup {
             Some(b) if reg_path_allowed(b.root, &b.path, &ctx) && registry::import_tree(b.root, &b.path, &b.tree).is_ok() => out.keys += 1,
             _ => out.failed += 1,
         }
     }
-    let _ = fs::remove_file(undo_file());
+    if let Ok(f) = undo_file() {
+        let _ = fs::remove_file(f);
+    }
     Ok(out)
 }
 
@@ -2096,6 +2119,60 @@ mod tests {
                 eprintln!("    {:?} {:?} {:?} {} ({} B)", x.confidence, x.kind, x.reason, x.path, x.bytes);
             }
         }
+    }
+
+    /// Deny (or allow again) DELETE on an HKCU key for everyone: `RegDeleteTree` then fails on it.
+    fn deny_delete(path: &str, deny: bool) {
+        use windows::Win32::Security::DACL_SECURITY_INFORMATION;
+        use windows::Win32::System::Registry::{HKEY, HKEY_CURRENT_USER, REG_OPTION_RESERVED, REG_SAM_FLAGS, RegCloseKey, RegOpenKeyExW, RegSetKeySecurity};
+        let sd = crate::protect::Sd::new(if deny { "D:(D;;SD;;;WD)(A;;KA;;;WD)" } else { "D:(A;;KA;;;WD)" }).unwrap();
+        let w = registry::wide(path);
+        let mut key = HKEY::default();
+        // SAFETY: WRITE_DAC open of a test key we created; closed below.
+        unsafe {
+            assert!(RegOpenKeyExW(HKEY_CURRENT_USER, windows::core::PCWSTR(w.as_ptr()), Some(REG_OPTION_RESERVED.0), REG_SAM_FLAGS(0x4_0000), &mut key).is_ok());
+            assert!(RegSetKeySecurity(key, DACL_SECURITY_INFORMATION, sd.0).is_ok());
+            let _ = RegCloseKey(key);
+        }
+    }
+
+    /// `RegDeleteTree` is not atomic: a key it could only half delete keeps its backup in the undo.
+    #[test]
+    fn half_deleted_key_keeps_its_undo() {
+        // SAFETY: undo and backups go to the test data dir.
+        unsafe { std::env::set_var("G2BOOST_DATA_DIR", crate::registry::tests::test_data_dir()) };
+        let base = r"Software\G2 Boost\Test\half";
+        let key = format!(r"{base}\Acme Widget");
+        registry::write(Root::Hkcu, &format!(r"{key}\a"), "v", &Value::Dword(1)).unwrap();
+        registry::write(Root::Hkcu, &format!(r"{key}\z"), "v", &Value::Dword(2)).unwrap();
+        deny_delete(&format!(r"{key}\z"), true);
+        let (root, mut ctx) = sandbox("half");
+        ctx.reg = vec![(Root::Hkcu, base.to_string())];
+        let item = Leftover {
+            id: 1,
+            kind: LeftoverKind::Registry,
+            path: format!(r"HKCU\{key}"),
+            bytes: 0,
+            confidence: Confidence::High,
+            reason: Reason::NameMatch,
+            needs_admin: false,
+            precious: false,
+            idle_days: None,
+            icon: None,
+            install_dir: false,
+            target: Target::Reg(Root::Hkcu, key.clone()),
+        };
+        let out = remove_in(&[item], "Acme Widget", &ctx, false);
+        assert_eq!((out.registry, out.failed), (0, 1), "the delete failed");
+        let rec = undo_status().expect("undo recorded");
+        let file = rec.keys.iter().filter_map(|k| key_backup_file(k)).find(|f| f.exists()).expect("backup in the undo");
+        let doc: KeyBackup = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+        assert_eq!((doc.path.as_str(), doc.tree.keys.len()), (key.as_str(), 2), "the whole tree, as it was");
+        assert!(key_backup_file(r"..\..\evil.json").is_none() && key_backup_file(r"C:\x\1-0.json").is_some_and(|f| f.parent() == backup_dir().ok().as_deref()));
+        deny_delete(&format!(r"{key}\z"), false);
+        registry::delete_tree(Root::Hkcu, base).unwrap();
+        let _ = fs::remove_file(file);
+        let _ = fs::remove_dir_all(&root);
     }
 
     /// Real Recycle Bin: remove a sandbox leftover, then undo puts it back

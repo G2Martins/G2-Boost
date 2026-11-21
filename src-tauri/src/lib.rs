@@ -1266,21 +1266,34 @@ fn settings_set(r: State<'_, Routines>, settings: Settings) -> Result<Settings, 
 #[derive(serde::Serialize)]
 struct AutostartStatus {
     enabled: bool,
+    /// Only SYSTEM and Administrators can change the exe or the folders above it: a "highest
+    /// privileges" task may start it. Portable copies never get one.
+    safe_folder: bool,
+}
+
+/// The exe a logon task with "highest privileges" may start: not portable, and nobody but
+/// SYSTEM/Administrators can swap it (`protect::exe_chain_safe`).
+fn exe_safe_for_highest(exe: &std::path::Path) -> bool {
+    g2boost_core::selfupdate::install_kind(exe) != "portable" && g2boost_core::protect::exe_chain_safe(exe)
 }
 
 #[tauri::command]
 fn autostart_status() -> AutostartStatus {
-    AutostartStatus { enabled: tasksched::task_exists("\\", AUTOSTART_TASK) }
+    AutostartStatus {
+        enabled: tasksched::task_exists("\\", AUTOSTART_TASK),
+        safe_folder: std::env::current_exe().is_ok_and(|e| exe_safe_for_highest(&e)),
+    }
 }
 
-/// Logon task running this exe with `--tray`. Elevated now → "highest privileges" (routines that
-/// need admin work at logon); otherwise a least-privilege task, and those routines are skipped.
+/// Logon task running this exe with `--tray`. Elevated now, and the exe in a folder only admins can
+/// change → "highest privileges" (routines that need admin work at logon); otherwise a
+/// least-privilege task, and those routines are skipped.
 #[tauri::command]
 fn autostart_set(on: bool) -> Result<AutostartStatus, String> {
     if on {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        tasksched::register_logon_task(AUTOSTART_TASK, &exe, "--tray", 10, system::is_elevated())
-            .map_err(|e| e.to_string())?;
+        let highest = system::is_elevated() && exe_safe_for_highest(&exe);
+        tasksched::register_logon_task(AUTOSTART_TASK, &exe, "--tray", 10, highest).map_err(|e| e.to_string())?;
     } else {
         tasksched::delete_task(AUTOSTART_TASK).map_err(|e| e.to_string())?;
     }
@@ -1655,6 +1668,8 @@ struct DnsAdapterView {
     #[serde(flatten)]
     adapter: dns::Adapter,
     has_backup: bool,
+    /// What "restore" puts back ("" = automatic), shown before the click.
+    backup_servers: Option<String>,
 }
 
 #[tauri::command]
@@ -1662,7 +1677,10 @@ async fn dns_adapters() -> Vec<DnsAdapterView> {
     tauri::async_runtime::spawn_blocking(|| {
         dns::adapters()
             .into_iter()
-            .map(|a| DnsAdapterView { has_backup: dns::has_backup(&a.guid), adapter: a })
+            .map(|a| {
+                let backup_servers = dns::backup_servers(&a.guid);
+                DnsAdapterView { has_backup: backup_servers.is_some(), backup_servers, adapter: a }
+            })
             .collect()
     })
     .await
@@ -2521,6 +2539,12 @@ pub fn run() {
             if system::is_elevated() {
                 let _ = qos::clear_all_ours(); // orphaned QoS policies (non-elevated: a reboot clears them)
                 netetw::stop_stale(); // a network usage session a crash left tracing
+                // Install folder others can write → admin-only DACL; then the protected store (and
+                // its one-time move from the data dir). Docs/security/protected-storage.md
+                std::thread::spawn(|| {
+                    eprintln!("install folder: {}", g2boost_core::protect::protect_install_dir());
+                    let _ = g2boost_core::protect::state_dir();
+                });
             }
             watch_uninstalls(app.handle().clone());
             // Reinstalled to another folder: the Claude apps the user connected keep finding us.

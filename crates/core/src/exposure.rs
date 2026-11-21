@@ -1394,8 +1394,7 @@ fn save_backup(fix: &Fix, mut entries: Vec<BackupEntry>) -> Result<(), ExposureE
 
 /// Fixes that have a backup on disk.
 pub fn reverts() -> Vec<Fix> {
-    let dir = registry::data_dir().join("backups");
-    let Ok(rd) = std::fs::read_dir(dir) else { return Vec::new() };
+    let Some(rd) = registry::backups_dir().ok().and_then(|d| std::fs::read_dir(d).ok()) else { return Vec::new() };
     rd.flatten()
         .filter_map(|e| e.file_name().to_str()?.strip_suffix(".json").filter(|n| n.starts_with("exposure_")).map(str::to_string))
         .filter_map(|id| {

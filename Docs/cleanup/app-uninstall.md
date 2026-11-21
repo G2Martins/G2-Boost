@@ -1,6 +1,6 @@
 # Desinstalar apps (AppCleaner para Windows)
 
-**Última revisão:** 2026-11-20 (rodada 11: ícones guardados e de pasta, sobras agrupadas por dono, desfazer no toast, sino, pouco usados e grandes) · 2026-10-23 (aba Atualizações) · 2026-10-18 · Código: `crates/core/src/apps.rs` (+ `registry::export_tree/delete_tree`, `disk::shell_recycle`, `boost::delete_orphan_service`, `cleanup::TokenStore`); shell `src-tauri/src/lib.rs` (`AppsState`, `apps_*`); UI `src/pages/apps.tsx` (rota **Desinstalar apps**), drop em `src/App.tsx` + `src/lib/nav.ts`. Conceito de origem (clean-room): [../references/appcleaner.md](../references/appcleaner.md).
+**Última revisão:** 2026-11-21 (desinstalador de entrada do HKCU sem o token de admin; chave apagada pela metade entra no desfazer; backups e desfazer no store protegido quando elevado) · 2026-11-20 (rodada 11: ícones guardados e de pasta, sobras agrupadas por dono, desfazer no toast, sino, pouco usados e grandes) · 2026-10-23 (aba Atualizações) · 2026-10-18 · Código: `crates/core/src/apps.rs` (+ `registry::export_tree/delete_tree`, `disk::shell_recycle`, `boost::delete_orphan_service`, `cleanup::TokenStore`); shell `src-tauri/src/lib.rs` (`AppsState`, `apps_*`); UI `src/pages/apps.tsx` (rota **Desinstalar apps**), drop em `src/App.tsx` + `src/lib/nav.ts`. Conceito de origem (clean-room): [../references/appcleaner.md](../references/appcleaner.md).
 
 ## O que faz
 
@@ -13,7 +13,7 @@ A página tem uma terceira aba, **Atualizações** (2026-10-23: apps pelo winget
    - `uninstaller()` analisa o `UninstallString` (dado hostil): caminho entre aspas ou até o `.exe` que fecha o token; **recusa** `cmd`, `powershell`, `pwsh`, `wscript/cscript`, `mshta`, `rundll32`, `regsvr32`, `reg`, `sc`, `net`, `wmic`, `schtasks`, `certutil`… e qualquer programa sob `%SystemRoot%`; exige `.exe` absoluto que exista.
    - **MSI:** sempre `%SystemRoot%\System32\msiexec.exe /X{código do produto}` (o código é extraído e validado; `/I`, `/quiet` e o resto são descartados).
    - **App aberto não desinstala** (`app_running:<exe>`): se o exe do app ou qualquer programa dentro da pasta dele está rodando, pede para fechar antes.
-   - Lançado por `ShellExecuteExW` (visível; o manifesto do desinstalador decide o UAC; UAC cancelado = `cancelled`). A UI consulta `apps_installed` a cada 2 s; quando a entrada some, refaz a busca de sobras.
+   - Lançado por `ShellExecuteExW` (visível; o manifesto do desinstalador decide o UAC; UAC cancelado = `cancelled`). Entrada do **HKCU** (qualquer programa do usuário grava) com o app elevado: abre pelo Explorer com os direitos do usuário (`games::run_unelevated`), nunca com o token de admin. A UI consulta `apps_installed` a cada 2 s; quando a entrada some, refaz a busca de sobras.
    - **Store:** `RemovePackageAsync` para o usuário atual (bloqueia até o Windows terminar).
 4. **Procura sobras** (`leftovers`) só em raízes fixas — AppData (Roaming), LocalAppData, LocalLow, ProgramData, `LocalAppData\Programs`, **Jogos salvos** e **Documentos\My Games** (known folders), Menu Iniciar (usuário e todos), Área de Trabalho (via `SHGetKnownFolderPath`, funciona com OneDrive) e Pública — mais a pasta de instalação, `CrashDumps` e o registro:
 
@@ -27,7 +27,7 @@ A página tem uma terceira aba, **Atualizações** (2026-10-23: apps pelo winget
    Alta e Média vêm marcadas; cada item mostra o motivo. **Dados preciosos** (`precious`): pasta/arquivo de saves, perfis (`Profiles`, `User Data` do navegador), cofres, carteiras, backups — ou tudo em Jogos salvos/My Games — ganha o chip **Seus dados**, nunca vem marcado e, se escolhido, o modal avisa em destaque. Registro: `Software\<Nome>` e `Software\<Fabricante>\<Nome>` em HKCU, HKLM e WOW6432Node. Serviços: só processo próprio/compartilhado (drivers nunca), fora do `%SystemRoot%`.
 5. **Remove** só depois do app desinstalado (`still_installed` caso contrário — apagar a pasta de um app instalado seria desinstalação forçada) e com **`ConfirmToken`** de uso único amarrado ao app + ids:
    - arquivos/pastas → **Lixeira** (`SHFileOperationW` + `FOF_ALLOWUNDO`), cada caminho **re-verificado na hora** (pode ter virado junção depois da prévia);
-   - chave de registro → **backup JSON completo** (`uninstall_backups/<ts>.json`, todos os tipos de valor) e depois `RegDeleteTreeW`; só chaves logo abaixo das bases pesquisadas;
+   - chave de registro → **backup JSON completo** (`uninstall_backups/<ts>.json`, todos os tipos de valor) e depois `RegDeleteTreeW`; só chaves logo abaixo das bases pesquisadas; o backup entra no desfazer mesmo se o `RegDeleteTreeW` falhar no meio (não é atômico); com o app elevado, `uninstall_backups` e `uninstall_undo.json` ficam no store protegido ([protected-storage.md](../security/protected-storage.md)) e o desfazer lê cada backup só pelo nome do arquivo dentro dele;
    - serviço → `DeleteService` (admin), só se o programa continua inexistente;
    - itens de todos os usuários (ProgramData, HKLM, serviços) sem admin → contados como `needs_admin`.
    - Histórico em `cleanup_history.json` (gatilho `app_leftovers`).

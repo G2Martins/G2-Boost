@@ -201,7 +201,8 @@ struct AppArgs {
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 struct PathsArgs {
-    /// Absolute local paths (from get_disk_usage), up to 50.
+    /// Absolute local paths (from get_disk_usage), at most 14 per request: the confirmation
+    /// dialog lists every one, and a longer list is refused (too_many_items).
     paths: Vec<String>,
 }
 
@@ -636,7 +637,7 @@ categories are skipped when G2 Boost is not elevated.")]
 
     #[tool(description = "Turn a G2 Boost tweak on or off (registry/services/power, with exact backup and revert). \
 Asks the person at the PC in a native dialog first. Admin tweaks answer needs_admin unless the G2 Boost app \
-runs elevated: then ask the user to do it in the app (open_in_g2boost route boost).")]
+runs elevated: then ask the user to do it in the app (open_in_g2boost route boost). Beta tweaks are \nchanged only in the app (beta_in_app_only).")]
     async fn set_tweak(&self, Parameters(a): Parameters<TweakArgs>) -> Result<String, String> {
         blocking(move || actions::set_tweak(&a.id, a.enabled)).await
     }
@@ -721,7 +722,7 @@ and whether it is the user's own data. Read-only.")]
     }
 
     #[tool(description = "Remove an uninstalled app's leftovers to the Recycle Bin (registry keys backed up \
-first). Never takes the user's own data or low-confidence guesses. Native confirmation first.")]
+first). Never takes the user's own data or low-confidence guesses. Native confirmation first, listing every \nitem; more than 14 items is refused (too_many_items): then the app's screen does it.")]
     async fn remove_app_leftovers(&self, Parameters(a): Parameters<AppArgs>) -> Result<String, String> {
         blocking(move || actions::remove_app_leftovers(&a.app_id)).await
     }
