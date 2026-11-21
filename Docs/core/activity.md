@@ -1,6 +1,6 @@
 # Atividade — sino, notificações, execuções e jobs em andamento
 
-**Última revisão:** 2026-11-20 (rodada 11, bloco A1)
+**Última revisão:** 2026-11-21 (`boot.startTab` lido uma vez: `takeStartTab`) · 2026-11-20 (rodada 11, bloco A1)
 
 Pedido do dono: uma aba de notificações e execuções para o usuário, feedback visual do que o app está fazendo
 (limpando, verificando, atualizando) e motion melhor. Tudo local: nada sai do PC, sem telemetria.
@@ -77,8 +77,10 @@ notificação do Windows (a pessoa está jogando; o sino basta).
 (passos do mesmo perfil a menos de 60 s viram uma execução). Ordenadas pelo **fim** (início + duração): a revisão
 semanal fica acima dos passos que ela rodou (os passos continuam com linha própria, como no histórico da Manutenção).
 Máx. 300. Clique abre a página dona (com `boot.startTab` quando há aba: Limpeza › Arquivos do sistema, Apps ›
-Atualizações/Instalar/Sobras, PC Boost › RAM, Perfis › Restauração). Fora do app: estado vazio com "Disponível só
-dentro do app".
+Atualizações/Instalar/Sobras, PC Boost › RAM, Perfis › Restauração). A página lê a aba **uma vez**
+(`takeStartTab()` de `src/lib/boot.ts`, num inicializador de `useState`): a visita seguinte abre na aba padrão, e a
+varredura de Sobras pedida por `unowned` não roda de novo ao voltar para a aba. Fora do app: estado vazio com
+"Disponível só dentro do app".
 
 ## 6. Testes
 

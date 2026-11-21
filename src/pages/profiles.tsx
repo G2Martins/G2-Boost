@@ -1,22 +1,24 @@
+import { useState } from "react";
 import { PerfisTab } from "@/components/profiles/perfis-tab";
 import { RestoreTab } from "@/components/profiles/restore-tab";
 import { PageBody, PageHeader } from "@/components/shell/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/primitives";
 import { useBoostStates, useElevated } from "@/lib/boost-hooks";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 
 export function ProfilesPage() {
   const { t } = useI18n();
   const elevated = useElevated();
   const { states, refresh } = useBoostStates();
+  const [arrival] = useState(takeStartTab);
   return (
     <PageHeader
       title={t("nav.profiles")}
       subtitle={t("profiles.subtitle")}
       tabs={
         <Tabs
-          defaultValue={boot.startTab === "restore" ? "restore" : "profiles"}
+          defaultValue={arrival === "restore" ? "restore" : "profiles"}
           onValueChange={() => void refresh()}
         >
           <TabsList>

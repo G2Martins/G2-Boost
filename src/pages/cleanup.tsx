@@ -15,7 +15,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/primitives";
 import { backend, type RunRecord } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { boot, takeStartTab } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatBytes } from "@/lib/utils";
 
@@ -28,11 +28,7 @@ type Mode = "smart" | "detailed";
  */
 export function CleanupPage() {
   const { t, locale } = useI18n();
-  const [arrival] = useState(() => {
-    const tab = boot.startTab;
-    boot.startTab = undefined;
-    return tab;
-  });
+  const [arrival] = useState(takeStartTab);
   const [mode, setMode] = useState<Mode>(() =>
     DETAIL_TABS.includes(arrival as DetailTab) ? "detailed" : "smart",
   );

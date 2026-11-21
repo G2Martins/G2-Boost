@@ -46,7 +46,7 @@ import {
   type OrphanApp,
   type UndoRecord,
 } from "@/lib/backend";
-import { boot } from "@/lib/boot";
+import { takeStartTab } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { sizeText, usePageData } from "@/lib/luli";
 import { APPS_REMOVED, onDrop, onOpenOrphans, takeDrop, takeOpenOrphans } from "@/lib/nav";
@@ -71,15 +71,18 @@ export function AppsPage() {
   const [drop, setDrop] = useState<string | null>(() => takeDrop());
   // An installed app handed over by the Install tab: the Installed tab selects it.
   const [focus, setFocus] = useState<string | null>(null);
+  const [arrival] = useState(takeStartTab);
+  // `unowned` starts the every-drive sweep once, not on every return to the leftovers tab.
+  const [sweep, setSweep] = useState(arrival === "unowned");
   // Tab on arrival: the SmartDelete banner opens the leftovers sweep and a dropped .exe the
   // Installed tab; otherwise the first tab. Dev aid: G2BOOST_START_TAB=install, installed,
   // orphans (or `unowned`, which also starts the every-drive sweep) or updates.
   const [tab, setTab] = useState(() =>
-    autoScan || boot.startTab === "orphans" || boot.startTab === "unowned"
+    autoScan || arrival === "orphans" || sweep
       ? "orphans"
-      : drop || boot.startTab === "installed"
+      : drop || arrival === "installed"
         ? "installed"
-        : boot.startTab === "updates"
+        : arrival === "updates"
           ? "updates"
           : "install",
   );
@@ -141,7 +144,12 @@ export function AppsPage() {
           </TabsContent>
           <TabsContent value="orphans">
             <PageBody className="px-0 pb-0">
-              <OrphansTab autoScan={autoScan} onAutoScanned={() => setAutoScan(false)} />
+              <OrphansTab
+                autoScan={autoScan}
+                onAutoScanned={() => setAutoScan(false)}
+                sweep={sweep}
+                onSweep={() => setSweep(false)}
+              />
             </PageBody>
           </TabsContent>
           <TabsContent value="updates">
@@ -601,13 +609,27 @@ function UndoButton() {
   );
 }
 
-function OrphansTab({ autoScan, onAutoScanned }: { autoScan: boolean; onAutoScanned: () => void }) {
+function OrphansTab({
+  autoScan,
+  onAutoScanned,
+  sweep,
+  onSweep,
+}: {
+  autoScan: boolean;
+  onAutoScanned: () => void;
+  sweep: boolean;
+  onSweep: () => void;
+}) {
   const { t, locale } = useI18n();
   const [list, setList] = useState<OrphanApp[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<{ id: string; name: string } | null>(() =>
-    boot.startTab === "unowned" ? { id: SWEEP_ID, name: t("apps.unowned.title") } : null,
+    sweep ? { id: SWEEP_ID, name: t("apps.unowned.title") } : null,
   );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: taken once, on mount
+  useEffect(() => {
+    if (sweep) onSweep();
+  }, []);
   const [reload, setReload] = useState(0);
 
   const scan = useCallback(async () => {

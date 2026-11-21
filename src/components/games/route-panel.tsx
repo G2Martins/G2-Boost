@@ -11,7 +11,6 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardTitle } from "@/components/ui/primitives";
 import { backend, type GameEntry, inTauri } from "@/lib/backend";
-import { boot } from "@/lib/boot";
 import { type I18nKey, useI18n } from "@/lib/i18n";
 import { navigate } from "@/lib/nav";
 import { analyzeRoute, type RouteAnalysis, type Zone } from "@/lib/route";
@@ -62,7 +61,7 @@ async function nearestRelay(appid: string, onStep: (done: number, total: number)
 }
 
 /** One game's route: where it connects, the path there hop by hop, and an honest "re-optimize". */
-export function RoutePanel({ game }: { game: GameEntry }) {
+export function RoutePanel({ game, autorun }: { game: GameEntry; autorun?: boolean }) {
   const { t } = useI18n();
   const [targets, setTargets] = useState<Target[]>([]);
   const [target, setTarget] = useState("");
@@ -127,7 +126,7 @@ export function RoutePanel({ game }: { game: GameEntry }) {
   // Dev aid (screenshots): G2BOOST_START_TAB=route + autorun traces to a public resolver.
   // biome-ignore lint/correctness/useExhaustiveDependencies: fires once on mount
   useEffect(() => {
-    if (boot.autorun && boot.startTab === "route") {
+    if (autorun) {
       setTarget("1.1.1.1");
       void trace("1.1.1.1");
     }

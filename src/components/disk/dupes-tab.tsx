@@ -3,12 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useErrorText } from "@/components/elevate-button";
 import { Badge, Button, Card, CardTitle, EmptyState, Modal } from "@/components/ui/primitives";
 import { backend, type DupGroup, type DupProgress, inTauri } from "@/lib/backend";
-import { boot } from "@/lib/boot";
 import { useI18n } from "@/lib/i18n";
 import { formatBytes } from "@/lib/utils";
 
 /** Duplicate files (≥ 1 MB) in the last scan; the user picks copies → Recycle Bin, one always stays. */
-export function DupesTab({ hasScan }: { hasScan: boolean }) {
+export function DupesTab({ hasScan, autorun }: { hasScan: boolean; autorun?: boolean }) {
   const { t, locale } = useI18n();
   const errorText = useErrorText();
   const [groups, setGroups] = useState<DupGroup[] | null>(null);
@@ -47,7 +46,7 @@ export function DupesTab({ hasScan }: { hasScan: boolean }) {
   // Dev aid (screenshots): G2BOOST_START_TAB=dupes + autorun searches right after the scan.
   // biome-ignore lint/correctness/useExhaustiveDependencies: fires once when the scan is ready
   useEffect(() => {
-    if (boot.autorun && boot.startTab === "dupes" && hasScan && !autoStarted.current) {
+    if (autorun && hasScan && !autoStarted.current) {
       autoStarted.current = true;
       void start();
     }
