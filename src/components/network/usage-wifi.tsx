@@ -23,9 +23,18 @@ export function NetUsageTab() {
   useEffect(() => {
     void load();
     // Rates are per interval: refresh faster when they are available (elevated).
-    const id = setInterval(() => void load(), 3_000);
+    const id = setInterval(() => {
+      if (!document.hidden) void load();
+    }, 3_000);
+    // Hidden in the tray the tab stays mounted: no tracing while nobody looks (the next poll
+    // starts the session again).
+    const onHide = () => {
+      if (document.hidden) void backend.netUsageStop();
+    };
+    document.addEventListener("visibilitychange", onHide);
     return () => {
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onHide);
       void backend.netUsageStop(); // stop the ETW session with the tab
     };
   }, [load]);

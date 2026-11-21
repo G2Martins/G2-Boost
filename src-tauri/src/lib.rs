@@ -2508,6 +2508,7 @@ pub fn run() {
             gamemode::stop();
             if system::is_elevated() {
                 let _ = qos::clear_all_ours(); // orphaned QoS policies (non-elevated: a reboot clears them)
+                netetw::stop_stale(); // a network usage session a crash left tracing
             }
             watch_uninstalls(app.handle().clone());
             // Reinstalled to another folder: the Claude apps the user connected keep finding us.
@@ -2859,6 +2860,10 @@ pub fn run() {
             // Quitting from the tray in the middle of a game: undo Game Mode on the way out.
             if let tauri::RunEvent::Exit = event {
                 gamemode::stop();
+                // The network usage tab was open: its ETW session would outlive the app.
+                if let Ok(mut m) = _app.state::<NetEtwState>().monitor.lock() {
+                    *m = None; // Drop stops the session
+                }
                 // r9:overlay: release the hotkey and close the FPS session on the way out.
                 overlay_cmds::shutdown(_app);
             }
