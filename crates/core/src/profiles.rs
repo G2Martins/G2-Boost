@@ -854,11 +854,14 @@ mod tests {
 
     #[test]
     fn plan_can_turn_off_the_others() {
+        // HAGS that G2 Boost turned on (it has our backup); Windows' own HAGS is left alone below.
+        let ours_hags = TweakState { has_backup: true, ..st("hags", Status::On, true) };
+        assert!(plan(&target(&[], true), &[st("hags", Status::On, true)], true).steps.is_empty(), "Windows' own HAGS stays on");
         let states = [
             st("mouse", Status::Off, false),
             st("keyboard", Status::On, false),
             st("tips", Status::Partial, false),
-            st("hags", Status::On, true),
+            ours_hags,
             st("mmcss", Status::Off, true),
             st("svc_spooler", Status::Unavailable, true),
         ];
@@ -893,6 +896,7 @@ mod tests {
             assert!(matches!(boost::apply(id, false), Err(boost::BoostError::NotOurs)), "{id}");
         }
         assert!(!boost::default_varies("keyboard") && boost::default_varies("recall_feature_off"));
+        assert!(boost::default_varies("hags") && boost::default_varies("hvci_off"), "Windows turns these on by itself on some PCs");
     }
 
     #[test]

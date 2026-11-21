@@ -64,9 +64,10 @@ pub fn running_process_paths() -> Vec<String> {
 }
 
 /// Is the current process running with an elevated (admin) token?
-/// `%SystemRoot%` in lower case (`c:\windows` when unset).
+/// The Windows folder in lower case, from the API: an environment variable can be set by the user
+/// (and an elevated G2 Boost inherits it), so it never decides what counts as Windows.
 pub(crate) fn system_root() -> String {
-    std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_ascii_lowercase()
+    crate::repair::windows_dir().to_string_lossy().to_ascii_lowercase()
 }
 
 /// Full Win32 path of an open process (`PROCESS_QUERY_LIMITED_INFORMATION` is enough).

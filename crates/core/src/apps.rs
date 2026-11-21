@@ -1410,7 +1410,7 @@ pub fn uninstall(app: &App) -> Result<(), AppsError> {
     if let Some(exe) = running_exe(app) {
         return Err(AppsError::Running(exe));
     }
-    let windows = crate::cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let windows = crate::repair::windows_dir(); // the API, never %SystemRoot% (user-settable)
     let (exe, args) = uninstaller(app, &windows)?;
     // Any program of this user can write an HKCU entry: what it names never gets our admin token.
     // It starts through Explorer with the user's own rights (its manifest may still ask for UAC).

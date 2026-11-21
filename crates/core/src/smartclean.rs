@@ -564,7 +564,7 @@ pub struct Owners {
 /// Which categories own `path` (lexical, case-insensitive). The path comes from the webview: it
 /// must pass `SafePath` (absolute, local, no `..`, not System32/WinSxS, not another user's).
 pub fn owners(path: &Path, roots: &[(&'static str, String)]) -> Owners {
-    let win = cleanup::env_dir("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let win = crate::repair::windows_dir(); // the API, never %SystemRoot% (user-settable)
     let profile = cleanup::env_dir("USERPROFILE").unwrap_or_else(|| PathBuf::from(r"C:\Users\Default"));
     owners_with(path, roots, &win, &profile)
 }

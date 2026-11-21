@@ -1022,7 +1022,9 @@ pub fn changes(id: &str) -> Result<Vec<Change>, BoostError> {
 /// Memory Integrity is on only where the hardware and every driver allow it (forcing it on can stop
 /// drivers from loading). Without a backup, turning these off does nothing.
 pub fn default_varies(id: &str) -> bool {
-    find(id).is_ok_and(|t| matches!(t.kind, Kind::Feature(_)) || t.id == "hvci_off")
+    // `hags`: Windows turns hardware GPU scheduling on by itself on recent GPUs (frame generation
+    // needs it); without our backup, "off" would switch off Windows' own choice.
+    find(id).is_ok_and(|t| matches!(t.kind, Kind::Feature(_)) || matches!(t.id, "hvci_off" | "hags"))
 }
 
 /// Turn a tweak on (with backup) or off (restore backup, else Windows default).
