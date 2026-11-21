@@ -11,6 +11,8 @@ import {
   Sparkle,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { errorText as installError, reasonText } from "@/components/apps/install-tab";
+import { useTweakErrorText } from "@/components/boost/tweak-kit";
 import { ElevateButton } from "@/components/elevate-button";
 import { PageBody, PageHeader, rise } from "@/components/shell/page-header";
 import {
@@ -48,6 +50,7 @@ type Line = { key: string; label: string; ok: boolean | null; note?: string };
  */
 export function SetupPage() {
   const { t } = useI18n();
+  const tweakError = useTweakErrorText();
   const [elevated, setElevated] = useState(false);
   const [catalog, setCatalog] = useState<InstallEntry[] | null>(null);
   const [installed, setInstalled] = useState<Set<string>>(new Set());
@@ -142,7 +145,7 @@ export function SetupPage() {
         await backend.boostApply(id, true);
         push({ key: id, label, ok: true });
       } catch (e) {
-        push({ key: id, label, ok: false, note: e instanceof Error ? e.message : String(e) });
+        push({ key: id, label, ok: false, note: tweakError(e) });
       }
     }
     const ids = [...apps].filter((id) => !installed.has(id));
@@ -167,7 +170,7 @@ export function SetupPage() {
             key: `app:${it.id}`,
             label: names.get(it.id) ?? it.name,
             ok: it.status === "ok",
-            note: it.status === "ok" ? undefined : it.reason,
+            note: it.status === "ok" ? undefined : reasonText(it, t),
           });
         }
       } catch (e) {
@@ -175,7 +178,7 @@ export function SetupPage() {
           key: "apps",
           label: t("setup.step.apps"),
           ok: false,
-          note: e instanceof Error ? e.message : String(e),
+          note: installError(e instanceof Error ? e.message : String(e), t),
         });
       } finally {
         off();
